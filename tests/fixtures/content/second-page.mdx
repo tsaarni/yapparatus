@@ -1,0 +1,22 @@
+# Second page
+
+Navigation target for browser tests.
+
+## Details
+
+Back to [the selection target](first-page#selection-target).
+
+## Steps
+
+<Diagram id="step-flow" caption="A flow in three steps." build draw={(d) => {
+  const a = d.box("Start")
+  const b = d.box("Finish")
+  d.row([a, b], { id: "both" })
+  d.arrow(a, b, { id: "go", label: "go" })
+  const hint = d.note("Only now", { id: "hint", stepOnly: true })
+  d.place(hint, { below: a })
+}}>
+  <Step focus="start hint">Everything begins here.</Step>
+  <Step id="end" focus="finish go">Then it moves on.</Step>
+  <Step focus="both">Both ends, together.</Step>
+</Diagram>

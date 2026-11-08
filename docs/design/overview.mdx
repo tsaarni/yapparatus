@@ -1,0 +1,90 @@
+# Overview
+
+This document describes how Yapparatus works and why. It is written for developers and agents who change its code. To write a document, see the authoring guide, [`starter/docs/guide.md`](/-/files/yapparatus/starter/docs/guide.md).
+
+
+## Purpose
+
+Yapparatus lets you talk with a document, which can be about any topic. You read it in the browser. When you do not understand something, you select it and ask about it in the chat, and your AI coding agent answers. For example:
+
+> **Reader** *(selecting a box in a diagram)*: Why does the gateway talk to the cache first?
+>
+> **Agent:** A cache hit avoids a request to the database.
+
+You can also write a document together with your coding agent. You ask for a document and read it as the agent writes it, then ask for changes. The browser shows each change when the file is saved.
+
+The name is *yap* plus *apparatus*: a document that yaps back at you. <Ref to="reading-loop" /> shows the cycle of reading, asking, and answering.
+
+<Diagram id="reading-loop" caption="The reading loop. The reader asks, and the agent answers in the chat or changes the page." draw={(d) => {
+  const read = d.box("Read", { sub: "the page" })
+  const mark = d.box("Mark", { sub: "text or diagram parts" })
+  const ask = d.box("Ask", { sub: "a question or a change" })
+  const answer = d.box("Get an answer", { sub: "in chat, on the page, or both" })
+  d.equalSize([read, mark, ask, answer])
+  d.place(mark, { rightOf: read, gap: 120 })
+  d.place(ask, { below: mark, gap: 72 })
+  d.place(answer, { below: read, gap: 72 })
+
+  d.arrow(read, mark, { label: "unclear part" })
+  d.arrow(mark, ask)
+  d.arrow(ask, answer, { label: "the agent replies" })
+  d.arrow(answer, read, { id: "read-again", label: "read again", role: "accent" })
+}}>
+  <Step focus="read read->mark mark">The reader finds a part that is unclear and selects it, or picks a diagram part.</Step>
+  <Step focus="mark->ask ask">The selection becomes context for a question or a request for a change. See [what context is](addresses-and-context#what-context-is).</Step>
+  <Step focus="ask->get-an-answer get-an-answer">The agent replies in the chat, edits the page, or both. See [the chat](chat).</Step>
+  <Step focus="read-again read">An edited page updates in place, and the reader continues reading.</Step>
+</Diagram>
+
+## Principles
+
+1. **Agents write documents in a compact authoring format.** The system is for authoring visually rich documents: text, figures, diagrams, and charts. The agent writes short MDX with ready-made components. Layout, themes, and drawing code are provided, so the agent does not write HTML and SVG, which is slow to generate.
+2. **The agent receives enough feedback to correct its own mistakes.** When generated content does not work, the system reports what failed with file, line, and context. The agent receives new errors when it waits and when it replies.
+
+## Terms
+
+This section explains the words that these pages use with a special meaning. Each term links to the section that explains it in full.
+
+### Documents
+
+<Table id="document-terms" caption="Terms for what a reader reads.">
+
+| Term | Meaning | Explained in |
+|---|---|---|
+| Document | Pages about one topic, shown in the browser. On disk, it is a set of MDX files and a `document.json` | [Purpose](overview#purpose) |
+| Project | The directory you run `pnpm dev` in to read a document. You create it by copying `starter/` | [Creating a document](architecture#creating-a-document) |
+| Page | One chapter of a document. Its file name is its address: `setup.mdx` is `/setup` | [Pages](rendering#pages) |
+| Address | The name of anything you can open, link to, or ask about, such as `/setup#install` | [Addresses](addresses-and-context#addresses) |
+| Anchor | The part of an address after `#`. It names one heading, figure, table, listing, or diagram part | [Addresses](addresses-and-context#addresses) |
+| External directory | A directory outside the project, such as the code being explained, whose files pages can include | [External files](rendering#external-files) |
+| File view | A page that shows one whole file from an external directory. You can select lines in it and ask about them | [External files](rendering#external-files) |
+| Excerpt | A few lines of a file from an external directory, shown inside a page | [External files](rendering#external-files) |
+| Diagnostic | An error or warning in a document, such as a broken link, shown in the header with its file and line | [Diagnostics](diagnostics) |
+
+</Table>
+
+### Diagrams
+
+<Table id="diagram-terms" caption="Terms for figures drawn with Diagram.">
+
+| Term | Meaning | Explained in |
+|---|---|---|
+| Diagram | A drawing on a page, such as boxes and arrows, that the author describes in a few lines of code | [Principles](diagrams#principles) |
+| Part | One box, arrow, or other shape in a diagram. Click it to ask about just that shape | [Ids](diagrams#ids) |
+| Step | One stage in a diagram that is explained in order. Each step highlights some parts and adds a sentence | [Steps](diagrams#steps) |
+
+</Table>
+
+### Chat
+
+<Table id="chat-terms" caption="Terms for the chat beside the page.">
+
+| Term | Meaning | Explained in |
+|---|---|---|
+| Agent | Your own coding agent, such as Claude Code, running in a terminal. It answers in the chat and edits the pages. None is included | [Chat and the agent](chat) |
+| Context | What a message is about: the text, figures, diagram parts, or code lines you attached. They are shown as pills. Each pill is a context item. In a sent message, clicking a pill takes you back to its place | [What context is](addresses-and-context#what-context-is) |
+| Hash | A short value computed from the lines a pill points at. It is used to find the lines again after the page changes | [Finding the lines again](addresses-and-context#finding-the-lines-again) |
+| Prompt | What the agent reads: your messages, their context, and the document's errors, as plain text | [Chat and the agent](chat) |
+| Agent state | Connected, working, or not connected, shown at the top of the chat. The design pages call these states listening, read, and away | [The agent's state](chat#the-agents-state) |
+
+</Table>

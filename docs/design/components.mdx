@@ -1,0 +1,174 @@
+# Components
+
+This page lists everything a page or a chat reply can contain and shows an example of each item. For each item, it says where its code is, whether it is numbered, what the reader can link to or ask about, and what the compiler checks. How authors write each component is in the authoring reference, [`starter/docs/components.md`](/-/files/yapparatus/starter/docs/components.md).
+
+## List of components
+
+<Ref to="component-inventory" /> lists the components. "Ask" means the item has Ask buttons, and "Link" means it also has a Link button. Every item can also be asked about by selecting its text.
+
+<Table id="component-inventory" caption="Everything a page can contain, and how the application treats it.">
+
+| Component | Written as | Numbered | Buttons | Checks | Code |
+|---|---|---|---|---|---|
+| Page title | `#` | Chapter | Link, Ask | One per page | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Section | `##`, `###` | Section | Link, Ask | `HEADING_DEPTH` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Prose | Markdown | No | None | `BROKEN_LINK`, `BROKEN_ANCHOR` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Markdown table | GFM table | No | None | None | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Code block | Fenced block | No | Ask | `CODE_LANGUAGE` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Code marks | `[!code ++]` comment | No | None | None | [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
+| Alert | `> [!NOTE]` | No | None | `ALERT_TYPE` | [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
+| `Figure` | Tag | Figure | Link, Ask | None | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Table` | Tag around a table | Table | Link, Ask | None | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Listing` | Tag around code | Listing | Link, Ask | None | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Excerpt` | Tag with `from` | No | Ask | `EXCERPT`, `BROKEN_LINK`, `BROKEN_ANCHOR` | [`code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts), [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Diagram`, `Step` | Tag with `draw` | Figure | Link, Ask, per part | Diagram codes | `src/diagram/` |
+| `Chart` | Tag with `plot`, around a block of CSV, or with `from` naming a table or file | Figure | Link, Ask | `CHART` and chart codes | `src/chart/`, [`chart-plugin.ts`](/-/files/yapparatus/src/chart-plugin.ts) |
+| `Ref` | Tag | No | None | `BROKEN_REF` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Icon` | Tag | No | None | Unknown names | [`icons.tsx`](/-/files/yapparatus/src/reader/icons.tsx) |
+| `FileTree` | Tag around a list | No | None | `FILE_TREE` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+
+</Table>
+
+1. **Every component also works in chat replies,** without imports and with the same line length as the page. In a reply, nothing is numbered and there are no Link or Ask buttons, because a reply is not part of the document.
+2. **A failed check is an error.** The server reports each error with its file and line, and it refuses a reply that contains an error. See [diagnostics](diagnostics).
+3. **A selection gives more precise context than the buttons.** A selection in a list item or a table row points at that line. See [capturing a selection](addresses-and-context#capturing-a-selection).
+
+## Text and Markdown
+
+Headings, paragraphs, lists, links, emphasis, inline code, images, quotations, rules, and tables are ordinary Markdown. [`src/reader/prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) gives each one its style.
+
+- **Headings** use `##` and `###` only. Both levels are numbered and listed in the contents. A deeper level would be neither numbered nor listed.
+- **Links** are checked. A link to a page or anchor that does not exist is an error.
+- **Tables** align text to the left and numbers to the right. Numbers use tabular figures, which all have the same width. Each header is aligned like its column. With this alignment, the reader can easily compare values down a column. Long cells keep a readable width. Wrap a table in `Table` to give it a number and a caption.
+
+> A quotation without a marker stays a quotation, like this one.
+
+## Alerts
+
+> [!NOTE]
+> A note adds something the reader may want to know.
+
+> [!WARNING]
+> A warning is for a step that can lose data or break something.
+
+An alert is a blockquote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, or `[!CAUTION]`. The compiler removes the marker and passes the kind to the reader, which draws the icon, the title, and the color. Other markers are an error. The syntax is the same as on GitHub, so agents already know it, and replies need no extra component. An alert is one or two sentences.
+
+## Code
+
+A fenced code block is highlighted at build time with the theme colors, and it never wraps. The block names a language that Shiki, the highlighter, knows, or `text`. The reader therefore always sees highlighted code. Common languages are loaded when the server starts. Any other language is loaded when a page first uses it.
+
+Code marks show what changed in a block:
+
+```ts
+const retry = {
+  attempts: 3, // [!code --]
+  attempts: 5, // [!code ++]
+  delayMs: 200, // [!code highlight]
+};
+```
+
+The marks are comments at the end of a line, and the compiler removes them before highlighting. They show what changed without a second copy of the code. The Copy button copies the code after the change.
+
+**Line length is a recommendation and is not checked.** Code written for a document stays within 100 columns, so it fits the breakout track without scrolling. Code copied from a source keeps its formatting, because the reader may compare it with the original.
+
+`Excerpt` shows lines of an external file in the same kind of block, with the file's line numbers and a link to the file. See [external files](rendering#external-files). `Listing` gives a block a number and a caption, as in <Ref to="listing-example" />. This listing shows the current content of this repository's [registry](/-/files/yapparatus/src/reader/registry.ts).
+
+<Listing id="listing-example" caption="The registry: the components pages and replies use without imports.">
+<Excerpt from="/-/files/yapparatus/src/reader/registry.ts" start="export const components =" mark="Excerpt" />
+</Listing>
+
+## Figures, diagrams, and charts
+
+`Figure` puts a frame around any content, usually an image, and adds a number and a caption below it. A figure is at least as wide as the text. The content is centered, and the caption has the same line length as the text. <Ref to="figure-example" /> frames three icons.
+
+<Figure id="figure-example" caption="A figure that frames icons." description="Three icons in a row: a database, a gateway, and a battery">
+  <Icon name="lucide:database" size={32} label="Database" /> <Icon name="local:gateway" size={32} label="Gateway" /> <Icon name="energy-icons:battery-bolt-20" size={32} label="Battery" />
+</Figure>
+
+`Diagram` draws a figure from a short program and numbers it like a `Figure`. Every part has an address that the reader can link to and ask about, and `Step` children explain the figure in order. <Ref to="diagram-example" /> has two steps. [Diagrams](diagrams) describes the compiler.
+
+<Diagram id="diagram-example" caption="A diagram with two steps." draw={(d) => {
+  const page = d.box("Page")
+  const reader = d.actor("Reader")
+  d.row([reader, page])
+  d.arrow(reader, page, "reads")
+}}>
+  <Step focus="reader">The reader opens the document.</Step>
+  <Step focus="page reader->page">The reader reads the page.</Step>
+</Diagram>
+
+`Chart` draws data with Observable Plot and numbers it like a `Figure`. Its data is a `Table` on the page, a block of CSV inside it, or a file. <Ref to="chart-example" /> draws a few rows written in the page. [Charts](charts) describes how it works.
+
+<Chart id="chart-example" caption="Lines of code in the largest components." plot={(Plot, rows) => ({
+  marks: [Plot.barY(rows, { x: "Component", y: "Lines" }), Plot.ruleY([0])],
+})}>
+
+```csv
+Component,Lines
+Diagram,1409
+Chat,1050
+App,962
+Prose,754
+```
+
+</Chart>
+
+## References and icons
+
+`Ref` links to a numbered item or a section and shows its current number. For example, <Ref to="alerts" /> describes alerts. A `Ref` to an id that does not exist is an error.
+
+`Icon` shows an icon from an installed collection or from `icons/`, such as <Icon name="lucide:folder" label="Folder" />. The name is a literal string, and the compiler turns it into an import of that one icon. An unknown name stops the page from compiling.
+
+## File trees
+
+`FileTree` shows a directory layout. <Ref to="file-tree-source" /> shows the source of the tree below, and the tree shows where the components are.
+
+<Listing id="file-tree-source" caption="A file tree is written as a Markdown list.">
+
+```mdx
+<FileTree>
+
+- src/
+  - markdown-plugin.ts reads alerts and file trees
+  - reader/
+    - **components.tsx** draws figures, tables, and file trees
+    - prose.tsx
+  - …
+
+</FileTree>
+```
+
+</Listing>
+
+<FileTree>
+
+- src/
+  - markdown-plugin.ts reads alerts and file trees
+  - reader/
+    - **components.tsx** draws figures, tables, and file trees
+    - prose.tsx
+  - …
+
+</FileTree>
+
+The compiler reads the list into entries and passes them to the component. The source remains a readable list. A `FileTree` without a list is an error. A tree can be placed in a `Figure` to give it a number, as in [the code](architecture#where-the-code-is). The tree then draws no frame of its own, so only the figure's frame is shown.
+
+## Custom components
+
+A document can import its own React components from `.tsx` files. These components work in that document's pages and use the exported theme. The color samples in [styling](styling#color) are a custom component of this document. Custom components are not available in chat replies, because a reply has no imports. See [styling](styling).
+
+## Adding a component
+
+A new built-in component is added in these places, in one change:
+
+1. [`src/reader/registry.ts`](/-/files/yapparatus/src/reader/registry.ts), so pages and replies can use it without an import.
+2. `pageComponents` in [`src/document.ts`](/-/files/yapparatus/src/document.ts), so the reply check accepts it.
+3. The component list in [`src/server/prompt.ts`](/-/files/yapparatus/src/server/prompt.ts), which the agent reads.
+4. The authoring guide and [`starter/docs/components.md`](/-/files/yapparatus/starter/docs/components.md).
+5. This page: a row in <Ref to="component-inventory" /> and an example.
+
+**Structured content is written as Markdown.** For a component such as `FileTree`, the author writes Markdown, and the compiler turns it into props. Agents write Markdown reliably, and the compiler can check it.
+
+## Sources
+
+Tables: [Material data tables](https://material.io/components/data-tables), [Matthew Ström](https://matthewstrom.com/writing/tables).

@@ -1,0 +1,36 @@
+# First page
+
+Fixture page for browser tests. It is not an example.
+
+## Selection target
+
+The target paragraph may change when the test agent edits it. Tests select this paragraph together with the diagram edge below.
+
+<Diagram id="fixture-flow" caption="Fixture flow." draw={(d) => {
+  const a = d.box("Source")
+  const b = d.box("Target")
+  d.row([a, b])
+  d.arrow(a, b, { id: "fixture-edge", label: "edge" })
+}} />
+
+```ts
+export const value = 1;
+export const longer = ["a line of about ninety columns", "that needs the wide track"];
+```
+
+## Wide figure
+
+<Diagram id="wide-flow" caption="A drawing wider than the text column." draw={(d) => {
+  const boxes = ["One", "Two", "Three", "Four", "Five", "Six", "Seven"].map((label) => d.box(label))
+  d.row(boxes, { gap: 24 })
+}} />
+
+<Table id="fixture-table" caption="A titled table.">
+
+| Name | Value |
+|---|---|
+| one | 1 |
+
+</Table>
+
+See <Ref to="wide-flow" /> and <Ref to="fixture-table" />, then continue to [the second page](second-page) or [its anchor](second-page.mdx#details). <Ref to="/second-page" /> follows, and <Ref to="/second-page#details" /> has the details.

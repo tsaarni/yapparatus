@@ -1,0 +1,18 @@
+{
+  "title": "Fixture document",
+  "subtitle": "Fixture",
+  "logo": "lucide:book-open",
+  "favicon": "lucide:book-open",
+  "pages": [
+    "first-page.mdx",
+    "second-page.mdx",
+    "icons.mdx",
+    "markdown.mdx",
+    "categories.mdx",
+    "source-code.mdx",
+    "charts.mdx"
+  ],
+  "files": {
+    "sample": "../source"
+  }
+}

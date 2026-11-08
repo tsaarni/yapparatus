@@ -1,0 +1,90 @@
+# Charts
+
+<Chart id="latency" caption="p99 latency per service." plot={(Plot, rows) => ({
+  marks: [
+    Plot.lineY(rows, { x: "Month", y: "p99 (ms)", stroke: "Service" }),
+    Plot.dot(rows, { x: "Month", y: "p99 (ms)", fill: "Service" }),
+  ],
+})}>
+
+```csv
+Month,Service,p99 (ms)
+2026-01,Search,90
+2026-02,Search,95
+2026-03,Search,92
+2026-01,Checkout,180
+2026-02,Checkout,240
+2026-03,Checkout,310
+```
+
+</Chart>
+
+<Chart id="throughput" caption="Requests per second by connection count." from="/-/files/sample/throughput.csv" plot={(Plot, rows) => ({
+  marks: [Plot.dot(rows, { x: "connections", y: "rps", fill: "build", r: 4 })],
+  y: { grid: true },
+})} />
+
+## Below the fold
+
+The next chart starts far below the first screen, so it loads its data only when the reader scrolls to it.
+
+- Item 1 stands between the charts.
+- Item 2 stands between the charts.
+- Item 3 stands between the charts.
+- Item 4 stands between the charts.
+- Item 5 stands between the charts.
+- Item 6 stands between the charts.
+- Item 7 stands between the charts.
+- Item 8 stands between the charts.
+- Item 9 stands between the charts.
+- Item 10 stands between the charts.
+- Item 11 stands between the charts.
+- Item 12 stands between the charts.
+- Item 13 stands between the charts.
+- Item 14 stands between the charts.
+- Item 15 stands between the charts.
+- Item 16 stands between the charts.
+- Item 17 stands between the charts.
+- Item 18 stands between the charts.
+- Item 19 stands between the charts.
+- Item 20 stands between the charts.
+- Item 21 stands between the charts.
+- Item 22 stands between the charts.
+- Item 23 stands between the charts.
+- Item 24 stands between the charts.
+- Item 25 stands between the charts.
+- Item 26 stands between the charts.
+- Item 27 stands between the charts.
+- Item 28 stands between the charts.
+- Item 29 stands between the charts.
+- Item 30 stands between the charts.
+- Item 31 stands between the charts.
+- Item 32 stands between the charts.
+- Item 33 stands between the charts.
+- Item 34 stands between the charts.
+- Item 35 stands between the charts.
+- Item 36 stands between the charts.
+- Item 37 stands between the charts.
+- Item 38 stands between the charts.
+- Item 39 stands between the charts.
+- Item 40 stands between the charts.
+
+<Chart id="latency-file" caption="Latency by minute." from="/-/files/sample/latency.csv" plot={(Plot, rows) => ({
+  marks: [Plot.lineY(rows, { x: "minute", y: "latency (ms)" })],
+})} />
+
+## From a table
+
+<Table id="requests" caption="Requests per service.">
+
+| Service | Requests |
+|---|---|
+| Search | 1200 |
+| Checkout | 450 |
+| Accounts | 300 |
+
+</Table>
+
+<Chart id="requests-chart" caption="Requests per service, from Table 7.1." from="#requests" plot={(Plot, rows) => ({
+  marks: [Plot.barY(rows, { x: "Service", y: "Requests" }), Plot.ruleY([0])],
+})} />

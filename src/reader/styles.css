@@ -1,0 +1,24 @@
+/* Global reset. Component, document, and theme styles live in StyleX. */
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+}
+button {
+  appearance: none;
+  -webkit-appearance: none;
+}
+/* Reduced motion, once for every component: movement becomes an instant change. StyleX
+   rules live in cascade layers, so these unlayered rules win without !important. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
+  }
+}

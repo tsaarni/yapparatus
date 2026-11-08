@@ -1,0 +1,139 @@
+# Rendering pages
+
+This page describes how a page file becomes a page on screen, how the page is laid out and numbered, how it shows external files, and how a document is built for other readers. The rules behind type and color are in [styling](styling).
+
+## Pages
+
+1. **A page's file name is its address.** `key-ideas.mdx` is served at `/key-ideas`, and subdirectories become path segments. Names use lowercase letters, digits, and hyphens. The file name, the page id, and the address are the same name, so no code has to convert one into another.
+2. **`document.json` lists every page file once, in reading order.** The list contains file names, such as `overview.mdx`, so it matches the files on disk. The address is the file name without the extension. A page file that is missing from the list is an error, and so is a listed page that has no file. The order is written in one place, and one edit changes it. Numbers in file names or in frontmatter would spread the order across every file.
+3. **A page has exactly one `#` heading, and this heading is the title.** A separate title field would repeat the heading, and the two could become different over time.
+4. **No page name is reserved.** The application's own paths, such as the API at `/-/api`, start with `-`. A page name cannot start with `-`. See [addresses](addresses-and-context#addresses).
+
+## Compiling a page
+
+<Diagram id="page-pipeline" caption="The path of a page file. Steps 1 to 4 run in the dev server, steps 5 and 6 in the browser." draw={(d) => {
+  const file = d.box("rendering.mdx", { id: "mdx-file", mono: true, sub: "a page file" })
+  const list = d.box("1. Page list", { id: "page-list", sub: "checks document.json" })
+  const parse = d.box("2. MDX parser", { id: "mdx-parser", sub: "reads Markdown and tags" })
+  const icons = d.box("3. Icon step", { id: "icon-step", sub: "links the icons" })
+  const marks = d.box("4. Outline and marks", { id: "source-marks", sub: "tags each block" })
+  const reader = d.box("5. Reader app", { id: "reader-app", sub: "picks the page" })
+  const screen = d.box("6. The screen", { id: "screen", sub: "the styled page", role: "accent" })
+  d.equalSize([file, list, parse, icons, marks, reader, screen])
+
+  const server = d.column([list, parse, icons, marks], { gap: 32 })
+  d.place(file, { above: server, gap: 64 })
+  d.place(reader, { rightOf: marks, gap: 112 })
+  d.place(screen, { below: reader, gap: 32 })
+  d.enclose([server], { id: "server-side", title: "Dev server" })
+  d.enclose([reader, screen], { id: "browser-side", title: "Browser" })
+
+  d.arrow(file, list)
+  d.arrow(list, parse)
+  d.arrow(parse, icons)
+  d.arrow(icons, marks)
+  d.arrow(marks, reader, { label: "module" })
+  d.arrow(reader, screen)
+}} />
+
+<Ref to="page-pipeline" /> follows one file through these steps:
+
+1. **Page list.** The plugin checks the page names and the list in `document.json`. It then generates the module `virtual:yapparatus/document`, which contains the pages in the order of `document.json`. When a file is added or the list is edited, the module is updated without a restart.
+2. **MDX parser.** The parser reads Markdown with GitHub-flavored tables, component tags, and JavaScript in braces. Because of this, a diagram's `draw` is an ordinary function. Headings get GitHub-style anchors. The conventions step then turns alerts and file trees into components, marks code lines, and checks code languages and heading depth. See [components](components).
+3. **Icon step.** An `<Icon name="…">` with a literal name becomes an import of that one SVG file, so a page includes only the icons it uses. A name that is built at run time cannot be resolved in advance, so it is an error.
+4. **Outline and source marks.** The outline records the title, sections, numbered blocks, ids, links, and references. Numbering and link checking use the outline. Each top-level block, list item, and table row is marked with its file, its lines, and a hash of its source lines. With these marks, a selection can be mapped to its source without ids written by the author. See [selection and context](addresses-and-context#capturing-a-selection).
+5. **Reader app.** The router picks the page from the address. It renders the page with styled Markdown elements and the page components, which need no imports.
+6. **The screen.** StyleX compiles the styles at build time. See [styling](styling).
+
+**An edited page is replaced in place without a reload.** The page list accepts the update and replaces the page's module. The numbers, the contents, and the links then update to match. A reload would make the page flash, and the reader would lose their place while an agent edits. Pages are not React Fast Refresh modules, because they export `outline`, and Fast Refresh would respond to that export with a full reload. The chat is rendered outside the page component, so an update keeps the reader's draft and its selections.
+
+## Layout
+
+The page uses a grid with a text column for prose and a breakout track beside it for wide content, as <Ref to="breakout-grid" /> shows.
+
+<Diagram id="breakout-grid" caption="The breakout grid. Text uses the text column, and a large figure also uses the breakout track." draw={(d) => {
+  const text = d.box("text column", { id: "text-column", sub: "560 px for reading", width: 300, height: 96 })
+  const track = d.box("breakout track", { id: "breakout-track", sub: "460 px", width: 220, height: 96, role: "muted" })
+  const columns = d.row([text, track], { gap: 12 })
+  const narrow = d.box("small figure", { id: "small-figure", sub: "at least the text width", width: 300 })
+  const wide = d.box("large figure", { id: "large-figure", sub: "grows into the track", width: 532, role: "accent" })
+  d.place(narrow, { below: columns, gap: 20, align: "start" })
+  d.place(wide, { below: narrow, gap: 16, align: "start" })
+}} />
+
+1. **Prose lines hold 45 to 75 characters.** The text column is 560 px wide, which is about 73 characters. When lines are longer, the eye has trouble finding the start of the next line. WCAG AAA sets the limit at 80 characters.
+2. **All content starts at one left edge.** The title, text, lists, code, tables, and figures start at the same horizontal position. This alignment gives the page a clear structure and costs almost nothing.
+3. **Figures, tables, and code may break out.** They grow to the right into the 460 px breakout track, but only as far as their content needs. The width of an element therefore depends only on its content.
+4. **The text track shrinks last.** When the space is too small, the breakout track shrinks first, and then the text column shrinks.
+5. **Wide content scrolls.** Drawings shrink to no less than 75 % of their size and then scroll sideways, because labels in a smaller drawing would be too small to read. Code never wraps, because wrapped code shows line breaks that are not in the source. Tables scroll when they are wider than the page.
+6. **The layout is at most 1440 px wide** and is centered, so the content is not stretched on very wide screens.
+7. **Navigation moves into a drawer when less than 1100 px of space is available.** The available space is the width that remains beside the chat. The order and alignment of the navigation stay the same.
+8. **Reading styles depend on the width of the reading column.** When the column is narrower than 600 px, the title, the lead paragraph, and the figure padding become smaller. The column becomes narrower on a phone and when the chat grows. Because the styles measure the column, they handle both cases. See [styling](styling#tokens).
+9. **The shell is small and plain.** The shell is the part of the screen around the page. A slim header stays at the top of the screen. It shows the document title, the current chapter, the number of errors and warnings when there are any, the theme button when the reader may choose a theme, and Ask. The optional subtitle is shown in small type above the title, so it never reduces the space for the title. The optional logo is shown beside the title and subtitle and is as tall as these two lines. The logo and the favicon are icon names, like the names in `<Icon>`, and each is set separately in `document.json`. The reader has no logo of its own, so it does not add one to a document. A 272 px sidebar lists the chapters. Under the current chapter, it lists the chapter's sections and marks the reader's position.
+
+## Numbering and references
+
+Numbering follows the Chicago Manual of Style and common technical-writing guides.
+
+1. **Chapters, sections, and titled figures, tables, and code listings are numbered.** Asides, inline snippets, and untitled examples are not.
+2. **Each kind has its own sequence per chapter,** so Figure 3.1 and Table 3.1 can both exist.
+3. **Every numbered item has a title and an `id`, and is referenced in the text.** A number that nothing refers to serves no purpose.
+4. **Tables and listings have their titles above, figures below,** as in print.
+5. **Numbers are generated.** Authors never type them, because they change as the document grows. `<Ref>` shows the current number, and a broken `Ref` is an error.
+6. **A document can turn numbering off,** for all kinds with `"numbering": false` in `document.json` or per kind with `{ "sections": false }`, using the keys `sections`, `figures`, `tables`, and `listings`. Ids, addresses, and `Ref` work the same, and a `Ref` then shows the caption, heading, or page title.
+
+## External files
+
+A document includes files from outside its project, such as the code it explains, through external directories. Pages can show any text file from these directories, including files that are not code. `document.json` lists each directory under `"files"`, with a path relative to `document.json`. Pages refer to files in these directories with file addresses. See [addresses](addresses-and-context#addresses). <Ref to="code-flow" /> shows how code goes from a directory to the reader, and how a question about the code reaches the agent.
+
+<Diagram id="code-flow" caption="Code from an external directory, on a page and in the file view, and back to the agent as context." description="An external directory feeds excerpts on a page and the file view. The reader asks about lines, the context item reaches the agent, and the agent opens the file by its path" draw={(d) => {
+  const directory = d.cylinder("External directory", { id: "external-directory", sub: "anywhere on disk" })
+  const page = d.box("Page", { id: "code-page", sub: "links and excerpts" })
+  const view = d.box("File view", { id: "file-view", sub: "/-/files/…", mono: true })
+  const item = d.box("Context item", { id: "lines-item", sub: "path, lines, words" })
+  const agent = d.box("Agent", { id: "code-agent", sub: "in the project directory", role: "external" })
+  d.equalSize([directory, page, view, item, agent])
+  d.row([directory, page, view], { gap: 104 })
+  d.place(agent, { below: directory, gap: 88 })
+  d.place(item, { below: view, gap: 88 })
+  d.arrow(directory, page, { id: "excerpts", label: "excerpts" })
+  d.arrow(page, view, { id: "links", label: "links" })
+  d.arrow(directory.top, view.top, { id: "whole-file", route: { viaY: directory.top.offset(0, -40) }, label: "whole file" })
+  d.arrow(view, item, { id: "ask-lines", label: "Ask" })
+  d.arrow(item, agent, { id: "prompt", label: "prompt" })
+  d.arrow(agent, directory, { id: "opens-path", label: "opens the path", role: "accent" })
+}} />
+
+1. **An excerpt is read when the page is compiled.** `<Excerpt from="/-/files/app/main.go" start="func (s *Server) Handle(" />` becomes a code block in the file's language. The page depends on the file, so an edit to the file updates the page. A build contains the excerpted lines, so it does not need the directory.
+2. **Excerpts find their lines by text, never by number.** Line numbers change whenever lines are added above them. An excerpt that uses line numbers can then show the wrong code without any error. `start` quotes text from the first line of the excerpt, and exactly one line in the file may contain this text. The excerpt continues to the end of the block that this line opens, or to the line that `end` quotes. When the file no longer contains the quoted text, the error is reported at the page's line, in the same way as a broken link. This design follows the `start-after` option of [Sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude). It leaves the external file unchanged, unlike the marker comments of [mdBook](https://rust-lang.github.io/mdBook/format/mdbook.html#including-portions-of-a-file), because a document often shows a repository that its author does not own.
+3. **Excerpts keep the file's text and line numbers.** Code marks written in the file are shown as ordinary text. The `mark` prop highlights the lines that contain its text. Line numbers are drawn outside the code's text, so copying and selecting take only the code. Links into a file use line numbers, because a link opens the whole file and only scrolls to the lines.
+4. **A chart checks its data when the page is compiled,** in the same way as an excerpt. The data is a block inside the chart, or the table or file that the chart names. The rows of a file are loaded in a separate module. See [charts](charts#where-the-data-comes-from).
+5. **The file view shows a whole file at the file's address.** It uses the same code block as an excerpt. It also lists the sections that link to the file or excerpt it, so the reader can go from the code to the text as well as from the text to the code. `#L11-L14` highlights those lines and scrolls to them.
+6. **Files are read only from the directories named in `document.json`.** The server refuses paths that leave the directory, including paths through symbolic links. It also refuses files inside `.git`, files over 1 MB, and binary files. A document must not become a way to read any file on the disk.
+7. **An external directory can be anywhere on disk, and the pages stay in the project.** A path under `"files"` may point outside the project, such as `"../../contour"`, so one document can show several repositories. The pages, `document.json`, and `.yapparatus/` stay in the project where the server runs. The agent runs its snippets in that directory, because the library finds the server through `.yapparatus/server.json`. Prompts name files relative to that directory. The agent therefore opens `../../contour/internal/dag/builder.go` exactly as written, if it has permission to read outside its directory.
+8. **Each file is named twice, and the two names must agree.** The address names the directory by its name in `document.json`. The path names the file on disk. Two directories can contain the same path, such as `src/main.ts`, and the directory names tell them apart. The server refuses a context item whose path is not the file that its address names.
+
+## Building for sharing
+
+<Diagram id="three-outputs" caption="The same reader app, in three forms. Only live mode has the chat." draw={(d) => {
+  const source = d.box("Document directory", { id: "document-directory", sub: "pages and document.json" })
+  const live = d.box("pnpm dev", { id: "out-live", mono: true, sub: "live, with chat", role: "accent" })
+  const site = d.box("pnpm build", { id: "out-site", mono: true, sub: "dist/ website" })
+  const single = d.box("pnpm build:single", { id: "out-single", mono: true, sub: "one HTML file" })
+  d.equalSize([live, site, single])
+  const outs = d.row([live, site, single], { gap: 32 })
+  d.place(source, { above: outs, gap: 64 })
+  for (const out of [live, site, single])
+    d.arrow(source.bottom, out.top, { route: { viaY: d.lerp(source.bottom, out.top) } })
+}} />
+
+1. **The same app is built in three forms,** as <Ref to="three-outputs" /> shows. All three use the same reader, styles, and diagram code. In each form, the browser draws the diagrams from the same program.
+2. **Builds have no chat** and make no requests to a backend. A shared document is only for reading.
+3. **A build never contains chat state.** Only the pages of the content directory are built, and `.yapparatus/` is left out, because sharing a document must not share the conversation about it.
+4. **Every address is a file in the website build,** and the build also contains `404.html`. Any static host can therefore serve links to any page and section.
+5. **The single file uses `#/page#anchor` addresses** and embeds all pages, fonts, and assets. The file has no server, and it must work offline when opened from disk.
+6. **A build contains the external files that its pages name, and no other files.** For every file address in a page that names a readable file, the build contains the highlighted file. In the website build, each such address is its own file. An author publishes a file by naming it in a page. A build never copies a whole directory.
+
+## Sources
+
+Line length: Bringhurst, *The Elements of Typographic Style*; [WCAG 1.4.8](https://www.w3.org/WAI/WCAG21/Understanding/visual-presentation). Breakout grids: [Cloud Four](https://cloudfour.com/thinks/breaking-out-with-css-grid-layout/), [Ryan Mulligan](https://ryanmulligan.dev/blog/layout-breakouts/). Numbering: [Chicago Manual of Style, ch. 3](https://www.chicagomanualofstyle.org/book/ed18/part1/ch03/toc.html), [Penn State style guide](https://courses.ems.psu.edu/styleforstudents/print/c4.html). Article layouts: [Quarto](https://quarto.org/docs/authoring/article-layout.html), [Distill](https://distill.pub/guide/), [MyST cross-references](https://mystmd.org/guide/cross-references).

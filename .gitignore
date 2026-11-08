@@ -1,0 +1,7 @@
+node_modules/
+dist/
+dist-single/
+.yapparatus/
+test-results/
+playwright-report/
+lib/

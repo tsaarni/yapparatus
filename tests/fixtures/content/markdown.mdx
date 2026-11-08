@@ -1,0 +1,38 @@
+# Markdown conventions
+
+> [!WARNING]
+> Back up the database before you migrate.
+
+> A plain quotation stays a quotation.
+
+The migration changes one setting and adds another.
+
+```ts
+const config = {
+  retries: 3, // [!code --]
+  retries: 5, // [!code ++]
+  timeout: 30, // [!code highlight]
+};
+```
+
+<FileTree>
+
+- src/
+  - **migrate.ts** runs the migration
+  - …
+- package.json
+
+</FileTree>
+
+<Ref to="tree-figure" /> frames a tree, which then draws no frame of its own.
+
+<Figure id="tree-figure" caption="A file tree in a figure.">
+
+<FileTree>
+
+- docs/
+  - guide.mdx
+
+</FileTree>
+
+</Figure>

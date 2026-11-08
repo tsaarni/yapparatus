@@ -1,0 +1,224 @@
+# Chat and the agent
+
+The chat is the conversation between the reader and an [agent](/overview#chat). This page describes what the chat contains, how the agent reads and answers it through the agent channel, and how the server tells the reader whether an agent is listening. The agent channel is the set of requests that the agent uses to talk to the server.
+
+## Principles
+
+1. **Each document has one chronological chat,** with one listening agent at a time and no threads. Each message carries its own context. With parallel threads, it would be unclear who answers which message.
+2. **The agent answers with replies, page edits, or both.** The reader does not choose between them, because sometimes the best answer is an improved page.
+3. **Replies use the page components.** A reply is a complete MDX message. The browser shows it once the server accepts it. Replies do not stream, because incomplete JSX cannot be rendered token by token.
+4. **Edits appear immediately** through hot reload, which updates the open page when its file changes. There is no approval step and no undo in the application, because version control already provides undo.
+5. **The chat stays when the reader moves to another page.** Closing the panel only hides the chat, and the agent stays connected.
+6. **Chat state stays out of the document.** The server stores it in `.yapparatus/`, never in page directories or builds, because it contains the reader's questions and selections.
+7. **Every prompt includes the diagnostics.** The agent learns about errors that its edits caused. The reader can write "Fix the errors" without further explanation. See [diagnostics](diagnostics).
+8. **The word *chat* is used everywhere.** The panel, the API, the types in [`src/protocol.ts`](/-/files/yapparatus/src/protocol.ts), and the file `.yapparatus/chat.jsonl` all use the word *chat*.
+
+## Messages
+
+1. **The chat is an append-only log.** The server stores it in `.yapparatus/chat.jsonl`, with one JSON line per message. A reader message contains its text and its context, captured when the reader sends it. An agent message contains the newest reader message that it answers (`to`), the path of its MDX module, the time when the agent first read that reader message (`readAt`), and the time when the server accepted the reply. The server cannot see the work that the agent does, so it stores only what was said and when. Appending never rewrites earlier lines. If a crash cuts a line short, the server skips that line when it loads the log.
+2. **Points in time are stored, and durations are computed.** The waiting time is `readAt` minus the time of the question. The working time is the time of the reply minus `readAt`. Two timestamps can answer every question about timing, while a stored duration answers only one.
+3. **One number series covers the agent channel.** Reader messages, replies, clears, and errors each take the next number. The server stores the counter in `.yapparatus/sequence`, because errors are not stored with the messages and a number must never be reused after a restart. The numbers are used for the agent's cursor, described in [Waiting](#waiting), and for storage. The browser shows messages in log order and never shows the numbers.
+4. **Questions have no states.** There is no open, answered, cancelled, or failed state. The server does not pair a question with its answer, and it does not mark a message as a follow-up to another message. Every message follows the previous one. Any lifecycle that the server assigned would be a guess.
+5. **Readers can always send.** The agent receives all new messages at once, so an addition such as "and the diagram too" does not have to wait.
+6. **The server computes which messages are unread from the replies.** The agent has replied up to some reader message, and the reader messages after it are unread. The server claims only that the agent replied after a message. The reader judges whether the reply answers it.
+7. **There is no cancel button.** The person stops the agent in the agent's terminal, because the browser cannot interrupt the agent. A cancel button that only discarded the reply would suggest that more was undone than really was, because the page edits would remain.
+8. **The author of a reader message is called *reader*.** The reader and the agent's user are often the same person, using two channels. The agent answers messages from the terminal in the terminal, and answers messages from the browser with `reply()`. The word *user* would not distinguish the two channels.
+
+### Clearing the chat
+
+1. **The chat lasts as long as the agent's context.** Here, context means the agent's conversation memory. **Clear chat** deletes every message and reply without keeping an archive, so the panel asks for confirmation first. The reader also clears the agent's context in the agent and connects the agent again, because the server cannot see when an agent forgets. A history that the agent no longer has would mislead both the reader and the prompts.
+2. **Numbering continues across a clear.** The log records the number that the clear took. A `wait` or `reply` call that started before the clear learns at once that the chat was cleared. If numbering restarted at 1, the cursor of a waiting agent would silently skip the new messages.
+
+## How the agent connects
+
+The reader's agent runs in its own session and terminal. It communicates with the server by running short TypeScript snippets that call the client library `yapparatus/agent`. The server does not host or start agents. <Ref to="agent-loop" /> shows the first round on an empty chat. The agent drives the loop, and the server only answers the agent's requests.
+
+<Diagram id="agent-loop" caption="The first round of the agent channel, on an empty chat." description="Sequence of messages between the reader, the chat server, the yapparatus/agent library, and the agent" draw={(d) => {
+  const reader = d.actor("Reader")
+  const server = d.box("Chat server", { role: "accent" })
+  const library = d.box("yapparatus/agent", { id: "library", mono: true })
+  const agent = d.box("Agent", { role: "external" })
+  d.sequence([reader, server, library, agent], [
+    { from: agent, to: library, label: "wait({ after: 0 })", id: "wait" },
+    { from: library, to: server, label: "GET prompt?after=0, waits", id: "get-prompt" },
+    { from: reader, to: server, label: "message #1", id: "message" },
+    { from: server, to: library, label: "prompt with #1", reply: true, id: "prompt" },
+    { from: library, to: agent, label: "messages, prompt", reply: true, id: "printed" },
+    { from: agent, to: agent, label: "edit pages", id: "edit" },
+    { from: agent, to: library, label: "reply({ to: 1 })", id: "reply" },
+    { from: library, to: server, label: "POST agent?to=1", id: "post-reply" },
+    { from: server, to: reader, label: "reply #2", async: true, id: "event" },
+    { from: server, to: library, label: "201", reply: true, id: "accepted" },
+    { from: agent, to: library, label: "wait({ after: 1 })", id: "next" },
+  ], { gap: 64 })
+}}>
+  <Step focus="wait get-prompt">The agent calls `wait`. The library opens a prompt read, which the server keeps open.</Step>
+  <Step focus="message prompt printed">The reader sends a message. The server answers the read, and the library prints the prompt for the agent.</Step>
+  <Step focus="edit">The agent edits pages if the answer needs it.</Step>
+  <Step focus="reply post-reply event accepted">The agent replies. The server checks the reply, shows it to the reader, and accepts it.</Step>
+  <Step focus="next">The agent waits again, using the cursor that the prompt gave it.</Step>
+</Diagram>
+
+### Alternatives considered
+
+- **ACP** (Agent Client Protocol) works with few agents. It starts a fresh session that does not know how the document was written, but the agent that wrote the document is the best one to answer questions about it. ACP also leaves permissions and reconnection for the server to handle.
+- **Copy and paste** needs a person to carry every message between the browser and the agent, and to mark every reply. People skip steps that they must repeat.
+- **MCP** (Model Context Protocol) cannot notify an agent that the reader wrote a message. It needs configuration for each agent, and the client sets the timeouts for tool calls. Every coding agent can run Node, but not every agent is configured for a given MCP server.
+- **A CLI** returns only text. A library returns data that the agent can filter and combine, and one snippet can both reply and wait again.
+
+## Waiting
+
+<Listing id="library-calls" caption="The two calls of the agent library.">
+
+```ts
+import { reply, wait } from "yapparatus/agent";
+
+await wait({ after: 7 }); // → { messages, newErrors, prompt }; blocks until news
+await reply({ to: 9 }); // MDX from stdin → { seq }
+```
+
+</Listing>
+
+The agent runs a snippet from the project directory with Node's TypeScript support, as <Ref to="snippet" /> shows. The code is passed in the `-e` argument, so stdin stays free for the reply.
+
+<Listing id="snippet" caption="A snippet that replies and then waits for the next message.">
+
+```sh
+node --input-type=module-typescript -e 'import { reply, wait } from "yapparatus/agent"; await reply({ to: 9 }); console.log((await wait({ after: 9 })).prompt);' <<'MDX'
+Show on page compares hashes, so it highlights a target only when it is sure.
+MDX
+```
+
+</Listing>
+
+1. **`wait({ after: N })` takes a cursor.** The cursor N is the number of the last item that the agent has received. `wait` resolves with the reader messages and open errors that are numbered after N. It blocks only while there are none. The same call gives the same result, so nothing is lost if a snippet is killed before it prints. The server keeps no record of what an agent has seen. It records when a message was first read, for `readAt`, but it never uses that time to decide what to deliver.
+2. **`wait` returns both data and text.** `messages` are objects for code that filters or combines them. `prompt` is text that the server writes for the agent to read, and it contains the instructions.
+3. **`wait` blocks until something new arrives,** and the agent does not choose a timeout. The start prompt, which is the first prompt the agent receives, tells the agent to run `wait` in the background. Otherwise the agent runs it with the longest shell timeout and runs it again if the shell stops it. Background commands have no shell time limit. An agent that a timer wakes spends a model turn on every wake, which can be hundreds of turns over a night when the chat is left open.
+4. **Waiting is not an error.** `wait` resolves with messages, with new errors, or with neither when the reader clears the chat. It rejects only on a real failure: no server, invalid MDX, a bad `to`, or another listener taking over. Agents treat a failing command as something to fix.
+5. **Every prompt ends with the exact next snippet,** and the server fills in the cursor. After messages, the snippet replies and waits in one run. After new errors, the prompt shows how to reply or how to only wait. After a clear, it shows how to wait again. The agent never tracks the cursor itself, so the loop keeps working after the agent's context is compacted.
+6. **The newest listener wins.** A listener is one running `wait` call. When a `wait` starts while another one is listening, the new one takes over, and the older one rejects with "another agent took over the chat; stop waiting". Without this rule, a background snippet left over from an old session could lock out the session that the person just started.
+7. **The start prompt contains what stays true for the whole session.** The browser shows it with the current cursor. It says how to run the snippet, where the authoring guide is, and what a reply may use. Later prompts contain only the messages, the diagnostics, and the next snippet, so a long session does not spend tokens on the instructions with every message. A new agent session uses the same start prompt to join the chat again.
+8. **The start cursor is the last reader message that an agent replied to,** or the last clear if that is later. A new session therefore receives the messages that are still unanswered and the errors numbered since then. The server's record of replies is the only record that remains after the old session ends.
+
+## Replying
+
+1. **`reply({ to: N })` records what the agent has read.** N is the cursor from the prompt, and the reply answers every reader message up to N. After a prompt about errors, N may be the number of an error. A message that arrives while the agent writes its reply stays unread. Several replies with the same cursor are allowed, for example when the agent asks the reader a question.
+2. **The reply is MDX on stdin.** The agent passes it inline with a quoted heredoc (`<<'MDX'`, so that the shell expands nothing) or from a file with `< reply.mdx`. Empty stdin or a terminal on stdin is an error, and `reply` never waits for input. MDX contains many backticks, and a template literal would silently turn `${` into code. Stdin needs no escaping.
+3. **Snippets that the server writes put their code in `-e '…'` and use only double quotes,** because a single quote would end the shell argument.
+4. **The server checks a reply before accepting it.** It checks that the MDX compiles, that the components exist, and that the links resolve. If a check fails, `reply` rejects with the file and line, and the agent fixes the reply and sends it again. The browser reports errors that appear only when the reply is rendered, and these errors end the agent's next `wait`.
+5. **A reply waits for the checks of the agent's edits, and is refused while new errors remain.** Errors numbered after the reply's cursor appeared while the agent worked. The server waits up to 8 s, until its own checks have run, an open browser has had time to report, and the new errors have numbers. If such errors remain, `reply` rejects with the list, and the agent fixes them and replies again. If the agent's edits did not cause the errors, the refusal offers a cursor past them, but only when that cursor skips no unread reader message. Without this check, the reader could read "done" on a broken page.
+6. **The agent replies even when the answer is a page edit,** so that the reader knows what changed.
+
+## The prompt
+
+<Ref to="prompt-example" /> shows a prompt with two reader messages.
+
+<Listing id="prompt-example" caption="A prompt as the agent reads it.">
+
+```text
+Reader, 14:02:
+--- reader ---
+Why does Show on page refuse instead of guessing?
+--- end reader ---
+Context, with lines as they are now:
+- text, docs/design/addresses-and-context.mdx:143, /addresses-and-context#finding-the-lines-again: “Show on page highlights a target only when it is sure.”
+
+Reader, 14:03:
+--- reader ---
+And make the diagram show it too.
+--- end reader ---
+Context, with lines as they are now:
+- diagram part, docs/design/addresses-and-context.mdx:107-126, /addresses-and-context#show-on-page-flow--say-gone
+
+Diagnostics: none
+
+Edit pages (/home/me/yapparatus/starter/docs/guide.md), reply, or both; always reply, so the reader knows what changed. Then reply and wait:
+
+node --input-type=module-typescript -e 'import { reply, wait } from "yapparatus/agent"; await reply({ to: 9 }); console.log((await wait({ after: 9 })).prompt);' <<'MDX'
+<your reply>
+MDX
+```
+
+</Listing>
+
+1. **Reader text is fenced** between `--- reader ---` and `--- end reader ---` lines, and the server's instructions follow in a fixed footer. The agent can therefore tell the reader's words from the instructions of the protocol.
+2. **Each context item is one line:** kind, file and current lines, address, and the selected words or the open step. The line contains no generated numbers and no copy of the source. A reference to lines that the agent can open is more useful than a copy of text that the agent can already read. See [what context is](addresses-and-context#what-context-is).
+3. **Reader messages are labelled with their time.** The reader never sees numbers, so a reply that said "as in #8" would point at nothing. The cursor in the snippet is the only number that the agent needs.
+4. **The start prompt lists the external directories** with their paths relative to the project directory, such as `contour: ../../contour`. The agent uses these paths to read the files itself and to write file addresses in replies.
+5. **The snippet replies and waits in one run.** If `reply` rejects, `wait` does not run, and the output is the error. With one step per round, the agent has one fewer step to forget.
+
+## The agent's state
+
+The server sees an agent only while one of the agent's requests is open. That request is either a prompt read, which `wait` repeats, or a `reply`. Between requests the server cannot see the agent, so it cannot tell an agent that is writing an answer from an agent that has stopped. The server computes the agent's state from its requests and stores nothing. <Ref to="agent-state" /> shows the three states.
+
+<Diagram id="agent-state" caption="The agent's state as the server computes it. Only the Listening state counts as connected." description="State machine with the states Away, Listening, and Read, and the agent requests and timeouts that move between them" draw={(d) => {
+  const start = d.start()
+  const away = d.box("Away", { sub: "not connected", role: "muted" })
+  const listening = d.box("Listening", { sub: "connected", role: "accent" })
+  const read = d.box("Read", { sub: "not connected" })
+  d.equalSize([away, listening, read])
+  d.row([away, read], { gap: 480 })
+  d.place(listening, { at: d.lerp(away.top, read.top, 0.5).offset(0, -200), anchor: "bottom" })
+  d.place(start, { leftOf: away, gap: 56 })
+  d.arrow(start, away)
+  d.arrow(away, listening, { id: "connect", label: "wait or reply", bend: 64 })
+  d.arrow(listening, away, { id: "stop", label: "read closed unanswered,\nor 10 s without a read", bend: 64 })
+  d.arrow(listening, listening, { id: "idle", label: "read without news;\nthe next read follows", loop: "top" })
+  d.arrow(listening, read, { id: "deliver", label: "read hands over\nreader messages", bend: 64 })
+  d.arrow(read, listening, { id: "answer", label: "reply or wait", bend: 64 })
+  d.arrow(read, away, { id: "give-up", label: "10 min without reply or wait, or chat cleared" })
+}}>
+  <Step focus="away connect listening">An agent that calls `wait` or `reply` becomes Listening.</Step>
+  <Step focus="idle">When reads without news follow each other, the agent stays Listening.</Step>
+  <Step focus="deliver read">When a read hands over messages, the agent moves to Read while it works.</Step>
+  <Step focus="answer">A reply or a new wait makes the agent Listening again.</Step>
+  <Step focus="stop give-up away">A read that closes unanswered, or a long time without requests, makes the agent Away.</Step>
+</Diagram>
+
+1. **Listening means connected.** The agent is listening while a prompt read is open. It also stays listening for 10 s after a read that ended without news, and for 10 s after a reply. These 10 s cover the gap between two reads of the same `wait`, and the gap between a `reply` and the `wait` that follows it in the same snippet.
+2. **A read that hands over news ends listening at once.** The agent now works and opens no read until it replies. If the server still counted the agent as listening, the reader would be told that an agent is connected when none is.
+3. **A read that closes before its answer means that the agent stopped.** The agent's process ended, so the agent becomes away at once, and the server forgets what it handed over.
+4. **Read means that the agent has unanswered messages and no open read.** This state lasts at most 10 minutes after the agent last received messages. During this time the agent is probably writing the answer. After 10 minutes, or when the reader clears the chat, the agent is away.
+5. **Away is every other case.** Only in this state does the reader see instructions for connecting an agent.
+6. **The browser shows only what the server knows.** When the agent is listening, the header shows a green dot and "Agent connected". When the agent is in the read state, the dot is grey and the header says "Agent working, not connected". The chat also keeps showing typing dots under the message, as a messaging app does while the other person writes. "Working" is a guess, and the 10 minute limit sets how long a wrong guess can be shown. When the agent is away, the dot is grey and the header says "Agent not connected".
+7. **State changes are pushed to the browser** as a `chat` event, including when a 10 s or 10 minute period ends. The server sets a timer for the next expiry, so the reader does not need to reload the page to see that the agent went away.
+
+## API
+
+<Table id="chat-api" caption="The chat and agent requests.">
+
+| Caller | Request | Response |
+|---|---|---|
+| browser | `GET /-/api/chat` | JSON: messages in log order, the last reader message answered, the agent's state, the start prompt |
+| browser | `POST /-/api/chat/reader`, JSON: text, context | `201` with the message's number |
+| browser | `POST /-/api/chat/clear` | `201` with the number the clear took |
+| browser | `GET /-/api/events`, event `chat` | The whole chat state, after a message, a reply, a clear, or a change of the agent's state |
+| browser | `GET /-/api/files/{directory}/{path}` | JSON: the file highlighted, its path from the project directory, and its line count; `404` for a file the document cannot show |
+| browser | `GET /-/api/events`, event `file` | The address of an open external file, after it changed on disk |
+| `wait` | `GET /-/api/agent/prompt?after=N&timeout=S&listener=ID` | `200` JSON: messages, new errors, and prompt text ending with the next snippet |
+| `reply` | `POST /-/api/agent/reply?to=N`, MDX body | `201` with the reply's number; `422` with errors in the reply or new errors in the document; `409` for a cursor from before a clear or with nothing to answer |
+
+</Table>
+
+1. **The browser and the agent read different resources.** The browser reads the chat. The agent reads a prompt written for it, with the messages next to the prompt. A single URL with a filter, a blocking mode, and two audiences would in fact be two resources under one name.
+2. **Each audience has its own module.** `/-/api/chat` serves the reader, and [`src/server/chat.ts`](/-/files/yapparatus/src/server/chat.ts) keeps the log. `/-/api/agent` serves the agent, and [`src/server/agent.ts`](/-/files/yapparatus/src/server/agent.ts) keeps the waiting reads, the error numbers, and the prompts. To write the prompts, `agent.ts` reads the chat and the diagnostics. The server never guesses who sent a request from its content type or its `Origin` header. Each module reports its changes, and [`src/server/api.ts`](/-/files/yapparatus/src/server/api.ts) decides who is notified of them.
+3. **Every agent response has a body that the server writes,** including idle responses and errors, because the server writes the next snippet and the instructions for fixing an error.
+4. **The prompt read blocks for at most `timeout` seconds,** and the server caps this at 25 s. A blocking read is an ordinary read with a parameter, so it needs no new kind of message.
+5. **Each `wait` call is one listener.** The listener is named by a random id that it sends with every read. A new id takes over, and the server refuses reads with an old id with `409`. The library repeats short reads, so the server needs the id to tell one long wait from a new one.
+6. **An accepted reply is stored only as a file,** `.yapparatus/chat/<seq>.mdx`, because Vite renders MDX by importing it. The message contains the module path, and the browser imports that path, so only the server names the files. Vite does not watch `.yapparatus/`. Before accepting a reply, the server compiles it as a temporary file.
+7. **A retried `reply` may duplicate a message.** On localhost, a lost response is rare and a duplicate is harmless, so this risk is accepted.
+
+## Library implementation
+
+1. **The library handles transport, and the server writes the text.** The library passes `prompt` and the error messages from the server unchanged. The library writes only transport errors, such as a missing server or a lost connection. All wording is therefore in one place.
+2. **The library waits, and requests stay short.** `wait` repeats prompt reads of 25 s until something new arrives. It retries a dropped connection for 30 s before it rejects. There are three reasons for this. Node's `fetch` gives up after 300 s without response headers. A restart of the dev server drops a waiting request. A stopped server must not leave the agent waiting forever.
+3. **The library is the package's `./agent` export,** and agents import it by package name. It is compiled to JavaScript with type declarations in `lib/`, because Node refuses to strip types from files inside `node_modules`.
+4. **Uncaught errors print only the server's text,** without Node's stack frames, and the process exits with code 1. Errors that a snippet catches are not affected. The agent needs to read what to fix, and a stack trace does not help with that.
+5. **Snippets use only erasable TypeScript,** and types are not checked. Erasable TypeScript is TypeScript whose types can be removed without changing the code. Node removes the type annotations and runs the rest, so enums and parameter properties cause errors.
+6. **The library finds the server through `.yapparatus/server.json`** in the project directory or a directory above it. The newest dev server writes this file. When a server closes, it removes the file only if the file still belongs to that server. If the connection is refused, the library rejects with instructions for starting the server. A stale file left after a crash therefore does not produce a bare `ECONNREFUSED` error.
+7. **The server uses no token.** Any local process can read `.yapparatus/server.json`, and local processes already have access to the workspace. The threats are web pages and DNS rebinding. The server therefore refuses other origins, accepts requests without an `Origin` header (from the library), and checks the `Host` header.
+
+## Open questions
+
+- Whether every supported agent can run commands in the background and be notified when they finish, or whether some agents must restart `wait` after their shell stops it.
+- Whether agents keep the `wait` loop running over a long session, or end their turn and stop listening.

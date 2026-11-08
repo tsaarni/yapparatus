@@ -1,0 +1,22 @@
+{
+  "title": "Design",
+  "subtitle": "Yapparatus",
+  "logo": "local:yapparatus",
+  "favicon": "local:yapparatus",
+  "theme": "auto",
+  "pages": [
+    "overview.mdx",
+    "architecture.mdx",
+    "rendering.mdx",
+    "components.mdx",
+    "diagrams.mdx",
+    "charts.mdx",
+    "addresses-and-context.mdx",
+    "diagnostics.mdx",
+    "chat.mdx",
+    "styling.mdx"
+  ],
+  "files": {
+    "yapparatus": "../.."
+  }
+}

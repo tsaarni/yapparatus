@@ -1,0 +1,11 @@
+# Categories
+
+<Diagram id="migration" caption="Two kinds of parts." draw={(d) => {
+  const orders = d.box("Orders", { category: "New" })
+  const payments = d.box("Payments", { category: "New" })
+  const batch = d.box("Batch job", { category: "To be removed" })
+  const db = d.cylinder("Database")
+  d.row([orders, payments, batch, db])
+}}>
+  <Step focus="new">The new services.</Step>
+</Diagram>

@@ -1,0 +1,126 @@
+# Addresses and context
+
+This page describes how each part of a document is named, how a reader's selection becomes context for a question, and how that context is found again after the page changes. What happens to the question after that is described in [the chat](chat).
+
+## Addresses
+
+1. **One address form:** `/page#id`. For selected words, a text fragment is added: `/page#id:~:text=…`. A text fragment is the part of an address after `:~:text=`, which names words on the page. Ids are heading slugs, the `id`s of numbered blocks, and diagram parts written as `figure--part`. A heading slug is the heading text, lowercased, with hyphens between the words. Links, `Ref`, Copy link, and context items all use this form, so there is only one form to learn and to check.
+2. **Ids are unique per page, and `--` is reserved for diagram parts and steps.**
+3. **Page addresses start at the root, and the application's own addresses start with `/-/`.** This keeps page addresses short. No page name is reserved, because a page name cannot start with `-`. GitLab moved its routes under `/-/` for the same reason.
+4. **An external file's address is `/-/files/<directory>/<path>`,** with lines written as on GitHub: `#L40` or `#L40-L72`. `<directory>` is the name that `document.json` gives to a directory under `"files"`. Addresses therefore stay the same wherever the directory is on disk. Selected words are added after the lines as a text fragment, `#L41:~:text=retry`, in the same way as on pages.
+5. **Links are checked.** A link, anchor, or `Ref` that points to nothing is reported with its file and line. A link to an external file must name a file that the server can show, and lines that exist in that file. A broken link is therefore found before a reader follows it. See [diagnostics](diagnostics).
+6. **Links work in every build.** The website build writes one file per address. The single HTML file uses addresses of the form `#/page#anchor`.
+7. **Copy link on a selection adds a text fragment** (`#section:~:text=…`), because the selected words are what the reader means. Browsers scroll to the words in a text fragment and highlight them. In an external file, Copy link copies the file's address with the selected lines. When the selection covers only part of those lines, Copy link also adds the selected words. The single HTML file copies the section's address.
+
+## What context is
+
+Context is what the reader attaches to a message. Each attached item is shown as a pill above the message box. The agent reads the context to learn what a question is about.
+
+1. **Context is only what the reader attached.** Readers can add prose, code, diagram parts, sections, figures, and whole pages, in any combination. The page that the reader is on is not context unless the reader adds it. As a result, the message contains nothing that the reader did not see attached.
+2. **No context means a question about the whole document,** and the prompt says so. The agent must not guess a scope that the reader did not give.
+3. **A context item is an address and the location of its source,** and nothing more. No text is copied from the file, because the agent has the files and only needs to know where to look. <Ref to="context-item" /> shows the type.
+4. **A page item or a file item names the whole file,** with no lines in the prompt. The Ask about this button on a page title, or on the title of the file view, adds such an item. The agent then reads the file.
+5. **Generated numbers are not addresses.** A pill shows the reader a number such as "Section 5.2.2" or "Figure 3.1", which is computed when the pill is shown. The agent sees only what the source contains: files, lines, heading slugs, and ids that the author wrote. Numbers are not in the source, and they change when a figure is inserted. Also, "section 2" typed in a message could mean several things.
+
+<Listing id="context-item" caption="The context item, as the browser sends it and the server stores it.">
+<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface ContextItem {" mark={["source: string", "startLine", "endLine", "hash"]} />
+</Listing>
+
+## Capturing a selection
+
+<Ref to="selection-capture" /> shows how a selection becomes context items.
+
+<Diagram id="selection-capture" caption="A selection across three source ranges becomes three context items." description="A selection that touches a paragraph, a list item, and a table row; each range carries its file, lines, and hash, and becomes one context item" build draw={(d) => {
+  const para = d.box("Paragraph", { id: "paragraph", sub: "lines 12–14" })
+  const item = d.box("List item", { id: "list-item", sub: "line 17" })
+  const row = d.box("Table row", { id: "table-row", sub: "line 23" })
+  d.equalSize([para, item, row])
+  const blocks = d.column([para, item, row], { gap: 24 })
+  const page = d.enclose([blocks], { id: "page", title: "Page" })
+
+  const a = d.box("text item", { id: "item-1", sub: "#section:~:text=…", mono: true })
+  const b = d.box("text item", { id: "item-2", sub: "lines 17, hash", mono: true })
+  const c = d.box("text item", { id: "item-3", sub: "lines 23, hash", mono: true })
+  d.equalSize([a, b, c])
+  const items = d.column([a, b, c], { gap: 24 })
+  d.place(items, { rightOf: blocks, gap: 160 })
+  d.enclose([items], { id: "message-box", title: "Message box" })
+
+  d.arrow(para, a, { id: "to-1" })
+  d.arrow(item, b, { id: "to-2" })
+  d.arrow(row, c, { id: "to-3" })
+
+  const marks = d.note("data-source, lines,\ndata-hash", { id: "marks", stepOnly: true })
+  d.place(marks, { above: page, gap: 24 })
+}}>
+  <Step focus="page marks">The compiler has marked each block, list item, and table row with its file, its lines, and a hash of those lines.</Step>
+  <Step focus="paragraph list-item table-row">The reader selects text across three of these ranges.</Step>
+  <Step focus="to-1 to-2 to-3 message-box">Each range becomes one item. The item's address is the nearest section, with the selected words as a text fragment.</Step>
+</Diagram>
+
+1. **The compiler records the source location in the page, and the browser sends it back.** An MDX plugin marks each top-level block, list item, and table row with its file, lines, and hash. Authors therefore do not need to give paragraphs ids. A selection in one list item points to the line of that item only, and not to the whole list.
+2. **A selection becomes one text item for each range it touches.** A range is the innermost marked block, list item, or table row. The address of each item is the nearest section's address with the selected words as a text fragment. This is the same fragment that Copy link makes.
+3. **Code from an external file is context about the file.** A selection in an excerpt or in the file view becomes a `lines` item. The item contains the file's address with the selected lines, the file's path relative to the project directory, and the hash of the lines. When the selection covers only part of its lines, the address keeps the selected words as a text fragment, and the prompt quotes them. This is needed because the lines alone do not show which name on a line the reader means. The server accepts such an item only for a file that the document shows, and only when the item's path and lines agree with its address.
+4. **Line numbers select lines, as on GitHub.** In the file view, clicking a line number selects that line, and shift-clicking extends the range. The address then ends in `#L11-L14`. The selected lines become the text selection, so the menu offers the same Ask and Copy link actions as for any other selection. Clicking a line number in an excerpt opens the file at that line.
+5. **A figure item records the open step,** for example "Step 2 of 5 (miss): …". The agent then knows what the reader was looking at. See [steps](diagrams#steps).
+
+<Table id="context-fields" caption="The fields of a context item, and where each one comes from.">
+
+| Field | Comes from |
+|---|---|
+| `kind` | The target: `text`, `section`, `figure`, `table`, `listing`, `code`, `diagram-part`, `page`, or for external files `lines` and `file` |
+| `address` | `/page`, `/page#id`, `/page#figure--part`, or for text the nearest section with a text fragment |
+| `source` | The range's `data-source`: the page's file, or the file that a source address names |
+| `startLine`, `endLine` | The range's line marks |
+| `hash` | The range's `data-hash`: the first 16 hex digits of the SHA-256 of its source lines |
+| `step` | The open diagram step and its text, for figures and their parts |
+
+</Table>
+
+## Finding the lines again
+
+The reader can send a message while the agent is editing. Lines that were correct when the message was sent may therefore be wrong when the agent reads it. Both the server and the browser find the lines again by their hash. The server does this when it writes the prompt. The browser does this when the reader clicks Show on page, which is the button on a pill in a sent message. <Ref to="show-on-page-flow" /> shows how Show on page decides what to show.
+
+<Diagram id="show-on-page-flow" caption="How Show on page decides what to show. If there is not exactly one match, it shows the item's section or figure, or says that the target is gone." description="Decision flow for finding an earlier context item on the page" draw={(d) => {
+  const start = d.start("Show on page clicked")
+  const samePage = d.decision("Page open?", { id: "same-page" })
+  const open = d.box("Open that page", { id: "open-page", sub: "then continue" })
+  const sameRev = d.box("Ranges with same file", { id: "same-hash", sub: "and same hash" })
+  const one = d.decision("One match?", { id: "one-match" })
+  const show = d.box("Scroll and frame it", { id: "show-it", role: "accent" })
+  const anchored = d.decision("Anchor there?", { id: "anchor-there" })
+  const around = d.box("Show its anchor", { id: "show-anchor", sub: "say it changed" })
+  const gone = d.box("Say it is gone", { id: "say-gone", sub: "or unclear", role: "warning" })
+  d.equalSize([open, sameRev, show, around, gone])
+  const main = d.column([start, samePage, sameRev, one, show], { gap: 40 })
+  d.place(open, { rightOf: samePage, gap: 88 })
+  d.place(anchored, { rightOf: one, gap: 88 })
+  d.place(around, { below: anchored, gap: 40 })
+  d.place(gone, { rightOf: anchored, gap: 88 })
+  d.arrow(start, samePage)
+  d.arrow(samePage, sameRev, { label: { text: "yes", side: "left" } })
+  d.arrow(samePage, open, { label: "no" })
+  d.arrow(open.bottom, sameRev.right, { id: "after-open", route: "vh", dashed: true })
+  d.arrow(sameRev, one)
+  d.arrow(one, show, { label: { text: "yes", side: "left" } })
+  d.arrow(one, anchored, { label: "no" })
+  d.arrow(anchored, around, { label: { text: "yes", side: "left" } })
+  d.arrow(anchored, gone, { label: "no" })
+}}>
+  <Step focus="show-on-page-clicked same-page open-page after-open">Show on page first makes sure that the item's page is open.</Step>
+  <Step focus="same-hash">It collects the ranges that have the item's file and hash. Then it narrows them by the words in the address, the part id, or the kind.</Step>
+  <Step focus="one-match show-it">If there is exactly one match, it scrolls to the target and frames it.</Step>
+  <Step focus="anchor-there show-anchor">If there are no matches or several, it looks for the item's anchor: the section around the selected words, or the figure around a part. It scrolls to the anchor and says that the target changed.</Step>
+  <Step focus="say-gone">If the anchor is also gone, it says that the target disappeared or is unclear.</Step>
+</Diagram>
+
+1. **Each range has its own hash.** The agent edits pages often. With one hash per file, every edit would invalidate every open selection on the page.
+2. **The server locates each item again when it writes the prompt.** If the hash still matches at the same lines, the server prints those lines. Otherwise, it prints the single run of lines in the file that has that hash. If no lines have that hash, it prints "changed since asked" with the old lines. A section runs from its heading to the next heading of the same level.
+3. **Show on page highlights a target only when it is sure of the location.** Highlighting the wrong place would mislead the reader more than highlighting nothing. When the exact target is gone, Show on page uses the target's anchor instead, because the anchor's location is still certain. The anchor is the section around the selected words, or the figure around a diagram part. The target is usually gone because the agent rewrote it in its answer, so the target's section is the place to look. Approximate matching of the old words, which annotation tools use, is left out. An agent usually rewrites more than a few words, and an approximate match could frame the wrong place.
+4. **An edited block no longer locates older items that point into it.** Items in other blocks keep working.
+5. **Show on page opens an external file at the item's lines** and checks their hash against the code shown. If the file has changed, it goes to the single run of lines with that hash, as the server does. If there is no such run, it says that the lines changed.
+6. **Diagram parts are matched by id.** The id is derived from the label unless the author gives one. Prose that refers to a part should give the part an explicit `id`, so that editing the label does not break the reference.
+
+## Sources
+
+[W3C Web Annotation Data Model](https://www.w3.org/TR/annotation-model/), [Hypothesis](https://web.hypothes.is/help/overview-of-the-hypothesis-system/), [Figma comments](https://help.figma.com/hc/en-us/articles/360041068574-Add-comments-to-files), [URL text fragments](https://wicg.github.io/scroll-to-text-fragment/).
