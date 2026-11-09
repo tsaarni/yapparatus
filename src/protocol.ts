@@ -6,7 +6,7 @@
  *   Reports       facts the browser observes   PUT|DELETE /-/api/diagnostics/{scope}
  *   Events        server → browser updates     GET /-/api/events (Server-Sent Events)
  *   Reads         state, possibly blocking     GET /-/api/chat, GET /-/api/diagnostics, GET /-/api/agent/prompt?after=N&timeout=S,
- *                                              GET /-/api/files/{folder}/{path}
+ *                                              GET /-/api/agent/diagnostics, GET /-/api/files/{folder}/{path}
  */
 
 import type { Root } from "hast";
@@ -115,7 +115,7 @@ export interface AgentPrompt {
   /** The number the chat was cleared at, when that happened after the cursor. */
   cleared?: number;
   /** Errors the agent has not been shown before. They end a wait, like a reader message. */
-  newErrors: Diagnostic[];
+  newErrors: ReportedDiagnostic[];
   prompt: string;
 }
 
@@ -135,12 +135,155 @@ export type DiagnosticOrigin =
   | "runtime"
   | "reply";
 
-/** An error or warning in the document, with where it is. */
+export type Severity = "error" | "warning";
+
+/**
+ * Every diagnostic code, with its severity and what it means. A code names what is wrong;
+ * checks pass a code and never a severity. `error`: the result is not what the author wrote
+ * (a reference to nothing, a duplicate, an invalid form, something that threw). `warning`:
+ * it renders as written but reads badly (overlap, overflow, too much).
+ */
+export const diagnosticCodes = {
+  // Links and ids, checked by the server across pages.
+  BROKEN_LINK: {
+    severity: "error",
+    meaning: "A link names a page, anchor, file, or lines that do not exist.",
+  },
+  BROKEN_REF: { severity: "error", meaning: "A <Ref> points at nothing." },
+  DUPLICATE_ID: { severity: "error", meaning: "Two things that must be told apart share an id." },
+  PAGE_LIST: { severity: "error", meaning: "document.json is invalid or does not list the pages." },
+  COMPILE_FAILED: { severity: "error", meaning: "A page or reply is not valid MDX." },
+  // Replies the agent sends.
+  UNKNOWN_COMPONENT: {
+    severity: "error",
+    meaning: "A reply uses a component that does not exist.",
+  },
+  REPLY_EMPTY: { severity: "error", meaning: "A reply has no text." },
+  // Markdown conventions and components, checked when a page compiles.
+  ALERT_TYPE: { severity: "error", meaning: "An alert names an unknown kind." },
+  CODE_LANGUAGE: {
+    severity: "error",
+    meaning: "A code block names no language, or one the highlighter does not know.",
+  },
+  HEADING_DEPTH: { severity: "error", meaning: "A heading is deeper than ###." },
+  FILE_TREE_INVALID: {
+    severity: "error",
+    meaning: "A <FileTree> does not wrap one Markdown list.",
+  },
+  PANEL_CONTENT: {
+    severity: "error",
+    meaning: "<Tabs> or <Columns> holds something besides panels, or fewer than two.",
+  },
+  PANEL_LABEL: {
+    severity: "error",
+    meaning: "A panel has no label, or the same label as another.",
+  },
+  PANEL_NESTED: {
+    severity: "error",
+    meaning: "A panel is outside a container, or a container is inside a panel.",
+  },
+  TOO_MANY_COLUMNS: {
+    severity: "error",
+    meaning: "<Columns> holds more panels than fit side by side.",
+  },
+  FIGURE_NESTED: {
+    severity: "error",
+    meaning: "A figure inside a <Figure> has its own id or caption.",
+  },
+  EXCERPT_TEXT: {
+    severity: "error",
+    meaning:
+      "An excerpt's start, end, or mark text is in no line of the file, or start is in several.",
+  },
+  EXCERPT_INVALID: {
+    severity: "error",
+    meaning: "An <Excerpt> has an invalid from or attributes.",
+  },
+  // Charts.
+  CHART_PLOT: { severity: "error", meaning: "A <Chart> has no plot function." },
+  CHART_DATA: { severity: "error", meaning: "A chart's data is missing, unreadable, or mistyped." },
+  CHART_OPTION: { severity: "error", meaning: "plot returns or calls something the chart owns." },
+  CHART_COLOR: {
+    severity: "error",
+    meaning: "A mark sets a literal color; the theme picks colors.",
+  },
+  CHART_FIELD: { severity: "error", meaning: "A mark names a column its data does not have." },
+  CHART_FAILED: { severity: "error", meaning: "Drawing the chart threw." },
+  CHART_OVERLAP: { severity: "warning", meaning: "Tick labels on an axis overlap." },
+  // Diagrams.
+  DRAW_FAILED: { severity: "error", meaning: "The diagram's draw function threw." },
+  DIAGRAM_FAILED: { severity: "error", meaning: "The diagram compiler threw." },
+  RECORD_ROW: {
+    severity: "error",
+    meaning: "A record row is named that the record does not have.",
+  },
+  BEND_WITH_ROUTE: { severity: "error", meaning: "An edge sets both bend and route." },
+  DEGENERATE_EDGE: { severity: "error", meaning: "An edge starts and ends at the same point." },
+  PLACEMENT_CYCLE: {
+    severity: "error",
+    meaning: "Parts are placed relative to each other in a circle.",
+  },
+  LABEL_SEGMENT: {
+    severity: "error",
+    meaning: "An edge label names a segment the edge does not have.",
+  },
+  INVALID_PLACEMENT: {
+    severity: "error",
+    meaning: "A placement does not name exactly one relation.",
+  },
+  ENCLOSURE_PLACEMENT: {
+    severity: "error",
+    meaning: "An enclosure is placed; it takes its place from what it holds.",
+  },
+  CONFLICTING_PLACEMENT: { severity: "error", meaning: "A part is positioned by two placements." },
+  UNPLACED: {
+    severity: "error",
+    meaning: "A part has no placement, so it is drawn over another part.",
+  },
+  UNKNOWN_PART: { severity: "error", meaning: "A step focuses a part the diagram does not have." },
+  TEXT_OVERFLOW: { severity: "warning", meaning: "Text does not fit its box." },
+  LABEL_CROWDED: { severity: "warning", meaning: "An edge label has too little room." },
+  LABEL_OVERLAP: { severity: "warning", meaning: "A label overlaps another label or a part." },
+  NODE_OVERLAP: { severity: "warning", meaning: "Two parts shown together overlap." },
+  EDGE_NODE_INTERSECTION: {
+    severity: "warning",
+    meaning: "An edge crosses a part it does not connect.",
+  },
+  ENCLOSURE_TITLE_CROSSED: {
+    severity: "warning",
+    meaning: "An edge crosses an enclosure's title.",
+  },
+  ENCLOSURE_INTRUSION: {
+    severity: "warning",
+    meaning: "A part it does not hold overlaps an enclosure.",
+  },
+  ACCENT_OVERUSED: { severity: "warning", meaning: "Too many parts are accented to stand out." },
+  TOO_MANY_CATEGORIES: {
+    severity: "warning",
+    meaning: "More categories than colors; the rest are drawn muted.",
+  },
+  DIAGRAM_SCROLLS: {
+    severity: "warning",
+    meaning: "The drawing is too wide, so readers scroll sideways.",
+  },
+  STEP_ONLY_UNUSED: { severity: "warning", meaning: "A stepOnly part is in no step." },
+  BUILD_WITHOUT_STEPS: { severity: "warning", meaning: "A diagram has build but no steps." },
+  // Found when a page or reply runs in the browser.
+  RENDER_FAILED: { severity: "error", meaning: "A page threw while rendering." },
+  RUNTIME_FAILED: { severity: "error", meaning: "Code on a page threw outside rendering." },
+  REPLY_FAILED: { severity: "error", meaning: "A reply could not be shown." },
+} as const satisfies Record<string, { severity: Severity; meaning: string }>;
+
+export type DiagnosticCode = keyof typeof diagnosticCodes;
+
+export function isDiagnosticCode(code: string): code is DiagnosticCode {
+  return Object.hasOwn(diagnosticCodes, code);
+}
+
+/** An error or warning in the document, with where it is. Its severity is its code's. */
 export interface Diagnostic {
   origin: DiagnosticOrigin;
-  severity: "error" | "warning";
-  /** Short machine code, such as BROKEN_LINK or NODE_OVERLAP. */
-  code: string;
+  code: DiagnosticCode;
   message: string;
   /** The file it is in, relative to the project folder, when known. */
   source?: string;
@@ -169,10 +312,30 @@ export interface DiagnosticReport {
   revision?: string;
 }
 
-/** A diagnostic as the server lists it. */
+/** A diagnostic as the server lists it, with its code's severity. */
 export interface ReportedDiagnostic extends Diagnostic {
+  severity: Severity;
   scope: string;
   reportedAt: string;
+}
+
+/**
+ * Body of GET /-/api/agent/diagnostics, which answers once the checks of recent edits are done:
+ * every open diagnostic, the pages no browser has checked since they changed, and text for the agent.
+ */
+export interface AgentDiagnostics {
+  diagnostics: ReportedDiagnostic[];
+  unchecked: string[];
+  prompt: string;
+}
+
+/**
+ * Body of a refused POST /-/api/agent/reply (422): text for the agent, and the problems with
+ * the reply or the errors that appeared after the agent read the message.
+ */
+export interface ReplyRefusal {
+  error: string;
+  diagnostics: Diagnostic[];
 }
 
 /* ---------- Source files ---------- */

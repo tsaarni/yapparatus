@@ -21,7 +21,13 @@ import { checkFiles } from "../files.ts";
 import { createLogger } from "../logger.ts";
 import { contentIssues } from "../markdown-plugin.ts";
 import { compiled } from "../outline-plugin.ts";
-import type { Diagnostic, DiagnosticOrigin, ReportedDiagnostic } from "../protocol.ts";
+import {
+  type Diagnostic,
+  type DiagnosticOrigin,
+  diagnosticCodes,
+  isDiagnosticCode,
+  type ReportedDiagnostic,
+} from "../protocol.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { revision } from "../source-plugin.ts";
 import { HttpError, isRecord, type Router } from "./http.ts";
@@ -85,7 +91,12 @@ export class DiagnosticStore {
         continue;
       }
       for (const diagnostic of entry.diagnostics)
-        out.push({ ...diagnostic, scope, reportedAt: entry.reportedAt });
+        out.push({
+          ...diagnostic,
+          severity: diagnosticCodes[diagnostic.code].severity,
+          scope,
+          reportedAt: entry.reportedAt,
+        });
     }
     return out;
   }
@@ -207,7 +218,6 @@ export class DiagnosticStore {
       "pages",
       pageErrors.map((message) => ({
         origin: "pages",
-        severity: "error",
         code: "PAGE_LIST",
         subject: message,
         message,
@@ -223,8 +233,7 @@ export class DiagnosticStore {
         const { message, loc } = cause as { message: string; loc?: { line: number } };
         failure = {
           origin: "compile",
-          severity: "error",
-          code: "COMPILE_ERROR",
+          code: "COMPILE_FAILED",
           message: message.split("\n")[0] ?? message,
           source,
           ...(loc?.line ? { line: loc.line } : {}),
@@ -235,9 +244,8 @@ export class DiagnosticStore {
         : (contentIssues.get(path.join(this.root, source)) ?? []).map(
             (issue): Diagnostic => ({
               origin: "compile",
-              severity: "error",
               code: issue.code,
-              subject: issue.subject,
+              ...(issue.subject ? { subject: issue.subject } : {}),
               message: issue.message,
               source,
               line: issue.line,
@@ -254,7 +262,6 @@ export class DiagnosticStore {
           .filter((link) => link.page === id)
           .map((link) => ({
             origin: "link",
-            severity: link.code === "DUPLICATE_TARGET" ? "warning" : "error",
             code: link.code,
             subject: link.subject,
             message: link.message,
@@ -291,7 +298,7 @@ export class DiagnosticStore {
       return;
     }
     log.info(`${scope}: ${diagnostics.length} diagnostics`);
-    for (const d of diagnostics) log.debug(`${scope}: ${d.severity} ${d.code} ${d.message}`);
+    for (const d of diagnostics) log.debug(`${scope}: ${d.code} ${d.message}`);
     this.changed();
   }
 
@@ -340,12 +347,16 @@ function parseDiagnostics(input: unknown): Diagnostic[] {
   return input.map((item): Diagnostic => {
     if (!isRecord(item)) throw new HttpError(400, "Each diagnostic must be an object.");
     const origin = item.origin as DiagnosticOrigin;
-    const severity = item.severity;
     const code = text(item.code, 80);
     const message = text(item.message, 4000);
-    if (!browserOrigins.includes(origin) || (severity !== "error" && severity !== "warning"))
-      throw new HttpError(400, "A diagnostic needs a known origin and severity.");
+    if (!browserOrigins.includes(origin))
+      throw new HttpError(400, "A diagnostic needs a known origin.");
     if (!code || !message) throw new HttpError(400, "A diagnostic needs a code and a message.");
+    if (!isDiagnosticCode(code))
+      throw new HttpError(
+        400,
+        `Unknown diagnostic code ${code}. The codes are in diagnosticCodes.`,
+      );
     const source = text(item.source, 500);
     const target = text(item.target, 200);
     const subject = text(item.subject, 500);
@@ -355,7 +366,6 @@ function parseDiagnostics(input: unknown): Diagnostic[] {
       : undefined;
     return {
       origin,
-      severity,
       code,
       message,
       ...(source ? { source } : {}),

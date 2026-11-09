@@ -134,13 +134,13 @@ Put a `.tsx` file next to the pages and import it: `import { Swatch } from "./sw
 
 ## Checking your work
 
-Fix the diagnostics your edits cause. Broken links, `Ref`s, and anchors, compile errors, and every diagram and chart diagnostic are reported with file and line.
+Fix every diagnostic. Broken links, `Ref`s, and anchors, duplicate ids, compile errors, and every diagram and chart diagnostic are reported with file and line, one per line: `- error BROKEN_LINK content/intro.mdx:12: …`. Each code is an `error`, which you must fix, or a `warning`, which reads badly but renders.
 
-- In the chat, new errors end your `wait`, and a reply is refused while errors that appeared after you read the message remain.
-- Without the chat, read them from the running dev server, from the project directory; `[]` means none:
+- After editing, read them from the running dev server, from the project directory. It waits until your edits are checked; `Diagnostics: none` means none:
 
 ```sh
-curl -s "$(node -p 'require("./.yapparatus/server.json").url')/-/api/diagnostics"
+node --input-type=module-typescript -e 'import { check } from "yapparatus/agent"; console.log((await check()).prompt);'
 ```
 
-- Diagrams and charts are checked only when a browser shows the page, because text is measured with the page font. Open each page with a diagram or a chart, for example with a browser tool, then read the diagnostics again.
+- In the chat, new errors also end your `wait`, and a reply is refused while errors that appeared after you read the message remain.
+- Diagrams and charts are checked only when a browser shows the page, because text is measured with the page font. The diagnostics list the pages no browser has shown since they changed. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.

@@ -67,9 +67,9 @@ The programs do not share memory. They communicate in only two ways: through HTT
 **The server API sorts messages by kind.** Each kind of message travels in one direction and has one module that handles it. The types are defined in [`src/protocol.ts`](/-/files/yapparatus/src/protocol.ts):
 
 - **Commands** are `POST` requests, such as a new message from the reader or a reply from the agent.
-- **Reports** are `PUT /-/api/diagnostics/{scope}` requests. The browser uses them to send the problems it found. See [diagnostics](diagnostics).
+- **Reports** are `PUT /-/api/diagnostics/{scope}` requests. The browser uses them to send the problems it found, by code: the server adds each code's severity and refuses a code it does not know. See [diagnostics](diagnostics#codes-and-severity).
 - **Events** are sent to the browser as a stream from `GET /-/api/events`.
-- **Reads** are `GET` requests. A read with a `timeout` parameter waits until there is new data. The [agent channel](chat#api) uses such reads.
+- **Reads** are `GET` requests. A read with a `timeout` parameter waits until there is new data, and `GET /-/api/agent/diagnostics` waits until the checks of recent edits are done. The [agent channel](chat#api) uses such reads.
 
 All text that the agent reads, from prompts to error messages, is written in [`src/server/prompt.ts`](/-/files/yapparatus/src/server/prompt.ts).
 
@@ -163,7 +163,7 @@ The browser runs one React app, which consists of the modules listed in <Ref to=
 
 ### Agent library
 
-[`src/agent.ts`](/-/files/yapparatus/src/agent.ts) is the package's `yapparatus/agent` export. It provides the functions `wait()` and `reply()`. The agent calls them from snippets, which are short TypeScript programs that the agent runs. The library runs in the agent's Node process. It finds the server through `.yapparatus/server.json`, and it prints only the text that the server writes. [The section on waiting](chat#waiting) describes the library's behavior.
+[`src/agent.ts`](/-/files/yapparatus/src/agent.ts) is the package's `yapparatus/agent` export. It provides the functions `wait()`, `reply()`, and `check()`. The agent calls them from snippets, which are short TypeScript programs that the agent runs. The library runs in the agent's Node process. It finds the server through `.yapparatus/server.json`, and it prints only the text that the server writes. [The section on waiting](chat#waiting) describes the library's behavior.
 
 ### Logging
 

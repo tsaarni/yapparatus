@@ -131,13 +131,16 @@ export function charts(files: SourceFiles) {
       if (node.name !== "Chart") return;
       const line = node.position?.start.line ?? 0;
       const issue = (subject: string, message: string, at = line) =>
-        issues.push({ code: "CHART", line: at, subject, message });
+        issues.push({ code: "CHART_DATA", line: at, subject, message });
       const plot = attribute(node, "plot");
       if (plot?.type !== "mdxJsxAttribute" || typeof plot.value !== "object" || !plot.value)
-        issue(
-          "plot",
-          "<Chart> needs plot={(Plot, rows) => ({ marks: [...] })}: a function that returns the marks.",
-        );
+        issues.push({
+          code: "CHART_PLOT",
+          line,
+          subject: "plot",
+          message:
+            "<Chart> needs plot={(Plot, rows) => ({ marks: [...] })}: a function that returns the marks.",
+        });
       const fromAttribute = attribute(node, "from");
       const from =
         fromAttribute?.type === "mdxJsxAttribute" && typeof fromAttribute.value === "string"

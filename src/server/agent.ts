@@ -10,7 +10,14 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { fileSource } from "../files.ts";
 import { createLogger } from "../logger.ts";
-import type { AgentPrompt, ChatState, Diagnostic } from "../protocol.ts";
+import type {
+  AgentDiagnostics,
+  AgentPrompt,
+  ChatState,
+  Diagnostic,
+  ReplyRefusal,
+  ReportedDiagnostic,
+} from "../protocol.ts";
 import { type ChatStore, placeContext } from "./chat.ts";
 import { HttpError, type Reply, type Router } from "./http.ts";
 import {
@@ -55,6 +62,12 @@ interface Waiter {
   done: (reply: Reply, gone?: boolean) => void;
 }
 
+/** A refused reply: the agent's text, and the diagnostics behind it. */
+function refused(error: string, diagnostics: Diagnostic[]): Reply {
+  const body: ReplyRefusal = { error, diagnostics };
+  return { status: 422, body };
+}
+
 export interface AgentOptions {
   root: string;
   /** The content folder, relative to the project folder. */
@@ -63,7 +76,11 @@ export interface AgentOptions {
   folders: () => Record<string, string>;
   chat: ChatStore;
   sequence: Sequence;
-  diagnostics: { list: () => Diagnostic[]; unchecked: () => string[]; settled: () => boolean };
+  diagnostics: {
+    list: () => ReportedDiagnostic[];
+    unchecked: () => string[];
+    settled: () => boolean;
+  };
   /** The agent's state changed: listening, working, or away. */
   changed: () => void;
 }
@@ -160,7 +177,7 @@ export class AgentChannel {
     if (next) this.agentTimer = setTimeout(() => this.agentChanged(), next - now + 10);
   }
 
-  private errors(): Diagnostic[] {
+  private errors(): ReportedDiagnostic[] {
     return this.options.diagnostics.list().filter((d) => d.severity === "error");
   }
 
@@ -203,7 +220,7 @@ export class AgentChannel {
   }
 
   /** Open errors numbered after `after`, with their numbers. */
-  private errorsAfter(after: number): Array<{ seq: number; error: Diagnostic }> {
+  private errorsAfter(after: number): Array<{ seq: number; error: ReportedDiagnostic }> {
     return this.errors()
       .map((error) => ({ seq: this.numbered.get(errorKey(error))?.seq ?? 0, error }))
       .filter(({ seq }) => seq > after);
@@ -239,11 +256,7 @@ export class AgentChannel {
     const cursor = Math.max(after, chat.cleared, newest, ...fresh.map(({ seq }) => seq));
     const isNew = new Set(fresh.map(({ error }) => errorKey(error)));
     const section = () =>
-      diagnosticsSection(
-        diagnostics.list(),
-        (d) => isNew.has(errorKey(d)),
-        diagnostics.unchecked(),
-      );
+      diagnosticsSection(diagnostics.list(), (d) => isNew.has(errorKey(d)), this.uncheckedPages());
     const prompt = messages.length
       ? messagesPrompt(
           messages,
@@ -340,13 +353,35 @@ export class AgentChannel {
       const skips = chat.readers(to).some((m) => m.seq <= past);
       log.info(`reply with cursor ${to} refused: ${fresh.length} new errors`);
       const errors = fresh.map(({ error }) => error);
-      throw new HttpError(422, newErrorsReply(to, errors, skips ? undefined : past));
+      return refused(newErrorsReply(to, errors, skips ? undefined : past), errors);
     }
     const result = await chat.addReply(answered.seq, mdx, this.readAt.get(answered.seq));
-    if ("errors" in result) throw new HttpError(422, rejectedReply(to, result.errors));
+    if ("errors" in result) return refused(rejectedReply(to, result.errors), result.errors);
     this.lastSeen = Date.now();
     this.agentChanged();
     return { status: 201, body: { seq: result.message.seq } };
+  }
+
+  /**
+   * The document's diagnostics once the checks of recent edits are done, for an agent that
+   * edited pages and wants to know before it replies. It reads only: it claims no listener
+   * and moves no cursor, so it can run beside a waiting read.
+   */
+  private async check(): Promise<AgentDiagnostics> {
+    await this.settle();
+    const { diagnostics } = this.options;
+    const listed = diagnostics.list();
+    const unchecked = diagnostics.unchecked();
+    const prompt = diagnosticsSection(listed, () => false, this.uncheckedPages());
+    return { diagnostics: listed, unchecked, prompt };
+  }
+
+  /** The pages not checked since they changed, as addresses: "content/a/b.mdx" → "/a/b". */
+  private uncheckedPages(): string[] {
+    const { content, diagnostics } = this.options;
+    return diagnostics
+      .unchecked()
+      .map((source) => `/${source.slice(content.length + 1).replace(/\.mdx$/, "")}`);
   }
 
   mount(router: Router) {
@@ -372,7 +407,8 @@ export class AgentChannel {
       })
       .on("POST", "/agent/reply", ({ query, text }) =>
         this.reply(integer(query.get("to"), "to"), text),
-      );
+      )
+      .on("GET", "/agent/diagnostics", async () => ({ status: 200, body: await this.check() }));
   }
 
   close() {

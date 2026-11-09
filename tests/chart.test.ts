@@ -199,7 +199,7 @@ test("a chart needs one source of data in a known format, and a plot", async () 
   for (const [name, source] of Object.entries(cases)) {
     const { issues } = await build(`${source}\n`);
     assert.equal(issues.length, 1, name);
-    assert.equal(issues[0]?.code, "CHART", name);
+    assert.equal(issues[0]?.code, name === "noPlot" ? "CHART_PLOT" : "CHART_DATA", name);
   }
 });
 

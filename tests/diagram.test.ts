@@ -336,7 +336,7 @@ test("categories: an id a part already has cannot name a category for steps", ()
   const d = new DiagramBuilder();
   d.box("Cache", { category: "Cache" });
   const out = compile(d, measure);
-  assert.deepEqual(codes(out), ["CATEGORY_ID_TAKEN"]);
+  assert.deepEqual(codes(out), ["DUPLICATE_ID"]);
   assert.equal(out.groups.cache, undefined);
 });
 

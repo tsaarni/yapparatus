@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Diagnostics, useFontsReady } from "../diagram/Diagram.tsx";
+import { diagnosticCodes } from "../protocol.ts";
 import { FigureFrame } from "../reader/components.tsx";
 import { useDiagramReport } from "../reader/diagnostics.tsx";
 import { fontSize, radius, sizes, space, theme } from "../reader/theme.stylex.ts";
@@ -155,9 +156,9 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
   const drawn = result?.svg ? result : fallback;
   const missing = !written && !load;
   const problems: ChartProblem[] = missing
-    ? [{ code: "CHART_DATA", severity: "error", message: "The chart has no data." }]
+    ? [{ code: "CHART_DATA", message: "The chart has no data." }]
     : error
-      ? [{ code: "CHART_DATA", severity: "error", message: `The data could not load: ${error}` }]
+      ? [{ code: "CHART_DATA", message: `The data could not load: ${error}` }]
       : (result?.problems ?? []);
 
   // The drawing is a DOM element Plot made; it replaces the last one in place.
@@ -252,7 +253,7 @@ function draw(
     return { problems: [...problems, thrown(error)] };
   }
   problems.push(...checkSpec(spec));
-  if (problems.some((p) => p.severity === "error")) return { problems };
+  if (problems.some((p) => diagnosticCodes[p.code].severity === "error")) return { problems };
   const base = {
     ...spec,
     width,
@@ -277,8 +278,7 @@ function draw(
     const domain = firstUseOrder([...((first as PlotDrawing).scale("color")?.domain ?? [])], rows);
     if (domain.length > categoryColors.length)
       problems.push({
-        code: "CHART_CATEGORIES",
-        severity: "warning",
+        code: "TOO_MANY_CATEGORIES",
         message: `The colors name ${domain.length} categories: ${domain.slice(0, 8).join(", ")}${domain.length > 8 ? ", …" : ""}. A chart has ${categoryColors.length} category colors, so the rest are drawn muted. Give fill or stroke a column with fewer categories, or split the chart with fx.`,
       });
     const range = domain.map((_, i) => categoryColors[i] ?? theme.textMuted);
@@ -307,8 +307,7 @@ function draw(
 
 function thrown(error: unknown): ChartProblem {
   return {
-    code: "CHART_ERROR",
-    severity: "error",
+    code: "CHART_FAILED",
     message: error instanceof Error ? error.message : String(error),
   };
 }
@@ -395,7 +394,7 @@ function overlaps(svg: Element): ChartProblem[] {
     const next = sorted[sorted.indexOf(clash) + 1];
     problems.push({
       code: "CHART_OVERLAP",
-      severity: "warning",
+      subject: axis,
       message: `The ${axis} tick labels "${clash.text}" and "${next?.text}" overlap. Show fewer ticks with ${axis}: { ticks: 5 }, rotate them with ${axis}: { tickRotate: -30 }, shorten the values, or swap the axes.`,
     });
   }

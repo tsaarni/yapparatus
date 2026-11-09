@@ -22,7 +22,7 @@ import {
   parseLines,
 } from "./files.ts";
 import { codeMarks, contentIssues } from "./markdown-plugin.ts";
-import type { SourceFileView } from "./protocol.ts";
+import type { DiagnosticCode, SourceFileView } from "./protocol.ts";
 import type { SourceFile, SourceFiles } from "./source-files.ts";
 
 /** Code colors come from CSS variables, so they follow the reader theme. */
@@ -193,12 +193,13 @@ export function excerpts(files: SourceFiles) {
     visit(tree, "mdxJsxFlowElement", (node: MdxJsxFlowElementHast) => {
       if (node.name !== "Excerpt") return;
       const line = node.position?.start.line ?? 0;
-      const issue = (subject: string, message: string) =>
-        issues.push({ code: "EXCERPT", line, subject, message });
+      const issue = (code: DiagnosticCode, subject: string, message: string) =>
+        issues.push({ code, line, ...(subject ? { subject } : {}), message });
       const from = literal(node, "from");
       const address = typeof from === "string" ? parseFileAddress(from) : undefined;
       if (!address) {
         issue(
+          "EXCERPT_INVALID",
           from ?? "",
           typeof from === "string"
             ? `<Excerpt from="${from}"> is not a file address. Write from="/-/files/<directory>/<path>".`
@@ -208,6 +209,7 @@ export function excerpts(files: SourceFiles) {
       }
       if (address.lines) {
         issue(
+          "EXCERPT_INVALID",
           from as string,
           `<Excerpt from="${from}"> names lines by number, which move when the file changes. Name the file alone and add start="text of the first line".`,
         );
@@ -218,7 +220,8 @@ export function excerpts(files: SourceFiles) {
       const mark = texts(node, "mark");
       if (start === null || end === null || mark === null || (end !== undefined && !start)) {
         issue(
-          "",
+          "EXCERPT_INVALID",
+          from as string,
           '<Excerpt> takes start="text", end="text", and mark="text" or mark={["text", "text"]}, written as strings; end needs start.',
         );
         return;
@@ -231,7 +234,7 @@ export function excerpts(files: SourceFiles) {
         ? excerptRange(source.lines, start, end)
         : { start: 1, end: source.lines.length };
       if ("error" in shown) {
-        issue(start ?? "", `<Excerpt> in ${address.path}: ${shown.error}`);
+        issue("EXCERPT_TEXT", start ?? "", `<Excerpt> in ${address.path}: ${shown.error}`);
         return;
       }
       const marked: number[] = [];
@@ -241,6 +244,7 @@ export function excerpts(files: SourceFiles) {
         );
         if (!at.length) {
           issue(
+            "EXCERPT_TEXT",
             text,
             `<Excerpt mark="${text}"> is in no line of the excerpt, L${shown.start} to L${shown.end}.`,
           );

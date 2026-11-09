@@ -40,7 +40,7 @@ export function installGlobalReporters() {
   const runtime: Diagnostic[] = [];
   const add = (message: string) => {
     if (!message || runtime.some((d) => d.message === message)) return;
-    runtime.push({ origin: "runtime", severity: "error", code: "RUNTIME_ERROR", message });
+    runtime.push({ origin: "runtime", code: "RUNTIME_FAILED", message });
     if (runtime.length > 20) runtime.shift();
     reportDiagnostics(scope, [...runtime]);
   };
@@ -80,7 +80,7 @@ export function useDiagramReport(
         origin: "diagram",
         source,
         // The parts identify a diagram diagnostic; its message may mention a step that moves.
-        ...(d.elements?.length ? { subject: d.elements.join(",") } : {}),
+        ...(!d.subject && d.elements?.length ? { subject: d.elements.join(",") } : {}),
       })),
       pages.find((page) => page.source === source)?.outline.revision,
     );
@@ -109,8 +109,7 @@ export class PageBoundary extends Component<
         ? [
             {
               origin: "render",
-              severity: "error",
-              code: "RENDER_ERROR",
+              code: "RENDER_FAILED",
               message: error.message,
               source,
             },

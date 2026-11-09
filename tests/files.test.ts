@@ -143,7 +143,7 @@ test("links to files and lines are checked against the file", () =>
     const problems = checkLinks([{ id: "intro", outline }], files.lineCount);
     assert.deepEqual(
       problems.map((p) => `${p.code}:${p.line}`),
-      ["BROKEN_ANCHOR:4", "BROKEN_LINK:5", "BROKEN_LINK:6"],
+      ["BROKEN_LINK:4", "BROKEN_LINK:5", "BROKEN_LINK:6"],
     );
     assert.match(problems[0]?.message ?? "", /lines 4–9, but the file has 4 lines/);
     assert.match(problems[2]?.message ?? "", /not a file address/);

@@ -71,7 +71,7 @@ test("code blocks name a language Shiki knows", async () => {
   assert.deepEqual(
     issues.map((i) => [i.code, i.subject, i.line]),
     [
-      ["CODE_LANGUAGE", "", 1],
+      ["CODE_LANGUAGE", "plain", 1],
       ["CODE_LANGUAGE", "tomll", 13],
     ],
   );
@@ -145,7 +145,7 @@ test("FileTree: the list becomes entries; names, comments, folders, and bold", a
 
 test("FileTree without a list is reported", async () => {
   const { issues } = await build("<FileTree>\nsrc/index.ts\n</FileTree>\n");
-  assert.equal(issues[0]?.code, "FILE_TREE");
+  assert.equal(issues[0]?.code, "FILE_TREE_INVALID");
 });
 
 let containerLabels: unknown;
@@ -177,22 +177,35 @@ test("Tabs and Columns get their panels' labels", async () => {
 
 test("panels are reported when they break the rules", async () => {
   const panel = (label: string) => `<Panel label="${label}">\n\nText.\n\n</Panel>\n`;
-  const cases: [string, string][] = [
-    [`<Tabs>\n${panel("a")}\nStray text.\n\n${panel("b")}</Tabs>\n`, "holds only <Panel>"],
-    [`<Tabs>\n${panel("a")}${panel("a")}</Tabs>\n`, `label "a"`],
-    [`<Tabs>\n${panel("a")}</Tabs>\n`, "at least two"],
-    [`<Tabs>\n<Panel>\n\nText.\n\n</Panel>\n${panel("b")}</Tabs>\n`, "needs a label"],
-    [`<Columns>\n${["a", "b", "c", "d"].map(panel).join("")}</Columns>\n`, "at most 3"],
-    [panel("alone"), "directly inside"],
+  const cases: [string, string, string][] = [
+    [
+      `<Tabs>\n${panel("a")}\nStray text.\n\n${panel("b")}</Tabs>\n`,
+      "PANEL_CONTENT",
+      "holds only <Panel>",
+    ],
+    [`<Tabs>\n${panel("a")}${panel("a")}</Tabs>\n`, "PANEL_LABEL", `label "a"`],
+    [`<Tabs>\n${panel("a")}</Tabs>\n`, "PANEL_CONTENT", "at least two"],
+    [
+      `<Tabs>\n<Panel>\n\nText.\n\n</Panel>\n${panel("b")}</Tabs>\n`,
+      "PANEL_LABEL",
+      "needs a label",
+    ],
+    [
+      `<Columns>\n${["a", "b", "c", "d"].map(panel).join("")}</Columns>\n`,
+      "TOO_MANY_COLUMNS",
+      "at most 3",
+    ],
+    [panel("alone"), "PANEL_NESTED", "directly inside"],
     [
       `<Tabs>\n<Panel label="a">\n\n<Tabs>\n${panel("x")}${panel("y")}</Tabs>\n\n</Panel>\n${panel("b")}</Tabs>\n`,
+      "PANEL_NESTED",
       "cannot be inside",
     ],
   ];
-  for (const [source, message] of cases) {
+  for (const [source, code, message] of cases) {
     const { issues } = await build(source);
     assert.ok(
-      issues.some((i) => i.code === "PANELS" && i.message.includes(message)),
+      issues.some((i) => i.code === code && i.message.includes(message)),
       `${message}: ${JSON.stringify(issues)}`,
     );
   }
@@ -222,6 +235,6 @@ test("a figure or listing holding columns is wide, and a figure inside a figure 
   const nested = await build(
     `<Figure id="outer" caption="Outer.">\n\n<Diagram id="inner" draw={() => {}} />\n\n</Figure>\n`,
   );
-  assert.equal(nested.issues[0]?.code, "FIGURE");
+  assert.equal(nested.issues[0]?.code, "FIGURE_NESTED");
   assert.equal(nested.issues[0]?.subject, "inner");
 });

@@ -35,14 +35,29 @@ Diagnostics are the errors and warnings in a document. Examples are a page that 
 4. **Runtime errors are reported per browser tab.** Each tab reports its runtime errors under its own scope. The tab clears them when a hot update starts, because the update replaces the code that failed. The tab removes them when it closes. If the new code throws the error again, the tab reports it again.
 5. **A report that belongs to one revision of a file expires when the file changes.** A diagnostic from an old version therefore disappears when the fix is saved.
 6. **Each page has a check state.** A browser that renders a page reports the page, even when it has no errors. A page that has changed since it was last rendered is listed as not checked. An empty list therefore always means that the checked pages have no problems.
-7. **Direction:** an open tab also renders, off screen, the pages that it does not show, so that one tab checks the whole document. Browsers slow down background tabs, so this needs testing first.
+7. **A reply is checked like a page before it is stored.** Its problems are diagnostics with the codes pages use, such as `BROKEN_LINK` or `COMPILE_FAILED`, plus `UNKNOWN_COMPONENT` and `REPLY_EMPTY`, which only a reply can have. They are not stored: they come back to the agent in the refusal. See [replying](chat#replying).
+8. **Direction:** an open tab also renders, off screen, the pages that it does not show, so that one tab checks the whole document. Browsers slow down background tabs, so this needs testing first.
+
+## Codes and severity
+
+<Ref to="diagnostic-codes" /> shows the start of the registry of codes.
+
+<Listing id="diagnostic-codes" caption="The registry: each code with its severity and what it means.">
+<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export const diagnosticCodes = {" end="DUPLICATE_ID:" mark="severity" />
+</Listing>
+
+1. **Every code is in one registry, with its severity.** `diagnosticCodes` in `protocol.ts` maps each code to its severity and one line on what it means, and `DiagnosticCode` is the union of its codes. A check passes a code and never a severity, so one code cannot be an error in one checker and a warning in another.
+2. **A code names what is wrong, in the words of the authoring guide.** It has no `_ERROR` suffix, because the severity says that, and it is never only a component's name. Each problem has one code, and the same problem has the same code in every checker: a duplicate is `DUPLICATE_ID` whether two pages, a heading and a figure, or a step and a part share the id.
+3. **The severity follows one rule.** A code is an `error` when the result is not what the author wrote: a reference to nothing, a duplicate, an invalid form, or something that threw. It is a `warning` when the page renders as written but reads badly: overlap, overflow, or too much. The rule guides the choice for each code in the registry; no code derives a severity from it.
+4. **Reports carry no severity; the server adds it.** The browser sends codes. The server refuses a report whose code is not in the registry, and adds each code's severity when it lists diagnostics, in the event stream, and in the agent's text. A browser running old code therefore cannot contradict the registry.
+5. **Rejected: a layered taxonomy.** A fixed list of problem words, classes such as "failure, mistake, flaw", and severity derived from the class would make codes less descriptive and need exceptions. Codes are used only as identity, as a label in the header list and the agent's prompt, and for their severity, so nothing would read the class.
 
 ## How diagnostics are identified
 
 <Ref to="diagnostic-type" /> shows the fields of a diagnostic.
 
 <Listing id="diagnostic-type" caption="A diagnostic. The code, file, target, and subject identify it.">
-<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface Diagnostic {" mark={["code: string", "source?: string", "target?: string", "subject?: string"]} />
+<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface Diagnostic {" mark={["code: DiagnosticCode", "source?: string", "target?: string", "subject?: string"]} />
 </Listing>
 
 **An error is identified by its code, file, target, and subject.** The subject is what the error is about, such as a link's target or a diagram's parts. With this identity, an error whose message is reworded is still the same error, and two broken links on one page are two separate errors. When an error has no subject, its message identifies it.
@@ -51,5 +66,7 @@ Diagnostics are the errors and warnings in a document. Examples are a page that 
 
 1. **The agent learns about new errors without asking.** The agent channel numbers its messages in a sequence. An error gets a number in this sequence after it has existed for 2 s. Errors with a number after the agent's cursor, its position in the sequence, are new. New errors end a `wait` in the same way as a reader message does. The prompt then lists all diagnostics with the new errors marked, and also the pages that are not checked. See [waiting](chat#waiting).
 2. **The server refuses a reply while new errors remain.** The agent has no `wait` open while it edits. Errors caused by its own edits therefore reach the agent when it replies; see [replying](chat#replying).
-3. **Short-lived errors and warnings never end the agent's wait.** An error that disappears within 2 s, such as one caused by a file that was saved half-written, gets no number. Warnings do not end a wait, so the agent does not spend a turn on them.
-4. **The reader sees diagnostics in place and in a list.** A page that fails shows its error. A diagram or chart shows its diagnostics under the figure. When there are errors or warnings, the header shows how many there are. Each item in the list opens the place it is about. **Ask** attaches that place to the message box. A diagnostic therefore reaches the chat only when the reader asks about it.
+3. **The agent can check its edits without the chat.** `check()` waits until the checks of recent edits are done, as a reply does, and returns every diagnostic and the pages not checked, with text for the agent. It reads only: it claims no listener and moves no cursor, so it runs beside a waiting `wait`. `GET /-/api/diagnostics` stays the immediate list, for the browser and for debugging.
+4. **The agent reads one line per diagnostic, the same everywhere.** A prompt, a check, and a refused reply all write `- error CODE file:line#figure: message`. A reply being checked has no file yet, so its problems name only the line.
+5. **Short-lived errors and warnings never end the agent's wait.** An error that disappears within 2 s, such as one caused by a file that was saved half-written, gets no number. Warnings do not end a wait, so the agent does not spend a turn on them.
+6. **The reader sees diagnostics in place and in a list.** A page that fails shows its error. A diagram or chart shows its diagnostics under the figure. When there are errors or warnings, the header shows how many there are. Each item in the list opens the place it is about. **Ask** attaches that place to the message box. A diagnostic therefore reaches the chat only when the reader asks about it.

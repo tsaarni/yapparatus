@@ -2,7 +2,13 @@ import { spawn } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import type { AgentPrompt, ChatState, ContextItem } from "../../src/protocol.ts";
+import type {
+  AgentDiagnostics,
+  AgentPrompt,
+  ChatState,
+  ContextItem,
+  ReplyRefusal,
+} from "../../src/protocol.ts";
 import { root, runSnippet, snippets } from "./workspace.ts";
 
 const reply = `# The fallback read
@@ -95,12 +101,23 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   // Replies are checked before they are accepted.
   const broken = await runSnippet(replyAndWait ?? "", "<Figure>\n\n{oops\n");
   expect(broken.code).not.toBe(0);
-  expect(broken.stderr).toContain("The reply was not accepted");
+  expect(broken.stderr).toContain("The reply was not sent:");
+  expect(broken.stderr).toMatch(/^- error COMPILE_FAILED line \d+: /m);
   const unknown = await runSnippet(replyAndWait ?? "", "<Bogus />\n\nSee [nowhere](nowhere).\n");
-  expect(unknown.stderr).toContain("<Bogus> is not a component");
-  expect(unknown.stderr).toContain('No page matches the link "nowhere"');
+  expect(unknown.stderr).toContain("- error UNKNOWN_COMPONENT: <Bogus> is not a component");
+  expect(unknown.stderr).toContain(
+    '- error BROKEN_LINK line 3: No page matches the link "nowhere"',
+  );
+  // A refused reply carries the same problems as data, for code that catches the error.
+  const caught = await runSnippet(
+    'import { reply } from "yapparatus/agent"; try { await reply({ to: 1 }); } catch (error) { console.log(JSON.stringify(error.diagnostics)); }',
+    "See [nowhere](nowhere).\n",
+  );
+  expect(JSON.parse(caught.stdout)).toEqual([
+    expect.objectContaining({ origin: "reply", code: "BROKEN_LINK", line: 1, subject: "nowhere" }),
+  ]);
   const empty = await runSnippet(replyAndWait ?? "", "");
-  expect(empty.stderr).toContain("The reply is empty");
+  expect(empty.stderr).toContain("- error REPLY_EMPTY: The reply is empty");
 
   // A marker on the window shows that page edits and replies arrive without a reload.
   await page.evaluate(() => Object.assign(window, { notReloaded: true }));
@@ -207,8 +224,7 @@ test("REST API: resources, status codes, waiting reads, listeners, and origin ch
   const scope = encodeURIComponent("runtime:test");
   const diagnostic = {
     origin: "runtime",
-    severity: "error",
-    code: "TEST_ERROR",
+    code: "RUNTIME_FAILED",
     message: "A deliberate test error.",
   };
   const put = (data: unknown, at = scope) => request.put(`/-/api/diagnostics/${at}`, { data });
@@ -216,6 +232,10 @@ test("REST API: resources, status codes, waiting reads, listeners, and origin ch
   // An error is numbered once it has stayed for a moment, so a flicker never wakes the agent.
   await new Promise((resolve) => setTimeout(resolve, 2500));
   expect((await put({ diagnostics: [{}] })).status()).toBe(400);
+  // Codes come from the registry, and the registry decides severity: reports carry none.
+  const unknownCode = await put({ diagnostics: [{ ...diagnostic, code: "MADE_UP" }] });
+  expect(unknownCode.status()).toBe(400);
+  expect(((await unknownCode.json()) as { error: string }).error).toContain("MADE_UP");
   // The server's own checks are not the browser's to write.
   expect((await put({ diagnostics: [] }, encodeURIComponent("links:x"))).status()).toBe(400);
   const listed = (await (await request.get("/-/api/diagnostics")).json()) as Array<{
@@ -223,7 +243,7 @@ test("REST API: resources, status codes, waiting reads, listeners, and origin ch
     scope: string;
   }>;
   expect(listed).toContainEqual(
-    expect.objectContaining({ code: "TEST_ERROR", scope: "runtime:test" }),
+    expect.objectContaining({ code: "RUNTIME_FAILED", severity: "error", scope: "runtime:test" }),
   );
 
   const created = await request.post("/-/api/chat/reader", {
@@ -236,7 +256,7 @@ test("REST API: resources, status codes, waiting reads, listeners, and origin ch
   const prompt = (await read.json()) as AgentPrompt;
   expect(prompt.messages.map((m) => m.seq)).toEqual([seq]);
   // The error is numbered before the cursor, so it is listed but not new.
-  expect(prompt.prompt).toContain("- error TEST_ERROR: A deliberate test error.");
+  expect(prompt.prompt).toContain("- error RUNTIME_FAILED: A deliberate test error.");
   expect(prompt.prompt).toContain("No context: a question about the document in general.");
   // The same cursor gives the same messages; an idle read says how to wait again.
   const again = (await (
@@ -258,7 +278,7 @@ test("REST API: resources, status codes, waiting reads, listeners, and origin ch
   expect(woken.messages).toEqual([]);
   expect(woken.newErrors.map((d) => d.message)).toEqual(["Another test error."]);
   expect(woken.prompt).toContain("The document has new errors.");
-  expect(woken.prompt).toContain("- new error TEST_ERROR: Another test error.");
+  expect(woken.prompt).toContain("- new error RUNTIME_FAILED: Another test error.");
   // The next cursor is past the error, which took a number after the message.
   const cursor = Number(/reply\(\{ to: (\d+) \}\)/.exec(woken.prompt)?.[1]);
   expect(cursor).toBeGreaterThan(seq);
@@ -269,6 +289,17 @@ test("REST API: resources, status codes, waiting reads, listeners, and origin ch
   const old = await request.get(`/-/api/agent/prompt?after=${seq}&timeout=0&listener=a`);
   expect(old.status()).toBe(409);
   expect(((await old.json()) as { error: string }).error).toContain("took over");
+  // Checking diagnostics reads only: it lists them with their severity and takes over no one.
+  const checked = await request.get("/-/api/agent/diagnostics");
+  expect(checked.status()).toBe(200);
+  const report = (await checked.json()) as AgentDiagnostics;
+  expect(report.diagnostics).toContainEqual(
+    expect.objectContaining({ code: "RUNTIME_FAILED", severity: "error" }),
+  );
+  expect(report.prompt).toContain("- error RUNTIME_FAILED: A deliberate test error.");
+  expect(
+    (await request.get(`/-/api/agent/prompt?after=${seq}&timeout=0&listener=b`)).status(),
+  ).toBe(200);
   expect((await request.get("/-/api/agent/prompt?after=-1")).status()).toBe(400);
 
   expect(
@@ -441,7 +472,20 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
   expect(told.stdout).toContain("The document has new errors.");
   expect(told.stdout).toContain(`- new error BROKEN_LINK content/second-page.mdx:${brokenLine}:`);
   expect(told.stdout).toContain(`HEADING_DEPTH content/second-page.mdx:${deepLine}:`);
-  expect(told.stdout).toMatch(/Not checked since they changed.*content\/second-page\.mdx/);
+  // Only a browser checks diagrams: the reply links each change, and opening it checks the page.
+  expect(told.stdout).toContain("link each change in your reply");
+  expect(told.stdout).toMatch(/^- \/second-page$/m);
+  // check() waits for the checks of an edit it has not seen yet.
+  writeFileSync(file, `${original.trimEnd()}\n\nSee [elsewhere](nowhere-else).\n`);
+  const checked = await runSnippet(
+    'import { check } from "yapparatus/agent"; console.log((await check()).prompt);',
+  );
+  expect(checked.stderr).toBe("");
+  expect(checked.stdout).toMatch(
+    /^- error BROKEN_LINK content\/second-page\.mdx:\d+: .*nowhere-else/m,
+  );
+  // The same pages, to link in the reply.
+  expect(checked.stdout).toMatch(/^- \/second-page$/m);
   // The fix clears it.
   writeFileSync(file, original);
   await expect
@@ -485,9 +529,8 @@ test("the header lists diagnostics, and Ask attaches where one is", async ({ pag
       diagnostics: [
         {
           origin: "diagram",
-          severity: "error",
-          code: "TEST_OVERLAP",
-          message: "Two test boxes overlap.",
+          code: "UNKNOWN_PART",
+          message: "A test step focuses nothing.",
           source: "content/first-page.mdx",
           target: "test-figure",
         },
@@ -496,10 +539,10 @@ test("the header lists diagnostics, and Ask attaches where one is", async ({ pag
   });
   await page.goto("/second-page");
   await page.getByRole("button", { name: "1 error" }).click();
-  await page.getByRole("button", { name: "Ask about TEST_OVERLAP" }).click();
+  await page.getByRole("button", { name: "Ask about UNKNOWN_PART" }).click();
   await expect(page).toHaveURL(/\/first-page/);
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
-    "Please fix this error: TEST_OVERLAP: Two test boxes overlap.",
+    "Please fix this error: UNKNOWN_PART: A test step focuses nothing.",
   );
   await expect(page.locator(".context-items")).toContainText("Chapter 1 · First page");
   await request.delete(`/-/api/diagnostics/${scope}`);
@@ -545,9 +588,7 @@ test("a reply is refused while errors that appeared after the agent read remain"
   const scope = encodeURIComponent("runtime:gate-test");
   await request.put(`/-/api/diagnostics/${scope}`, {
     data: {
-      diagnostics: [
-        { origin: "runtime", severity: "error", code: "GATE_ERROR", message: "Broken by an edit." },
-      ],
+      diagnostics: [{ origin: "runtime", code: "RUNTIME_FAILED", message: "Broken by an edit." }],
     },
   });
   const refused = await request.post(`/-/api/agent/reply?to=${cursor}`, {
@@ -555,10 +596,14 @@ test("a reply is refused while errors that appeared after the agent read remain"
     data: "Done.",
   });
   expect(refused.status()).toBe(422);
-  const text = ((await refused.json()) as { error: string }).error;
+  const body = (await refused.json()) as ReplyRefusal;
+  const text = body.error;
   expect(text).toContain("The reply was not sent.");
-  expect(text).toContain("- error GATE_ERROR: Broken by an edit.");
-  // A cursor past the errors says the agent saw them and did not cause them.
+  expect(text).toContain("- error RUNTIME_FAILED: Broken by an edit.");
+  expect(body.diagnostics).toEqual([
+    expect.objectContaining({ code: "RUNTIME_FAILED", message: "Broken by an edit." }),
+  ]);
+  // A cursor past the errors says the agent saw them and cannot fix them.
   const past = Number(/past them:\n\n.*reply\(\{ to: (\d+) \}\)/s.exec(text)?.[1]);
   expect(past).toBeGreaterThan(cursor);
   // Fixed, the reply goes through with the original cursor.

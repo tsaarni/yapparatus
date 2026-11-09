@@ -107,7 +107,7 @@ The chart passes a wrapped Plot library to `plot`. Its functions check their opt
 1. **A field must name a column.** A text value of a field option, such as `y: "p99"`, must name a column of the mark's data. If it does not, the error lists the columns. Plot itself would draw nothing for an unknown field and report nothing.
 2. **A constant color is reported as a literal color.** Plot treats a text value that parses as a color as a constant color. The check therefore catches `fill: "tomato"` before Plot draws it.
 3. **The chart creates the figure.** Calling `Plot.plot` or `Plot.legend` inside `plot` is an error.
-4. **Errors from Plot are reported unchanged,** as `CHART_ERROR` with Plot's message.
+4. **Errors from Plot are reported unchanged,** as `CHART_FAILED` with Plot's message.
 
 ## Sources
 

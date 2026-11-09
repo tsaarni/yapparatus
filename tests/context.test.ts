@@ -209,7 +209,7 @@ test("links resolve by address, file name, and anchor; broken ones are reported"
   );
   assert.deepEqual(
     problems.map((p) => `${p.code}:${p.line}`),
-    ["BROKEN_ANCHOR:4", "BROKEN_LINK:5", "BROKEN_REF:12", "BROKEN_REF:13", "BROKEN_REF:14"],
+    ["BROKEN_LINK:4", "BROKEN_LINK:5", "BROKEN_REF:12", "BROKEN_REF:13", "BROKEN_REF:14"],
   );
 });
 
@@ -252,12 +252,12 @@ test("the sequence survives a restart and never goes below the log", () => {
 });
 
 test("an error is identified by its subject, so rewording does not make it new", () => {
-  const link = { origin: "link" as const, severity: "error" as const, code: "BROKEN_LINK" };
+  const link = { origin: "link" as const, code: "BROKEN_LINK" as const };
   const a = { ...link, source: "content/a.mdx", subject: "nowhere", message: "No page." };
   assert.equal(errorKey(a), errorKey({ ...a, message: "No page matches." }));
   assert.notEqual(errorKey(a), errorKey({ ...a, subject: "elsewhere" }));
   // Without a subject, the message identifies it.
-  const runtime = { origin: "runtime" as const, severity: "error" as const, code: "RUNTIME_ERROR" };
+  const runtime = { origin: "runtime" as const, code: "RUNTIME_FAILED" as const };
   assert.notEqual(errorKey({ ...runtime, message: "x" }), errorKey({ ...runtime, message: "y" }));
 });
 

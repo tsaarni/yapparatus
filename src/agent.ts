@@ -11,20 +11,38 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createLogger } from "./logger.ts";
-import { type AgentPrompt, apiPrefix } from "./protocol.ts";
+import {
+  type AgentDiagnostics,
+  type AgentPrompt,
+  apiPrefix,
+  type Diagnostic,
+  type ReplyRefusal,
+} from "./protocol.ts";
 
-export type { AgentPrompt, ContextItem, ReaderMessage } from "./protocol.ts";
+export type {
+  AgentDiagnostics,
+  AgentPrompt,
+  ContextItem,
+  Diagnostic,
+  ReaderMessage,
+  ReportedDiagnostic,
+} from "./protocol.ts";
 
 const log = createLogger("agent");
 
 /** The longest single request, in seconds; the server waits no longer than this either. */
 const requestWait = 25;
 
-/** An error whose message is meant for the agent: what went wrong and the snippet to run next. */
+/**
+ * An error whose message is meant for the agent: what went wrong and the snippet to run next.
+ * A refused reply also carries the diagnostics behind it.
+ */
 export class YapparatusError extends Error {
-  constructor(message: string) {
+  readonly diagnostics: Diagnostic[];
+  constructor(message: string, diagnostics: Diagnostic[] = []) {
     super(message);
     this.name = "YapparatusError";
+    this.diagnostics = diagnostics;
   }
 }
 
@@ -71,8 +89,11 @@ async function call(url: string, init: RequestInit, timeout: number): Promise<Re
 }
 
 async function failure(response: Response): Promise<YapparatusError> {
-  const body = (await response.json().catch(() => ({}))) as { error?: string };
-  return new YapparatusError(body.error ?? `${response.status} ${response.statusText}`);
+  const body = (await response.json().catch(() => ({}))) as Partial<ReplyRefusal>;
+  return new YapparatusError(
+    body.error ?? `${response.status} ${response.statusText}`,
+    body.diagnostics ?? [],
+  );
 }
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -130,4 +151,15 @@ export async function reply(options: { to: number }): Promise<{ seq: number }> {
   );
   if (!response.ok) throw await failure(response);
   return (await response.json()) as { seq: number };
+}
+
+/**
+ * The document's errors and warnings, once the checks of recent edits are done. Resolves with
+ * them, the pages no browser has checked since they changed, and the prompt to read. It does
+ * not touch the chat: run it after editing pages, before replying, or without a chat at all.
+ */
+export async function check(): Promise<AgentDiagnostics> {
+  const response = await call(`${serverUrl()}${apiPrefix}/agent/diagnostics`, {}, requestWait);
+  if (!response.ok) throw await failure(response);
+  return (await response.json()) as AgentDiagnostics;
 }

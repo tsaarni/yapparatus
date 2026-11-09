@@ -3,6 +3,7 @@
  * size, fonts, colors, and margins, and checks what the marks name.
  */
 import type * as PlotModule from "@observablehq/plot";
+import type { DiagnosticCode } from "../protocol.ts";
 
 export type PlotLibrary = typeof PlotModule;
 export type Row = Record<string, number | string | Date | null>;
@@ -20,8 +21,9 @@ export interface ChartSpec {
 export type PlotFunction = (Plot: PlotLibrary, rows: Row[]) => ChartSpec;
 
 export interface ChartProblem {
-  code: string;
-  severity: "error" | "warning";
+  code: DiagnosticCode;
+  /** What the problem is about, so two problems in one chart stay apart. */
+  subject?: string;
   message: string;
 }
 
@@ -90,7 +92,7 @@ export function chartLibrary(Plot: PlotLibrary, problems: ChartProblem[]): PlotL
       if (outside.has(name))
         problems.push({
           code: "CHART_OPTION",
-          severity: "error",
+          subject: `Plot.${name}`,
           message: `plot calls Plot.${name}. Return { marks: [...] } instead: the chart draws the plot, its legend, and its frame.`,
         });
       const data = Array.isArray(args[0]) ? args[0] : undefined;
@@ -117,7 +119,7 @@ function checkOptions(
       if (!neutral.has(value.toLowerCase()) && !reported)
         problems.push({
           code: "CHART_COLOR",
-          severity: "error",
+          subject: `Plot.${name} ${key}: ${value}`,
           message: `Plot.${name} sets ${key}: "${value}". The theme picks colors: set ${key} to a column of categories${fields ? `, one of ${list(fields)},` : ""} and each category gets its own color, or leave it out for the text color.`,
         });
       continue;
@@ -125,7 +127,7 @@ function checkOptions(
     if (fields)
       problems.push({
         code: "CHART_FIELD",
-        severity: "error",
+        subject: `Plot.${name} ${key}: ${value}`,
         message: `Plot.${name} sets ${key}: "${value}", which is no column of its data. The columns are ${list(fields)}.`,
       });
   }
@@ -137,7 +139,7 @@ export function checkSpec(spec: unknown): ChartProblem[] {
     return [
       {
         code: "CHART_OPTION",
-        severity: "error",
+        subject: "marks",
         message: "plot returns { marks: [...] }, with the marks in an array.",
       },
     ];
@@ -146,7 +148,7 @@ export function checkSpec(spec: unknown): ChartProblem[] {
   return [
     {
       code: "CHART_OPTION",
-      severity: "error",
+      subject: extra.join(", "),
       message: `plot returns ${list(extra)}. It may return ${list(specOptions)}: the chart sets its size, margins, fonts, colors, and legend itself.`,
     },
   ];

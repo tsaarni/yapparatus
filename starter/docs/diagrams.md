@@ -294,9 +294,10 @@ In development, diagnostics appear under the figure, in the console, as dashed o
 |---|---|---|
 | `PLACEMENT_CYCLE` | error | Placements depend on each other. Place one of them independently |
 | `CONFLICTING_PLACEMENT` | error | A shape is in a row and also placed. Keep one |
-| `DUPLICATE_ID` | error | Two explicit ids are the same, or a step id is taken |
+| `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or a part has the same id as a category, so steps cannot focus the category. Rename one |
 | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT` | error | Check the `place()` options |
-| `DRAW_ERROR` | error | The `draw` function threw |
+| `DRAW_FAILED` | error | The `draw` function threw |
+| `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or use `loop` |
 | `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |
 | `RECORD_ROW` | error | `rec.row(i)` names a row that does not exist |
@@ -306,14 +307,13 @@ In development, diagnostics appear under the figure, in the console, as dashed o
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only parts overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
 | `TEXT_OVERFLOW` | warning | Increase `width` or `height` |
-| `UNPLACED` | warning | Add the shape to a row or column, or `place()` it |
-| `UNKNOWN_PART` | warning | A step focuses an id that does not exist. The message lists the valid ids |
+| `UNPLACED` | error | Add the shape to a row or column, or `place()` it |
+| `UNKNOWN_PART` | error | A step focuses an id that does not exist. The message lists the valid ids |
 | `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |
 | `STEP_ONLY_UNUSED` | warning | A `stepOnly` part that no step focuses is never shown |
 | `DIAGRAM_SCROLLS` | warning | Wider than 1280 units. Stack it more vertically |
 | `ACCENT_OVERUSED` | warning | Keep `role: "accent"` on one part; give the others the default role |
 | `TOO_MANY_CATEGORIES` | warning | Merge categories, or split the figure. Four is the most |
-| `CATEGORY_ID_TAKEN` | warning | A part has the same id as a category, so steps cannot focus the category. Rename one |
 
 ## Size
 

@@ -3,6 +3,7 @@
  * Resolution is lazy and memoized, so declaration order never matters and
  * genuine dependency cycles are reported with their chain.
  */
+import { type DiagnosticCode, diagnosticCodes } from "../protocol.ts";
 import {
   anchorOf,
   boundaryToward,
@@ -255,12 +256,10 @@ export function compile(
   };
   const frameTitleFont = { family: m.sans, size: m.smallSize, weight: m.edgeWeight };
   const diagnostics: Diagnostic[] = [...scene.diagnostics];
-  const warn = (code: string, message: string, ids: string[]) =>
-    diagnostics.push({ code, severity: "warning", message, ids });
-  const fail = (code: string, message: string, ids: string[]) =>
-    diagnostics.push({ code, severity: "error", message, ids });
+  const report = (code: DiagnosticCode, message: string, ids: string[]) =>
+    diagnostics.push({ code, message, ids });
 
-  checkIds(scene, fail);
+  checkIds(scene, report);
 
   const known = new Set<Element>([...scene.nodes, ...scene.stacks, ...scene.enclosures]);
   const content = new Map<Node, Content>();
@@ -339,7 +338,7 @@ export function compile(
     const c = { lines, width, height, titleLines };
     content.set(node, c);
     if (lines.length && width > wrapWidth + 0.5)
-      warn(
+      report(
         "TEXT_OVERFLOW",
         `${node.id}: a word is ${round(width - wrapWidth)} units wider than the fixed width allows.`,
         [node.id],
@@ -395,7 +394,7 @@ export function compile(
     let height = o.height ?? Math.max(needed, text ? 0 : (o.minHeight ?? m.minHeight));
     if (o.minHeight !== undefined) height = Math.max(height, o.minHeight);
     if (o.height !== undefined && needed > o.height + 0.5)
-      warn(
+      report(
         "TEXT_OVERFLOW",
         `${node.id}: content needs height ${round(needed)} but height is fixed at ${o.height}.`,
         [node.id],
@@ -444,7 +443,7 @@ export function compile(
   const roots = [...scene.nodes, ...scene.stacks].filter((el) => !scene.owner.has(el));
   const firstRoot = roots[0];
   if (roots.length > 1)
-    warn(
+    report(
       "UNPLACED",
       `${roots
         .slice(1)
@@ -633,7 +632,7 @@ export function compile(
   function recordRowY(node: Node, rect: Rect, index: number) {
     const rows = node.rows.length;
     if (index < 0 || index >= rows) {
-      fail("RECORD_ROW", `${node.id} has ${rows} rows; row ${index} does not exist.`, [node.id]);
+      report("RECORD_ROW", `${node.id} has ${rows} rows; row ${index} does not exist.`, [node.id]);
       return rect.y + rect.height / 2;
     }
     return (
@@ -665,13 +664,13 @@ export function compile(
     frames = scene.frames.map(compileFrame);
   } catch (error) {
     if (error instanceof CycleError) {
-      fail(
+      report(
         "PLACEMENT_CYCLE",
         `${error.chain.join(" → ")}. These placements depend on each other; anchor one of them independently.`,
         [...new Set(error.chain.map((k) => k.replace(/^\w+\((.*)\)$/, "$1")))],
       );
     } else {
-      fail("COMPILE_ERROR", error instanceof Error ? error.message : String(error), []);
+      report("DIAGRAM_FAILED", error instanceof Error ? error.message : String(error), []);
     }
     return finish(false);
   }
@@ -855,7 +854,9 @@ export function compile(
     if (fromEl && fromEl === toEl) shape = loop(bounds(fromEl), edge.loop);
     else if (edge.bend) {
       if (edge.route !== "straight")
-        fail("BEND_WITH_ROUTE", `${edge.id} has both bend and route; use one of them.`, [edge.id]);
+        report("BEND_WITH_ROUTE", `${edge.id} has both bend and route; use one of them.`, [
+          edge.id,
+        ]);
       shape = curve(edge, fromEl, toEl);
     } else shape = { points: routed(edge, fromEl, toEl), label: {}, radius: 6 };
     const points = dedupe(shape.points);
@@ -874,7 +875,7 @@ export function compile(
       heads,
     };
     if (points.length < 2) {
-      fail("DEGENERATE_EDGE", `${edge.id} starts and ends at the same point.`, [edge.id]);
+      report("DEGENERATE_EDGE", `${edge.id} starts and ends at the same point.`, [edge.id]);
       return { ...base, labels: [], ariaLabel: edge.id };
     }
     const labels = edge.labels.map((l) => placeLabel(edge, points, { ...shape.label, ...l }));
@@ -1035,7 +1036,7 @@ export function compile(
         )
           segment = i;
     } else if (segment < 0 || segment >= legs) {
-      fail(
+      report(
         "LABEL_SEGMENT",
         `${edge.id} label "${l.text}" names segment ${segment}, but the route has ${legs} (0–${legs - 1}).`,
         [edge.id],
@@ -1072,7 +1073,7 @@ export function compile(
     const along = vertical ? height : width;
     const leg = distance(a, b);
     if (legs === 1 && (side === "above" || side === "below") !== vertical && along + 12 > leg)
-      warn(
+      report(
         "LABEL_CROWDED",
         `${edge.id} label "${l.text}" needs ${round(along + 12)} units along segment ${segment}, which is ${round(leg)} long. Widen the gap or move the label.`,
         [edge.id],
@@ -1104,15 +1105,15 @@ export function compile(
     const categoryGroups: Record<string, string[]> = {};
     for (const entry of legend) {
       if (taken.has(entry.id))
-        warn(
-          "CATEGORY_ID_TAKEN",
+        report(
+          "DUPLICATE_ID",
           `The category "${entry.name}" has the id "${entry.id}", which a part already has, so steps cannot focus the category. Rename the category or the part.`,
           [entry.id],
         );
       else categoryGroups[entry.id] = entry.parts;
     }
     if (scene.categories.length > maxCategories)
-      warn(
+      report(
         "TOO_MANY_CATEGORIES",
         `This figure has ${scene.categories.length} categories; ${maxCategories} can be told apart by color. Parts in ${scene.categories
           .slice(maxCategories)
@@ -1131,7 +1132,7 @@ export function compile(
     ]) ?? { x: 0, y: 0, width: 0, height: 0 };
     const viewBox = inflate(painted, m.margin);
     return {
-      ok: ok && !diagnostics.some((d) => d.severity === "error"),
+      ok: ok && !diagnostics.some((d) => diagnosticCodes[d.code].severity === "error"),
       viewBox: {
         x: Math.floor(viewBox.x),
         y: Math.floor(viewBox.y),
@@ -1148,7 +1149,7 @@ export function compile(
     };
   }
 
-  validate(scene, nodes, edges, enclosures, warn);
+  validate(scene, nodes, edges, enclosures, report);
   return finish(true);
 }
 
@@ -1193,7 +1194,10 @@ function dedupe(points: Vec[]): Vec[] {
   return points.filter((p, i) => i === 0 || distance(p, points[i - 1] as Vec) > 0.01);
 }
 
-function checkIds(scene: DiagramBuilder, fail: (c: string, m: string, ids: string[]) => void) {
+function checkIds(
+  scene: DiagramBuilder,
+  report: (code: DiagnosticCode, message: string, ids: string[]) => void,
+) {
   const all: Array<{ id: string; explicitId: boolean }> = [
     ...scene.nodes,
     ...scene.stacks,
@@ -1202,7 +1206,7 @@ function checkIds(scene: DiagramBuilder, fail: (c: string, m: string, ids: strin
   ];
   const taken = new Set<string>();
   for (const el of all.filter((e) => e.explicitId)) {
-    if (taken.has(el.id)) fail("DUPLICATE_ID", `Two elements use id "${el.id}".`, [el.id]);
+    if (taken.has(el.id)) report("DUPLICATE_ID", `Two elements use id "${el.id}".`, [el.id]);
     taken.add(el.id);
   }
   // Derived IDs are conveniences, not identities: disambiguate them in declaration order.
@@ -1218,14 +1222,14 @@ function validate(
   nodes: CompiledNode[],
   edges: CompiledEdge[],
   enclosures: CompiledEnclosure[],
-  warn: (c: string, m: string, ids: string[]) => void,
+  report: (code: DiagnosticCode, message: string, ids: string[]) => void,
 ) {
   // The accent marks the one part that matters most; on two parts it marks neither.
   const accented = [...nodes, ...edges, ...enclosures]
     .filter((part) => part.role === "accent" && !("passive" in part && part.passive))
     .map((part) => part.id);
   if (accented.length > 1)
-    warn(
+    report(
       "ACCENT_OVERUSED",
       `${accented.join(", ")} all use the accent. Keep it on the one part that matters most.`,
       accented,
@@ -1249,7 +1253,7 @@ function validate(
         .map((r) => overlapOf(a, r))
         .find(Boolean);
       if (o)
-        warn(
+        report(
           "NODE_OVERLAP",
           `${a.id} and ${b.id} overlap by ${round(o.width)} × ${round(o.height)}.`,
           [a.id, b.id],
@@ -1272,7 +1276,7 @@ function validate(
         const a = compiled.points[i] as Vec;
         const b = compiled.points[i + 1] as Vec;
         if (hit.some((r) => segmentHitsRect(a, b, r))) {
-          warn(
+          report(
             "EDGE_NODE_INTERSECTION",
             `${compiled.id} crosses ${node.id}. Route it (via, viaX, viaY), bend it, or move ${node.id}.`,
             [compiled.id, node.id],
@@ -1290,7 +1294,7 @@ function validate(
       if (node.passive || (edge.stepOnly && node.stepOnly)) continue;
       const o = overlapOf(node, label.rect);
       if (o)
-        warn(
+        report(
           "LABEL_OVERLAP",
           `${edge.id} label "${label.text}" intersects ${node.id} by ${round(o.width)} × ${round(o.height)}.`,
           [edge.id, node.id],
@@ -1300,7 +1304,7 @@ function validate(
       if (other === edge || other.passive || (other.stepOnly && edge.stepOnly)) continue;
       for (let i = 0; i < other.points.length - 1; i++)
         if (segmentHitsRect(other.points[i] as Vec, other.points[i + 1] as Vec, label.rect)) {
-          warn("LABEL_OVERLAP", `${edge.id} label "${label.text}" is crossed by ${other.id}.`, [
+          report("LABEL_OVERLAP", `${edge.id} label "${label.text}" is crossed by ${other.id}.`, [
             edge.id,
             other.id,
           ]);
@@ -1313,7 +1317,7 @@ function validate(
       const a = labels[i];
       const b = labels[j];
       if (a && b && !(a.edge.stepOnly && b.edge.stepOnly) && overlap(a.label.rect, b.label.rect))
-        warn(
+        report(
           "LABEL_OVERLAP",
           `Labels "${a.label.text}" (${a.edge.id}) and "${b.label.text}" (${b.edge.id}) overlap.`,
           [a.edge.id, b.edge.id],
@@ -1329,7 +1333,7 @@ function validate(
         if (
           segmentHitsRect(edge.points[i] as Vec, edge.points[i + 1] as Vec, inflate(e.titleRect, 8))
         ) {
-          warn(
+          report(
             "ENCLOSURE_TITLE_CROSSED",
             `${edge.id} crosses the title of ${e.id}. Move the title with titleAt, or move the edge.`,
             [edge.id, e.id],
@@ -1346,7 +1350,7 @@ function validate(
     for (const node of nodes) {
       if (members.has(node.id) || node.passive) continue;
       if (rects(node).some((r) => overlap(r, compiled.rect) && !contains(r, compiled.rect)))
-        warn(
+        report(
           "ENCLOSURE_INTRUSION",
           `${node.id} is not a member of ${e.id} but overlaps its boundary.`,
           [node.id, e.id],

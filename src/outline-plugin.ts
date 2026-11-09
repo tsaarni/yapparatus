@@ -4,6 +4,7 @@ import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
 import type { NumberedKind, PageOutline } from "./document.ts";
+import { contentIssues } from "./markdown-plugin.ts";
 import { revision } from "./source-plugin.ts";
 
 /** Which MDX components are numbered blocks, and of which kind. */
@@ -45,6 +46,8 @@ export function pageOutline(isPage: (file: string) => boolean) {
       refs: [],
     };
     const titles: string[] = [];
+    /** Each heading's and numbered block's anchor, with its kind and line, in page order. */
+    const anchored: Array<{ kind: string; id: string; line: number }> = [];
     const components = new Set<string>();
     /** The heading the walk is under, so each link knows its section. */
     let section: string | undefined;
@@ -57,6 +60,7 @@ export function pageOutline(isPage: (file: string) => boolean) {
         if (el.tagName === "h1") titles.push(textOf(el).trim());
         if ((el.tagName === "h2" || el.tagName === "h3") && typeof el.properties.id === "string") {
           section = el.properties.id;
+          anchored.push({ kind: "heading", id: el.properties.id, line });
           outline.headings.push({
             depth: el.tagName === "h2" ? 2 : 3,
             id: el.properties.id,
@@ -85,7 +89,10 @@ export function pageOutline(isPage: (file: string) => boolean) {
       const id = literal(jsx, "id");
       const caption = literal(jsx, "caption");
       if (id) outline.anchors.push(id);
-      if (id && caption) outline.numbered.push({ kind, id, caption });
+      if (id && caption) {
+        outline.numbered.push({ kind, id, caption });
+        anchored.push({ kind, id, line });
+      }
     });
 
     if (isPage(file.path) && titles.length !== 1)
@@ -95,17 +102,20 @@ export function pageOutline(isPage: (file: string) => boolean) {
     outline.title = titles[0] ?? "";
     compiled.set(file.path, { outline, components: [...components] });
 
+    // Two anchors with one id: links and references go to the first. The page still renders.
     const ids = new Map<string, string>();
-    for (const [kind, id] of [
-      ...outline.headings.map((h) => ["heading", h.id] as const),
-      ...outline.numbered.map((f) => [f.kind, f.id] as const),
-    ]) {
+    const issues = contentIssues.get(file.path) ?? [];
+    contentIssues.set(file.path, issues);
+    for (const { kind, id, line } of anchored) {
       const other = ids.get(id);
       if (other)
-        throw new Error(
-          `${file.path}: ${other} and ${kind} both use the anchor "#${id}". Give one of them a different id.`,
-        );
-      ids.set(id, kind);
+        issues.push({
+          code: "DUPLICATE_ID",
+          line,
+          subject: id,
+          message: `A ${other} and a ${kind} both use the anchor "#${id}"; links go to the first. Give one of them a different id.`,
+        });
+      else ids.set(id, kind);
     }
 
     tree.children.unshift({

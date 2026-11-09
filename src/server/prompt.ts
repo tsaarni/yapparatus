@@ -3,7 +3,12 @@
  * exact snippet to run next. The library prints this text verbatim.
  */
 import { quoteOf, splitAddress } from "../document.ts";
-import type { ContextItem, Diagnostic, ReaderMessage } from "../protocol.ts";
+import {
+  type ContextItem,
+  type Diagnostic,
+  diagnosticCodes,
+  type ReaderMessage,
+} from "../protocol.ts";
 
 const run = "node --input-type=module-typescript -e";
 
@@ -24,19 +29,36 @@ export function replySnippet(to: number): string {
   ].join("\n");
 }
 
+/** The snippet that prints the document's diagnostics once the checks of recent edits are done. */
+export function checkSnippet(): string {
+  return `${run} 'import { check } from "yapparatus/agent"; console.log((await check()).prompt);'`;
+}
+
+/**
+ * One line per diagnostic, the same everywhere the agent reads one: "- error CODE where: message".
+ * A reply being checked has no file yet, so its problems name only the line.
+ */
 function describeDiagnostic(d: Diagnostic, fresh = false): string {
-  const where = [
-    d.source ?? "",
-    d.line ? `:${d.line}` : "",
-    d.target && d.origin !== "reply" ? `#${d.target}` : "",
-    d.origin === "reply" && d.target ? `reply #${d.target}` : "",
-  ].join("");
-  return `- ${fresh ? "new " : ""}${d.severity} ${d.code}${where ? ` ${where}` : ""}: ${d.message}`;
+  const where = d.source
+    ? [
+        d.source,
+        d.line ? `:${d.line}` : "",
+        d.target && d.origin !== "reply" ? `#${d.target}` : "",
+      ].join("")
+    : d.line
+      ? `line ${d.line}`
+      : "";
+  const reply = d.origin === "reply" && d.target ? `reply #${d.target}` : "";
+  const place = [where, reply].filter(Boolean).join(" ");
+  const severity = diagnosticCodes[d.code].severity;
+  return `- ${fresh ? "new " : ""}${severity} ${d.code}${place ? ` ${place}` : ""}: ${d.message}`;
 }
 
 /**
  * The document's errors and warnings, new errors marked, and the pages whose diagram and
  * render checks are out of date because no browser has rendered them since they changed.
+ * `unchecked` are those pages' addresses. Only a browser checks them, and the agent may have
+ * none: the reader's browser checks a page when the reader opens the reply's link to it.
  */
 export function diagnosticsSection(
   diagnostics: Diagnostic[],
@@ -46,13 +68,13 @@ export function diagnosticsSection(
   const sorted = [...diagnostics].sort((a, b) => Number(isNew(b)) - Number(isNew(a)));
   return [
     diagnostics.length
-      ? `Diagnostics (${diagnostics.length}). Fix those your edits caused:\n${sorted
+      ? `Diagnostics (${diagnostics.length}). Fix them:\n${sorted
           .slice(0, 40)
           .map((d) => describeDiagnostic(d, isNew(d)))
           .join("\n")}`
       : "Diagnostics: none",
     unchecked.length
-      ? `Not checked since they changed, because no browser has shown them: ${unchecked.join(", ")}`
+      ? `Not checked since they changed: diagrams and charts on these pages. They are checked when the reader opens them, so link each change in your reply:\n${unchecked.map((page) => `- ${page}`).join("\n")}`
       : "",
   ]
     .filter(Boolean)
@@ -128,7 +150,7 @@ export function messagesPrompt(
       ].join("\n"),
     ),
     diagnostics,
-    `Edit pages (${guide}), reply, or both; always reply, so the reader knows what changed. Then reply and wait:`,
+    `Edit pages (${guide}) or not, and reply. Reply and wait:`,
     replySnippet(cursor),
   ]
     .filter(Boolean)
@@ -147,8 +169,8 @@ export function errorsPrompt(
     "The document has new errors.",
     diagnostics,
     canReply
-      ? `If your edits caused them, fix them. If you change pages, tell the reader:\n\n${replySnippet(cursor)}\n\nOtherwise wait for the next messages:\n\n${waitSnippet(cursor)}`
-      : `If your edits caused them, fix them. Then wait for the next messages:\n\n${waitSnippet(cursor)}`,
+      ? `Tell the reader what you changed. The reply is refused while these errors remain:\n\n${replySnippet(cursor)}`
+      : `Check, then wait:\n\n${checkSnippet()}\n\n${waitSnippet(cursor)}`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -179,19 +201,20 @@ export function startPrompt(
   root: string,
 ): string {
   return [
-    `You are connected to a Yapparatus document. A reader asks about it in the browser, and you answer by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when the answer is a page edit.`,
+    `You are connected to a Yapparatus document. A reader asks about it in the browser, and you answer by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when the answer is a page edit: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses).`,
     foldersSection(folders),
     `Run this from the project directory, ${root}, and follow what it prints. It waits until the reader writes, which may take hours: run it in the background if you are notified when commands finish, otherwise with the longest timeout your shell allows, and run it again if your shell stops it.`,
     waitSnippet(after),
+    `After editing pages, check for errors and warnings:\n\n${checkSnippet()}`,
   ]
     .filter(Boolean)
     .join("\n\n");
 }
 
-export function rejectedReply(to: number, errors: string[]): string {
+export function rejectedReply(to: number, errors: Diagnostic[]): string {
   return [
-    "The reply was not accepted:",
-    errors.map((error) => `- ${error}`).join("\n"),
+    "The reply was not sent:",
+    errors.map((d) => describeDiagnostic(d)).join("\n"),
     "Fix the MDX and send it again:",
     replySnippet(to),
   ].join("\n\n");
@@ -205,9 +228,9 @@ export function newErrorsReply(to: number, errors: Diagnostic[], past?: number):
   return [
     "The reply was not sent. These errors appeared after you read the message:",
     errors.map((d) => describeDiagnostic(d)).join("\n"),
-    `If your edits caused them, fix them and send the reply again:\n\n${replySnippet(to)}`,
+    `Fix them and send the reply again:\n\n${replySnippet(to)}`,
     past
-      ? `If your edits did not cause them, say so in the reply and send it with this cursor, which is past them:\n\n${replySnippet(past)}`
+      ? `If you cannot fix them, say why in the reply and send it with this cursor, past them:\n\n${replySnippet(past)}`
       : "",
   ]
     .filter(Boolean)

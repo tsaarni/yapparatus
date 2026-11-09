@@ -11,28 +11,28 @@ This page lists everything a page or a chat reply can contain and shows an examp
 | Component | Written as | Numbered | Buttons | Checks | Code |
 |---|---|---|---|---|---|
 | Page title | `#` | Chapter | Link, Ask | One per page | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
-| Section | `##`, `###` | Section | Link, Ask | `HEADING_DEPTH` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
-| Prose | Markdown | No | None | `BROKEN_LINK`, `BROKEN_ANCHOR` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Section | `##`, `###` | Section | Link, Ask | `HEADING_DEPTH`, `DUPLICATE_ID` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Prose | Markdown | No | None | `BROKEN_LINK` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
 | Markdown table | GFM table | No | None | None | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
 | Code block | Fenced block | No | Ask | `CODE_LANGUAGE` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
 | Code marks | `[!code ++]` comment | No | None | None | [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
 | Alert | `> [!NOTE]` | No | None | `ALERT_TYPE` | [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
-| `Figure` | Tag | Figure | Link, Ask | `FIGURE` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Table` | Tag around a table | Table | Link, Ask | None | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Listing` | Tag around code | Listing | Link, Ask | None | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Excerpt` | Tag with `from` | No | Ask | `EXCERPT`, `BROKEN_LINK`, `BROKEN_ANCHOR` | [`code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts), [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Figure` | Tag | Figure | Link, Ask | `FIGURE_NESTED`, `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Table` | Tag around a table | Table | Link, Ask | `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Listing` | Tag around code | Listing | Link, Ask | `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Excerpt` | Tag with `from` | No | Ask | `EXCERPT_TEXT`, `EXCERPT_INVALID`, `BROKEN_LINK` | [`code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts), [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
 | `Diagram`, `Step` | Tag with `draw` | Figure | Link, Ask, per part | Diagram codes | `src/diagram/` |
-| `Chart` | Tag with `plot`, around a block of CSV, or with `from` naming a table or file | Figure | Link, Ask | `CHART` and chart codes | `src/chart/`, [`chart-plugin.ts`](/-/files/yapparatus/src/chart-plugin.ts) |
+| `Chart` | Tag with `plot`, around a block of CSV, or with `from` naming a table or file | Figure | Link, Ask | `CHART_PLOT`, `CHART_DATA`, and chart codes | `src/chart/`, [`chart-plugin.ts`](/-/files/yapparatus/src/chart-plugin.ts) |
 | `Ref` | Tag | No | None | `BROKEN_REF` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
 | `Icon` | Tag | No | None | Unknown names | [`icons.tsx`](/-/files/yapparatus/src/reader/icons.tsx) |
-| `FileTree` | Tag around a list | No | None | `FILE_TREE` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Tabs`, `Panel` | Tag around panels | No | None | `PANELS` | [`alternatives.tsx`](/-/files/yapparatus/src/reader/alternatives.tsx), [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
-| `Columns`, `Panel` | Tag around panels | In a `Listing` or `Figure` | None | `PANELS` | [`alternatives.tsx`](/-/files/yapparatus/src/reader/alternatives.tsx), [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
+| `FileTree` | Tag around a list | No | None | `FILE_TREE_INVALID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
+| `Tabs`, `Panel` | Tag around panels | No | None | `PANEL_CONTENT`, `PANEL_LABEL`, `PANEL_NESTED` | [`alternatives.tsx`](/-/files/yapparatus/src/reader/alternatives.tsx), [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
+| `Columns`, `Panel` | Tag around panels | In a `Listing` or `Figure` | None | `PANEL_CONTENT`, `PANEL_LABEL`, `PANEL_NESTED`, `TOO_MANY_COLUMNS` | [`alternatives.tsx`](/-/files/yapparatus/src/reader/alternatives.tsx), [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
 
 </Table>
 
 1. **Every component also works in chat replies,** without imports and with the same line length as the page. In a reply, nothing is numbered and there are no Link or Ask buttons, because a reply is not part of the document.
-2. **A failed check is an error.** The server reports each error with its file and line, and it refuses a reply that contains an error. See [diagnostics](diagnostics).
+2. **A failed check is reported by its code.** Each code in the Checks column is an error in the registry, except some diagram and chart codes, which are warnings. The server reports each problem with its file and line, and it refuses a reply that contains one. See [diagnostics](diagnostics#codes-and-severity).
 3. **A selection gives more precise context than the buttons.** A selection in a list item or a table row points at that line. See [capturing a selection](addresses-and-context#capturing-a-selection).
 
 ## Text and Markdown
@@ -195,9 +195,9 @@ pnpm build:single       # dist-single/index.html: one offline file
 1. **One panel, two ways to show it.** A reader cannot compare what is hidden, so content to compare is never in tabs. Both containers take the same panels, and an author changes one into the other by renaming the outer tag.
 2. **A choice follows its label.** Choosing a tab selects the tab with the same label in every set, on every page, and the browser keeps the choice for the next visit. Sets are matched by their labels, with no group key, so an author has nothing to choose or forget. Unrelated sets with the same labels also follow each other, which is one more reason that a before and an after belong in columns.
 3. **Hidden panels can be found and printed.** A hidden panel is `hidden="until-found"`. Find in page reveals it and selects its tab in that set only, without changing the reader's choice. Print shows every panel under its label. The tabs follow the WAI-ARIA tabs pattern: the arrow keys, Home, and End move between tabs.
-4. **Columns are numbered by what they hold.** Columns alone hold text and are not numbered. Code side by side goes in a `Listing` and drawings side by side in a `Figure`, and the container then takes the full width. A diagram or chart inside a figure is part of it: it draws no frame and has no `id` or `caption` of its own, which the compiler reports as `FIGURE`.
+4. **Columns are numbered by what they hold.** Columns alone hold text and are not numbered. Code side by side goes in a `Listing` and drawings side by side in a `Figure`, and the container then takes the full width. A diagram or chart inside a figure is part of it: it draws no frame and has no `id` or `caption` of its own, which the compiler reports as `FIGURE_NESTED`.
 5. **Columns line up.** The last block of each column fills the column's height, so code blocks side by side end on one line. Up to three columns fit, and on a narrow page they stack.
-6. **The compiler reads the panels.** It passes their labels to the container, so the reader never inspects its children. It reports content outside a panel, a missing or repeated label, fewer than two panels, more than three columns, a panel outside a container, and a container inside a panel as `PANELS`.
+6. **The compiler reads the panels.** It passes their labels to the container, so the reader never inspects its children. It reports content outside a panel and fewer than two panels as `PANEL_CONTENT`, a missing or repeated label as `PANEL_LABEL`, a panel outside a container and a container inside a panel as `PANEL_NESTED`, and more than three columns as `TOO_MANY_COLUMNS`.
 
 ## Custom components
 

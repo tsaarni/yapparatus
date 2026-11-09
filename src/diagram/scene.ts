@@ -2,6 +2,7 @@
  * Authoring API: a retained scene of handles and relationships.
  * Nothing is measured or positioned here; `compile` resolves geometry later.
  */
+import type { DiagnosticCode } from "../protocol.ts";
 import type { AnchorName, Side } from "./geometry.ts";
 import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
 
@@ -10,14 +11,16 @@ export type { AnchorName, Side };
 /** What a part is for: the one to look at, a risk, a quiet part, or one outside the system. */
 export type Role = "default" | "accent" | "muted" | "warning" | "external";
 export type Align = "start" | "center" | "end";
-export type Severity = "error" | "warning";
 export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
 
+/** A problem in a diagram. Its severity is its code's, in `diagnosticCodes`. */
 export interface Diagnostic {
-  code: string;
-  severity: Severity;
+  code: DiagnosticCode;
   message: string;
+  /** The parts it is about, which also identify it. */
   ids: string[];
+  /** What it is about when no part is, such as a step's id. */
+  subject?: string;
 }
 
 /* ---------- Points ---------- */
@@ -465,7 +468,7 @@ export class DiagramBuilder {
     const dirs = (["below", "above", "leftOf", "rightOf"] as const).filter((d) => options[d]);
     const count = dirs.length + (options.at ? 1 : 0);
     if (count !== 1) {
-      this.error(
+      this.report(
         "INVALID_PLACEMENT",
         `place(${el.id}) needs exactly one of below, above, leftOf, rightOf, or at; got ${count}.`,
         [el.id],
@@ -552,7 +555,7 @@ export class DiagramBuilder {
   }
   private own(el: Element, owner: Stack | Placement, by: string) {
     if (el instanceof Enclosure) {
-      this.error(
+      this.report(
         "ENCLOSURE_PLACEMENT",
         `${el.id} is an enclosure; its bounds come from its members. Position the members instead.`,
         [el.id],
@@ -562,7 +565,7 @@ export class DiagramBuilder {
     const existing = this.owner.get(el);
     if (existing) {
       const prior = existing instanceof Stack ? `${existing.direction}(${existing.id})` : "place()";
-      this.error(
+      this.report(
         "CONFLICTING_PLACEMENT",
         `${el.id} is positioned by both ${prior} and ${by}. Each element has one position owner.`,
         [el.id],
@@ -571,8 +574,8 @@ export class DiagramBuilder {
     }
     this.owner.set(el, owner);
   }
-  private error(code: string, message: string, ids: string[]) {
-    this.diagnostics.push({ code, severity: "error", message, ids });
+  private report(code: DiagnosticCode, message: string, ids: string[]) {
+    this.diagnostics.push({ code, message, ids });
   }
 }
 

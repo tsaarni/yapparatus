@@ -20,7 +20,14 @@ import { parseFileAddress } from "../files.ts";
 import { createLogger } from "../logger.ts";
 import { contentIssues } from "../markdown-plugin.ts";
 import { compiled } from "../outline-plugin.ts";
-import type { AgentMessage, ContextItem, Message, ReaderMessage, TargetKind } from "../protocol.ts";
+import type {
+  AgentMessage,
+  ContextItem,
+  Diagnostic,
+  Message,
+  ReaderMessage,
+  TargetKind,
+} from "../protocol.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { blockHash } from "../source-plugin.ts";
 import { HttpError, isRecord, type Router } from "./http.ts";
@@ -284,31 +291,61 @@ export class ChatStore {
     return seq;
   }
 
-  /** Compile a reply like a page and check its components and links. Returns the errors. */
-  private async check(file: string, url: string): Promise<string[]> {
+  /**
+   * Compile a reply like a page and check its components and links, with the codes pages use.
+   * Returns the problems, all errors: a reply is not stored with any.
+   */
+  private async check(file: string, url: string): Promise<Diagnostic[]> {
     try {
       await this.options.server.transformRequest(url);
     } catch (error) {
       const { message, loc } = error as { message: string; loc?: { line: number; column: number } };
-      const where = loc ? `line ${loc.line}, column ${loc.column}: ` : "";
-      return [`${where}${message.split("\n")[0]}`];
+      return [
+        {
+          origin: "reply",
+          code: "COMPILE_FAILED",
+          message: message.split("\n")[0] ?? message,
+          ...(loc?.line ? { line: loc.line } : {}),
+        },
+      ];
     }
     const entry = compiled.get(file);
     compiled.delete(file);
-    if (!entry) return ["The reply could not be compiled."];
+    if (!entry)
+      return [
+        { origin: "reply", code: "COMPILE_FAILED", message: "The reply could not be compiled." },
+      ];
     const allowed: readonly string[] = pageComponents;
-    const errors = entry.components
+    const errors: Diagnostic[] = entry.components
       .filter((name) => !allowed.includes(name))
-      .map((name) => `<${name}> is not a component. Use ${pageComponents.join(", ")}.`);
+      .map((name) => ({
+        origin: "reply",
+        code: "UNKNOWN_COMPONENT",
+        subject: name,
+        message: `<${name}> is not a component. Use ${pageComponents.join(", ")}.`,
+      }));
     for (const issue of contentIssues.get(file) ?? [])
-      errors.push(`line ${issue.line}: ${issue.message}`);
+      errors.push({
+        origin: "reply",
+        code: issue.code,
+        ...(issue.subject ? { subject: issue.subject } : {}),
+        message: issue.message,
+        line: issue.line,
+      });
     contentIssues.delete(file);
     const links = checkLinks(
       [...(await this.options.outlines()), { id: "", outline: entry.outline }],
       this.options.files.lineCount,
     );
     for (const link of links)
-      if (link.page === "") errors.push(`line ${link.line}: ${link.message}`);
+      if (link.page === "")
+        errors.push({
+          origin: "reply",
+          code: link.code,
+          subject: link.subject,
+          message: link.message,
+          line: link.line,
+        });
     return errors;
   }
 
@@ -320,15 +357,16 @@ export class ChatStore {
     to: number,
     mdx: string,
     readAt: string | undefined,
-  ): Promise<{ errors: string[] } | { message: AgentMessage }> {
-    if (!mdx.trim()) return { errors: ["The reply is empty."] };
+  ): Promise<{ errors: Diagnostic[] } | { message: AgentMessage }> {
+    if (!mdx.trim())
+      return { errors: [{ origin: "reply", code: "REPLY_EMPTY", message: "The reply is empty." }] };
     const name = `pending-${randomUUID()}.mdx`;
     const pending = path.join(this.dir, "chat", name);
     writeFileSync(pending, mdx);
     const errors = await this.check(realpathSync(pending), `/.yapparatus/chat/${name}`);
     if (errors.length) {
       log.info(`reply to #${to} refused: ${errors.length} errors`);
-      for (const error of errors) log.debug(`reply to #${to}: ${error}`);
+      for (const error of errors) log.debug(`reply to #${to}: ${error.code} ${error.message}`);
       rmSync(pending, { force: true });
       return { errors };
     }

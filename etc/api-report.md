@@ -70,10 +70,12 @@ export interface ContextItem {
 export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
 
 export interface Diagnostic {
-  code: string;
-  severity: Severity;
+  code: DiagnosticCode;
   message: string;
+  /** The parts it is about, which also identify it. */
   ids: string[];
+  /** What it is about when no part is, such as a step's id. */
+  subject?: string;
 }
 
 export const Diagram: { ({ draw, id, caption, description, build, children, debug }: DiagramProps): Element; breakout: boolean; };
@@ -165,7 +167,7 @@ export class DiagramBuilder {
     const dirs = (["below", "above", "leftOf", "rightOf"] as const).filter((d) => options[d]);
     const count = dirs.length + (options.at ? 1 : 0);
     if (count !== 1) {
-      this.error(
+      this.report(
         "INVALID_PLACEMENT",
         `place(${el.id}) needs exactly one of below, above, leftOf, rightOf, or at; got ${count}.`,
         [el.id],
@@ -252,7 +254,7 @@ export class DiagramBuilder {
   }
   private own(el: Element, owner: Stack | Placement, by: string) {
     if (el instanceof Enclosure) {
-      this.error(
+      this.report(
         "ENCLOSURE_PLACEMENT",
         `${el.id} is an enclosure; its bounds come from its members. Position the members instead.`,
         [el.id],
@@ -262,7 +264,7 @@ export class DiagramBuilder {
     const existing = this.owner.get(el);
     if (existing) {
       const prior = existing instanceof Stack ? `${existing.direction}(${existing.id})` : "place()";
-      this.error(
+      this.report(
         "CONFLICTING_PLACEMENT",
         `${el.id} is positioned by both ${prior} and ${by}. Each element has one position owner.`,
         [el.id],
@@ -271,8 +273,8 @@ export class DiagramBuilder {
     }
     this.owner.set(el, owner);
   }
-  private error(code: string, message: string, ids: string[]) {
-    this.diagnostics.push({ code, severity: "error", message, ids });
+  private report(code: DiagnosticCode, message: string, ids: string[]) {
+    this.diagnostics.push({ code, message, ids });
   }
 }
 
@@ -600,14 +602,22 @@ export interface TerminalOptions
 ## yapparatus/agent
 
 ```ts
+export interface AgentDiagnostics {
+  diagnostics: ReportedDiagnostic[];
+  unchecked: string[];
+  prompt: string;
+}
+
 export interface AgentPrompt {
   messages: ReaderMessage[];
   /** The number the chat was cleared at, when that happened after the cursor. */
   cleared?: number;
   /** Errors the agent has not been shown before. They end a wait, like a reader message. */
-  newErrors: Diagnostic[];
+  newErrors: ReportedDiagnostic[];
   prompt: string;
 }
+
+export const check: () => Promise<AgentDiagnostics>;
 
 export interface ContextItem {
   kind: TargetKind;
@@ -627,6 +637,26 @@ export interface ContextItem {
   step?: string;
 }
 
+export interface Diagnostic {
+  origin: DiagnosticOrigin;
+  code: DiagnosticCode;
+  message: string;
+  /** The file it is in, relative to the project folder, when known. */
+  source?: string;
+  /** The line in that file, when known. */
+  line?: number;
+  /** A figure id, or a reply's message number, inside that source. */
+  target?: string;
+  /**
+   * What the diagnostic is about, such as a link's target or a diagram's parts. With the code,
+   * source, and target it identifies the diagnostic, so its message may change wording.
+   * Without it, the message identifies it.
+   */
+  subject?: string;
+  /** Diagram part ids involved. */
+  elements?: string[];
+}
+
 export interface ReaderMessage {
   seq: number;
   author: "reader";
@@ -637,12 +667,20 @@ export interface ReaderMessage {
 
 export const reply: (options: { to: number; }) => Promise<{ seq: number; }>;
 
+export interface ReportedDiagnostic extends Diagnostic {
+  severity: Severity;
+  scope: string;
+  reportedAt: string;
+}
+
 export const wait: (options: { after: number; }) => Promise<AgentPrompt>;
 
 export class YapparatusError extends Error {
-  constructor(message: string) {
+  readonly diagnostics: Diagnostic[];
+  constructor(message: string, diagnostics: Diagnostic[] = []) {
     super(message);
     this.name = "YapparatusError";
+    this.diagnostics = diagnostics;
   }
 }
 ```

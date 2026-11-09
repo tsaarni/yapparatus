@@ -43,8 +43,7 @@ function reportReply(message: AgentMessage, error: string) {
   reportDiagnostics(`reply:${message.seq}`, [
     {
       origin: "reply",
-      severity: "error",
-      code: "REPLY_ERROR",
+      code: "REPLY_FAILED",
       message: `A reply could not be shown: ${error}`,
       target: String(message.seq),
     },

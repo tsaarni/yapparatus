@@ -9,20 +9,16 @@ import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxAttribute, MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { bundledLanguages, type ShikiTransformer } from "shiki";
 import { visit } from "unist-util-visit";
+import type { DiagnosticCode } from "./protocol.ts";
 
 export interface ContentIssue {
-  code:
-    | "ALERT_TYPE"
-    | "CHART"
-    | "CODE_LANGUAGE"
-    | "EXCERPT"
-    | "FIGURE"
-    | "FILE_TREE"
-    | "HEADING_DEPTH"
-    | "PANELS";
+  code: DiagnosticCode;
   line: number;
-  /** What the issue is about, so the same problem keeps one identity as its wording changes. */
-  subject: string;
+  /**
+   * What the issue is about, so the same problem keeps one identity as its wording changes.
+   * Without it, the message identifies the issue.
+   */
+  subject?: string;
   message: string;
 }
 
@@ -61,9 +57,9 @@ export function markdownConventions() {
         if (jsx.name === "Figure" || jsx.name === "Listing") widen(jsx);
         if (jsx.name === "Panel" && !claimed.has(jsx))
           issues.push({
-            code: "PANELS",
+            code: "PANEL_NESTED",
             line,
-            subject: literal(jsx, "label") ?? "",
+            subject: literal(jsx, "label") ?? "Panel",
             message: "<Panel> belongs directly inside <Tabs> or <Columns>.",
           });
         return;
@@ -92,11 +88,13 @@ function codeLanguage(pre: Element, line: number, issues: ContentIssue[]) {
     .map(String)
     .find((c) => c.startsWith("language-"))
     ?.slice("language-".length);
+  // A block without a language is told apart by its first line.
+  const first = textOf(code).trim().split("\n")[0]?.slice(0, 60);
   if (!language)
     issues.push({
       code: "CODE_LANGUAGE",
       line,
-      subject: "",
+      ...(first ? { subject: first } : {}),
       message:
         "A code block names no language. Name one, such as ```ts, or ```text for plain text.",
     });
@@ -182,14 +180,15 @@ function panels(
   const name = jsx.name ?? "";
   // Each issue's subject tells it apart from others in the same file: the stray text, the
   // panel's label or position, or the container's labels.
-  const report = (message: string, subject: string, at = line) =>
-    issues.push({ code: "PANELS", line: at, subject, message });
+  const report = (code: DiagnosticCode, message: string, subject: string, at = line) =>
+    issues.push({ code, line: at, subject, message });
   const content = jsx.children.filter((c) => !(c.type === "text" && !c.value.trim()));
   const labels: string[] = [];
   for (const [index, child] of content.entries()) {
     const at = child.position?.start.line ?? line;
     if (child.type !== "mdxJsxFlowElement" || child.name !== "Panel") {
       report(
+        "PANEL_CONTENT",
         `<${name}> holds only <Panel> elements. Put the content inside a panel.`,
         textOf(child as ElementContent)
           .trim()
@@ -202,12 +201,18 @@ function panels(
     const label = literal(child, "label");
     if (!label?.trim())
       report(
+        "PANEL_LABEL",
         `Each <Panel> in <${name}> needs a label, written as a string.`,
         `${name} panel ${index + 1}`,
         at,
       );
     else if (labels.includes(label))
-      report(`Two panels in <${name}> have the label "${label}". Labels must differ.`, label, at);
+      report(
+        "PANEL_LABEL",
+        `Two panels in <${name}> have the label "${label}". Labels must differ.`,
+        label,
+        at,
+      );
     else labels.push(label);
     visit(child, (inner) => {
       if (
@@ -216,6 +221,7 @@ function panels(
         containers.includes(inner.name ?? "")
       )
         report(
+          "PANEL_NESTED",
           `<${inner.name}> cannot be inside <${name}>. Keep panels one level deep.`,
           `${inner.name} in ${label ?? name}`,
           inner.position?.start.line ?? at,
@@ -223,9 +229,13 @@ function panels(
     });
   }
   const all = `${name}: ${labels.join(", ")}`;
-  if (labels.length < 2) report(`<${name}> needs at least two panels.`, all);
+  if (labels.length < 2) report("PANEL_CONTENT", `<${name}> needs at least two panels.`, all);
   if (name === "Columns" && labels.length > maxColumns)
-    report(`<Columns> holds at most ${maxColumns} panels. Use a table to compare more.`, all);
+    report(
+      "TOO_MANY_COLUMNS",
+      `<Columns> holds at most ${maxColumns} panels. Use a table to compare more.`,
+      all,
+    );
   jsx.attributes.push(compiledAttribute("labels", labels));
 }
 
@@ -252,9 +262,9 @@ function figure(jsx: MdxJsxFlowElementHast, issues: ContentIssue[]) {
     const named = ["id", "caption"].filter((a) => literal(part, a) !== undefined);
     if (named.length)
       issues.push({
-        code: "FIGURE",
+        code: "FIGURE_NESTED",
         line: part.position?.start.line ?? 0,
-        subject: literal(part, "id") ?? literal(part, "caption") ?? "",
+        subject: literal(part, "id") || literal(part, "caption") || `${part.name}`,
         message: `A <${part.name}> inside a <Figure> is part of it and has no ${named.join(" or ")} of its own. Number the outer figure.`,
       });
   });
@@ -268,10 +278,14 @@ function fileTree(jsx: MdxJsxFlowElementHast, line: number, issues: ContentIssue
   const content = jsx.children.filter((c) => !(c.type === "text" && !c.value.trim()));
   const list = content[0];
   if (content.length !== 1 || list?.type !== "element" || list.tagName !== "ul") {
+    const first = textOf(jsx as unknown as ElementContent)
+      .trim()
+      .split("\n")[0]
+      ?.slice(0, 60);
     issues.push({
-      code: "FILE_TREE",
+      code: "FILE_TREE_INVALID",
       line,
-      subject: "",
+      ...(first ? { subject: first } : {}),
       message:
         "<FileTree> wraps one Markdown list, with a blank line after the opening tag and before the closing tag.",
     });

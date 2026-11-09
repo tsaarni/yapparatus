@@ -92,15 +92,15 @@ A reader asks about a chart as a whole, like any figure.
 
 Data problems are found when the page is compiled and reported with their line in the page, or in the file. Problems with the marks are found when a browser shows the page.
 
-| Code | Meaning |
-|---|---|
-| `CHART` | The data is missing, comes from two places, names no table on the page, is not in a known format, or has a column problem |
-| `CHART_FIELD` | A mark names a field that is not a column of its data |
-| `CHART_COLOR` | A mark sets a literal color |
-| `CHART_OPTION` | `plot` returns options the chart sets itself, or calls `Plot.plot` |
-| `CHART_CATEGORIES` | More than four categories |
-| `CHART_OVERLAP` | Tick labels on one axis overlap; show fewer ticks, rotate them, or swap the axes |
-| `CHART_ERROR` | Plot could not draw the marks; the message is Plot's |
-| `CHART_DATA` | A file's data could not load |
+| Code | Severity | Meaning |
+|---|---|---|
+| `CHART_PLOT` | error | The chart has no `plot` function |
+| `CHART_DATA` | error | The data is missing, comes from two places, names no table on the page, is not in a known format, has a column problem, or could not load |
+| `CHART_FIELD` | error | A mark names a field that is not a column of its data |
+| `CHART_COLOR` | error | A mark sets a literal color |
+| `CHART_OPTION` | error | `plot` returns options the chart sets itself, or calls `Plot.plot` |
+| `CHART_FAILED` | error | Plot could not draw the marks; the message is Plot's |
+| `TOO_MANY_CATEGORIES` | warning | More than four categories |
+| `CHART_OVERLAP` | warning | Tick labels on one axis overlap; show fewer ticks, rotate them, or swap the axes |
 
 A chart that fails keeps showing its last valid drawing, dimmed, above the errors.

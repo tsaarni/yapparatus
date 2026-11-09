@@ -1,6 +1,7 @@
 /** Document model shared by the Vite plugin (Node) and the reader (browser). */
 
 import { type FileAddress, linesLabel, parseFileAddress } from "./files.ts";
+import type { DiagnosticCode } from "./protocol.ts";
 
 const pageName = /^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)*$/;
 
@@ -237,7 +238,7 @@ function normalize(path: string) {
 export interface LinkDiagnostic {
   page: string;
   line: number;
-  code: "BROKEN_LINK" | "BROKEN_ANCHOR" | "BROKEN_REF" | "DUPLICATE_TARGET";
+  code: DiagnosticCode;
   /** The link, reference, or id the diagnostic is about. */
   subject: string;
   message: string;
@@ -265,7 +266,7 @@ export function checkLinks(
         broken.push({
           page: page.id,
           line: 1,
-          code: "DUPLICATE_TARGET",
+          code: "DUPLICATE_ID",
           subject: block.id,
           message: `The id "${block.id}" is also used in ${owner}.mdx; references to it go there.`,
         });
@@ -296,7 +297,7 @@ export function checkLinks(
           broken.push({
             page: page.id,
             line,
-            code: "BROKEN_ANCHOR",
+            code: "BROKEN_LINK",
             subject: href,
             message: `The link "${href}" names lines ${linesLabel(lines)}, but the file has ${found.lines} lines.`,
           });
@@ -316,7 +317,7 @@ export function checkLinks(
         broken.push({
           page: page.id,
           line,
-          code: "BROKEN_ANCHOR",
+          code: "BROKEN_LINK",
           subject: href,
           message: `The link "${href}" names #${resolved.fragment}, which ${resolved.page}.mdx does not have.`,
         });

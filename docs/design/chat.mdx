@@ -10,7 +10,7 @@ The chat is the conversation between the reader and an [agent](/overview#chat). 
 4. **Edits appear immediately** through hot reload, which updates the open page when its file changes. There is no approval step and no undo in the application, because version control already provides undo.
 5. **The chat stays when the reader moves to another page.** Closing the panel only hides the chat, and the agent stays connected.
 6. **Chat state stays out of the document.** The server stores it in `.yapparatus/`, never in page directories or builds, because it contains the reader's questions and selections.
-7. **Every prompt includes the diagnostics.** The agent learns about errors that its edits caused. The reader can write "Fix the errors" without further explanation. See [diagnostics](diagnostics).
+7. **Every prompt includes the diagnostics.** The agent fixes every diagnostic. The reader can write "Fix the errors" without further explanation. See [diagnostics](diagnostics).
 8. **The word *chat* is used everywhere.** The panel, the API, the types in [`src/protocol.ts`](/-/files/yapparatus/src/protocol.ts), and the file `.yapparatus/chat.jsonl` all use the word *chat*.
 
 ## Messages
@@ -68,13 +68,14 @@ The reader's agent runs in its own session and terminal. It communicates with th
 
 ## Waiting
 
-<Listing id="library-calls" caption="The two calls of the agent library.">
+<Listing id="library-calls" caption="The three calls of the agent library.">
 
 ```ts
-import { reply, wait } from "yapparatus/agent";
+import { check, reply, wait } from "yapparatus/agent";
 
 await wait({ after: 7 }); // → { messages, newErrors, prompt }; blocks until news
 await reply({ to: 9 }); // MDX from stdin → { seq }
+await check(); // → { diagnostics, unchecked, prompt }; once recent edits are checked
 ```
 
 </Listing>
@@ -95,7 +96,7 @@ MDX
 2. **`wait` returns both data and text.** `messages` are objects for code that filters or combines them. `prompt` is text that the server writes for the agent to read, and it contains the instructions.
 3. **`wait` blocks until something new arrives,** and the agent does not choose a timeout. The start prompt, which is the first prompt the agent receives, tells the agent to run `wait` in the background. Otherwise the agent runs it with the longest shell timeout and runs it again if the shell stops it. Background commands have no shell time limit. An agent that a timer wakes spends a model turn on every wake, which can be hundreds of turns over a night when the chat is left open.
 4. **Waiting is not an error.** `wait` resolves with messages, with new errors, or with neither when the reader clears the chat. It rejects only on a real failure: no server, invalid MDX, a bad `to`, or another listener taking over. Agents treat a failing command as something to fix.
-5. **Every prompt ends with the exact next snippet,** and the server fills in the cursor. After messages, the snippet replies and waits in one run. After new errors, the prompt shows how to reply or how to only wait. After a clear, it shows how to wait again. The agent never tracks the cursor itself, so the loop keeps working after the agent's context is compacted.
+5. **Every prompt ends with the exact next snippet,** and the server fills in the cursor. After messages, the snippet replies and waits in one run. After new errors, it replies when there is a reader to tell, and otherwise checks and then waits. After a clear, it shows how to wait again. The agent never tracks the cursor itself, so the loop keeps working after the agent's context is compacted.
 6. **The newest listener wins.** A listener is one running `wait` call. When a `wait` starts while another one is listening, the new one takes over, and the older one rejects with "another agent took over the chat; stop waiting". Without this rule, a background snippet left over from an old session could lock out the session that the person just started.
 7. **The start prompt contains what stays true for the whole session.** The browser shows it with the current cursor. It says how to run the snippet, where the authoring guide is, and what a reply may use. Later prompts contain only the messages, the diagnostics, and the next snippet, so a long session does not spend tokens on the instructions with every message. A new agent session uses the same start prompt to join the chat again.
 8. **The start cursor is the last reader message that an agent replied to,** or the last clear if that is later. A new session therefore receives the messages that are still unanswered and the errors numbered since then. The server's record of replies is the only record that remains after the old session ends.
@@ -105,9 +106,24 @@ MDX
 1. **`reply({ to: N })` records what the agent has read.** N is the cursor from the prompt, and the reply answers every reader message up to N. After a prompt about errors, N may be the number of an error. A message that arrives while the agent writes its reply stays unread. Several replies with the same cursor are allowed, for example when the agent asks the reader a question.
 2. **The reply is MDX on stdin.** The agent passes it inline with a quoted heredoc (`<<'MDX'`, so that the shell expands nothing) or from a file with `< reply.mdx`. Empty stdin or a terminal on stdin is an error, and `reply` never waits for input. MDX contains many backticks, and a template literal would silently turn `${` into code. Stdin needs no escaping.
 3. **Snippets that the server writes put their code in `-e '…'` and use only double quotes,** because a single quote would end the shell argument.
-4. **The server checks a reply before accepting it.** It checks that the MDX compiles, that the components exist, and that the links resolve. If a check fails, `reply` rejects with the file and line, and the agent fixes the reply and sends it again. The browser reports errors that appear only when the reply is rendered, and these errors end the agent's next `wait`.
-5. **A reply waits for the checks of the agent's edits, and is refused while new errors remain.** Errors numbered after the reply's cursor appeared while the agent worked. The server waits up to 8 s, until its own checks have run, an open browser has had time to report, and the new errors have numbers. If such errors remain, `reply` rejects with the list, and the agent fixes them and replies again. If the agent's edits did not cause the errors, the refusal offers a cursor past them, but only when that cursor skips no unread reader message. Without this check, the reader could read "done" on a broken page.
-6. **The agent replies even when the answer is a page edit,** so that the reader knows what changed.
+4. **The server checks a reply before accepting it.** It checks that the MDX compiles, that the components exist, and that the links resolve, with the same codes as pages. If a check fails, `reply` rejects with one line per problem, such as `- error BROKEN_LINK line 7: …`, and the agent fixes the reply and sends it again. The browser reports errors that appear only when the reply is rendered, and these errors end the agent's next `wait`.
+5. **A reply waits for the checks of the agent's edits, and is refused while new errors remain.** Errors numbered after the reply's cursor appeared while the agent worked. The server waits up to 8 s, until its own checks have run, an open browser has had time to report, and the new errors have numbers. If such errors remain, `reply` rejects with the list, and the agent fixes them and replies again. If the agent cannot fix the errors, the refusal offers a cursor past them, but only when that cursor skips no unread reader message. Without this check, the reader could read "done" on a broken page.
+6. **A refusal carries data as well as text.** The server answers `422` with `{ error, diagnostics }`: `error` is the text for the agent, and `diagnostics` are the problems or the new errors behind it. `reply` rejects with a `YapparatusError` whose message is the text and whose `diagnostics` are the data, as `wait` returns `prompt` beside `newErrors`.
+7. **The agent replies even when the answer is a page edit,** so that the reader knows what changed. The reply says in a sentence what changed on each page and links to the change. The reader can go straight to it, and opening the link renders the page, which checks its diagrams and charts. The agent needs no browser of its own.
+
+## Checking edits
+
+<Listing id="check-snippet" caption="A snippet that prints the document's diagnostics once recent edits are checked.">
+
+```sh
+node --input-type=module-typescript -e 'import { check } from "yapparatus/agent"; console.log((await check()).prompt);'
+```
+
+</Listing>
+
+1. **`check()` reads the diagnostics after the agent's edits, without the chat.** Without it, an agent learns whether an edit broke something only by trying to reply or by waiting for the reader. `check` waits as a reply does, up to 8 s, until the server's checks have run, an open browser has had time to report, and new errors have numbers. It resolves with every diagnostic, the pages no browser has checked since they changed, and the text to read. Only a browser checks diagrams and charts, and most agents have none. The text lists the unchecked pages, as a `wait` prompt does, for the agent to link in its reply.
+2. **`check` changes nothing.** It claims no listener and moves no cursor, so it can run while a `wait` is open, and its errors still end that wait when they are new.
+3. **The start prompt shows the `check` snippet,** and so does a prompt about new errors when there is no reader to reply to. A reply needs no check first: it waits for the same checks and is refused while new errors remain.
 
 ## The prompt
 
@@ -132,7 +148,7 @@ Context, with lines as they are now:
 
 Diagnostics: none
 
-Edit pages (/home/me/yapparatus/starter/docs/guide.md), reply, or both; always reply, so the reader knows what changed. Then reply and wait:
+Edit pages (/home/me/yapparatus/starter/docs/guide.md) or not, and reply. Reply and wait:
 
 node --input-type=module-typescript -e 'import { reply, wait } from "yapparatus/agent"; await reply({ to: 9 }); console.log((await wait({ after: 9 })).prompt);' <<'MDX'
 <your reply>
@@ -196,7 +212,8 @@ The server sees an agent only while one of the agent's requests is open. That re
 | browser | `GET /-/api/files/{directory}/{path}` | JSON: the file highlighted, its path from the project directory, and its line count; `404` for a file the document cannot show |
 | browser | `GET /-/api/events`, event `file` | The address of an open external file, after it changed on disk |
 | `wait` | `GET /-/api/agent/prompt?after=N&timeout=S&listener=ID` | `200` JSON: messages, new errors, and prompt text ending with the next snippet |
-| `reply` | `POST /-/api/agent/reply?to=N`, MDX body | `201` with the reply's number; `422` with errors in the reply or new errors in the document; `409` for a cursor from before a clear or with nothing to answer |
+| `reply` | `POST /-/api/agent/reply?to=N`, MDX body | `201` with the reply's number; `422` JSON: `error` text and the `diagnostics` in the reply or new in the document; `409` for a cursor from before a clear or with nothing to answer |
+| `check` | `GET /-/api/agent/diagnostics` | `200` JSON, once recent edits are checked: every diagnostic with its severity, the pages not checked, and prompt text |
 
 </Table>
 

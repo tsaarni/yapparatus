@@ -60,7 +60,7 @@ export function installApi(server: ViteDevServer, content: string, files: Source
     chat,
     sequence,
     diagnostics: {
-      list: () => diagnostics.list().map(({ scope: _s, reportedAt: _r, ...d }) => d),
+      list: () => diagnostics.list(),
       unchecked: () => diagnostics.unchecked(),
       settled: () => diagnostics.settled(),
     },

@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { partSeparator } from "../document.ts";
+import { type DiagnosticCode, diagnosticCodes } from "../protocol.ts";
 import { FigureFrame } from "../reader/components.tsx";
 import { useDiagramReport } from "../reader/diagnostics.tsx";
 import { AppIcon } from "../reader/icons.tsx";
@@ -158,7 +159,6 @@ export function Diagram({ draw, id, caption, description, build, children, debug
   if (natural * minScale > readingWidth)
     diagnostics.push({
       code: "DIAGRAM_SCROLLS",
-      severity: "warning",
       message: `The drawing is ${natural} units wide. The widest figure area fits ${readingWidth} at full size and ${Math.floor(readingWidth / minScale)} when shrunk, so readers must scroll sideways. Stack rows into columns or shorten labels.`,
       ids: [],
     });
@@ -168,9 +168,9 @@ export function Diagram({ draw, id, caption, description, build, children, debug
     key ?? marker,
     result &&
       diagnostics.map((d) => ({
-        severity: d.severity,
         code: d.code,
         message: d.message,
+        ...(d.subject ? { subject: d.subject } : {}),
         ...(id ? { target: id } : {}),
         ...(d.ids.length ? { elements: d.ids } : {}),
       })),
@@ -259,8 +259,7 @@ function compileDraw(draw: DiagramProps["draw"]): CompiledDiagram {
       groups: {},
       diagnostics: [
         {
-          code: "DRAW_ERROR",
-          severity: "error",
+          code: "DRAW_FAILED",
           message: error instanceof Error ? error.message : String(error),
           ids: [],
         },
@@ -328,12 +327,12 @@ function checkSteps(steps: StepItem[], diagram: CompiledDiagram, build: boolean)
     ...diagram.frames.map((f) => f.id),
   ];
   const known = new Set([...parts, ...Object.keys(diagram.groups)]);
-  const diagnostic = (code: string, message: string, ids: string[] = []): Diagnostic => ({
-    code,
-    severity: "warning",
-    message,
-    ids,
-  });
+  const diagnostic = (
+    code: DiagnosticCode,
+    message: string,
+    ids: string[] = [],
+    subject?: string,
+  ): Diagnostic => ({ code, message, ids, ...(subject ? { subject } : {}) });
   const diagnostics: Diagnostic[] = steps.flatMap((step, i) =>
     step.focus
       .filter((part) => !known.has(part))
@@ -341,6 +340,8 @@ function checkSteps(steps: StepItem[], diagram: CompiledDiagram, build: boolean)
         diagnostic(
           "UNKNOWN_PART",
           `Step ${i + 1} focuses "${part}", which is not a part of this diagram. Parts: ${parts.join(", ")}.`,
+          [],
+          part,
         ),
       ),
   );
@@ -349,7 +350,12 @@ function checkSteps(steps: StepItem[], diagram: CompiledDiagram, build: boolean)
     if (!step.id) continue;
     if (known.has(step.id) || ids.has(step.id))
       diagnostics.push(
-        diagnostic("DUPLICATE_ID", `Step id "${step.id}" is already used in this figure.`),
+        diagnostic(
+          "DUPLICATE_ID",
+          `Step id "${step.id}" is already used in this figure.`,
+          [],
+          step.id,
+        ),
       );
     ids.add(step.id);
   }
@@ -518,7 +524,11 @@ function DiagramView({
     );
   const vb = diagram.viewBox;
   const flagged = new Set(
-    dev ? diagram.diagnostics.flatMap((d) => (d.severity === "warning" ? d.ids : [])) : [],
+    dev
+      ? diagram.diagnostics.flatMap((d) =>
+          diagnosticCodes[d.code].severity === "warning" ? d.ids : [],
+        )
+      : [],
   );
   const passive = diagram.edges.filter((e) => e.passive);
   const active = diagram.edges.filter((e) => !e.passive);
@@ -1014,10 +1024,11 @@ export function Diagnostics({
   items,
   of = "diagram",
 }: {
-  items: Pick<Diagnostic, "code" | "severity" | "message">[];
+  items: Pick<Diagnostic, "code" | "message">[];
   of?: "diagram" | "chart";
 }) {
-  const errors = items.filter((d) => d.severity === "error").length;
+  const isError = (d: { code: DiagnosticCode }) => diagnosticCodes[d.code].severity === "error";
+  const errors = items.filter(isError).length;
   const warnings = items.length - errors;
   const count = (n: number, word: string) => (n ? `${n} ${word}${n === 1 ? "" : "s"}` : "");
   return (
@@ -1032,7 +1043,7 @@ export function Diagnostics({
       >
         {items.map((d, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: Diagnostics can repeat.
-          <li key={i} {...stylex.props(styles.item, d.severity === "error" && styles.itemError)}>
+          <li key={i} {...stylex.props(styles.item, isError(d) && styles.itemError)}>
             <code {...stylex.props(styles.code)}>{d.code}</code> {d.message}
           </li>
         ))}
