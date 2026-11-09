@@ -1,0 +1,64 @@
+# Tabs and columns
+
+Install the package:
+
+<Tabs>
+<Panel label="pnpm">
+
+```sh
+pnpm add yapparatus
+```
+
+</Panel>
+<Panel label="npm">
+
+```sh
+npm install yapparatus
+```
+
+</Panel>
+</Tabs>
+
+Start it:
+
+<Tabs>
+<Panel label="pnpm">
+
+```sh
+pnpm dev
+```
+
+</Panel>
+<Panel label="npm">
+
+```sh
+npm run dev
+```
+
+</Panel>
+</Tabs>
+
+<Ref to="retry" /> compares two versions.
+
+<Listing id="retry" caption="The retry delay, before and after backoff.">
+
+<Columns>
+<Panel label="Before">
+
+```ts
+await sleep(200);
+```
+
+</Panel>
+<Panel label="After">
+
+```ts
+for (let attempt = 0; attempt < 5; attempt++) {
+  await sleep(100 * 2 ** attempt);
+}
+```
+
+</Panel>
+</Columns>
+
+</Listing>

@@ -53,7 +53,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 | `files` | External directories by name, relative to `document.json`; see [external files](#external-files) | None |
 
 - A page has exactly one `#` heading, at the top. Its text is the page title in navigation. Sections use `##` and `###` only; deeper headings are an error.
-- Markdown and GitHub-flavored Markdown work, including alerts such as `> [!NOTE]`. `Figure`, `Chart`, `Diagram`, `Step`, `Table`, `Listing`, `Excerpt`, `Ref`, `Icon`, and `FileTree` need no imports. See [components](components.md).
+- Markdown and GitHub-flavored Markdown work, including alerts such as `> [!NOTE]`. `Figure`, `Chart`, `Diagram`, `Step`, `Table`, `Listing`, `Excerpt`, `Ref`, `Icon`, `FileTree`, `Tabs`, `Columns`, and `Panel` need no imports. See [components](components.md).
 - Not available: local images, math, Mermaid, hand-written SVG, charts drawn as images, frontmatter, and headings deeper than `###`.
 
 ## Writing
@@ -69,6 +69,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 - Alerts and captions are one or two sentences. Use an alert only for what the reader must not miss, such as a step that deletes data. Keep table cells short; explanations belong in prose.
 - Give every fenced code block a language, or `text` for plain text; a missing or unknown language is an error. Code never wraps. Keep code you write for the document within 100 columns. Code copied from an existing source, such as a command a tool prints or a file's lines, keeps its own formatting; prefer an `Excerpt` for project files.
 - Mark changed or important lines with `// [!code ++]`, `// [!code --]`, and `// [!code highlight]`. See [code marks](components.md#code-marks).
+- Put alternatives the reader picks one of, such as package managers, in `<Tabs>`, and things the reader compares, such as an old and a new design, in `<Columns>`, each made of labelled `<Panel>`s. Wrap code columns in a `Listing` and drawing columns in a `Figure` to number them. See [tabs and columns](components.md#tabs-and-columns).
 
 ## Numbering and references
 
@@ -82,6 +83,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 - One address form: `/page#id`. Ids are headings' slugs, numbered blocks' `id`s, and diagram parts as `figure--part`.
 - A heading's id is its text, lowercased with hyphens: `## Install the CLI` → `install-the-cli`. A repeated heading gets `-1`, `-2`. Headings take no custom id; keep heading text stable or update links.
 - Link pages by address or file name: `[setup](setup)`, `[setup](setup.mdx#install)`. External links are ordinary Markdown and are not checked.
+- Write a GitHub issue or pull request as a link, keeping the reference as its text: `[#1234](https://github.com/owner/repo/issues/1234)`, `[owner/other#56](https://github.com/owner/other/issues/56)`. Neither form becomes a link by itself.
 - `<Ref to="…" />` takes a figure, table, or listing id, a heading id on this page, or an address: `/setup` for a page, `/setup#install` for anything on it. Add `--part` for a diagram part or step: `request-flow--lookup`.
 - Give an explicit `id` to every figure, table, and listing. Ids are addresses: renaming one breaks links.
 - Diagram parts get ids from their labels. Set `id` on a part when prose, a link, or a `Ref` points at it, or when the derived id is long or unclear; see [the diagram reference](diagrams.md#ids).
@@ -93,6 +95,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 - External directories are the way to include files from outside the project, such as the repository the document is about. `document.json` names each one, relative to `document.json`: `"files": { "app": "../app" }`. Their names use lowercase letters, digits, and hyphens. Pages can show any text file from them, not only code.
 - Files under `.git`, binary files, files over 1 MB, and symlinks leading out of the directory are not shown.
 - A file's address is `/-/files/<directory>/<path>`, and lines are `#L40` or `#L40-L72`. Link to code with an ordinary link: `[the handler](/-/files/app/src/server.ts#L40-L72)`. The address opens the file view, which shows the whole file.
+- When the text is about part of a file, such as a function, type, or block, link to its lines: `[handle](/-/files/app/src/server.ts#L40-L72)`, not the bare file. Read the file to find the lines. Link a whole file only when the text is about the whole file.
 - Show code from the project with `<Excerpt from="/-/files/app/src/server.ts" start="export function handle(" />`, never by copying it into a fenced block. `start` quotes the first line, and the excerpt runs to the end of the block that line opens, or to the line with `end="…"`. Highlight lines with `mark="text"` or `mark={["text", "text"]}`. Excerpts find their lines by text, so they follow the code when lines are added above it. See [Excerpt](components.md#excerpt).
 - Keep excerpts short, about 5 to 30 lines, and explain them in the text. Link to the file for the rest.
 - A reader can ask about lines of a file. The prompt names the file relative to the project directory, so you can open it.

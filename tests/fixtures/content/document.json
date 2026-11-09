@@ -10,7 +10,8 @@
     "markdown.mdx",
     "categories.mdx",
     "source-code.mdx",
-    "charts.mdx"
+    "charts.mdx",
+    "panels.mdx"
   ],
   "files": {
     "sample": "../source"

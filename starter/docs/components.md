@@ -1,6 +1,6 @@
 # Components
 
-`Figure`, `Chart`, `Diagram`, `Step`, `Table`, `Listing`, `Excerpt`, `Ref`, `Icon`, and `FileTree` work in MDX pages and chat replies without imports, and so do alerts and code marks. Diagrams and their steps have [their own reference](diagrams.md), and so do [charts](charts.md) and [icons](icons.md).
+`Figure`, `Chart`, `Diagram`, `Step`, `Table`, `Listing`, `Excerpt`, `Ref`, `Icon`, `FileTree`, `Tabs`, `Columns`, and `Panel` work in MDX pages and chat replies without imports, and so do alerts and code marks. Diagrams and their steps have [their own reference](diagrams.md), and so do [charts](charts.md) and [icons](icons.md).
 
 ## Figure
 
@@ -86,6 +86,53 @@ Mark only the lines the text talks about.
 ```
 
 A blockquote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, or `[!CAUTION]` is an alert of that kind. Any other `[!…]` marker is an error. Keep an alert to one or two sentences, and use one only for what the reader must not miss. A blockquote without a marker is a quotation.
+
+## Tabs and Columns
+
+````mdx
+<Tabs>
+<Panel label="macOS">
+
+Install Node with `brew install node`.
+
+</Panel>
+<Panel label="Linux">
+
+Install Node with your distribution's package manager.
+
+</Panel>
+</Tabs>
+````
+
+`Tabs` shows one `Panel` at a time, for alternatives the reader picks one of: an operating system, a package manager, a language. `Columns` takes the same panels and shows them side by side, for things the reader compares: an old and a new design, a client and its server. Never put what the reader should compare in tabs.
+
+- A container holds only `Panel`s, at least two, each with its own `label` written as a string. Leave a blank line after each opening `<Panel>` tag and before its closing tag. Containers do not nest.
+- Choosing a tab selects the tab with the same label in every set, on every page. Write the same choice with the same label everywhere.
+- `Columns` holds two or three panels. Columns alone hold text and are not numbered. Wrap code side by side in a `Listing` and drawings side by side in a `Figure`, as below. A `Diagram` or `Chart` inside a `Figure` takes no `id` or `caption`; the figure has them.
+- A small change to code reads better as [code marks](#code-marks), and a comparison of several aspects as a `Table`.
+
+````mdx
+<Listing id="retry" caption="The retry delay, before and after backoff.">
+
+<Columns>
+<Panel label="Before">
+
+```ts
+await sleep(200);
+```
+
+</Panel>
+<Panel label="After">
+
+```ts
+await sleep(100 * 2 ** attempt);
+```
+
+</Panel>
+</Columns>
+
+</Listing>
+````
 
 ## FileTree
 

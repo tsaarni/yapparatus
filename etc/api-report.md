@@ -292,12 +292,16 @@ export interface DiagramProps {
 }
 
 export interface DocumentSettings {
-  /** Page ids in reading order. Every page is listed exactly once. */
+  /** Page files in the content folder, with `.mdx`, in reading order. Every page is listed exactly once. */
   pages: string[];
   /** Document title in the header and browser tab. Default: the folder name. */
   title?: string;
-  /** Optional name shown above the title and after it in the browser tab, such as a project or team. */
-  brand?: string;
+  /** Small line above the title, also after it in the browser tab, such as the project. */
+  subtitle?: string;
+  /** Icon beside the title in the header, as `collection:icon`. Default: none. */
+  logo?: string;
+  /** Icon in the browser tab, as `collection:icon`. Default: the browser's own. */
+  favicon?: string;
   /** Heading above the page list. Default: "Contents". */
   contentsLabel?: string;
   /** Automatic numbering. `true` or `false` sets every kind. Default: true. */
@@ -370,6 +374,8 @@ export const Figure: { (props: FigureProps): Element; breakout: boolean; };
 export interface FigureProps extends HTMLAttributes<HTMLElement> {
   caption?: string;
   description?: string;
+  /** The figure takes the whole width, as when it holds columns. The compiler sets it; authors never write it. */
+  wide?: boolean;
   children: ReactNode;
 }
 

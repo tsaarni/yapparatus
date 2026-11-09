@@ -1,12 +1,18 @@
 import * as stylex from "@stylexjs/stylex";
-import { createContext, type HTMLAttributes, type ReactNode, useContext } from "react";
+import { type HTMLAttributes, type ReactNode, useContext } from "react";
 import { partSeparator } from "../document.ts";
 import { parseFileAddress } from "../files.ts";
 import { createLogger } from "../logger.ts";
 import type { FileTreeEntry } from "../markdown-plugin.ts";
 import { AppIcon as Icon } from "./icons.tsx";
 import { blockLabel, findTarget, usePage } from "./numbering.ts";
-import { InTargetContext, ReadingContext, SourceFileContext, useScopedId } from "./prose.tsx";
+import {
+  InFigureContext,
+  InTargetContext,
+  ReadingContext,
+  SourceFileContext,
+  useScopedId,
+} from "./prose.tsx";
 import { href } from "./router.ts";
 import { TargetActions, targetHost, targetProps } from "./targets.tsx";
 import {
@@ -23,12 +29,11 @@ import { styled, ui } from "./ui.tsx";
 
 const log = createLogger("components");
 
-/** Inside a figure, which already draws the frame, so content inside draws none of its own. */
-const InFigureContext = createContext(false);
-
 export interface FigureProps extends HTMLAttributes<HTMLElement> {
   caption?: string;
   description?: string;
+  /** The figure takes the whole width, as when it holds columns. The compiler sets it; authors never write it. */
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -48,9 +53,11 @@ export function FigureFrame({
   children,
   id,
   footer,
+  wide,
   ...props
 }: FigureProps & { footer?: ReactNode }) {
   const { reply } = useContext(ReadingContext);
+  const inFigure = useContext(InFigureContext);
   const page = usePage();
   const domId = useScopedId(id);
   const label = reply ? undefined : blockLabel("figure", page, id);
@@ -62,6 +69,15 @@ export function FigureFrame({
       placement={titled ? "inline" : "corner"}
     />
   );
+  // A diagram or chart inside a figure, such as one panel of a comparison: the enclosing
+  // figure draws the frame and the caption.
+  if (inFigure)
+    return (
+      <div {...styled(`figure-part ${props.className ?? ""}`, s.figurePart)}>
+        {children}
+        {footer}
+      </div>
+    );
   return (
     <figure
       id={domId}
@@ -70,6 +86,7 @@ export function FigureFrame({
       {...styled(
         `figure ${props.className ?? ""}`,
         s.figure,
+        wide && s.figureWide,
         reply && s.figureInReply,
         ...targetHost,
       )}
@@ -109,6 +126,8 @@ interface TitledProps {
   id?: string;
   /** The title, shown above the content. */
   caption?: string;
+  /** The block takes the whole width, as when it holds columns. The compiler sets it. */
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -133,7 +152,13 @@ export function Listing(props: TitledProps) {
 }
 Listing.breakout = true;
 
-function Titled({ kind, id, caption, children }: TitledProps & { kind: "table" | "listing" }) {
+function Titled({
+  kind,
+  id,
+  caption,
+  wide,
+  children,
+}: TitledProps & { kind: "table" | "listing" }) {
   const { reply } = useContext(ReadingContext);
   const page = usePage();
   const domId = useScopedId(id);
@@ -142,7 +167,7 @@ function Titled({ kind, id, caption, children }: TitledProps & { kind: "table" |
     <figure
       {...(domId ? { id: domId } : {})}
       {...targetProps(kind, label, caption)}
-      {...styled(`titled-${kind}`, s.titled, ...targetHost)}
+      {...styled(`titled-${kind}`, s.titled, wide && s.figureWide, ...targetHost)}
       {...(caption ? { "aria-label": label ? `${label}. ${caption}` : caption } : {})}
     >
       {(caption || label) && (
@@ -205,6 +230,8 @@ export function FileTree({ entries = [] }: { entries?: FileTreeEntry[] }) {
   );
 }
 
+FileTree.breakout = true;
+
 function TreeLevel({ entries, nested }: { entries: FileTreeEntry[]; nested?: boolean }) {
   return (
     <ul {...stylex.props(s.treeLevel, nested && s.treeNested)}>
@@ -220,20 +247,23 @@ function TreeLevel({ entries, nested }: { entries: FileTreeEntry[]; nested?: boo
                 size={15}
               />
             </span>
-            {entry.kind === "more" ? (
-              <span {...stylex.props(s.visuallyHidden)}>More entries</span>
-            ) : (
-              <span
-                {...stylex.props(
-                  s.treeName,
-                  entry.kind === "directory" && s.treeDirectory,
-                  entry.highlight && s.treeHighlight,
-                )}
-              >
-                {entry.kind === "directory" ? `${entry.name}/` : entry.name}
-              </span>
-            )}
-            {entry.comment && <span {...stylex.props(s.treeComment)}>{entry.comment}</span>}
+            {/* The comment follows the name, or wraps under it as a whole when it does not fit. */}
+            <span {...stylex.props(s.treeText)}>
+              {entry.kind === "more" ? (
+                <span {...stylex.props(s.visuallyHidden)}>More entries</span>
+              ) : (
+                <span
+                  {...stylex.props(
+                    s.treeName,
+                    entry.kind === "directory" && s.treeDirectory,
+                    entry.highlight && s.treeHighlight,
+                  )}
+                >
+                  {entry.kind === "directory" ? `${entry.name}/` : entry.name}
+                </span>
+              )}
+              {entry.comment && <span {...stylex.props(s.treeComment)}>{entry.comment}</span>}
+            </span>
           </span>
           {entry.children && <TreeLevel entries={entry.children} nested />}
         </li>
@@ -277,7 +307,13 @@ const s = stylex.create({
     color: theme.textMuted,
     fontSize: fontSize.sm,
   },
+  /** Like a code block: at least as wide as the text, growing to fit its longest line. */
   tree: {
+    justifySelf: "start",
+    boxSizing: "border-box",
+    width: "fit-content",
+    minWidth: `min(100%, ${sizes.textWidth})`,
+    maxWidth: "100%",
     marginBlock: space.xl,
     paddingBlock: space.md,
     paddingInline: space.lg,
@@ -312,13 +348,23 @@ const s = stylex.create({
   },
   treeLine: {
     display: "flex",
-    alignItems: "baseline",
+    alignItems: "flex-start",
     gap: space.sm,
   },
+  /** The icon is centered on the first line, beside the name, however far the comment wraps. */
   treeIcon: {
     display: "inline-flex",
-    alignSelf: "center",
+    flexShrink: 0,
+    alignItems: "center",
+    height: "1lh",
     color: theme.textMuted,
+  },
+  treeText: {
+    display: "flex",
+    flexWrap: "wrap",
+    alignItems: "baseline",
+    columnGap: space.sm,
+    minWidth: 0,
   },
   treeFolder: {
     color: theme.accent,
@@ -370,6 +416,14 @@ const s = stylex.create({
     "--figure-bg": theme.surface,
     scrollMarginTop: `calc(${sizes.headerHeight} + ${space.xl})`,
     breakInside: "avoid",
+  },
+  /** Holding columns, a figure or listing takes the whole width so each column gets a fair share. */
+  figureWide: {
+    width: "100%",
+  },
+  figurePart: {
+    minWidth: 0,
+    overflowX: "auto",
   },
   figureInReply: {
     minWidth: 0,

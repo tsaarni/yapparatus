@@ -255,3 +255,66 @@ test("diagram categories: colors, a legend, and highlighting from the legend or 
   await expect(part("payments")).toHaveAttribute("data-state", "focus");
   await expect(part("batch-job")).toHaveAttribute("data-state", "dim");
 });
+
+test("tabs follow their label, and columns line up side by side", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto("/panels");
+  // A hidden panel is `until-found`, so it stays in the page for find; the shown one is not hidden.
+  const shown = "[role=tabpanel]:not([hidden])";
+  const sets = page.locator(".tabs");
+  await expect(sets).toHaveCount(2);
+  const install = sets.nth(0);
+  const start = sets.nth(1);
+  await expect(install.locator(shown)).toContainText("pnpm add");
+  await expect(start.locator(shown)).toContainText("pnpm dev");
+
+  // Choosing a tab chooses the tab with that label in every set, and the choice is kept.
+  await install.getByRole("tab", { name: "npm", exact: true }).click();
+  await expect(install.getByRole("tab", { name: "npm", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(start.locator(shown)).toContainText("npm run dev");
+  await page.reload();
+  await expect(page.locator(".tabs").nth(1).locator(shown)).toContainText("npm run dev");
+
+  // The arrow keys move between tabs, as the WAI-ARIA tabs pattern says.
+  await page.locator(".tabs").nth(0).getByRole("tab", { name: "npm", exact: true }).focus();
+  await page.keyboard.press("ArrowRight");
+  await expect(page.locator(".tabs").nth(1).locator(shown)).toContainText("pnpm dev");
+
+  // Find in page reveals a hidden panel in its own set, without changing the choice.
+  const hidden = page.locator(".tabs").nth(0).locator("[role=tabpanel][hidden]");
+  await expect(hidden).toHaveAttribute("hidden", "until-found");
+  await hidden.evaluate((panel) => panel.dispatchEvent(new Event("beforematch")));
+  await expect(page.locator(".tabs").nth(0).locator(shown)).toContainText("npm install");
+  await expect(page.locator(".tabs").nth(1).locator(shown)).toContainText("pnpm dev");
+
+  // Columns in a listing: numbered, side by side, and their code blocks end on one line.
+  const listing = page.locator("#retry");
+  await expect(listing).toContainText("Listing 8.1");
+  const frames = listing.locator("section pre");
+  const [before, after] = await Promise.all(
+    [0, 1].map((i) =>
+      frames.nth(i).evaluate((pre) => (pre.parentElement as HTMLElement).getBoundingClientRect()),
+    ),
+  );
+  expect(after?.left).toBeGreaterThan((before?.right ?? 0) - 1);
+  expect(Math.round(before?.bottom ?? 0)).toBe(Math.round(after?.bottom ?? 0));
+
+  // Print shows every panel under its label; a narrow page stacks the columns.
+  await page.emulateMedia({ media: "print" });
+  await expect(page.locator(".tabs").nth(0)).toContainText("pnpm add");
+  await expect(page.locator(".tabs").nth(0)).toContainText("npm install");
+  await page.emulateMedia({ media: "screen" });
+  await page.setViewportSize({ width: 390, height: 844 });
+  const [top, bottom] = await Promise.all(
+    [0, 1].map((i) =>
+      listing
+        .locator("section")
+        .nth(i)
+        .evaluate((s) => s.getBoundingClientRect()),
+    ),
+  );
+  expect(bottom?.top).toBeGreaterThan(top?.bottom ?? 0);
+});

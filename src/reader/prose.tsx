@@ -44,12 +44,16 @@ export const ReadingContext = createContext({ reply: false, idPrefix: "" });
 /** Inside a titled table or listing, which is the target itself. */
 export const InTargetContext = createContext(false);
 
+/** Inside a figure, which already draws the frame, so content inside draws none of its own. */
+export const InFigureContext = createContext(false);
+
 /** The DOM id for an authored id, namespaced inside replies. */
 export function useScopedId(id: string | undefined) {
   const { idPrefix } = useContext(ReadingContext);
   return id ? `${idPrefix}${id}` : undefined;
 }
 const CodeContext = createContext(false);
+
 type Props = HTMLAttributes<HTMLElement>;
 
 /**
@@ -77,6 +81,37 @@ function isBreakout(children: ReactNode): boolean {
   if (child.type === Fragment)
     return isBreakout((child.props as { children?: ReactNode }).children);
   return !!(child.type as Breakout).breakout;
+}
+
+/**
+ * The blocks of a panel, top to bottom. Text keeps the reading measure, and wide blocks such
+ * as code and figures may grow beyond it, as on the page. Wide blocks bring their own margin;
+ * text that comes first gets the same distance from what is above. With `fill`, the last
+ * block takes the remaining height, so code blocks side by side end on one line.
+ */
+export function Flow({ children, fill }: { children: ReactNode; fill?: boolean }) {
+  const blocks = Children.toArray(children);
+  return (
+    <div {...stylex.props(s.flow)}>
+      {blocks.map((block, index) => {
+        const wide = isBreakout(block);
+        return (
+          <div
+            // biome-ignore lint/suspicious/noArrayIndexKey: The blocks are the page's, in source order.
+            key={index}
+            {...stylex.props(
+              s.flowBlock,
+              !wide && s.flowText,
+              index === 0 && !wide && s.flowLead,
+              fill && index === blocks.length - 1 && s.flowFill,
+            )}
+          >
+            {block}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /** A top-level block, tagged by the source plugin with its file, lines, and revision. */
@@ -397,6 +432,26 @@ const s = stylex.create({
   },
   wideBlock: {
     gridColumn: "content-start / wide-end",
+  },
+  flow: {
+    display: "flex",
+    flexDirection: "column",
+    flexGrow: 1,
+    minWidth: 0,
+  },
+  flowBlock: {
+    minWidth: 0,
+  },
+  flowText: {
+    maxWidth: sizes.textWidth,
+  },
+  flowLead: {
+    paddingTop: space.md,
+  },
+  /** A grid stretches its one child, such as a code block's frame, to the full height. */
+  flowFill: {
+    flexGrow: 1,
+    display: "grid",
   },
   titleGroup: {
     marginBottom: space.md,

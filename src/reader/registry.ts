@@ -1,6 +1,7 @@
 import { Chart } from "../chart/Chart.tsx";
 import { Diagram, Step } from "../diagram/Diagram.tsx";
 import type { pageComponents } from "../document.ts";
+import { Columns, Panel, Tabs } from "./alternatives.tsx";
 import { Excerpt, Figure, FileTree, Listing, Ref, Table } from "./components.tsx";
 import { Icon } from "./icons.tsx";
 import { prose } from "./prose.tsx";
@@ -21,4 +22,7 @@ export const components = {
   Listing,
   FileTree,
   Excerpt,
+  Tabs,
+  Columns,
+  Panel,
 } satisfies Record<(typeof pageComponents)[number], unknown>;

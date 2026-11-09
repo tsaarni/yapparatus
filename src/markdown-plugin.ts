@@ -1,17 +1,25 @@
 /**
  * Markdown conventions the compiler turns into components, and the rules it checks: GitHub
- * alerts, file trees, code block languages, and heading depth. Problems are recorded per file,
+ * alerts, file trees, panels, figures, code block languages, and heading depth. Problems are recorded per file,
  * and the dev server reports them with the page's other compile diagnostics.
  */
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
-import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
+import type { MdxJsxAttribute, MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { bundledLanguages, type ShikiTransformer } from "shiki";
 import { visit } from "unist-util-visit";
 
 export interface ContentIssue {
-  code: "ALERT_TYPE" | "CHART" | "CODE_LANGUAGE" | "EXCERPT" | "FILE_TREE" | "HEADING_DEPTH";
+  code:
+    | "ALERT_TYPE"
+    | "CHART"
+    | "CODE_LANGUAGE"
+    | "EXCERPT"
+    | "FIGURE"
+    | "FILE_TREE"
+    | "HEADING_DEPTH"
+    | "PANELS";
   line: number;
   /** What the issue is about, so the same problem keeps one identity as its wording changes. */
   subject: string;
@@ -41,11 +49,23 @@ export interface FileTreeEntry {
 export function markdownConventions() {
   return (tree: Root, file: { path: string }) => {
     const issues: ContentIssue[] = [];
+    // Panels a container has claimed; the tree is visited parents first.
+    const claimed = new Set<unknown>();
     visit(tree, (node) => {
       const line = node.position?.start.line ?? 0;
       if (node.type === "mdxJsxFlowElement") {
         const jsx = node as MdxJsxFlowElementHast;
         if (jsx.name === "FileTree") fileTree(jsx, line, issues);
+        if (jsx.name === "Tabs" || jsx.name === "Columns") panels(jsx, line, issues, claimed);
+        if (jsx.name === "Figure") figure(jsx, issues);
+        if (jsx.name === "Figure" || jsx.name === "Listing") widen(jsx);
+        if (jsx.name === "Panel" && !claimed.has(jsx))
+          issues.push({
+            code: "PANELS",
+            line,
+            subject: literal(jsx, "label") ?? "",
+            message: "<Panel> belongs directly inside <Tabs> or <Columns>.",
+          });
         return;
       }
       if (node.type !== "element") return;
@@ -119,6 +139,127 @@ function alert(quote: Element, line: number, issues: ContentIssue[]) {
   if (!first.children.length) quote.children.splice(quote.children.indexOf(first), 1);
 }
 
+/** An attribute's value, when it is written as a string. */
+function literal(jsx: MdxJsxFlowElementHast, name: string) {
+  const attr = jsx.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
+  return attr?.type === "mdxJsxAttribute" && typeof attr.value === "string"
+    ? attr.value
+    : undefined;
+}
+
+/** An attribute whose value is computed at compile time, which authors never write. */
+function compiledAttribute(name: string, value: unknown): MdxJsxAttribute {
+  return {
+    type: "mdxJsxAttribute",
+    name,
+    value: {
+      type: "mdxJsxAttributeValueExpression",
+      value: JSON.stringify(value),
+      data: {
+        estree: {
+          type: "Program",
+          sourceType: "module",
+          body: [{ type: "ExpressionStatement", expression: valueToEstree(value) }],
+        },
+      },
+    },
+  };
+}
+
+const maxColumns = 3;
+const containers = ["Tabs", "Columns"];
+
+/**
+ * `<Tabs>` and `<Columns>` hold only `<Panel>`s, each with its own label. The compiler passes
+ * the labels to the container, so the reader never inspects its children.
+ */
+function panels(
+  jsx: MdxJsxFlowElementHast,
+  line: number,
+  issues: ContentIssue[],
+  claimed: Set<unknown>,
+) {
+  const name = jsx.name ?? "";
+  // Each issue's subject tells it apart from others in the same file: the stray text, the
+  // panel's label or position, or the container's labels.
+  const report = (message: string, subject: string, at = line) =>
+    issues.push({ code: "PANELS", line: at, subject, message });
+  const content = jsx.children.filter((c) => !(c.type === "text" && !c.value.trim()));
+  const labels: string[] = [];
+  for (const [index, child] of content.entries()) {
+    const at = child.position?.start.line ?? line;
+    if (child.type !== "mdxJsxFlowElement" || child.name !== "Panel") {
+      report(
+        `<${name}> holds only <Panel> elements. Put the content inside a panel.`,
+        textOf(child as ElementContent)
+          .trim()
+          .slice(0, 60) || `${name} child ${index + 1}`,
+        at,
+      );
+      continue;
+    }
+    claimed.add(child);
+    const label = literal(child, "label");
+    if (!label?.trim())
+      report(
+        `Each <Panel> in <${name}> needs a label, written as a string.`,
+        `${name} panel ${index + 1}`,
+        at,
+      );
+    else if (labels.includes(label))
+      report(`Two panels in <${name}> have the label "${label}". Labels must differ.`, label, at);
+    else labels.push(label);
+    visit(child, (inner) => {
+      if (
+        inner !== child &&
+        inner.type === "mdxJsxFlowElement" &&
+        containers.includes(inner.name ?? "")
+      )
+        report(
+          `<${inner.name}> cannot be inside <${name}>. Keep panels one level deep.`,
+          `${inner.name} in ${label ?? name}`,
+          inner.position?.start.line ?? at,
+        );
+    });
+  }
+  const all = `${name}: ${labels.join(", ")}`;
+  if (labels.length < 2) report(`<${name}> needs at least two panels.`, all);
+  if (name === "Columns" && labels.length > maxColumns)
+    report(`<Columns> holds at most ${maxColumns} panels. Use a table to compare more.`, all);
+  jsx.attributes.push(compiledAttribute("labels", labels));
+}
+
+const figureKinds = ["Figure", "Diagram", "Chart"];
+
+/**
+ * A figure or listing that holds columns takes the whole width, so each column gets a fair
+ * share: drawings side by side in a figure, code side by side in a listing.
+ */
+function widen(jsx: MdxJsxFlowElementHast) {
+  if (jsx.children.some((c) => c.type === "mdxJsxFlowElement" && c.name === "Columns"))
+    jsx.attributes.push({ type: "mdxJsxAttribute", name: "wide", value: null });
+}
+
+/**
+ * A figure frames and numbers its content, so a figure inside it is a part: it has no number,
+ * caption, or id of its own.
+ */
+function figure(jsx: MdxJsxFlowElementHast, issues: ContentIssue[]) {
+  visit(jsx, (inner) => {
+    if (inner === jsx || inner.type !== "mdxJsxFlowElement") return;
+    const part = inner as MdxJsxFlowElementHast;
+    if (!figureKinds.includes(part.name ?? "")) return;
+    const named = ["id", "caption"].filter((a) => literal(part, a) !== undefined);
+    if (named.length)
+      issues.push({
+        code: "FIGURE",
+        line: part.position?.start.line ?? 0,
+        subject: literal(part, "id") ?? literal(part, "caption") ?? "",
+        message: `A <${part.name}> inside a <Figure> is part of it and has no ${named.join(" or ")} of its own. Number the outer figure.`,
+      });
+  });
+}
+
 /**
  * `<FileTree>` wraps one Markdown list. The compiler reads the list into entries and passes
  * them to the component, which draws the tree.
@@ -136,23 +277,8 @@ function fileTree(jsx: MdxJsxFlowElementHast, line: number, issues: ContentIssue
     });
     return;
   }
-  const entries = listEntries(list);
   jsx.children = [];
-  jsx.attributes.push({
-    type: "mdxJsxAttribute",
-    name: "entries",
-    value: {
-      type: "mdxJsxAttributeValueExpression",
-      value: JSON.stringify(entries),
-      data: {
-        estree: {
-          type: "Program",
-          sourceType: "module",
-          body: [{ type: "ExpressionStatement", expression: valueToEstree(entries) }],
-        },
-      },
-    },
-  });
+  jsx.attributes.push(compiledAttribute("entries", listEntries(list)));
 }
 
 function listEntries(list: Element): FileTreeEntry[] {

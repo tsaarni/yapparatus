@@ -147,3 +147,81 @@ test("FileTree without a list is reported", async () => {
   const { issues } = await build("<FileTree>\nsrc/index.ts\n</FileTree>\n");
   assert.equal(issues[0]?.code, "FILE_TREE");
 });
+
+let containerLabels: unknown;
+function StubContainer({ labels }: { labels: unknown }) {
+  containerLabels = labels;
+  return null;
+}
+let figureWide: unknown;
+function StubFigure({ wide }: { wide?: boolean }) {
+  figureWide = wide;
+  return null;
+}
+
+test("Tabs and Columns get their panels' labels", async () => {
+  for (const name of ["Tabs", "Columns"]) {
+    const { js, issues } = await build(
+      `<${name}>\n<Panel label="pnpm">\n\nOne.\n\n</Panel>\n<Panel label="npm">\n\nTwo.\n\n</Panel>\n</${name}>\n`,
+      "function-body",
+    );
+    assert.deepEqual(issues, []);
+    const { default: Content } = await run(js, { ...runtime, baseUrl: import.meta.url });
+    containerLabels = undefined;
+    renderToStaticMarkup(
+      createElement(Content, { components: { [name]: StubContainer, Panel: StubContainer } }),
+    );
+    assert.deepEqual(containerLabels, ["pnpm", "npm"]);
+  }
+});
+
+test("panels are reported when they break the rules", async () => {
+  const panel = (label: string) => `<Panel label="${label}">\n\nText.\n\n</Panel>\n`;
+  const cases: [string, string][] = [
+    [`<Tabs>\n${panel("a")}\nStray text.\n\n${panel("b")}</Tabs>\n`, "holds only <Panel>"],
+    [`<Tabs>\n${panel("a")}${panel("a")}</Tabs>\n`, `label "a"`],
+    [`<Tabs>\n${panel("a")}</Tabs>\n`, "at least two"],
+    [`<Tabs>\n<Panel>\n\nText.\n\n</Panel>\n${panel("b")}</Tabs>\n`, "needs a label"],
+    [`<Columns>\n${["a", "b", "c", "d"].map(panel).join("")}</Columns>\n`, "at most 3"],
+    [panel("alone"), "directly inside"],
+    [
+      `<Tabs>\n<Panel label="a">\n\n<Tabs>\n${panel("x")}${panel("y")}</Tabs>\n\n</Panel>\n${panel("b")}</Tabs>\n`,
+      "cannot be inside",
+    ],
+  ];
+  for (const [source, message] of cases) {
+    const { issues } = await build(source);
+    assert.ok(
+      issues.some((i) => i.code === "PANELS" && i.message.includes(message)),
+      `${message}: ${JSON.stringify(issues)}`,
+    );
+  }
+});
+
+test("a figure or listing holding columns is wide, and a figure inside a figure has no id", async () => {
+  const columns = `<Columns>\n<Panel label="a">\n\nA.\n\n</Panel>\n<Panel label="b">\n\nB.\n\n</Panel>\n</Columns>`;
+  const { js, issues } = await build(`<Figure>\n\n${columns}\n\n</Figure>\n`, "function-body");
+  assert.deepEqual(issues, []);
+  const { default: Content } = await run(js, { ...runtime, baseUrl: import.meta.url });
+  renderToStaticMarkup(
+    createElement(Content, {
+      components: { Figure: StubFigure, Columns: StubContainer, Panel: StubContainer },
+    }),
+  );
+  assert.equal(figureWide, true);
+  const listing = await build(`<Listing>\n\n${columns}\n\n</Listing>\n`, "function-body");
+  const { default: Code } = await run(listing.js, { ...runtime, baseUrl: import.meta.url });
+  figureWide = undefined;
+  renderToStaticMarkup(
+    createElement(Code, {
+      components: { Listing: StubFigure, Columns: StubContainer, Panel: StubContainer },
+    }),
+  );
+  assert.equal(figureWide, true);
+
+  const nested = await build(
+    `<Figure id="outer" caption="Outer.">\n\n<Diagram id="inner" draw={() => {}} />\n\n</Figure>\n`,
+  );
+  assert.equal(nested.issues[0]?.code, "FIGURE");
+  assert.equal(nested.issues[0]?.subject, "inner");
+});

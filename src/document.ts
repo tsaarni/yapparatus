@@ -73,6 +73,9 @@ export const pageComponents = [
   "Listing",
   "FileTree",
   "Excerpt",
+  "Tabs",
+  "Columns",
+  "Panel",
 ] as const;
 
 /** Kinds of numbered, titled blocks. Each kind has its own sequence per chapter. */
