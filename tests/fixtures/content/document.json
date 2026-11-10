@@ -11,7 +11,8 @@
     "categories.mdx",
     "source-code.mdx",
     "charts.mdx",
-    "panels.mdx"
+    "panels.mdx",
+    "diagrams.mdx"
   ],
   "files": {
     "sample": "../source"

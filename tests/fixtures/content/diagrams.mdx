@@ -1,0 +1,134 @@
+# Diagram forms
+
+Fixture page for browser tests. It draws one figure of each form in the diagram reference, so that the browser measures and checks each form with real text.
+
+## Sequences
+
+<Diagram id="request-sequence" caption="A request with a branch and a note." draw={(d) => {
+  const you = d.actor("Reader")
+  const api = d.box("API")
+  const db = d.cylinder("Database")
+  d.sequence([you, api, db], [
+    { from: you, to: api, label: "GET /item" },
+    { from: api, to: db, label: "query" },
+    { from: db, to: api, label: "rows", reply: true },
+    { fragment: "alt", title: "found", steps: [
+      { from: api, to: you, label: "200 OK", reply: true },
+    ], else: [{ title: "missing", steps: [
+      { from: api, to: you, label: "404", reply: true },
+    ] }] },
+    { note: "Logged for audit", over: api },
+  ])
+}} />
+
+<Diagram id="queue-sequence" caption="A queue drained in a loop." draw={(d) => {
+  const app = d.box("App")
+  const queue = d.cylinder("Queue")
+  const worker = d.box("Worker")
+  d.sequence([app, queue, worker], [
+    { from: app, to: queue, label: "enqueue", async: true },
+    { fragment: "loop", title: "until empty", id: "drain", steps: [
+      { from: worker, to: queue, label: "poll" },
+      { from: queue, to: worker, label: "job", reply: true },
+      { from: worker, to: worker, label: "run" },
+    ] },
+  ], { numbered: true, gap: 64 })
+}}>
+  <Step focus="drain">The worker drains the queue.</Step>
+</Diagram>
+
+## Records
+
+<Diagram id="tables" caption="Tables with foreign keys." draw={(d) => {
+  const orders = d.record([
+    "id\tuuid\tPK",
+    ["user_id\tuuid\tFK", { role: "accent" }],
+    "total\tnumeric",
+  ], { title: "orders", header: "column\ttype\tkey", mono: true })
+  const users = d.record([
+    "id\tuuid\tPK",
+    "email\ttext",
+    ["team_id\tuuid\tFK", { category: "New" }],
+  ], { title: "users", header: "column\ttype\tkey", mono: true })
+  const teams = d.record(["id\tuuid\tPK", "name\ttext"], { title: "teams", header: "column\ttype\tkey", mono: true, category: "New" })
+  d.row([orders, users, teams], { gap: 80, align: "start" })
+  d.arrow(orders.part("user-id"), users.part("id"))
+  d.arrow(users.part("team-id"), teams.part("id"))
+}} />
+
+<Diagram id="tcp-header" caption="A protocol header with a ruler and a pinned field." draw={(d) => {
+  const tcp = d.record([
+    ["Source port", 16], ["Destination port", 16],
+    ["Sequence number", 32],
+    ["Off", 4], ["Rsv", 4], ["Flags", { span: 8, pin: 1, category: "Changed" }], ["Window", 16],
+    ["Options (variable length)", 32],
+  ], { title: "TCP header", columns: 32, ruler: { top: (i) => (i % 8 ? "" : i), left: (row) => row * 4 }, id: "tcp" })
+  const flags = d.note("1  CWR and ECE signal congestion")
+  const options = d.note("Up to 40 bytes")
+  d.place(d.row([flags, options], { gap: 40 }), { below: tcp, gap: 40 })
+  d.arrow(options, tcp.part("options-variable-length"))
+}} />
+
+<Diagram id="hash-table" caption="An array of buckets and a linked list." draw={(d) => {
+  const buckets = d.record(["0", "1", "2", "3", "4", "5", "6", "7"], { title: "buckets", columns: 8, mono: true })
+  const ant = d.record(["key: \"ant\"", "next"], { title: "entry", mono: true })
+  const cat = d.record(["key: \"cat\"", "next"], { title: "entry", mono: true, category: "Collision" })
+  const bee = d.record(["key: \"bee\"", "next"], { title: "entry", mono: true })
+  d.place(d.row([ant, cat, bee], { gap: 40, align: "start" }), { below: buckets, gap: 56 })
+  d.arrow(buckets.part("2"), ant)
+  d.arrow(buckets.part("6"), bee)
+  d.arrow(ant.part("next"), cat.part("key-cat"))
+}} />
+
+## Marked text
+
+<Diagram id="marked-request" caption="A request with marked parts." draw={(d) => {
+  const req = d.text("GET /users/42?fields=name HTTP/1.1\nHost: api.example.com\nAuthorization: Bearer eyJhbGciOi…", {
+    mono: true,
+    id: "req",
+    marks: {
+      path: { text: "/users/42", role: "accent" },
+      host: { text: "api.example.com", category: "Picks the site" },
+      auth: { lines: "3", category: "Credential" },
+    },
+  })
+  const routing = d.note("Routes to a\nvirtual host")
+  const secret = d.note("Never logged")
+  d.place(routing, { rightOf: req, gap: 64, align: "start" })
+  d.place(secret, { below: routing, gap: 24 })
+  d.arrow(routing, req.part("host"))
+  d.arrow(secret, req.part("auth"))
+}}>
+  <Step focus="req.host">The host picks the site.</Step>
+</Diagram>
+
+## Flows and states
+
+<Diagram id="token-flow" caption="A flow with a decision, in a frame." draw={(d) => {
+  const start = d.start("Request received")
+  const check = d.box("Check token")
+  const valid = d.decision("Valid?")
+  const serve = d.box("Serve", { role: "accent" })
+  const reject = d.box("Reject", { role: "warning" })
+  const done = d.end()
+  d.column([start, check, valid, serve, done], { gap: 40 })
+  d.place(reject, { rightOf: valid, gap: 72 })
+  d.arrow(start, check)
+  d.arrow(check, valid)
+  d.arrow(valid, serve, "yes")
+  d.arrow(valid, reject, "no")
+  d.arrow(serve, done)
+  d.frame(check.topLeft.offset(-120, -24), d.xy(reject.right.offset(24, 0), valid.bottom.offset(0, 8)), { tab: "opt", title: "token present" })
+}} />
+
+<Diagram id="worker-states" caption="A state machine with bends and a loop." draw={(d) => {
+  const idle = d.box("Idle")
+  const busy = d.box("Busy", { role: "accent" })
+  d.row([idle, busy], { gap: 160 })
+  const start = d.start()
+  d.place(start, { leftOf: idle, gap: 56 })
+  d.arrow(start, idle)
+  d.arrow(idle, busy, { label: "request", bend: 32 })
+  d.arrow(busy, idle, { label: "done", bend: 32 })
+  d.arrow(busy, busy, { label: "retry", loop: "top" })
+}} />

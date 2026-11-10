@@ -1,10 +1,10 @@
 # My document
 
-This is a [Yapparatus](https://github.com/tsaarni/yapparatus) document, written and revised in conversation with a coding agent. The pages are in `content/`. The browser shows the document next to a chat with the agent, for questions about any part of it and requests for changes.
+This is a [Yapparatus](https://github.com/tsaarni/yapparatus) document, written and revised in conversation with a coding agent. Its pages are in `content/`. In the browser, the document appears next to a chat where you can ask the agent about any part of it or request changes.
 
-## Create
+## Create the project
 
-The document requires Node.js 22.18 or later, and pnpm or npm.
+You need Node.js 22.18 or later, and pnpm or npm. Create the project and install its dependencies:
 
 ```sh
 npx giget gh:tsaarni/yapparatus/starter my-document
@@ -12,50 +12,54 @@ cd my-document
 pnpm install            # or: npm install
 ```
 
-You can keep the directory anywhere, for example next to the repository that the document describes.
+The project directory can be anywhere, for example next to the repository that the document describes.
 
-## Write
+## Ask the agent to write the document
 
-Start your coding agent in this directory and ask it to write the document:
+Start your coding agent in the project directory and ask it to write the document:
 
 ```text
 Write a document about the order service in ../orders.
 ```
 
-`AGENTS.md` points the agent to the authoring guide. The agent writes the pages in `content/` and then tells you to start the document.
+The agent finds the authoring guide through `AGENTS.md`, writes the pages in `content/`, and then tells you how to start the document.
 
-## Read and ask
+## Read the document and ask questions
+
+Start the document with the name of its directory, `content`:
 
 ```sh
 pnpm dev content        # or: npm run dev content
 ```
 
-`content` is the document's directory. The command prints an address. To use another port, add `--port 5180` with pnpm or `-- --port 5180` with npm.
+Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/) in the browser. To choose the port, add `--port 5180` with pnpm or `-- --port 5180` with npm.
 
-Open the address in the browser. The chat shows a prompt. Give the prompt to the same agent session. After that, you can select any part of the document and ask about it. The agent answers in the chat or edits the pages.
+The chat shows a prompt for your agent: paste it into the same agent session that wrote the document, and the agent starts answering the chat. You can then select any part of the document and ask about it, and the agent answers in the chat or edits the pages.
 
-## Share
+## Build the document for readers
 
 ```sh
 pnpm build content          # or: npm run build content
 pnpm build:single content   # or: npm run build:single content
 ```
 
-`build` writes a static site to `dist/content/`. `build:single` writes the whole document to one offline file, `dist-single/content/index.html`.
+`build` writes the document as a static site to `dist/content/`, and `build:single` writes it as one offline file, `dist-single/content/index.html`.
 
-The chat is stored in `.yapparatus/content/`, and no build includes it. It contains your questions, so keep it private.
+Neither build includes the chat, which is stored in `.yapparatus/content/`. The chat contains your questions, so keep it private.
 
-## Add a document
+## Add another document
 
-The project can hold more documents. Each document is a directory with its own `document.json` and pages, for example `tutorial/`. Ask the agent to write the new document in that directory, then start it with `pnpm dev tutorial`. The documents share `docs/`, `icons/`, and `node_modules/`. One document directory cannot be inside another.
+A project can hold more than one document. Each document is a directory with its own `document.json` and pages, and all documents share `docs/`, `icons/`, and `node_modules/`. A document directory cannot be inside another one.
 
-## Update
+To add a document, for example in `tutorial/`, ask the agent to write it in that directory, and then start it with `pnpm dev tutorial`.
 
-These commands install the latest Yapparatus and replace the authoring guide in `docs/` with the latest version:
+## Update Yapparatus and the authoring guide
+
+Run these commands to install the latest Yapparatus and the latest authoring guide:
 
 ```sh
 pnpm add github:tsaarni/yapparatus      # or: npm install github:tsaarni/yapparatus
 npx giget gh:tsaarni/yapparatus/starter/docs docs --force
 ```
 
-The second command overwrites every file in `docs/`. It does not change the pages of your documents.
+The second command overwrites every file in `docs/` and leaves the pages of your documents unchanged.

@@ -1,34 +1,30 @@
-# Yapparatus
+<h1>
+  <img alt="Yapparatus" src="assets/logo-light.svg#gh-light-mode-only" height="64">
+  <img alt="Yapparatus" src="assets/logo-dark.svg#gh-dark-mode-only" height="64">
+</h1>
 
-A document you can talk to. Your coding agent writes it as MDX pages; you read it in the browser, select a passage or a diagram part, and ask. The agent answers in a chat panel, edits the document, or both.
+Yapparatus is a tool for documents that are written and revised in conversation with a coding agent. The agent writes the pages as [MDX](https://mdxjs.com/). In the browser, the document appears next to a chat where you can select any part of the document, such as text, a table, or a part of a diagram, and ask the agent about it or request changes. The agent answers in the chat, edits the pages, or both.
 
-This is an early implementation. Its design is a Yapparatus document in [`docs/design/`](docs/design/overview.mdx).
+This is an early implementation. Its design is itself a Yapparatus document, in [`docs/design/`](docs/design/overview.mdx).
 
-## Run
+## Read the design document
 
-Requires Node.js 22.18+ and pnpm.
+You need Node.js 22.18 or later, and pnpm. Install the dependencies and start the design document:
 
 ```sh
 pnpm install
 pnpm dev docs/design
 ```
 
-This starts the design document. `pnpm dev tests/fixtures/content` starts the test document.
+Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/) in the browser.
 
-## Write a document
+The repository also has a test document, which you can start with `pnpm dev tests/fixtures/content`.
 
-```sh
-npx giget gh:tsaarni/yapparatus/starter my-document
-cd my-document && pnpm install
-```
+## Write a new document
 
-Start your coding agent in that directory and ask for a document. When it is done, run `pnpm dev content`, open the address, and give the prompt the chat shows to the same agent session. Agents write pages by the [authoring guide](starter/docs/guide.md).
+A new document starts from the starter project. The [starter README](starter/README.md) describes how to create the project, ask the agent to write the document, read it and ask questions, and build it for readers.
 
-## Check
+## Screenshot
 
-```sh
-pnpm verify              # Biome, TypeScript, style rules
-pnpm test:unit
-pnpm test                # browser tests; first run: pnpm exec playwright install chromium
-pnpm build docs/design   # static site in dist/docs/design/
-```
+<img alt="The design document in the browser. An arrow of a sequence diagram is selected, and the chat panel shows the reader's question about it and the agent's answer." src="assets/screenshot-light.png#gh-light-mode-only">
+<img alt="The design document in the browser. An arrow of a sequence diagram is selected, and the chat panel shows the reader's question about it and the agent's answer." src="assets/screenshot-dark.png#gh-dark-mode-only">
