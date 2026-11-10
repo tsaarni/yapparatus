@@ -213,9 +213,13 @@ export const diagnosticCodes = {
   // Diagrams.
   DRAW_FAILED: { severity: "error", meaning: "The diagram's draw function threw." },
   DIAGRAM_FAILED: { severity: "error", meaning: "The diagram compiler threw." },
-  RECORD_ROW: {
+  MARK_UNMATCHED: {
     severity: "error",
-    meaning: "A record row is named that the record does not have.",
+    meaning: "A text mark does not match exactly one place in its text.",
+  },
+  CELL_SPAN: {
+    severity: "error",
+    meaning: "A record cell spans more columns than remain in its row.",
   },
   BEND_WITH_ROUTE: { severity: "error", meaning: "An edge sets both bend and route." },
   DEGENERATE_EDGE: { severity: "error", meaning: "An edge starts and ends at the same point." },
@@ -240,8 +244,12 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A part has no placement, so it is drawn over another part.",
   },
-  UNKNOWN_PART: { severity: "error", meaning: "A step focuses a part the diagram does not have." },
+  UNKNOWN_PART: {
+    severity: "error",
+    meaning: "A step or part() names a part the diagram does not have.",
+  },
   TEXT_OVERFLOW: { severity: "warning", meaning: "Text does not fit its box." },
+  RULER_CROWDED: { severity: "warning", meaning: "A record's column labels run into each other." },
   LABEL_CROWDED: { severity: "warning", meaning: "An edge label has too little room." },
   LABEL_OVERLAP: { severity: "warning", meaning: "A label overlaps another label or a part." },
   NODE_OVERLAP: { severity: "warning", meaning: "Two parts shown together overlap." },

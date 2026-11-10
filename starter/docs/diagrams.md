@@ -24,20 +24,61 @@
 
 `draw` uses only `d` and values written inside it. The figure is compiled once per source text, so outside variables are not seen when they change.
 
-## Choosing a form
+## Pick a form
 
-Draw a figure when it shows parts, a path, or an order faster than text; a rule stays a sentence. Pick the form from what the reader needs to see:
+Draw a figure when it shows parts, a path, or an order faster than text; a rule stays a sentence. Find what the reader needs to see, and copy its example.
 
-| To show | Build it with |
+| To show | Example |
 |---|---|
-| Components and who talks to whom | Boxes in rows and columns, `enclose` for a process or machine, arrows with short labels |
-| A flow with a question | A `column` of boxes, `decision` diamonds, a labelled `start()`, and side branches placed `rightOf` |
-| Messages over time | `d.sequence`; see [Sequence diagrams](#sequence-diagrams) |
-| States and transitions | Boxes, `start()`, `bend` for each pair of opposite edges, and `loop` for a transition to itself; see [Curves and loops](#edges) |
-| Types or tables | `d.record`, with edges from `rec.row(i)` |
+| Components and who talks to whom | [Components](#components) |
+| A flow with a question | [A flow](#a-flow) |
+| States and transitions | [A state machine](#a-state-machine) |
+| Messages over time | [Sequences](diagram-sequences.md) |
+| Tables, types, protocol headers, registers, arrays | [Structures](diagram-structures.md) |
+| Which part of a text or code matters | [Marked text](diagram-structures.md#marked-text) |
 | A layout or a size | Boxes with a fixed `width` and `height`, placed with gaps that match the thing drawn |
 
-A state machine needs no special component:
+### Components
+
+```js
+const browser = d.actor("Browser", { role: "external" })
+const api = d.box("API", { role: "accent" })
+const auth = d.box("Auth")
+const db = d.cylinder("Database")
+d.equalSize([api, auth])
+d.row([browser, api, db])
+d.place(auth, { below: api })
+d.enclose([api, auth], { title: "Backend" })
+d.arrow(browser, api, "HTTPS")
+d.arrow(api, db, "SQL")
+d.arrow(api, auth, "verify")
+```
+
+- Peers in a row share a size with `equalSize`.
+- `enclose` names a process, a machine, or a network around shapes placed elsewhere.
+
+### A flow
+
+```js
+const start = d.start("Request received")
+const check = d.box("Check token")
+const valid = d.decision("Valid?")
+const serve = d.box("Serve", { role: "accent" })
+const reject = d.box("Reject", { role: "warning" })
+const done = d.end()
+d.column([start, check, valid, serve, done], { gap: 40 })
+d.place(reject, { rightOf: valid, gap: 72 })
+d.arrow(start, check)
+d.arrow(check, valid)
+d.arrow(valid, serve, "yes")
+d.arrow(valid, reject, "no")
+d.arrow(serve, done)
+```
+
+- The main path runs down a `column`; a side branch is placed `rightOf` its decision.
+- Ask in two or three words in a decision, and explain it in the prose.
+
+### A state machine
 
 ```js
 const idle = d.box("Idle")
@@ -51,6 +92,9 @@ d.arrow(busy, idle, { label: "done", bend: 32 })
 d.arrow(busy, busy, { label: "retry", loop: "top" })
 ```
 
+- Opposite transitions take the same `bend`, and curve apart.
+- `d.arrow(a, a)` loops; `loop` picks the side.
+
 ## Shapes
 
 | Call | Draws |
@@ -60,9 +104,9 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 | `d.actor(label, options?)` | A person or outside system |
 | `d.note(label, options?)` | A remark with a folded corner |
 | `d.decision(label, options?)` | A diamond around a short question |
-| `d.record(title, rows, options?)` | A title over rows, such as a type or table |
+| `d.record(cells, options?)` | Cells on a grid: a table, type, header, register, or array. See [Structures](diagram-structures.md) |
 | `d.start(label?, options?)`, `d.end(label?, options?)` | The start and end of a flow or state machine |
-| `d.text(label, options?)` | Text without an outline |
+| `d.text(label, options?)` | Text without an outline; with `marks`, see [Marked text](diagram-structures.md#marked-text) |
 
 - **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
 - **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The label takes part in the overlap checks, so put it on a side no edge leaves from. Without a label, the id is `start-1`, `end-2`, and so on. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
@@ -89,6 +133,7 @@ Every part has an id. Steps, links, and the reader's questions use it.
 - A shape's id comes from its label: `"Auth service"` → `auth-service`. A labelled start or end too: `d.start("Request received")` → `request-received`.
 - An edge's id joins the ids of its ends: `client->api`. With a box labelled "Get an answer", the edge from `ask` is `ask->get-an-answer`.
 - A category's id comes from its name: `"To be removed"` → `to-be-removed`.
+- A record cell or text mark has its parent's id, a dot, and its own: `users.team-id`. See [Members](diagram-structures.md#members).
 - Repeated ids get a number: `box`, `box-2`.
 
 Set `id` when:
@@ -128,7 +173,6 @@ Every element has nine anchors:
 There are also these points:
 
 - `port(side, t)`: a point along a side, such as `api.port("right", 0.25)`. `t` defaults to 0.5.
-- `rec.row(i, "left" | "right")`: the edge of record row `i`, on the right by default.
 
 Derived points:
 
@@ -139,7 +183,7 @@ Derived points:
 
 ## Edges
 
-```js
+```ts
 d.arrow(from, to, "label")
 d.arrow(from, to, { id, label, route, bend, loop, role, category, dashed, ends, head, stepOnly })
 d.line(from, to, ...)   // the same, without arrowheads
@@ -189,43 +233,6 @@ A label is a string or `{ text, segment, at, side, gap }`:
 
 `d.frame(topLeft, bottomRight, { tab, title, dividers })` draws a titled region between two points, such as a UML fragment. It does not own or move anything.
 
-## Sequence diagrams
-
-```js
-const you = d.actor("Reader")
-const api = d.box("API")
-const db = d.cylinder("Database")
-d.sequence([you, api, db], [
-  { from: you, to: api, label: "GET /item" },
-  { from: api, to: db, label: "query" },
-  { from: db, to: api, label: "rows", reply: true },
-  { fragment: "alt", title: "found", steps: [
-    { from: api, to: you, label: "200 OK", reply: true },
-  ], else: [{ title: "missing", steps: [
-    { from: api, to: you, label: "404", reply: true },
-  ] }] },
-  { note: "Logged for audit", over: api },
-])
-```
-
-The participants are ordinary shapes, in a row; time runs downward.
-
-- **Calls and replies:** a call opens an activation bar on the receiver, and its `reply` closes it. A call with no reply gets a short bar. `async` messages do not activate the receiver.
-- **Self-messages:** a message to oneself draws a loop.
-- **Notes:** a note sits `over` one participant, or spans two: `over: [a, b]`.
-- **Fragments:** give a fragment an `id` to focus all its messages in one step.
-- **Fragments** (`alt`, `opt`, `loop`, `par`, …): take a `title` and optional `else` branches.
-- **Message ids:** derived from the label, such as `get-item`. A repeated label gets a number: `get-item-2`.
-
-Options:
-
-- `gap`: the space between participants. Default: 40.
-- `step`: the vertical space per message. Default: 44.
-- `numbered`: number the messages.
-- `id`: an id for the sequence element.
-
-`d.sequence` returns one element, so you can place it like any other. Keep each message label shorter than the space between its two lifelines, or widen `gap`.
-
 ## Categories
 
 A category shows which parts belong together, or how they differ. Give parts the same `category` and they share a color; a legend under the figure names each color.
@@ -235,6 +242,11 @@ const orders = d.box("Orders API", { category: "New" })
 const payments = d.box("Payments API", { category: "New" })
 const batch = d.box("Batch job", { category: "To be removed" })
 const db = d.cylinder("Database")
+d.row([orders, payments, batch])
+d.place(db, { below: payments })
+d.arrow(orders, db)
+d.arrow(payments, db)
+d.arrow(batch, db, { dashed: true })
 ```
 
 - **Colors follow the order of first use.** The first category gets the first color, and so on. Parts without a category stay neutral.
@@ -248,10 +260,18 @@ const db = d.cylinder("Database")
 Steps tell the story of a figure in order. Each `<Step>` names the parts it is about and says one or two sentences. Step text is MDX, so it can link to the section that explains more. Steps never move anything; they only change what is highlighted, faded, or shown.
 
 ```mdx
-<Diagram id="request-flow" caption="A cached read." build draw={(d) => {
-  …
+<Diagram id="cached-read" caption="A cached read." build draw={(d) => {
+  const client = d.box("Client")
+  const api = d.box("API")
+  const cache = d.cylinder("Cache")
+  const db = d.cylinder("Database")
+  d.row([client, api, cache])
+  d.place(db, { below: cache })
+  d.arrow(client, api)
+  d.arrow(api, cache)
+  d.arrow(cache, db, { id: "miss", label: "miss" })
   const why = d.note("Most reads stop here", { stepOnly: true })
-  d.place(why, { below: cache })
+  d.place(why, { below: api })
 }}>
   <Step focus="client api client->api">The client sends a request to the API.</Step>
   <Step id="lookup" focus="cache api->cache most-reads-stop-here">The API first looks in the cache.</Step>
@@ -267,7 +287,7 @@ Steps tell the story of a figure in order. Each `<Step>` names the parts it is a
 | Categories | Focusing a category's id focuses every part in it |
 | `build` | Each part stays hidden until the first step that focuses it |
 | `stepOnly` | A shape or edge option: the part shows only in steps that focus it. Use it for callouts next to a part, or for versions of a label that change from step to step |
-| `id` | A step's address: `/page#request-flow--lookup`. Unique among the figure's parts and steps |
+| `id` | A step's address: `/page#cached-read--lookup`. Unique among the figure's parts and steps |
 
 To tell a story:
 
@@ -282,7 +302,7 @@ Steps help when the reader must follow an order: a request through components, a
 - Steps and a numbered prose list that walk the same path repeat each other. Keep the walk in the steps, and keep rules and details in the prose after the figure.
 - With `build`, a part that no step focuses is shown, faded, from the first step. Focus every part that should appear in order.
 
-The reader steps with the buttons under the caption, the arrow keys, and Esc. Clicking a part opens the next step about it. A link to a step or part opens it. `<Ref to="request-flow--lookup">the lookup</Ref>` links to a step from the prose. When the reader asks about the figure, the question includes the open step. Print shows the whole figure, without step-only parts, and lists the steps.
+The reader steps with the buttons under the caption, the arrow keys, and Esc. Clicking a part opens the next step about it. A link to a step or part opens it. `<Ref to="cached-read--lookup">the lookup</Ref>` links to a step from the prose. When the reader asks about the figure, the question includes the open step. Print shows the whole figure, without step-only parts, and lists the steps.
 
 Use steps when the order matters. A simple figure needs none.
 
@@ -300,15 +320,17 @@ In development, diagnostics appear under the figure, in the console, as dashed o
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or use `loop` |
 | `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |
-| `RECORD_ROW` | error | `rec.row(i)` names a row that does not exist |
+| `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are out of range. Mark a longer text, or whole lines |
+| `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
 | `BEND_WITH_ROUTE` | error | An edge has both `bend` and `route`. Keep one |
 | `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only parts overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
 | `TEXT_OVERFLOW` | warning | Increase `width` or `height` |
+| `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a row or column, or `place()` it |
-| `UNKNOWN_PART` | error | A step focuses an id that does not exist. The message lists the valid ids |
+| `UNKNOWN_PART` | error | A step focuses an id that does not exist, or `part()` names a member that does not. The message lists the valid ids |
 | `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |
 | `STEP_ONLY_UNUSED` | warning | A `stepOnly` part that no step focuses is never shown |
 | `DIAGRAM_SCROLLS` | warning | Wider than 1280 units. Stack it more vertically |

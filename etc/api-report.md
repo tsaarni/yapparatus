@@ -105,9 +105,20 @@ export class DiagramBuilder {
   cylinder(label: string, options: NodeOptions = {}): Node {
     return this.add(new Node("cylinder", label, options));
   }
-  /** Free-standing text without an outline. */
-  text(label: string, options: NodeOptions = {}): Node {
-    return this.add(new Node("text", label, options));
+  /** Free-standing text without an outline. `marks` name spans or lines as members. */
+  text(label: string, options: TextOptions = {}): Node {
+    const { marks, ...rest } = options;
+    const node = this.add(new Node("text", label, rest));
+    for (const [id, mark] of Object.entries(marks ?? {})) {
+      const { text, lines, ...o } =
+        typeof mark === "string"
+          ? { text: mark }
+          : (mark as Mark & { text?: string; lines?: string });
+      const place: Place =
+        text !== undefined ? { kind: "mark", text } : { kind: "mark", lines: lines ?? "" };
+      this.member(node, text ?? "", { ...o, id }, place);
+    }
+    return node;
   }
   /** A person or outside system that acts: a figure above its name. */
   actor(label: string, options: NodeOptions = {}): Node {
@@ -138,9 +149,43 @@ export class DiagramBuilder {
     });
     return this.add(node);
   }
-  /** A title over rows, like a type, table, or message. `rec.row(i)` is an anchor on row i. */
-  record(title: string, rows: string[], options: NodeOptions = {}): Node {
-    return this.add(new Node("record", title, options, { rows }));
+  /**
+   * Cells on a grid under an optional title: a type, a table, a packet header, a register,
+   * an array. Each cell is a member: `rec.part("id")`.
+   */
+  record(cells: Cell[], options: RecordOptions = {}): Node {
+    const { title = "", ...rest } = options;
+    const n = this.nodes.filter((x) => x.shape === "record").length + 1;
+    const node = this.add(new Node("record", title, rest, title ? {} : { id: `record-${n}` }));
+    for (const cell of cells) {
+      const [label, o] = typeof cell === "string" ? [cell, {}] : cell;
+      const { span = 1, ...options } = typeof o === "number" ? { span: o } : o;
+      this.member(node, label, options, { kind: "cell", span: Math.max(1, Math.round(span)) });
+    }
+    return node;
+  }
+  /**
+   * A member's id is its parent's, then its own, such as `users.team-id`. Its own comes from
+   * the first tab-separated column of its label, and is unique in the parent. The parent's
+   * part is joined in later, when the parent's id is final.
+   */
+  private member(parent: Node, label: string, options: MemberOptions, place: Place) {
+    const { id, pin, ...rest } = options;
+    const base = id ?? slug(label.split("\t")[0] ?? "");
+    let own = base;
+    for (let n = 2; parent.members.some((m) => m.member?.own === own); n++) own = `${base}-${n}`;
+    const node = new Node(
+      place.kind,
+      label,
+      { ...rest, mono: parent.options.mono ?? false },
+      {
+        id: `${parent.id}.${own}`,
+        explicit: id !== undefined,
+        member: { ...place, parent, own, ...(pin !== undefined ? { pin } : {}) },
+      },
+    );
+    parent.members.push(node);
+    this.add(node);
   }
   /**
    * A sequence diagram: the participants in a row, lifelines, and messages in time order.
@@ -242,6 +287,7 @@ export class DiagramBuilder {
   }
 
   private add(node: Node): Node {
+    node.report = (code, message, ids) => this.report(code, message, ids);
     this.nodes.push(node);
     this.noteCategory(node.options.category);
     return node;

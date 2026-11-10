@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Rules for agents working on Yapparatus. Short on purpose: each rule is the essence; the reason follows the dash.
+Rules for agents working on this project.
 
 ## Where things are written
 
@@ -14,9 +14,9 @@ Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtur
 
 ## Engineering
 
-- **No backwards compatibility.** Change any API, format, or address when a better design appears; update every caller and document in the same change. — Shims and deprecated paths are debt with no users to serve.
-- **One way to do each thing.** Prefer an opinionated API with a single elegant, clear path over options and aliases. — Every alternative is something an agent must choose between and a reader must learn.
-- **Docs describe what exists.** The authoring reference covers only built features; agreed but unbuilt rules are marked **Direction** in design documents. — Agents write code against what docs promise.
+- **No backwards compatibility.** Change any API, format, or address when a better design appears; update every caller and document in the same change.
+- **One way to do each thing.** Prefer an opinionated API with a single elegant, clear path over options and aliases.
+- **Docs describe what exists.** The authoring reference covers only built features; agreed but unbuilt rules are marked **Direction** in design documents.
 
 - `pnpm verify`, `pnpm test:unit`, and `pnpm test` pass before work is done; `pnpm api:report` when exports change.
 - StyleX: longhand properties only (`borderWidth`, `backgroundColor`). Shorthands with theme variables are dropped silently; `pnpm verify` rejects them and literal colors.
@@ -25,3 +25,7 @@ Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtur
 - The server API sorts messages by kind: commands (`POST`), reports (`PUT /-/api/diagnostics/{scope}`), events (`GET /-/api/events`), and reads (`GET`, which may wait). Types in `src/protocol.ts`; everything the agent reads is written in `src/server/prompt.ts`.
 - Browser tests run in an isolated temporary workspace with their own Vite cache.
 - `yapparatus/vite` and `yapparatus/agent` load from `lib/`, compiled by `pnpm build:lib`; `pnpm dev` and `pnpm test` run it. A project installs this package, as `starter/` does: test a change to how it installs with `pnpm pack` into a copy of the starter.
+
+## Writing
+
+- **Write simple, direct technical English.** No filler words, marketing tone, em dashes in prose, or dramatic contrasts such as "not X, but Y". This covers code comments, commit messages, and READMEs; document pages also follow [the guide's writing rules](starter/docs/guide.md#writing).

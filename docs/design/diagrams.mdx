@@ -57,7 +57,7 @@ The design is judged by the number of repair rounds a figure needs. A repair rou
 ## Names in the API
 
 1. **Clear words over short ones.** Every name must be readable without decoding, even if it costs an extra token. One misread abbreviation costs a whole repair round.
-2. **Screen words for positions.** Anchors are `top`, `bottom`, `left`, `right`, `center`, and the corners `topLeft`, `topRight`, `bottomLeft`, `bottomRight`. Ports, record rows, loops, and enclosure titles use the same words, and relations use `above`, `below`, `leftOf`, `rightOf`. Map words such as `north` and `ne` require the reader to translate them into screen directions.
+2. **Screen words for positions.** Anchors are `top`, `bottom`, `left`, `right`, `center`, and the corners `topLeft`, `topRight`, `bottomLeft`, `bottomRight`. Ports, rulers, loops, and enclosure titles use the same words, and relations use `above`, `below`, `leftOf`, `rightOf`. Map words such as `north` and `ne` require the reader to translate them into screen directions.
 3. **Semantic options over glyphs.** The option `dashed: true` replaces a glyph such as `"-->"`. The same glyph means different things in Mermaid, D2, and PlantUML, and a word has one meaning.
 4. **The common case is positional.** In `d.arrow(a, b, "label")`, a string as the third argument is the label. An object as the third argument holds the options. Most edges need only a label.
 5. **One way to do each thing.** The API has no aliases and does not expose internal pieces. The library draws activation bars, lifelines, and spacing itself, and they are not options.
@@ -137,11 +137,96 @@ Color in a figure has two uses, as in maps and charts. It highlights parts, and 
 
 ## Shapes and composites
 
-1. **Few shapes, each with one meaning.** Box, cylinder, actor, note, decision, record, start, and end stand for components, storage, people, remarks, questions, types, and the ends of a flow. Ellipses, parallelograms, and hexagons are left out for three reasons: few readers know what they mean, `role` and `category` already show how parts differ, and each shape needs its own outline for attaching edges. The trigger of a flow is a `start()` with a label, so the trigger stays one part with one id.
+1. **Few shapes, each with one meaning.** Box, cylinder, actor, note, decision, record, start, and end stand for components, storage, people, remarks, questions, structured data, and the ends of a flow. Ellipses, parallelograms, and hexagons are left out for three reasons: few readers know what they mean, `role` and `category` already show how parts differ, and each shape needs its own outline for attaching edges. The trigger of a flow is a `start()` with a label, so the trigger stays one part with one id.
 2. **An enclosure draws around elements and never moves them.** The bounds of an enclosure come from its members, so the enclosure cannot be placed. An enclosure that moved its contents would create a cycle.
 3. **Composite diagrams are built only from public primitives.** A composite diagram, such as a sequence diagram, takes node handles, returns an element that can be placed, and exposes its parts as handles or ids. A sequence diagram can therefore sit beside a component diagram, inside an enclosure, or next to a note.
 4. **An algorithm is added only where one is needed.** Sequence diagrams compute activation bars from calls and replies. State diagrams need no algorithm, because rows, boxes, `start()`, `end()`, and general edges are enough.
 5. **Lists stay plain data.** Sequence steps are an array of objects, because a model writes and edits an array more easily than callbacks. Participants are ordinary shapes, messages have derived ids, and `d.sequence` returns one element that can be placed. [The agent channel](chat#how-the-agent-connects) shows an example.
+
+## Members
+
+Some figures are about the pieces of one shape: a field of a protocol header, a row of a table, a slot of an array, or a word of a request. A **member** is such a piece: a record's cell or a text's mark. Every member is a part, so pointers, steps, categories, links, and questions work on it without anything new. <Ref to="member-header" /> through <Ref to="member-text" /> show the forms.
+
+<Diagram id="member-header" caption="The TCP header, 32 bits per row: bit numbers on top, byte offsets on the left. A pin marks the inner field that the note explains." build draw={(d) => {
+  const tcp = d.record([
+    ["Source port", 16], ["Destination port", 16],
+    ["Sequence number", 32],
+    ["Acknowledgment number", 32],
+    ["Off", 4], ["Rsv", 4], ["Flags", { span: 8, pin: 1, category: "Changed in this draft" }], ["Window", 16],
+    ["Checksum", 16], ["Urgent pointer", 16],
+    ["Options (variable length)", 32],
+  ], { title: "TCP header", columns: 32, ruler: { top: (i) => (i % 8 ? "" : i), left: (row) => row * 4 }, id: "tcp" })
+  const why = d.note("1  CWR and ECE signal congestion", { id: "why" })
+  const options = d.note("Up to 40 bytes", { id: "options" })
+  d.place(options, { below: tcp, gap: 40 })
+  d.place(why, { leftOf: options, gap: 40 })
+  d.arrow(options, tcp.part("options-variable-length"))
+}}>
+  <Step focus="tcp">The fixed header is five 32-bit rows, followed by options.</Step>
+  <Step focus="tcp.source-port tcp.destination-port">The ports name the two ends of the connection.</Step>
+  <Step focus="tcp.flags why">An inner field has no free side for an arrow, so a pin numbers it and the note refers to the number.</Step>
+  <Step focus="tcp.options-variable-length options options->tcp.options-variable-length">A field on the outline takes an arrow.</Step>
+</Diagram>
+
+<Diagram id="member-tables" caption="Tables with a header row. A pointer leaves a row's side and enters the row it refers to." draw={(d) => {
+  const orders = d.record([
+    "id\tuuid\tPK",
+    ["user_id\tuuid\tFK", { role: "accent" }],
+    "total\tnumeric",
+  ], { title: "orders", header: "column\ttype\tkey", mono: true })
+  const users = d.record([
+    "id\tuuid\tPK",
+    "email\ttext",
+    ["team_id\tuuid\tFK", { category: "New" }],
+  ], { title: "users", header: "column\ttype\tkey", mono: true })
+  const teams = d.record(["id\tuuid\tPK", "name\ttext"], { title: "teams", header: "column\ttype\tkey", mono: true, category: "New" })
+  d.row([orders, users, teams], { gap: 80, align: "start" })
+  d.arrow(orders.part("user-id"), users.part("id"))
+  d.arrow(users.part("team-id"), teams.part("id"))
+}} />
+
+<Diagram id="member-memory" caption="A register numbered from its most significant bit, and a hash table whose buckets point into chained entries." draw={(d) => {
+  const status = d.record([
+    ["Reserved", { span: 4, role: "muted" }], ["Mode", 2], ["IE", 1], ["Busy", 1],
+  ], { title: "STATUS", columns: 8, ruler: { top: (i) => 7 - i } })
+  const buckets = d.record(["0", "1", "2", "3", "4", "5", "6", "7"], { title: "buckets", columns: 8, mono: true })
+  const ant = d.record(["key: \"ant\"", "next"], { title: "entry", mono: true })
+  const cat = d.record(["key: \"cat\"", "next"], { title: "entry", mono: true, category: "Collision" })
+  const bee = d.record(["key: \"bee\"", "next"], { title: "entry", mono: true })
+  d.place(status, { above: buckets, gap: 40 })
+  d.place(d.row([ant, cat, bee], { gap: 40, align: "start" }), { below: buckets, gap: 56 })
+  d.arrow(buckets.part("2"), ant)
+  d.arrow(buckets.part("6"), bee)
+  d.arrow(ant.part("next"), cat.part("key-cat"))
+}} />
+
+<Diagram id="member-text" caption="An HTTP request with its parts marked. The path picks the handler; the Host header picks the site." draw={(d) => {
+  const req = d.text("GET /users/42?fields=name HTTP/1.1\nHost: api.example.com\nAccept: application/json\nAuthorization: Bearer eyJhbGciOi…", {
+    mono: true,
+    id: "req",
+    marks: {
+      path: { text: "/users/42", role: "accent" },
+      query: "?fields=name",
+      host: { text: "api.example.com", category: "Picks the site" },
+      auth: { lines: "4", category: "Credential" },
+    },
+  })
+  const routing = d.note("Routes to a\nvirtual host", { id: "routing" })
+  const secret = d.note("Never logged", { id: "secret" })
+  d.place(routing, { rightOf: req, gap: 64, align: "start" })
+  d.place(secret, { below: routing, gap: 24 })
+  d.arrow(routing, req.part("host"))
+  d.arrow(secret, req.part("auth"))
+}} />
+
+1. **A member is a part.** It has an id after its parent's (`users.team-id`), takes a `role` and a `category`, and steps focus it. Focusing the parent focuses all its members. Pointers, steps, links, and questions therefore need no special case.
+2. **A record is cells on a grid.** One mechanism covers a type, a table, a protocol header, a register, and an array: `columns` sets the grid, and each cell spans some of it. A separate shape for each would repeat the same layout with different names.
+3. **A cell is a rectangle.** It fills the rest of its row, or starts a row and covers whole rows. A field that crosses a row is split by the author. Cells that wrap would make shapes that are not rectangles, with no clear side for an edge, and well-designed protocols align their fields anyway.
+4. **Tabs align the columns of a table.** A table row stays one member, because a pointer refers to a row, not to its type. A header row names the columns with the same tabs.
+5. **A ruler numbers positions in the reader's units.** It is a function from the index to the label, one for each side, because the units differ between figures: bits from either end, byte offsets, addresses, or letters. A fixed numbering would be wrong for most of them. A ruler is not a header: a header names content, and a ruler numbers positions.
+6. **Edges leave a cell through the record's outline.** A cell takes an edge on a side that lies on the outline and faces the other end best: a table row from its left or right, an array slot from its bottom. A cell inside the grid has no such side, and an edge to it crosses its neighbors and is reported. A **pin** numbers it instead, and a note or the text refers to the number.
+7. **A mark matches one place.** A mark is a substring that occurs exactly once, or whole lines. A repeated or missing substring is reported, never guessed. The marked text is drawn again over its highlight, so the highlight never covers it.
+8. **The record draws its own lines.** The cells' fills lie between the record's background and its outline, and the record draws the dividers in its own ink. A cell's fill therefore never covers the outline, and its color never leaks into a neighbor's border.
 
 ## Steps
 

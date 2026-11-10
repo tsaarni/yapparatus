@@ -31,8 +31,7 @@ export type PointExpr =
   | { k: "abs"; x: number; y: number }
   | { k: "offset"; base: PointExpr; dx: number; dy: number }
   | { k: "xy"; x: PointExpr; y: PointExpr }
-  | { k: "lerp"; a: PointExpr; b: PointExpr; t: number }
-  | { k: "row"; el: Element; index: number; side: "left" | "right" };
+  | { k: "lerp"; a: PointExpr; b: PointExpr; t: number };
 
 /** A lazily resolved point. Coordinates are known only after compilation. */
 export class Point {
@@ -107,6 +106,10 @@ export type Shape =
   | "dot"
   | "ring"
   | "record"
+  /** A member of a record: one cell of its grid. */
+  | "cell"
+  /** A member of a text: a highlighted span or range of lines. */
+  | "mark"
   /** Internal: activation bars in sequence diagrams. */
   | "bar"
   /** Internal: empty space that reserves room, such as under a sequence's lifelines. */
@@ -142,42 +145,118 @@ export interface TerminalOptions
   side?: LabelSide;
 }
 
+/** Options of one member: a record cell or a text mark. */
+export interface MemberOptions {
+  /** The member's own id, after the parent's: `users.id`. Default: derived from the label. */
+  id?: string;
+  role?: Role;
+  category?: string;
+  stepOnly?: boolean;
+  /**
+   * A numbered badge on the member's corner, for a remark the text or a note refers to by
+   * number. It stands in for a pointer where no line can reach, such as an inner packet field.
+   */
+  pin?: number;
+}
+
+export interface CellOptions extends MemberOptions {
+  /** Grid columns the cell covers. Default: 1. Whole rows make it taller: 64 of 32 is two rows. */
+  span?: number;
+}
+
+/**
+ * A record cell: its text, with its span or its options. Tabs in the text line up with the
+ * tabs of the other cells, which makes columns in a table.
+ */
+export type Cell = string | [label: string, span: number] | [label: string, options: CellOptions];
+
+export interface RecordOptions extends Omit<NodeOptions, "sub"> {
+  title?: string;
+  /** Column names over the cells, separated by tabs like the cells: `"name\ttype"`. */
+  header?: string;
+  /** Grid columns. Cells fill them left to right and wrap. Default: 1, one cell per row. */
+  columns?: number;
+  /**
+   * Labels over each column and beside each row, from their index: `top: (i) => 31 - i`,
+   * `left: (row) => row * 4`. An empty string skips a label.
+   */
+  ruler?: { top?: (column: number) => string | number; left?: (row: number) => string | number };
+}
+
+/** A highlighted part of a text: a substring that occurs once, or lines (`"2"`, `"2-4"`, from 1). */
+export type Mark = MemberOptions & ({ text: string } | { lines: string });
+
+export interface TextOptions extends NodeOptions {
+  /** Named spans or lines, each a member: `t.part("path")`. A string is the text to mark. */
+  marks?: Record<string, string | Mark>;
+}
+
 /** What the library sets on nodes it draws itself; not part of the authoring API. */
 export interface NodeInternals {
   /** A derived id that is not the label's slug, such as `start-1`. */
   id?: string;
-  /** Record rows, shown under the title. */
-  rows?: string[];
+  /** Whether that id is the author's: a member's own id, given in its options. */
+  explicit?: boolean;
+  /** The shape this one is a member of, and its place there. */
+  member?: Member;
   /** Decoration only: excluded from overlap and crossing checks, never interactive. */
   passive?: boolean;
   /** A decoration that steps show and fade with this edge, such as an activation bar. */
   follows?: Edge;
 }
 
+/** Where a member sits in its parent, and its own id there. */
+type Place =
+  | { kind: "cell"; span: number }
+  | { kind: "mark"; text: string }
+  | { kind: "mark"; lines: string };
+export type Member = Place & { parent: Node; own: string; pin?: number };
+
 export class Node extends Element {
   readonly shape: Shape;
   readonly label: string;
-  readonly options: NodeOptions & Pick<TerminalOptions, "side">;
-  readonly rows: string[];
+  readonly options: NodeOptions &
+    Pick<TerminalOptions, "side"> &
+    Pick<RecordOptions, "columns" | "ruler" | "header">;
   readonly passive: boolean;
   readonly follows: Edge | undefined;
+  /** Set on a member: its parent and its place there. */
+  readonly member: Member | undefined;
+  /** Record cells or text marks, in order. */
+  readonly members: Node[] = [];
   constructor(
     shape: Shape,
     label: string,
-    options: NodeOptions & Pick<TerminalOptions, "side">,
+    options: Node["options"],
     internals: NodeInternals = {},
   ) {
-    super(options.id ?? internals.id ?? slug(label), options.id !== undefined);
+    super(
+      options.id ?? internals.id ?? slug(label),
+      options.id !== undefined || !!internals.explicit,
+    );
     this.shape = shape;
     this.label = label;
     this.options = options;
-    this.rows = internals.rows ?? [];
     this.passive = internals.passive ?? false;
     this.follows = internals.follows;
+    this.member = internals.member;
   }
-  /** A point on the left or right edge of a record row. */
-  row(index: number, side: "left" | "right" = "right"): Point {
-    return new Point({ k: "row", el: this, index, side });
+  /** Set by the builder: where a missing member is reported. */
+  report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
+  /**
+   * A member, by its own id: a record cell, such as `users.part("team-id")`, or a text mark.
+   * It is a part like any other: edges attach to it, steps focus it, and it takes a category.
+   * A missing member is reported, and the parent stands in for it.
+   */
+  part(id: string): Node {
+    const found = this.members.find((m) => m.member?.own === id);
+    if (found) return found;
+    this.report?.(
+      "UNKNOWN_PART",
+      `${this.id} has no member "${id}". Members: ${this.members.map((m) => m.member?.own).join(", ") || "none"}.`,
+      [this.id],
+    );
+    return this;
   }
 }
 
@@ -303,8 +382,11 @@ export class Edge {
   readonly passive: boolean;
   readonly stepOnly: boolean;
   readonly labels: LabelOptions[] = [];
+  /** Whether the id joins the ids of the ends, which are final only at compile time. */
+  readonly fromEnds: boolean;
   constructor(from: PointLike, to: PointLike, options: EdgeOptions, internals: EdgeInternals = {}) {
     this.id = options.id ?? internals.derivedId ?? `${refName(from)}->${refName(to)}`;
+    this.fromEnds = options.id === undefined && internals.derivedId === undefined;
     this.explicitId = options.id !== undefined;
     this.from = from;
     this.to = to;
@@ -319,6 +401,10 @@ export class Edge {
     this.passive = internals.passive ?? false;
     this.stepOnly = options.stepOnly ?? false;
     if (options.label) this.label(options.label);
+  }
+  /** Join the ids of the ends again, once they are final. */
+  deriveId() {
+    if (this.fromEnds) this.id = `${refName(this.from)}->${refName(this.to)}`;
   }
   /** Add a label. An edge can have several. */
   label(label: string | LabelOptions): this {
@@ -406,9 +492,20 @@ export class DiagramBuilder {
   cylinder(label: string, options: NodeOptions = {}): Node {
     return this.add(new Node("cylinder", label, options));
   }
-  /** Free-standing text without an outline. */
-  text(label: string, options: NodeOptions = {}): Node {
-    return this.add(new Node("text", label, options));
+  /** Free-standing text without an outline. `marks` name spans or lines as members. */
+  text(label: string, options: TextOptions = {}): Node {
+    const { marks, ...rest } = options;
+    const node = this.add(new Node("text", label, rest));
+    for (const [id, mark] of Object.entries(marks ?? {})) {
+      const { text, lines, ...o } =
+        typeof mark === "string"
+          ? { text: mark }
+          : (mark as Mark & { text?: string; lines?: string });
+      const place: Place =
+        text !== undefined ? { kind: "mark", text } : { kind: "mark", lines: lines ?? "" };
+      this.member(node, text ?? "", { ...o, id }, place);
+    }
+    return node;
   }
   /** A person or outside system that acts: a figure above its name. */
   actor(label: string, options: NodeOptions = {}): Node {
@@ -439,9 +536,43 @@ export class DiagramBuilder {
     });
     return this.add(node);
   }
-  /** A title over rows, like a type, table, or message. `rec.row(i)` is an anchor on row i. */
-  record(title: string, rows: string[], options: NodeOptions = {}): Node {
-    return this.add(new Node("record", title, options, { rows }));
+  /**
+   * Cells on a grid under an optional title: a type, a table, a packet header, a register,
+   * an array. Each cell is a member: `rec.part("id")`.
+   */
+  record(cells: Cell[], options: RecordOptions = {}): Node {
+    const { title = "", ...rest } = options;
+    const n = this.nodes.filter((x) => x.shape === "record").length + 1;
+    const node = this.add(new Node("record", title, rest, title ? {} : { id: `record-${n}` }));
+    for (const cell of cells) {
+      const [label, o] = typeof cell === "string" ? [cell, {}] : cell;
+      const { span = 1, ...options } = typeof o === "number" ? { span: o } : o;
+      this.member(node, label, options, { kind: "cell", span: Math.max(1, Math.round(span)) });
+    }
+    return node;
+  }
+  /**
+   * A member's id is its parent's, then its own, such as `users.team-id`. Its own comes from
+   * the first tab-separated column of its label, and is unique in the parent. The parent's
+   * part is joined in later, when the parent's id is final.
+   */
+  private member(parent: Node, label: string, options: MemberOptions, place: Place) {
+    const { id, pin, ...rest } = options;
+    const base = id ?? slug(label.split("\t")[0] ?? "");
+    let own = base;
+    for (let n = 2; parent.members.some((m) => m.member?.own === own); n++) own = `${base}-${n}`;
+    const node = new Node(
+      place.kind,
+      label,
+      { ...rest, mono: parent.options.mono ?? false },
+      {
+        id: `${parent.id}.${own}`,
+        explicit: id !== undefined,
+        member: { ...place, parent, own, ...(pin !== undefined ? { pin } : {}) },
+      },
+    );
+    parent.members.push(node);
+    this.add(node);
   }
   /**
    * A sequence diagram: the participants in a row, lifelines, and messages in time order.
@@ -543,6 +674,7 @@ export class DiagramBuilder {
   }
 
   private add(node: Node): Node {
+    node.report = (code, message, ids) => this.report(code, message, ids);
     this.nodes.push(node);
     this.noteCategory(node.options.category);
     return node;
@@ -596,7 +728,7 @@ export function elementOf(p: PointLike): Element | undefined {
     else if (e.k === "lerp") e = e.a;
     else break;
   }
-  return e.k === "anchor" || e.k === "port" || e.k === "row" ? e.el : undefined;
+  return e.k === "anchor" || e.k === "port" ? e.el : undefined;
 }
 
 function refName(p: PointLike): string {

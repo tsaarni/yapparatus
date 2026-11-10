@@ -29,6 +29,7 @@ import {
   elementOf,
   type Frame,
   type LabelOptions,
+  type Member,
   Node,
   type Placement,
   Point,
@@ -142,6 +143,12 @@ export interface CompiledNode {
   follows?: string;
   /** Record: y of the line under the title. */
   divider?: number;
+  /** Record: hairlines between the ruler, the row offsets, and the cells. */
+  rules?: Array<[Vec, Vec]>;
+  /** A member: the record or text it belongs to. */
+  parent?: string;
+  /** A member's numbered badge, which a remark elsewhere refers to. */
+  pin?: number;
   /** Start and end: the label beside the dot, outside its layout bounds. */
   labelRect?: Rect;
 }
@@ -226,15 +233,36 @@ interface Content {
   }>;
   width: number;
   height: number;
-  /** Record: how many leading lines form the title. */
-  titleLines: number;
+}
+
+/** A record's grid, relative to the record's top-left corner. */
+interface GridLayout {
+  width: number;
+  height: number;
+  /** Bottom of the title band, and of the header under it; 0 without them. */
+  titleBand: number;
+  headerBand: number;
+  /** Top and left of the cells, after the title, the header, the ruler, and the row labels. */
+  top: number;
+  left: number;
+  unit: number;
+  rows: number;
+  /** Where each tab-separated column of text starts, from the start of the cell's text. */
+  stops: number[];
+  /** Each cell's rectangle, in the order of `node.members`. */
+  cells: Rect[];
+  font: FontSpec;
+  /** Ruler labels over each column and beside each row; empty when that side has none. */
+  ruler: { top: string[]; left: string[] };
 }
 
 /** Shape-specific measurements shared by sizing, layout, and anchors. */
 const shapes = {
   actor: { figure: 30, gap: 6 },
   note: { padX: 12, padY: 9, fold: 10 },
-  record: { padX: 14, padY: 8, row: 21 },
+  record: { padX: 14, padY: 8, row: 26, cellPad: 8, tabGap: 16, ruler: 16, gutterPad: 8 },
+  /** How far a mark's highlight reaches past its text. */
+  mark: { linesPad: 5 },
   dot: 16,
   ring: 20,
   /** Between a start or end dot and its label. */
@@ -255,6 +283,7 @@ export function compile(
     return index >= 0 && index < maxCategories ? { category: index + 1 } : {};
   };
   const frameTitleFont = { family: m.sans, size: m.smallSize, weight: m.edgeWeight };
+  const rulerFont = { family: m.sans, size: m.tabSize, weight: m.textWeight };
   const diagnostics: Diagnostic[] = [...scene.diagnostics];
   const report = (code: DiagnosticCode, message: string, ids: string[]) =>
     diagnostics.push({ code, message, ids });
@@ -263,6 +292,8 @@ export function compile(
 
   const known = new Set<Element>([...scene.nodes, ...scene.stacks, ...scene.enclosures]);
   const content = new Map<Node, Content>();
+  const grids = new Map<Node, GridLayout>();
+  const memberRects = new Map<Node, { rect: Rect; lines: TextLine[] }>();
   const sizes = new Map<Element, { width: number; height: number }>();
   const positions = new Map<Element, Vec>();
   const stackOffsets = new Map<Stack, Vec[]>();
@@ -325,17 +356,9 @@ export function compile(
     };
     if (node.label) push(node.label, labelFont, false);
     if (o.sub) push(o.sub, subFont, true);
-    const titleLines = lines.length;
-    if (node.shape === "record")
-      for (const row of node.rows)
-        push(
-          row,
-          { family: o.mono ? m.mono : m.sans, size: m.smallSize, weight: m.textWeight },
-          false,
-        );
     const width = Math.max(0, ...lines.map((l) => l.width));
     const height = lines.reduce((sum, l) => sum + l.size * m.lineHeight, 0);
-    const c = { lines, width, height, titleLines };
+    const c = { lines, width, height };
     content.set(node, c);
     if (lines.length && width > wrapWidth + 0.5)
       report(
@@ -374,14 +397,8 @@ export function compile(
       case "diamond":
         return fixed(Math.max((c.width + 28) * 1.5, 80), Math.max((c.height + 14) * 1.7, 52));
       case "record": {
-        const title = c.lines
-          .slice(0, c.titleLines)
-          .reduce((sum, l) => sum + l.size * m.lineHeight, 0);
-        const rows = node.rows.length * shapes.record.row;
-        return fixed(
-          Math.max(c.width + 2 * shapes.record.padX, 140),
-          title + 2 * shapes.record.padY + rows + (rows ? shapes.record.padY : 0),
-        );
+        const g = grid(node);
+        return { width: g.width, height: g.height };
       }
     }
     const text = node.shape === "text";
@@ -402,13 +419,237 @@ export function compile(
     return { width, height };
   }
 
+  /**
+   * A record's cells fill `columns` grid columns left to right, each spanning `span` of
+   * them. A cell is always a rectangle: it fits the rest of its row, or it starts a row and
+   * covers whole rows. One column is as wide as the widest cell needs per column it spans.
+   */
+  function grid(node: Node): GridLayout {
+    const cached = grids.get(node);
+    if (cached) return cached;
+    const r = shapes.record;
+    const o = node.options;
+    const columns = Math.max(1, Math.round(o.columns ?? 1));
+    const font = { family: o.mono ? m.mono : m.sans, size: m.smallSize, weight: m.textWeight };
+    const cells = node.members;
+    // Tab-separated columns of text line up across all cells and the header.
+    const header = o.header !== undefined ? [o.header] : [];
+    const segments = [...header, ...cells.map((c) => c.label)].map((t) =>
+      t.split("\t").map((x) => measure(x, font)),
+    );
+    const stops: number[] = [0];
+    for (let k = 1; k < Math.max(1, ...segments.map((s) => s.length)); k++) {
+      const before = segments.filter((s) => s.length > k).map((s) => s[k - 1] as number);
+      stops[k] = (stops[k - 1] as number) + Math.max(0, ...before) + r.tabGap;
+    }
+    const textWidth = (s: number[] = []) =>
+      (stops[s.length - 1] as number) + (s[s.length - 1] ?? 0) + 2 * r.cellPad;
+    // Place each cell: in the rest of its row, or over whole rows from the start of one.
+    let row = 0;
+    let col = 0;
+    const placed = cells.map((cell) => {
+      const span = cell.member?.kind === "cell" ? cell.member.span : 1;
+      if (col === 0 && span > columns && span % columns === 0) {
+        const at = { row, col, span: columns, rows: span / columns };
+        row += at.rows;
+        return at;
+      }
+      const fits = Math.min(span, columns - col);
+      if (fits < span)
+        report(
+          "CELL_SPAN",
+          `${cell.id} spans ${span} columns, but ${columns - col} remain in its row. A cell fills the rest of its row or whole rows; split it into two cells.`,
+          [cell.id],
+        );
+      const at = { row, col, span: fits, rows: 1 };
+      col += fits;
+      if (col >= columns) {
+        col = 0;
+        row++;
+      }
+      return at;
+    });
+    const rows = row + (col > 0 ? 1 : 0);
+    const c = measureNode(node);
+    const titleBand = node.label ? c.height + 2 * r.padY : 0;
+    const headerBand = header.length ? r.row : 0;
+    const labels = (f: ((i: number) => string | number) | undefined, n: number) =>
+      f ? Array.from({ length: n }, (_, i) => String(f(i))) : [];
+    const ruler = { top: labels(o.ruler?.top, columns), left: labels(o.ruler?.left, rows) };
+    const gutter = ruler.left.length
+      ? Math.max(...ruler.left.map((t) => measure(t, rulerFont))) + 2 * r.gutterPad
+      : 0;
+    const needed = Math.max(
+      0,
+      ...placed.map((p, i) => textWidth(segments[i + header.length]) / p.span),
+      (Math.max(
+        header.length ? textWidth(segments[0]) : 0,
+        c.width + 2 * r.padX,
+        columns === 1 ? 140 : 0,
+      ) -
+        gutter) /
+        columns,
+    );
+    const unit = o.width !== undefined ? (o.width - gutter) / columns : needed;
+    // Column labels are centered on their columns; two that touch cannot be read apart.
+    const shown = ruler.top.flatMap((t, i) => (t ? [{ i, w: measure(t, rulerFont) }] : []));
+    const crowded = shown.some((a, k) => {
+      const b = shown[k - 1];
+      return b !== undefined && b.w / 2 + a.w / 2 + 4 > (a.i - b.i) * unit;
+    });
+    if (crowded)
+      report(
+        "RULER_CROWDED",
+        `${node.id}: the column labels are wider than the columns. Return "" for the columns to skip, such as (i) => (i % 4 ? "" : i).`,
+        [node.id],
+      );
+    const top = titleBand + headerBand + (ruler.top.length ? r.ruler : 0);
+    const g: GridLayout = {
+      width: gutter + unit * columns,
+      height: top + rows * r.row,
+      titleBand,
+      headerBand,
+      top,
+      left: gutter,
+      unit,
+      rows,
+      stops,
+      cells: placed.map((p) => ({
+        x: gutter + p.col * unit,
+        y: top + p.row * r.row,
+        width: p.span * unit,
+        height: p.rows * r.row,
+      })),
+      font,
+      ruler,
+    };
+    grids.set(node, g);
+    return g;
+  }
+
+  /** One row of tab-separated text, its columns at the record's tab stops. */
+  function tabbed(text: string, g: GridLayout, x: number, y: number, muted: boolean): TextLine[] {
+    return text
+      .split("\t")
+      .map((t, k) =>
+        textAt(t, x + shapes.record.cellPad + (g.stops[k] ?? 0), y, g.font, muted || k > 0),
+      );
+  }
+
+  /** A member's place: a cell in its record, or a mark's span in its text. */
+  function member(node: Node): { rect: Rect; lines: TextLine[] } {
+    const cached = memberRects.get(node);
+    if (cached) return cached;
+    const place = node.member;
+    if (!place) throw new Error(`${node.id} is not a member.`);
+    const outer = bounds(place.parent);
+    const result =
+      place.kind === "cell" ? cell(node, place.parent, outer) : mark(node, place, outer);
+    memberRects.set(node, result);
+    return result;
+  }
+
+  function cell(node: Node, record: Node, outer: Rect) {
+    const g = grid(record);
+    const r = g.cells[record.members.indexOf(node)] ?? { x: 0, y: 0, width: 0, height: 0 };
+    const rect = { ...r, x: outer.x + r.x, y: outer.y + r.y };
+    const cy = rect.y + rect.height / 2;
+    // On a grid of several columns, as in a packet header, a field's name is centered. In a
+    // table, it starts the row, and tabs align its columns with the others.
+    const segs = node.label.split("\t");
+    const centered = (record.options.columns ?? 1) > 1 && segs.length === 1;
+    const lines = centered
+      ? [{ ...textAt(node.label, rect.x + rect.width / 2, cy, g.font), align: "middle" as const }]
+      : tabbed(node.label, g, rect.x, cy, false);
+    const need =
+      (g.stops[segs.length - 1] ?? 0) +
+      measure(segs[segs.length - 1] ?? "", g.font) +
+      2 * shapes.record.cellPad;
+    if (need > rect.width + 0.5)
+      report(
+        "TEXT_OVERFLOW",
+        `${node.id}: "${node.label}" needs ${round(need)} units but its cell is ${round(rect.width)} wide. Shorten it, or give the record a larger width.`,
+        [node.id],
+      );
+    return { rect, lines };
+  }
+
+  /** A mark: a substring that occurs once in the text, or whole lines of it. */
+  function mark(node: Node, place: Extract<Member, { kind: "mark" }>, outer: Rect) {
+    const text = place.parent;
+    const c = measureNode(text);
+    const font = textFont(text);
+    const lh = font.size * m.lineHeight;
+    const top = outer.y + outer.height / 2 - c.height / 2;
+    // Where a line starts: at the left in code, centered otherwise.
+    const startOf = (width: number) =>
+      text.options.mono ? outer.x : outer.x + (outer.width - width) / 2;
+    const unmatched = (why: string) => {
+      report("MARK_UNMATCHED", `${node.id}: ${why}`, [node.id]);
+      return { rect: { x: outer.x, y: outer.y, width: 0, height: 0 }, lines: [] };
+    };
+    if ("lines" in place) {
+      const [a = Number.NaN, b = a] = place.lines.split("-").map(Number);
+      if (!(a >= 1 && b >= a && b <= c.lines.length))
+        return unmatched(`lines "${place.lines}" are not within 1–${c.lines.length}.`);
+      const pad = shapes.mark.linesPad;
+      const rect = {
+        x: outer.x - pad,
+        y: top + (a - 1) * lh,
+        width: outer.width + 2 * pad,
+        height: (b - a + 1) * lh,
+      };
+      const lines = c.lines
+        .slice(a - 1, b)
+        .map((l, i) => textAt(l.text, startOf(l.width), top + (a - 1 + i + 0.5) * lh, font));
+      return { rect, lines };
+    }
+    const found = c.lines.flatMap((l, line) => {
+      const at: Array<{ line: number; at: number }> = [];
+      for (
+        let i = l.text.indexOf(place.text);
+        place.text && i >= 0;
+        i = l.text.indexOf(place.text, i + 1)
+      )
+        at.push({ line, at: i });
+      return at;
+    });
+    if (found.length > 1)
+      return unmatched(
+        `"${place.text}" occurs ${found.length} times. Mark a longer text, or whole lines.`,
+      );
+    const only = found[0];
+    const line = only && c.lines[only.line];
+    if (!only || !line)
+      return unmatched(
+        text.label.replace(/\s+/g, " ").includes(place.text)
+          ? `"${place.text}" is split across wrapped lines. Widen the text, or mark whole lines.`
+          : `"${place.text}" does not occur in ${text.id}.`,
+      );
+    const x = startOf(line.width) + measure(line.text.slice(0, only.at), font);
+    const rect = { x, y: top + only.line * lh, width: measure(place.text, font), height: lh };
+    return { rect, lines: [textAt(place.text, x, rect.y + lh / 2, font)] };
+  }
+
+  /** The font of a text's label, which its marks repeat over their highlight. */
+  function textFont(node: Node): FontSpec {
+    return {
+      family: node.options.mono ? m.mono : m.sans,
+      size: m.smallSize,
+      weight: m.textWeight,
+    };
+  }
+
   function size(el: Element): { width: number; height: number } {
     requireKnown(el);
     const cached = sizes.get(el);
     if (cached) return cached;
     return guard(`size(${el.id})`, () => {
       let s: { width: number; height: number };
-      if (el instanceof Node) {
+      if (el instanceof Node && el.member) {
+        const r = member(el).rect;
+        s = { width: r.width, height: r.height };
+      } else if (el instanceof Node) {
         s = intrinsicSize(el);
         for (const group of scene.sizeGroups) {
           if (!group.members.includes(el)) continue;
@@ -440,7 +681,9 @@ export function compile(
 
   /* ----- positions (top-left of layout bounds) ----- */
 
-  const roots = [...scene.nodes, ...scene.stacks].filter((el) => !scene.owner.has(el));
+  const roots = [...scene.nodes, ...scene.stacks].filter(
+    (el) => !scene.owner.has(el) && !(el instanceof Node && el.member),
+  );
   const firstRoot = roots[0];
   if (roots.length > 1)
     report(
@@ -463,6 +706,9 @@ export function compile(
       const owner = scene.owner.get(el);
       if (el instanceof Enclosure) {
         const r = enclosureRect(el);
+        p = { x: r.x, y: r.y };
+      } else if (el instanceof Node && el.member) {
+        const r = member(el).rect;
         p = { x: r.x, y: r.y };
       } else if (owner instanceof Stack) {
         const base = position(owner);
@@ -615,29 +861,7 @@ export function compile(
         const b = evalPoint(e.b);
         return { x: a.x + (b.x - a.x) * e.t, y: a.y + (b.y - a.y) * e.t };
       }
-      case "row": {
-        const r = bounds(e.el);
-        const y = e.el instanceof Node ? recordRowY(e.el, r, e.index) : r.y + r.height / 2;
-        return { x: e.side === "right" ? r.x + r.width : r.x, y };
-      }
     }
-  }
-
-  function recordTitleBottom(node: Node, rect: Rect) {
-    const c = measureNode(node);
-    const title = c.lines.slice(0, c.titleLines).reduce((sum, l) => sum + l.size * m.lineHeight, 0);
-    return rect.y + title + 2 * shapes.record.padY;
-  }
-
-  function recordRowY(node: Node, rect: Rect, index: number) {
-    const rows = node.rows.length;
-    if (index < 0 || index >= rows) {
-      report("RECORD_ROW", `${node.id} has ${rows} rows; row ${index} does not exist.`, [node.id]);
-      return rect.y + rect.height / 2;
-    }
-    return (
-      recordTitleBottom(node, rect) + shapes.record.padY / 2 + (index + 0.5) * shapes.record.row
-    );
   }
 
   /* ----- resolve all elements ----- */
@@ -704,8 +928,13 @@ export function compile(
     const centerX = rect.x + rect.width / 2;
     let lines: TextLine[];
     let divider: number | undefined;
+    let rules: Array<[Vec, Vec]> | undefined;
     const labelRect = terminalLabel(node, rect);
     switch (node.shape) {
+      case "cell":
+      case "mark":
+        lines = member(node).lines;
+        break;
       case "dot":
       case "ring":
         lines = labelRect
@@ -726,23 +955,67 @@ export function compile(
         lines = stackLines(c.lines, rect.y + shapes.note.padY, rect.x + shapes.note.padX, "start");
         break;
       case "record": {
-        const title = c.lines.slice(0, c.titleLines);
-        lines = stackLines(title, rect.y + shapes.record.padY, centerX, "middle");
-        divider = recordTitleBottom(node, rect);
-        node.rows.forEach((_row, i) => {
-          const l = c.lines[c.titleLines + i];
-          if (l)
-            lines.push(line(l, rect.x + shapes.record.padX, recordRowY(node, rect, i), "start"));
+        const g = grid(node);
+        lines = stackLines(c.lines, rect.y + shapes.record.padY, centerX, "middle");
+        const top = rect.y + g.top;
+        const left = rect.x + g.left;
+        const right = rect.x + rect.width;
+        const across = (y: number): [Vec, Vec] => [
+          { x: rect.x, y },
+          { x: right, y },
+        ];
+        if (g.titleBand && (node.members.length || g.headerBand)) divider = rect.y + g.titleBand;
+        rules = [];
+        if (node.options.header !== undefined) {
+          const y = rect.y + g.titleBand;
+          lines.push(...tabbed(node.options.header, g, left, y + g.headerBand / 2, true));
+          rules.push(across(y + g.headerBand));
+        }
+        // Hairlines between cells: each cell draws the right and bottom sides it shares
+        // with another. The outline draws the outer sides, over the cells' fills.
+        for (const p of g.cells) {
+          const x = rect.x + p.x;
+          const y = rect.y + p.y;
+          if (p.x + p.width < g.width - 0.5)
+            rules.push([
+              { x: x + p.width, y },
+              { x: x + p.width, y: y + p.height },
+            ]);
+          if (p.y + p.height < g.height - 0.5)
+            rules.push([
+              { x, y: y + p.height },
+              { x: x + p.width, y: y + p.height },
+            ]);
+        }
+        const label = (text: string, x: number, y: number) =>
+          text ? [{ ...textAt(text, x, y, rulerFont, true), align: "middle" as const }] : [];
+        g.ruler.top.forEach((t, k) => {
+          lines.push(...label(t, left + (k + 0.5) * g.unit, top - shapes.record.ruler / 2));
         });
+        g.ruler.left.forEach((t, r) => {
+          lines.push(...label(t, rect.x + g.left / 2, top + (r + 0.5) * shapes.record.row));
+        });
+        if (g.ruler.top.length)
+          rules.push([
+            { x: left, y: top },
+            { x: right, y: top },
+          ]);
+        if (g.ruler.left.length)
+          rules.push([
+            { x: left, y: top },
+            { x: left, y: rect.y + rect.height },
+          ]);
         break;
       }
       default: {
         const cap = capHeight(node, rect.width);
+        // Code keeps its lines' start; other text is centered.
+        const code = node.shape === "text" && node.options.mono;
         lines = stackLines(
           c.lines,
           rect.y + rect.height / 2 + cap / 2 - c.height / 2,
-          centerX,
-          "middle",
+          code ? rect.x : centerX,
+          code ? "start" : "middle",
         );
       }
     }
@@ -759,6 +1032,10 @@ export function compile(
       stepOnly: node.options.stepOnly ?? false,
       ...(node.follows ? { follows: node.follows.id } : {}),
       ...(divider !== undefined ? { divider } : {}),
+      // A record with cells always has rules, even none: it is drawn under and over its cells.
+      ...(rules && node.members.length ? { rules } : {}),
+      ...(node.member ? { parent: node.member.parent.id } : {}),
+      ...(node.member?.pin !== undefined ? { pin: node.member.pin } : {}),
       ...(labelRect ? { labelRect } : {}),
     };
   }
@@ -988,6 +1265,38 @@ export function compile(
         const t = 1 / (Math.abs(dx) / (rect.width / 2) + Math.abs(dy) / (rect.height / 2));
         return { x: c.x + dx * t, y: c.y + dy * t };
       }
+      // A cell is pointed at as a whole, from the middle of a side. It prefers a side on its
+      // record's outline, so the edge crosses no other cell: a table row's left or right, an
+      // array slot's top or bottom. Of those, it takes the one facing the other end best.
+      if (shape === "cell" && el instanceof Node && el.member && (dx || dy)) {
+        const outer = bounds(el.member.parent);
+        const sides = [
+          { side: "left", nx: -1, ny: 0, out: Math.abs(rect.x - outer.x) < 0.5 },
+          {
+            side: "right",
+            nx: 1,
+            ny: 0,
+            out: Math.abs(rect.x + rect.width - outer.x - outer.width) < 0.5,
+          },
+          {
+            side: "top",
+            nx: 0,
+            ny: -1,
+            out: grid(el.member.parent).top === 0 && Math.abs(rect.y - outer.y) < 0.5,
+          },
+          {
+            side: "bottom",
+            nx: 0,
+            ny: 1,
+            out: Math.abs(rect.y + rect.height - outer.y - outer.height) < 0.5,
+          },
+        ] as const;
+        const outside = sides.filter((s) => s.out);
+        const best = (outside.length ? outside : sides).reduce((a, b) =>
+          b.nx * dx + b.ny * dy > a.nx * dx + a.ny * dy ? b : a,
+        );
+        return anchorOf(rect, best.side);
+      }
       if ((shape === "dot" || shape === "ring") && (dx || dy)) {
         const len = Math.hypot(dx, dy);
         return { x: c.x + (dx / len) * (rect.width / 2), y: c.y + (dy / len) * (rect.height / 2) };
@@ -1194,27 +1503,34 @@ function dedupe(points: Vec[]): Vec[] {
   return points.filter((p, i) => i === 0 || distance(p, points[i - 1] as Vec) > 0.01);
 }
 
+/**
+ * Settle ids in dependency order: shapes and containers first, then members, whose ids
+ * start with their parent's, then edges, whose derived ids join the ids of their ends.
+ * Explicit ids are fixed; derived ids get a numeric suffix when they collide.
+ */
 function checkIds(
   scene: DiagramBuilder,
   report: (code: DiagnosticCode, message: string, ids: string[]) => void,
 ) {
-  const all: Array<{ id: string; explicitId: boolean }> = [
-    ...scene.nodes,
-    ...scene.stacks,
-    ...scene.enclosures,
-    ...scene.edges,
-  ];
   const taken = new Set<string>();
-  for (const el of all.filter((e) => e.explicitId)) {
-    if (taken.has(el.id)) report("DUPLICATE_ID", `Two elements use id "${el.id}".`, [el.id]);
-    taken.add(el.id);
-  }
-  // Derived IDs are conveniences, not identities: disambiguate them in declaration order.
-  for (const el of all.filter((e) => !e.explicitId)) {
-    const base = el.id;
-    for (let n = 2; taken.has(el.id); n++) el.id = `${base}-${n}`;
-    taken.add(el.id);
-  }
+  const settle = (all: Array<{ id: string; explicitId: boolean }>) => {
+    for (const el of all.filter((e) => e.explicitId)) {
+      if (taken.has(el.id)) report("DUPLICATE_ID", `Two elements use id "${el.id}".`, [el.id]);
+      taken.add(el.id);
+    }
+    for (const el of all.filter((e) => !e.explicitId)) {
+      const base = el.id;
+      for (let n = 2; taken.has(el.id); n++) el.id = `${base}-${n}`;
+      taken.add(el.id);
+    }
+  };
+  const members = scene.nodes.filter((n) => n.member);
+  settle([...scene.nodes.filter((n) => !n.member), ...scene.stacks, ...scene.enclosures]);
+  // Own ids are unique in their parent, and parents' ids are now unique.
+  for (const m of members) if (m.member) m.id = `${m.member.parent.id}.${m.member.own}`;
+  settle(members.map((m) => ({ id: m.id, explicitId: true })));
+  for (const edge of scene.edges) edge.deriveId();
+  settle(scene.edges);
 }
 
 function validate(
@@ -1242,13 +1558,16 @@ function validate(
       .map((r) => overlap(r, b))
       .find(Boolean);
 
-  // Nodes overlapping each other.
+  // Nodes overlapping each other. Members lie inside their parent, which is checked for them.
   for (let i = 0; i < nodes.length; i++)
     for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i] as CompiledNode;
       const b = nodes[j] as CompiledNode;
       // Step-only parts may share a place; the steps decide whether they appear together.
       if (a.passive || b.passive || (a.stepOnly && b.stepOnly)) continue;
+      // Of members, only marks of one text can collide: two highlights over the same letters.
+      const marks = a.shape === "mark" && b.shape === "mark" && a.parent === b.parent;
+      if ((a.parent || b.parent) && !marks) continue;
       const o = rects(b)
         .map((r) => overlapOf(a, r))
         .find(Boolean);
@@ -1260,16 +1579,30 @@ function validate(
         );
     }
 
-  // Edges crossing nodes other than their own endpoints.
-  const endpointsOf = (edge: Edge) =>
-    new Set([edge.from, edge.to].flatMap((p) => elementOf(p)?.id ?? []));
+  // Edges crossing nodes other than their own endpoints. A member's edge leaves through its
+  // parent, and an edge of a record or text may cross its own members.
+  const endpointsOf = (edge: Edge) => {
+    const ends = [edge.from, edge.to].flatMap((p) => elementOf(p) ?? []);
+    const own = new Set(ends.map((e) => e.id));
+    for (const e of ends) if (e instanceof Node && e.member) own.add(e.member.parent.id);
+    return own;
+  };
   scene.edges.forEach((edge, k) => {
     const compiled = edges[k];
     if (!compiled || compiled.passive) return;
     const own = endpointsOf(edge);
     for (const node of nodes) {
-      if (node.shape === "text" || node.passive) continue;
+      if (node.shape === "text" || node.shape === "mark" || node.passive) continue;
       if (compiled.stepOnly && node.stepOnly) continue;
+      if (node.parent !== undefined) {
+        // A member is checked only for edges of its own parent: from a sibling cell, across
+        // this one. Any other edge that crosses it crosses its parent, which is reported.
+        const fromSibling = [edge.from, edge.to].some((p) => {
+          const el = elementOf(p);
+          return el instanceof Node && el.member?.parent.id === node.parent;
+        });
+        if (!fromSibling) continue;
+      }
       // An edge may meet its own endpoints, but not cross their labels.
       const hit = own.has(node.id) ? (node.labelRect ? [node.labelRect] : []) : rects(node);
       for (let i = 0; i < compiled.points.length - 1; i++) {
@@ -1349,6 +1682,7 @@ function validate(
     const members = new Set(memberIds(e));
     for (const node of nodes) {
       if (members.has(node.id) || node.passive) continue;
+      if (node.parent !== undefined && members.has(node.parent)) continue;
       if (rects(node).some((r) => overlap(r, compiled.rect) && !contains(r, compiled.rect)))
         report(
           "ENCLOSURE_INTRUSION",
@@ -1368,6 +1702,7 @@ function groupsOf(scene: DiagramBuilder): Record<string, string[]> {
   for (const e of scene.enclosures) add(e.id, e.members);
   for (const s of scene.stacks) add(s.id, s.children);
   for (const [container, members] of scene.groups) add(container.id, members);
+  for (const node of scene.nodes) if (node.members.length) add(node.id, node.members);
   return groups;
 }
 

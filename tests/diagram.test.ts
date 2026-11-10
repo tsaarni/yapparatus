@@ -165,20 +165,163 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
   assert.ok(frame.title.x >= frame.tab.rect.x + frame.tab.rect.width);
 });
 
-test("record rows have anchors; shapes snap to their own outline", () => {
+test("record cells are parts; an edge from a row leaves the record's side", () => {
   const d = new DiagramBuilder();
-  const rec = d.record("Message", ["seq", "author", "text"], { id: "message" });
+  const rec = d.record(["seq", "author", "text"], { title: "Message", id: "message" });
   const choice = d.decision("Same page?", { id: "choice" });
   d.row([rec, choice], { gap: 80 });
-  const link = d.arrow(rec.row(2), choice, { id: "link" });
+  const link = d.arrow(rec.part("text"), choice, { id: "link" });
   const out = compile(d, measure);
   const r = out.nodes.find((n) => n.id === "message")?.rect;
+  const cell = out.nodes.find((n) => n.id === "message.text");
   const edge = out.edges.find((e) => e.id === link.id);
-  assert.ok(r && edge);
+  assert.ok(r && cell && edge);
+  assert.equal(cell.parent, "message");
   const start = edge.points[0];
   assert.equal(start?.x, r.x + r.width);
-  assert.ok(start && start.y > r.y + r.height / 2, "row 2 is in the lower half");
-  assert.equal(out.nodes.find((n) => n.id === "message")?.lines.length, 4);
+  assert.ok(start && start.y > r.y + r.height / 2, "the last row is in the lower half");
+  assert.deepEqual(out.groups.message, ["message.seq", "message.author", "message.text"]);
+  assert.equal(
+    out.diagnostics.filter((x) => x.code === "EDGE_NODE_INTERSECTION").length,
+    0,
+    "an edge leaving through its own record crosses nothing",
+  );
+});
+
+test("record cells are rectangles: the rest of a row, or whole rows", () => {
+  const d = new DiagramBuilder();
+  d.record(
+    [
+      ["Version", 4],
+      ["Flow", 28],
+      ["Source address", 128],
+      ["A", 24],
+      ["B", 16],
+    ],
+    {
+      columns: 32,
+      id: "ip",
+    },
+  );
+  const out = compile(d, measure);
+  const cell = (id: string) => out.nodes.find((n) => n.id === `ip.${id}`)?.rect;
+  const flow = cell("flow");
+  const source = cell("source-address");
+  assert.ok(flow && source);
+  assert.equal(source.y, flow.y + flow.height, "the address starts the next row");
+  assert.equal(source.height, 4 * flow.height, "128 of 32 columns is four rows tall");
+  assert.equal(source.width, (cell("version")?.width ?? 0) * 8, "and the full width");
+  const spans = out.diagnostics.filter((x) => x.code === "CELL_SPAN").map((x) => x.ids[0]);
+  assert.deepEqual(spans, ["ip.b"], "B needs 16 columns, but 8 remain");
+});
+
+test("member ids follow their record's id, even when it is derived and repeated", () => {
+  const d = new DiagramBuilder();
+  const a = d.record(["key", "next"], { title: "entry" });
+  const b = d.record(["key", "next"], { title: "entry" });
+  d.row([a, b]);
+  const link = d.arrow(a.part("next"), b.part("key"));
+  const untitled = d.record(["x"]);
+  d.place(untitled, { below: a });
+  const out = compile(d, measure);
+  assert.deepEqual(codes(out), []);
+  assert.deepEqual(
+    out.nodes.map((n) => n.id),
+    [
+      "entry",
+      "entry.key",
+      "entry.next",
+      "entry-2",
+      "entry-2.key",
+      "entry-2.next",
+      "record-3",
+      "record-3.x",
+    ],
+  );
+  assert.equal(link.id, "entry.next->entry-2.key");
+});
+
+test("a missing member is reported, and its parent stands in", () => {
+  const d = new DiagramBuilder();
+  const rec = d.record(["id"], { id: "users" });
+  assert.equal(rec.part("email"), rec);
+  const out = compile(d, measure);
+  const missing = out.diagnostics.find((x) => x.code === "UNKNOWN_PART");
+  assert.match(missing?.message ?? "", /no member "email"\. Members: id\./);
+});
+
+test("a header row lines up with the cells' tab columns", () => {
+  const d = new DiagramBuilder();
+  d.record(["id\tuuid", "email\ttext"], { id: "users", title: "users", header: "column\ttype" });
+  const out = compile(d, measure);
+  const rec = out.nodes.find((n) => n.id === "users");
+  const cell = out.nodes.find((n) => n.id === "users.id");
+  const header = rec?.lines.filter((l) => l.muted);
+  assert.ok(rec && cell && header);
+  assert.deepEqual(
+    header.map((l) => l.text),
+    ["column", "type"],
+  );
+  assert.equal(header[1]?.x, cell.lines[1]?.x, "type sits over uuid");
+  assert.ok(cell.rect.y > (rec.divider ?? 0) + 20, "the header is between title and cells");
+});
+
+test("text marks are parts over their substring; unmatched marks are reported", () => {
+  const d = new DiagramBuilder();
+  const t = d.text("GET /users/42 HTTP/1.1\nHost: example.com\nAccept: */*", {
+    id: "req",
+    mono: true,
+    marks: {
+      path: "/users/42",
+      header: { lines: "2" },
+      nope: "absent",
+      twice: "e",
+      far: { lines: "4" },
+    },
+  });
+  const centered = d.text("one two\nthree", { id: "c", marks: { two: "two" } });
+  d.place(centered, { below: t });
+  const out = compile(d, measure);
+  const node = (id: string) => out.nodes.find((n) => n.id === id);
+  const width = (s: string) => measure(s, { family: "", size: 0, weight: 0 });
+  const path = node("req.path");
+  const text = node("req")?.rect;
+  assert.ok(path && text && t.part("path") !== t);
+  assert.equal(path.rect.x, text.x + width("GET "));
+  assert.equal(path.lines[0]?.text, "/users/42");
+  const unmatched = out.diagnostics.filter((x) => x.code === "MARK_UNMATCHED");
+  assert.deepEqual(
+    unmatched.map((x) => x.ids[0]),
+    ["req.nope", "req.twice", "req.far"],
+  );
+  assert.match(unmatched[1]?.message ?? "", /occurs \d+ times/);
+  // In centered text, a mark follows its line's start.
+  const two = node("c.two");
+  const c = node("c")?.rect;
+  assert.ok(two && c);
+  assert.equal(two.rect.x, c.x + (c.width - width("one two")) / 2 + width("one "));
+});
+
+test("a marked substring split by wrapping says so", () => {
+  const d = new DiagramBuilder();
+  d.text("alpha beta gamma", { id: "t", width: 50, marks: { bg: "beta gamma" } });
+  const out = compile(d, measure);
+  const message = out.diagnostics.find((x) => x.code === "MARK_UNMATCHED")?.message ?? "";
+  assert.match(message, /split across wrapped lines/);
+});
+
+test("a pin numbers a member", () => {
+  const d = new DiagramBuilder();
+  d.record(
+    [
+      ["Flags", { span: 8, pin: 1 }],
+      ["Window", 24],
+    ],
+    { columns: 32, id: "tcp" },
+  );
+  const out = compile(d, measure);
+  assert.equal(out.nodes.find((n) => n.id === "tcp.flags")?.pin, 1);
+  assert.equal(out.nodes.find((n) => n.id === "tcp.window")?.pin, undefined);
 });
 
 test("arrow takes its label as a string; a sequence is one placeable element", () => {
@@ -368,4 +511,26 @@ test("start and end labels sit beside the dot without moving it, and take part i
   e.column([s, b]);
   e.arrow(s, b);
   assert.ok(codes(compile(e, measure)).includes("EDGE_NODE_INTERSECTION"));
+});
+
+test("a ruler labels each side from a function, and crowded labels are reported", () => {
+  const d = new DiagramBuilder();
+  const packet = d.record([["Field", 32]], {
+    id: "packet",
+    columns: 32,
+    width: 640,
+    ruler: { top: (i) => (i % 8 ? "" : i), left: (row) => `0x${row * 4}` },
+  });
+  const crowded = d.record([["Word", 32]], {
+    id: "crowded",
+    columns: 32,
+    width: 320,
+    ruler: { top: (i) => 31 - i },
+  });
+  d.column([packet, crowded]);
+  const out = compile(d, measure);
+  const labels = out.nodes.find((n) => n.id === "packet")?.lines.map((l) => l.text);
+  assert.deepEqual(labels, ["0", "8", "16", "24", "0x0"]);
+  const crowdedIds = out.diagnostics.filter((x) => x.code === "RULER_CROWDED").map((x) => x.ids[0]);
+  assert.deepEqual(crowdedIds, ["crowded"]);
 });

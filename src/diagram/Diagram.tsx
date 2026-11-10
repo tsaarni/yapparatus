@@ -539,6 +539,8 @@ function DiagramView({
   // Decorations fade and hide with their edge, but never take the accent themselves.
   const decoration = (state: PartState) => (state && state !== "focus" ? { state } : {});
   const anyStepped = [...diagram.nodes, ...diagram.edges].some((p) => stepped(p.id));
+  // Clip paths are named per figure: several figures can have a record with the same id.
+  const clip = `clip${marker.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <svg
       data-diagram={marker}
@@ -570,11 +572,29 @@ function DiagramView({
           key={node.id}
           node={node}
           flagged={flagged.has(node.id)}
+          clip={clip}
           {...(node.passive
             ? decoration(node.follows ? stateOf(node.follows) : undefined)
             : part(node.id, node.label))}
         />
       ))}
+      {/* Over every shape: records' outlines, which cover their cells' fills, then pins. */}
+      {diagram.nodes
+        .filter((node) => node.rules)
+        .map((node) => (
+          <RecordOutline
+            key={`${node.id}-outline`}
+            node={node}
+            flagged={flagged.has(node.id)}
+            state={stateOf(node.id)}
+          />
+        ))}
+      {diagram.nodes.map(
+        (node) =>
+          node.pin !== undefined && (
+            <Pin key={`${node.id}-pin`} node={node} state={stateOf(node.id)} />
+          ),
+      )}
       {active.map((edge) => (
         <EdgeView
           key={edge.id}
@@ -671,14 +691,19 @@ function Lines({ lines }: { lines: TextLine[] }) {
 function NodeView({
   node,
   flagged,
+  clip,
   target,
   state,
 }: {
   node: CompiledNode;
   flagged: boolean;
+  /** The prefix of this figure's clip paths, which keep cell fills inside their record. */
+  clip: string;
   target?: Target;
   state?: PartState;
 }) {
+  // A record with cells is drawn in two layers: this body, then its outline over the cells.
+  const layered = node.shape === "record" && node.rules !== undefined;
   const r = node.rect;
   if (node.shape === "space") return null;
   if (node.shape === "bar")
@@ -704,10 +729,10 @@ function NodeView({
         stateStyle(state),
       )}
     >
-      <Shape node={node} />
+      <Shape node={node} clip={clip} />
       <Lines lines={node.lines} />
-      {node.role === "warning" && <WarningBadge node={node} />}
-      {flagged && (
+      {node.role === "warning" && !layered && <WarningBadge node={node} />}
+      {flagged && !layered && (
         <rect
           {...outline(node.labelRect ? (union([r, node.labelRect]) as Rect) : r, 4)}
           rx={8}
@@ -737,7 +762,83 @@ function WarningBadge({ node }: { node: CompiledNode }) {
   );
 }
 
-function Shape({ node }: { node: CompiledNode }) {
+/**
+ * A member's number on its top-left corner, for a remark elsewhere that refers to it. It is
+ * drawn over the record's outline, and fades with the member.
+ */
+function Pin({ node, state }: { node: CompiledNode; state: PartState }) {
+  const { x, y } = node.rect;
+  return (
+    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The pin only paints; the member is the part.
+    <g
+      aria-hidden="true"
+      {...stylex.props(
+        roleStyle(node.role),
+        categoryStyle(node.category),
+        styles.passThrough,
+        styles.fade,
+        stateStyle(state),
+      )}
+    >
+      <circle cx={x} cy={y} r={badge.radius + 1} {...stylex.props(styles.pin)} />
+      <text
+        x={x}
+        y={y}
+        fontSize={m.tabSize}
+        fontWeight={m.labelWeight}
+        {...stylex.props(styles.text, styles.sans, styles.pinText)}
+      >
+        {node.pin}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * The outline of a record with cells, its title divider, and the hairlines between cells.
+ * It is drawn after the cells, so their fills stay under it; it fades with the record.
+ */
+function RecordOutline({
+  node,
+  flagged,
+  state,
+}: {
+  node: CompiledNode;
+  flagged: boolean;
+  state: PartState;
+}) {
+  const { x, y, width: w, height: h } = node.rect;
+  return (
+    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The outline only paints; the record's body is the part.
+    <g
+      aria-hidden="true"
+      {...stylex.props(
+        roleStyle(node.role),
+        categoryStyle(node.category),
+        styles.passThrough,
+        styles.fade,
+        stateStyle(state),
+      )}
+    >
+      <rect
+        x={x}
+        y={y}
+        width={w}
+        height={h}
+        rx={corner.shape}
+        {...stylex.props(styles.outlineOnly, node.role === "external" && styles.dashed)}
+      />
+      {node.divider !== undefined && (
+        <path d={`M${x} ${node.divider}H${x + w}`} {...stylex.props(styles.rule)} />
+      )}
+      <Rules node={node} />
+      {node.role === "warning" && <WarningBadge node={node} />}
+      {flagged && <rect {...outline(node.rect, 4)} rx={8} {...stylex.props(styles.flag)} />}
+    </g>
+  );
+}
+
+function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
   const r = node.rect;
   const { x, y, width: w, height: h } = r;
   const shape = stylex.props(styles.shape, node.role === "external" && styles.dashed);
@@ -796,6 +897,23 @@ function Shape({ node }: { node: CompiledNode }) {
         </>
       );
     case "record":
+      if (node.rules !== undefined)
+        // The body of a record with cells: its fill, and the shape its cells are clipped to.
+        return (
+          <>
+            <clipPath id={`${clip}-${node.id}`}>
+              <rect x={x} y={y} width={w} height={h} rx={corner.shape} />
+            </clipPath>
+            <rect
+              x={x}
+              y={y}
+              width={w}
+              height={h}
+              rx={corner.shape}
+              {...stylex.props(styles.fillOnly)}
+            />
+          </>
+        );
       return (
         <>
           <rect x={x} y={y} width={w} height={h} rx={corner.shape} {...shape} />
@@ -804,9 +922,32 @@ function Shape({ node }: { node: CompiledNode }) {
           )}
         </>
       );
+    case "cell": {
+      // A plain cell paints nothing; a cell with a role or category is filled. Its record
+      // draws the dividers and the outline over it, and clips it to its rounded corners.
+      // Inside, a ring shows while the cell is pointed at or a step focuses it.
+      const filled = node.role !== "default" || node.category !== undefined;
+      return (
+        <g clipPath={node.parent ? `url(#${clip}-${node.parent})` : undefined}>
+          <rect {...outline(r, 0)} {...stylex.props(filled ? styles.cellFill : styles.hitArea)} />
+          <rect {...outline(r, -2)} {...stylex.props(styles.cellRing)} />
+        </g>
+      );
+    }
+    case "mark":
+      return (
+        <rect x={x} y={y} width={w} height={h} rx={corner.mark} {...stylex.props(styles.mark)} />
+      );
     default:
       return <rect x={x} y={y} width={w} height={h} fill="transparent" />;
   }
+}
+
+/** Hairlines inside a record: under the ruler, beside the row offsets, between cells. */
+function Rules({ node }: { node: CompiledNode }) {
+  if (!node.rules) return null;
+  const d = node.rules.map(([a, b]) => `M${a.x} ${a.y}L${b.x} ${b.y}`).join("");
+  return <path d={d} {...stylex.props(styles.rule)} />;
 }
 
 /** A polyline whose bends are rounded by up to `radius`. */
@@ -1124,7 +1265,7 @@ function Legend({
 }
 
 /** Shape corners, by kind. */
-const corner = { shape: 6, group: 10, frame: 4 };
+const corner = { shape: 6, group: 10, frame: 4, mark: 3 };
 /** Stroke weights: dividers and quiet parts, ordinary parts, the accent, and the extra weight of a part in focus. */
 const stroke = { hairline: "1px", line: "1.5px", strong: "2px", boost: "0.75px" };
 /** Dash patterns: dashed for boundaries and replies, dotted for lifelines and markers. */
@@ -1291,6 +1432,39 @@ const styles = stylex.create({
   solid: { fill: theme.text },
   ring: { fill: "none", stroke: theme.text, strokeWidth: stroke.line },
   rule: { stroke: "var(--ink)", strokeWidth: stroke.hairline },
+  /** A record cell with a role or category: the cell's fill, inside its parent's outline. */
+  cellFill: { fill: "var(--fill)", stroke: "none" },
+  /** A record body under its cells, and its outline over them. */
+  fillOnly: { fill: "var(--fill)", stroke: "none" },
+  outlineOnly: {
+    fill: "none",
+    stroke: "var(--ink)",
+    strokeWidth: `calc(var(--weight) + var(--boost, 0px))`,
+    strokeLinejoin: "round",
+  },
+  /** A layer that only paints: the pointer reaches the part under it. */
+  passThrough: { pointerEvents: "none" },
+  /** A cell's ring: as wide as the boost, so it shows only on hover and focus. */
+  cellRing: {
+    fill: "none",
+    stroke: "var(--ink)",
+    strokeWidth: "calc(2 * var(--boost, 0px))",
+  },
+  /** A member's pin: its number in a dot of its ink. */
+  pin: {
+    fill: "var(--ink)",
+    stroke: `var(--figure-bg, ${theme.surface})`,
+    strokeWidth: 2,
+  },
+  pinText: { fill: theme.canvas },
+  /** A plain cell paints nothing but must still take the pointer. */
+  hitArea: { fill: "transparent", stroke: "none" },
+  /** A text mark: a highlight behind the marked text, outlined so it reads without color. */
+  mark: {
+    fill: "var(--fill)",
+    stroke: "var(--ink)",
+    strokeWidth: `calc(${stroke.hairline} + var(--boost, 0px))`,
+  },
   bar: {
     fill: theme.surfaceHover,
     stroke: theme.borderControl,

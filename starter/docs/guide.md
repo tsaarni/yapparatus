@@ -58,16 +58,20 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 
 ## Writing
 
-- Write plain, neutral, descriptive prose. Say what a thing is and what it does. Avoid marketing tone, slogans, and punchy fragments.
-- Use simple words and simple sentence structure: one idea per sentence, one topic per paragraph.
-- Write complete sentences that say who does what, such as "The server checks every link."
-- Say things directly. Avoid clever or compressed phrases such as "built the way it is", "rests on", or "holds now", and explain every term the reader may not know.
+- Write plain, neutral prose in complete sentences that say who does what, such as "The server checks every link." One idea per sentence, one topic per paragraph.
+- Avoid hype, metaphor, and filler words, such as "seamless", "under the hood", and "simply".
+- Avoid punchy patterns: slogans, kickers in headings or closing lines ("Small change, big impact"), questions answered at once ("The catch? …"), and announcements ("Let's dive in").
 - Do not use em dashes. Use a period, a comma, or a colon instead.
 - Do not frame statements as contrasts, such as "it is not X, it is Y" or "X, not Y". State what is true. Mention the alternative only when the reader needs to know about it.
-- Introduce each concept before using it; then explain step by step.
-- Start a page with one or two sentences that say what it covers. Say something once, in the place it belongs, and link to it from elsewhere; do not repeat a document-wide note on every page.
+- Use one term for one thing, everywhere. Do not vary words for style.
+- Introduce each concept and term before using it; then explain step by step.
+- Start a page with one or two sentences that say what it covers.
+- Say something once, in the place it belongs, and link to it from elsewhere.
 - Alerts and captions are one or two sentences. Use an alert only for what the reader must not miss, such as a step that deletes data. Keep table cells short; explanations belong in prose.
-- Give every fenced code block a language, or `text` for plain text; a missing or unknown language is an error. Code never wraps. Keep code you write for the document within 100 columns. Code copied from an existing source, such as a command a tool prints or a file's lines, keeps its own formatting; prefer an `Excerpt` for project files.
+
+## Code and layout
+
+- Give every fenced code block a language, or `text` for plain text. Keep code you write within 100 columns. Code copied from an existing source, such as a command a tool prints or a file's lines, keeps its own formatting; prefer an `Excerpt` for project files.
 - Mark changed or important lines with `// [!code ++]`, `// [!code --]`, and `// [!code highlight]`. See [code marks](components.md#code-marks).
 - Put alternatives the reader picks one of, such as package managers, in `<Tabs>`, and things the reader compares, such as an old and a new design, in `<Columns>`, each made of labelled `<Panel>`s. Wrap code columns in a `Listing` and drawing columns in a `Figure` to number them. See [tabs and columns](components.md#tabs-and-columns).
 
@@ -102,7 +106,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 
 ## Diagrams
 
-- Draw with `<Diagram>`, never with hand-written SVG. Read [the diagram reference](diagrams.md) before drawing.
+- Draw with `<Diagram>`, never with hand-written SVG. Read [the diagram reference](diagrams.md) before drawing, and the page for the form you draw: [structures](diagram-structures.md) for tables, headers, and marked text, [sequences](diagram-sequences.md) for messages over time. Start from the closest example.
 - Use `d.sequence` for interactions over time.
 - Add `<Step>` children when the figure is best explained in order. Each step is one or two sentences. Focus containers instead of listing their parts, and use `stepOnly` notes for words that belong on the drawing. See [steps](diagrams.md#steps).
 - Keep text-heavy drawings under about 960 units wide. Stack rows into columns rather than letting a figure scroll.
