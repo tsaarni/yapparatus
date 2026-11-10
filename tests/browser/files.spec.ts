@@ -140,7 +140,7 @@ test("Show on page shows the section when the text asked about was rewritten", a
       original.replace(/^The target paragraph.*$/m, "The agent rewrote this paragraph."),
     );
     await expect(page.getByText("The agent rewrote this paragraph.")).toBeVisible();
-    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.evaluate(() => document.querySelector("[data-scroll-root]")?.scrollTo(0, 1e6));
     await page
       .getByRole("button", { name: /^Show .* on the page$/ })
       .last()

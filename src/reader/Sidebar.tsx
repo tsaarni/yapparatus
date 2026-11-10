@@ -2,7 +2,7 @@ import { type DocumentPage, pages, settings } from "virtual:yapparatus/document"
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 import { numbering, numbersOf } from "./numbering.ts";
-import { href } from "./router.ts";
+import { href, scrollRoot } from "./router.ts";
 import {
   duration,
   fontSize,
@@ -33,8 +33,9 @@ function useCurrentSection(page: DocumentPage | undefined) {
       setCurrent(found);
     };
     update();
-    window.addEventListener("scroll", update, { passive: true });
-    return () => window.removeEventListener("scroll", update);
+    const root = scrollRoot();
+    root.addEventListener("scroll", update, { passive: true });
+    return () => root.removeEventListener("scroll", update);
   }, [page]);
   return current;
 }

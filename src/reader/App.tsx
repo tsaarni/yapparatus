@@ -39,6 +39,7 @@ import {
   interceptLinks,
   navigate,
   parseAddress,
+  scrollRoot,
   scrollToFragment,
   useRoute,
 } from "./router.ts";
@@ -133,7 +134,7 @@ export function App() {
   }, [page, file]);
   // After a route change: restore the old position on Back, else go to the anchor or top.
   useLayoutEffect(() => {
-    if (route.restore !== undefined) window.scrollTo({ top: route.restore });
+    if (route.restore !== undefined) scrollRoot().scrollTo({ top: route.restore });
     else {
       scrollToFragment(route.fragment, false);
       // Arriving at an address shows where it points. Diagrams render after their fonts
@@ -151,6 +152,9 @@ export function App() {
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
+    // Keys such as Page Down scroll the focused element, and the page scrolls in this one.
+    // A click on the page focuses it again, since it is the nearest focusable element.
+    app.focus({ preventScroll: true });
     const observer = new ResizeObserver(([entry]) => {
       const width = entry?.contentRect.width ?? 0;
       setLayout(width >= wideLayout ? "wide" : "compact");
@@ -312,6 +316,8 @@ export function App() {
     <div
       ref={appRef}
       data-layout={layout}
+      data-scroll-root
+      tabIndex={-1}
       {...styled(
         `app ${chatOpen ? "with-chat" : ""} ${full ? "chat-full" : ""}`,
         s.app,
@@ -736,8 +742,11 @@ function PageFooter({ page }: { page: DocumentPage | undefined }) {
 }
 
 const s = stylex.create({
+  // The page scrolls here, beside the chat, and not in the window. Print shows it whole.
   app: {
-    minHeight: "100dvh",
+    height: { default: "100dvh", [when.print]: "auto" },
+    overflowY: { default: "auto", [when.print]: "visible" },
+    outlineStyle: "none",
   },
   withChat: {
     marginRight: {

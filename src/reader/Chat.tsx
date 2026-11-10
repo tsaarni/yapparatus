@@ -5,18 +5,20 @@ import {
   Component,
   type ComponentType,
   type ErrorInfo,
+  memo,
   type ReactNode,
   type Ref,
   type RefObject,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
 import { partSeparator, quoteOf, splitAddress } from "../document.ts";
 import { linesLabel, parseFileAddress } from "../files.ts";
 import { createLogger } from "../logger.ts";
-import type { AgentMessage, ChatState, ContextItem, ReaderMessage } from "../protocol.ts";
+import type { AgentMessage, ChatState, ContextItem, Message, ReaderMessage } from "../protocol.ts";
 import { commands, reportDiagnostics } from "./api.ts";
 import { type AppIconName, AppIcon as Icon } from "./icons.tsx";
 import { findTarget, numbering, numbersOf, PageContext } from "./numbering.ts";
@@ -281,7 +283,38 @@ function TurnHeader({
   );
 }
 
-function ReaderView({
+/**
+ * The messages, in log order. Memoized, so typing a question does not render them again: at a
+ * few hundred messages that took most of each keystroke.
+ */
+const MessageList = memo(function MessageList({
+  messages,
+  onShowOnPage,
+}: {
+  messages: Message[];
+  onShowOnPage: (item: ContextItem) => void;
+}) {
+  const bySeq = new Map(messages.map((message) => [message.seq, message]));
+  return messages.map((message) =>
+    message.author === "reader" ? (
+      <ReaderView key={message.seq} message={message} onShowOnPage={onShowOnPage} />
+    ) : (
+      <AgentView key={message.seq} message={message} asked={bySeq.get(message.to)?.createdAt} />
+    ),
+  );
+});
+
+/**
+ * A logged message never changes, but chat events replace its object. Comparing numbers lets
+ * a new message render alone.
+ */
+function sameMessage<P extends { message: { seq: number } }>(before: P, after: P): boolean {
+  return Object.entries(after).every(([key, value]) =>
+    key === "message" ? before.message.seq === after.message.seq : before[key as keyof P] === value,
+  );
+}
+
+const ReaderView = memo(function ReaderView({
   message,
   onShowOnPage,
 }: {
@@ -299,9 +332,15 @@ function ReaderView({
       </div>
     </article>
   );
-}
+}, sameMessage);
 
-function AgentView({ message, asked }: { message: AgentMessage; asked: string | undefined }) {
+const AgentView = memo(function AgentView({
+  message,
+  asked,
+}: {
+  message: AgentMessage;
+  asked: string | undefined;
+}) {
   // From the message it answers to the reply, as the counter showed while it worked. When
   // the server saw the agent read it, the tooltip tells waiting from working.
   const at = (iso: string) => new Date(iso).getTime();
@@ -323,7 +362,7 @@ function AgentView({ message, asked }: { message: AgentMessage; asked: string | 
       </div>
     </article>
   );
-}
+}, sameMessage);
 
 /** What the server knows, and nothing more: it cannot see an agent between its commands. */
 const presence: Record<ChatState["agent"], string> = {
@@ -490,6 +529,12 @@ export function Chat(props: ChatProps) {
   const unread = newestReader > chat.repliedTo;
 
   const scrollToBottom = useStickyScroll(thread);
+  // The parent passes a new function on each render; the list gets one that stays the same.
+  const showOnPage = useRef(props.onShowOnPage);
+  useLayoutEffect(() => {
+    showOnPage.current = props.onShowOnPage;
+  });
+  const stableShowOnPage = useCallback((item: ContextItem) => showOnPage.current(item), []);
 
   async function submit() {
     if (sending || !question.trim()) return;
@@ -570,17 +615,7 @@ export function Chat(props: ChatProps) {
               </ul>
             </div>
           )}
-          {chat.messages.map((message) =>
-            message.author === "reader" ? (
-              <ReaderView key={message.seq} message={message} onShowOnPage={props.onShowOnPage} />
-            ) : (
-              <AgentView
-                key={message.seq}
-                message={message}
-                asked={chat.messages.find((m) => m.seq === message.to)?.createdAt}
-              />
-            ),
-          )}
+          <MessageList messages={chat.messages} onShowOnPage={stableShowOnPage} />
           {unread && chat.agent !== "away" && (
             <div {...stylex.props(s.turn)}>
               <TurnHeader

@@ -96,9 +96,17 @@ export function useRoute(): Route {
   return useSyncExternalStore(subscribe, snapshot);
 }
 
+/**
+ * The element the page scrolls in. It ends at the chat's left edge, so the page's scrollbar
+ * is drawn there and not beside the chat's own scrollbar at the window's edge.
+ */
+export function scrollRoot(): HTMLElement {
+  return document.querySelector<HTMLElement>("[data-scroll-root]") ?? document.documentElement;
+}
+
 /** Go to an address produced by `href`. Remembers the scroll position for Back. */
 export function navigate(to: string, { replace = false } = {}) {
-  history.replaceState({ ...(history.state as object), scroll: window.scrollY }, "");
+  history.replaceState({ ...(history.state as object), scroll: scrollRoot().scrollTop }, "");
   if (replace) history.replaceState({}, "", to);
   else history.pushState({}, "", to);
   window.dispatchEvent(new Event(changed));
@@ -181,5 +189,5 @@ export function scrollToFragment(fragment: string, smooth = true) {
   // Diagram parts are SVG and ignore scroll margins; center them instead.
   const block = target instanceof SVGElement ? "center" : "start";
   if (target) target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block });
-  else if (!fragment) window.scrollTo({ top: 0 });
+  else if (!fragment) scrollRoot().scrollTo({ top: 0 });
 }
