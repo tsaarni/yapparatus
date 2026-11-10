@@ -103,6 +103,14 @@ test("a file's place is relative to the project folder, even outside it", () => 
   ]);
   assert.equal(languageOf("src/main.go"), "go");
   assert.equal(languageOf("Dockerfile"), "docker");
+  assert.equal(languageOf("source/common/common/regex.cc"), "cpp");
+  assert.equal(languageOf("include/regex.h"), "cpp");
+  assert.equal(languageOf("api/route.proto"), "proto");
+  assert.equal(languageOf("source/common/BUILD"), "python");
+  assert.equal(languageOf("makefile"), "make");
+  assert.equal(languageOf("ci/Dockerfile.dev"), "docker");
+  assert.equal(languageOf("rtl/core.v"), "verilog");
+  assert.equal(languageOf("a.constructor"), "text");
   assert.equal(languageOf("notes.unknown"), "text");
 });
 
@@ -260,6 +268,27 @@ test("an excerpt's block follows indentation, and a closing line that opens agai
   assert.deepEqual(excerptRange(lines, "def handle(", undefined), { start: 11, end: 15 });
   assert.deepEqual(excerptRange(lines, "after = 1", undefined), { start: 16, end: 16 });
   assert.deepEqual(excerptRange(lines, "options: Options", ") {"), { start: 2, end: 3 });
+});
+
+test("an excerpt's block takes a brace on its own line and preprocessor lines in column 0", () => {
+  const lines = [
+    "void run()",
+    "{",
+    "  a();",
+    "#ifdef FAST",
+    "  b();",
+    "#endif",
+    "}",
+    "",
+    "# A comment before the next block.",
+    "after = 1",
+  ];
+  assert.deepEqual(excerptRange(lines, "void run()", undefined), { start: 1, end: 7 });
+  assert.deepEqual(excerptRange(lines, "after = 1", undefined), { start: 10, end: 10 });
+  assert.deepEqual(
+    excerptRange(["def f():", "    x = 1", "# next", "def g():"], "def f():", undefined),
+    { start: 1, end: 2 },
+  );
 });
 
 test("two folders with the same paths stay apart, in context and in the agent's prompt", () => {

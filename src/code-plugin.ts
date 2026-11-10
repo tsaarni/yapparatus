@@ -76,21 +76,66 @@ export const codeHighlighting: [typeof rehypeShiki, RehypeShikiOptions] = [
   },
 ];
 
-/** Files known by name rather than by extension. */
+/** Files known by name rather than by extension, in lowercase. */
 const languageByName: Record<string, string> = {
-  Dockerfile: "docker",
-  Makefile: "make",
-  "CMakeLists.txt": "cmake",
+  dockerfile: "docker",
+  containerfile: "docker",
+  makefile: "make",
+  gnumakefile: "make",
+  "cmakelists.txt": "cmake",
+  build: "python",
+  "build.bazel": "python",
+  workspace: "python",
+  "workspace.bazel": "python",
+  jenkinsfile: "groovy",
+  gemfile: "ruby",
+  rakefile: "ruby",
+  ".bashrc": "bash",
+  ".bash_profile": "bash",
+  ".profile": "bash",
+  ".zshrc": "zsh",
 };
 
-/** The Shiki language for a file, from its name or extension, or "text". */
+/** Extensions that Shiki does not know by name. A `.h` header is read as C++, which covers C. */
+const languageByExtension: Record<string, string> = {
+  cc: "cpp",
+  cxx: "cpp",
+  hh: "cpp",
+  hpp: "cpp",
+  hxx: "cpp",
+  h: "cpp",
+  m: "objective-c",
+  mm: "objective-cpp",
+  pl: "perl",
+  ex: "elixir",
+  exs: "elixir",
+  ml: "ocaml",
+  sv: "system-verilog",
+  bzl: "python",
+  mk: "make",
+  patch: "diff",
+  gradle: "groovy",
+  v: "verilog",
+};
+
+/**
+ * The Shiki language for a file, from its name or extension, or "text". A Dockerfile keeps its
+ * language with a suffix, as in `Dockerfile.dev`.
+ */
 export function languageOf(file: string): string {
-  const name = file.split("/").at(-1) ?? file;
-  const byName = languageByName[name];
+  const name = (file.split("/").at(-1) ?? file).toLowerCase();
+  const stem = name.slice(0, name.indexOf(".") > 0 ? name.indexOf(".") : undefined);
+  const byName =
+    own(languageByName, name) ??
+    (stem === "dockerfile" || stem === "containerfile" ? "docker" : undefined);
   if (byName) return byName;
-  const extension = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1).toLowerCase() : "";
-  return extension && extension in bundledLanguages ? extension : "text";
+  const extension = name.includes(".") ? name.slice(name.lastIndexOf(".") + 1) : "";
+  const language = own(languageByExtension, extension) ?? extension;
+  return language && Object.hasOwn(bundledLanguages, language) ? language : "text";
 }
+
+const own = (map: Record<string, string>, key: string) =>
+  Object.hasOwn(map, key) ? map[key] : undefined;
 
 /** A whole file as the file view shows it: highlighted like an excerpt that starts at line 1. */
 export async function fileView(address: FileAddress, file: SourceFile): Promise<SourceFileView> {
@@ -141,7 +186,9 @@ const opens = /[{([:]\s*$/;
  * The lines an excerpt shows. `start` is the one line that contains its text. `end` is the
  * first line from there that contains its text; without it, the excerpt is the block the start
  * line opens: the lines indented deeper than it, and the closing line at its own indentation.
- * A closing line that opens again, such as `) {` or `} else {`, continues the block.
+ * A closing line that opens again, such as `) {` or `} else {`, continues the block, and so
+ * does an opening `{` on the line after the start. Lines that start with `#`, such as C
+ * preprocessor lines, are written in column 0 inside a block, so they do not end it.
  */
 export function excerptRange(
   lines: string[],
@@ -165,10 +212,11 @@ export function excerptRange(
   for (let i = first; i < lines.length; i++) {
     const line = lines[i] as string;
     if (!line.trim()) continue;
-    if (indent(line) > level) {
+    if (indent(line) > level || (last === first && line.trim() === "{")) {
       last = i + 1;
       continue;
     }
+    if (line.trimStart().startsWith("#")) continue;
     if (closes.test(line.trim())) {
       last = i + 1;
       if (opens.test(line)) continue;

@@ -55,7 +55,7 @@ Lines of an external file, read when the page is compiled, from a directory that
 |---|---|
 | `from` | The file's address, `/-/files/<directory>/<path>`, without lines |
 | `start` | Text from the first line to show. Exactly one line of the file may contain it. Without `start`, the whole file |
-| `end` | Text from the last line to show: the first line from `start` on that contains it. Without `end`, the block that the `start` line opens: the lines indented deeper than it, and its closing `}`, `)`, or `]` |
+| `end` | Text from the last line to show: the first line from `start` on that contains it. Without `end`, the block that the `start` line opens: the lines indented deeper than it, and its closing `}`, `)`, or `]`. An opening `{` on the next line and `#` lines in column 0, such as `#ifdef`, stay in the block. A multi-line string that starts in column 0 ends the block; use `end` |
 | `mark` | Text of lines to highlight, or a list, `mark={["retry", "backoff"]}`: every line of the excerpt that contains one |
 
 Quote enough of a line to name it once, such as `export function handle(` rather than `handle`. The block shows the file's line numbers, and its bar links to the lines. The language comes from the file name. Text that is in no line and `start` text in several lines are reported as `EXCERPT_TEXT`, and a `from` that is not a file address, has line numbers, or comes with invalid attributes as `EXCERPT_INVALID`, both with the page's line, so a change to the file that breaks an excerpt shows up in the diagnostics. A missing file is reported as `BROKEN_LINK`.
