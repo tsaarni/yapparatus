@@ -106,6 +106,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 
 ## Diagrams
 
+- Draw a figure whenever structure, flow, or change over time is easier to see than to read: components and how they connect, a request path, messages between participants, a data layout, or numbers to compare. Write the prose around it, and refer to it with `Ref`.
 - Draw with `<Diagram>`, never with hand-written SVG. Read [the diagram reference](diagrams.md) before drawing, and the page for the form you draw: [structures](diagram-structures.md) for tables, headers, and marked text, [sequences](diagram-sequences.md) for messages over time. Start from the closest example.
 - Use `d.sequence` for interactions over time.
 - Add `<Step>` children when the figure is best explained in order. Each step is one or two sentences. Focus containers instead of listing their parts, and use `stepOnly` notes for words that belong on the drawing. See [steps](diagrams.md#steps).
