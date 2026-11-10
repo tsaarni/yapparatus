@@ -167,7 +167,7 @@ function Section({ level, id, children, ...props }: Props & { level: 2 | 3 }) {
         ...targetHost,
       )}
     >
-      {number && <span {...stylex.props(s.number)}>{number}</span>}
+      {number && <span {...stylex.props(s.number)}>{number} </span>}
       {children}
       {!reply && (
         <TargetActions
@@ -499,7 +499,8 @@ const s = stylex.create({
     letterSpacing: letterSpacing.snug,
   },
   number: {
-    marginRight: "0.6em",
+    // With the space after the number, so a double click selects the title word alone.
+    marginRight: "0.35em",
     color: theme.textMuted,
     fontWeight: fontWeight.medium,
     fontVariantNumeric: "tabular-nums",

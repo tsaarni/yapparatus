@@ -107,7 +107,7 @@ export function FigureFrame({
         <figcaption {...stylex.props(s.caption)}>
           <div {...stylex.props(s.captionLine)}>
             <span {...stylex.props(s.captionText)}>
-              {label && <span {...stylex.props(s.label)}>{label}</span>}
+              {label && <span {...stylex.props(s.label)}>{label} </span>}
               {caption}
             </span>
             {actions && <span {...stylex.props(s.captionActions)}>{actions}</span>}
@@ -172,7 +172,7 @@ function Titled({
     >
       {(caption || label) && (
         <figcaption {...stylex.props(s.title)}>
-          {label && <span {...stylex.props(s.label)}>{label}</span>}
+          {label && <span {...stylex.props(s.label)}>{label} </span>}
           {caption}
           {!reply && (
             <TargetActions
@@ -460,7 +460,8 @@ const s = stylex.create({
     marginTop: `calc((1lh - ${sizes.controlSmall}) / 2)`,
   },
   label: {
-    marginRight: "0.5em",
+    // With the space after the label, so a double click selects the caption word alone.
+    marginRight: "0.25em",
     color: theme.text,
     fontWeight: fontWeight.semibold,
   },
