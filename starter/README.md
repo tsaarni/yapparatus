@@ -1,6 +1,6 @@
-# My document
+# Starter Document
 
-This is a [Yapparatus](https://github.com/tsaarni/yapparatus) document, written and revised in conversation with a coding agent. Its pages are in `content/`. In the browser, the document appears next to a chat where you can ask the agent about any part of it or request changes.
+This is a [Yapparatus](https://github.com/tsaarni/yapparatus) document, written and revised in conversation with a coding agent. The agent writes the pages as [MDX](https://mdxjs.com/), with components for diagrams, charts, tables, code excerpts and more to make the document highly visual. In the browser, the document appears next to a chat where you can select any part of the document and ask the agent about it or request changes. The agent answers in the chat, edits the pages, or both.
 
 ## Create the project
 
@@ -14,29 +14,33 @@ pnpm install            # or: npm install
 
 The project directory can be anywhere, for example next to the repository that the document describes.
 
-## Ask the agent to write the document
+## Work with the document
 
-Start your coding agent in the project directory and ask it to write the document:
+Start the document with the name of its directory.
+This starter project uses `content` as the default document directory:
+
+```sh
+pnpm dev content   # or: npm run dev content
+```
+
+Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/) in the browser.
+
+Start your coding agent. The chat has a button that copies a prompt for the agent. The prompt contains instructions and a short Node.js script that connects to the chat server. Paste the prompt into the agent's session, and the agent connects to the chat shortly after.
+
+To have it write a document, ask for one, for example:
 
 ```text
 Write a document about the order service in ../orders.
 ```
 
-The agent finds the authoring guide through `AGENTS.md`, writes the pages in `content/`, and then tells you how to start the document.
+Select any part of the document as context and ask about it, and the agent answers in the chat or edits the pages.
 
-## Read the document and ask questions
-
-Start the document with the name of its directory, `content`:
-
-```sh
-pnpm dev content        # or: npm run dev content
-```
-
-Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/) in the browser. To choose the port, add `--port 5180` with pnpm or `-- --port 5180` with npm.
-
-The chat shows a prompt for your agent: paste it into the same agent session that wrote the document, and the agent starts answering the chat. You can then select any part of the document and ask about it, and the agent answers in the chat or edits the pages.
+The agent finds the authoring guide through `AGENTS.md`.
+The chat is stored in `.yapparatus/` in the project directory. It holds your questions, so keep that directory private.
 
 ## Build the document for readers
+
+To build standalone versions of the document, use the following commands:
 
 ```sh
 pnpm build content          # or: npm run build content
@@ -45,7 +49,7 @@ pnpm build:single content   # or: npm run build:single content
 
 `build` writes the document as a static site to `dist/content/`, and `build:single` writes it as one offline file, `dist-single/content/index.html`.
 
-Neither build includes the chat, which is stored in `.yapparatus/content/`. The chat contains your questions, so keep it private.
+Neither build includes the chat.
 
 ## Add another document
 
