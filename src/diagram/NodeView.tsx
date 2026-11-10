@@ -38,7 +38,8 @@ export function NodeView({
   state?: PartState;
 }) {
   // A record with cells is drawn in two layers: this body, then its outline over the cells.
-  const layered = node.shape === "record" && node.rules !== undefined;
+  // A cell's warning badge is drawn over that outline, with the pins.
+  const layered = (node.shape === "record" && node.rules !== undefined) || node.shape === "cell";
   const r = node.rect;
   if (node.shape === "space") return null;
   if (node.shape === "bar")
@@ -93,6 +94,27 @@ function WarningBadge({ node }: { node: CompiledNode }) {
         d={`M${cx} ${cy - 3.5}V${cy + 0.5}M${cx} ${cy + 3.2}V${cy + 3.3}`}
         {...stylex.props(styles.badgeMark)}
       />
+    </g>
+  );
+}
+
+/**
+ * A warning cell's badge, drawn over its record's outline and dividers, which would cross it.
+ * It fades with the cell.
+ */
+export function CellWarning({ node, state }: { node: CompiledNode; state: PartState }) {
+  return (
+    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The badge only paints; the cell is the part.
+    <g
+      aria-hidden="true"
+      {...stylex.props(
+        roleStyle(node.role),
+        styles.passThrough,
+        partStyles.fade,
+        stateStyle(state),
+      )}
+    >
+      <WarningBadge node={node} />
     </g>
   );
 }

@@ -7,7 +7,7 @@ import { diagnosticCodes } from "../protocol.ts";
 import { fontSize, space, theme } from "../reader/theme.stylex.ts";
 import type { CompiledDiagram } from "./compiled.ts";
 import { EdgeView, EnclosureView, FrameView } from "./EdgeView.tsx";
-import { NodeView, Pin, RecordOutline } from "./NodeView.tsx";
+import { CellWarning, NodeView, Pin, RecordOutline } from "./NodeView.tsx";
 import { interactive, outline, type PartState } from "./part.tsx";
 
 const dev = import.meta.env.DEV;
@@ -101,7 +101,8 @@ export function DiagramView({
             : part(node.id, node.label))}
         />
       ))}
-      {/* Over every shape: records' outlines, which cover their cells' fills, then pins. */}
+      {/* Over every shape: records' outlines, which cover their cells' fills, then cells'
+          warning badges and pins. */}
       {diagram.nodes
         .filter((node) => node.rules)
         .map((node) => (
@@ -112,6 +113,13 @@ export function DiagramView({
             state={stateOf(node.id)}
           />
         ))}
+      {diagram.nodes.map(
+        (node) =>
+          node.shape === "cell" &&
+          node.role === "warning" && (
+            <CellWarning key={`${node.id}-warning`} node={node} state={stateOf(node.id)} />
+          ),
+      )}
       {diagram.nodes.map(
         (node) =>
           node.pin !== undefined && (

@@ -36,15 +36,7 @@ import {
   targetHost,
   targetProps,
 } from "./targets.tsx";
-import {
-  fontSize,
-  fontWeight,
-  letterSpacing,
-  lineHeight,
-  sizes,
-  space,
-  theme,
-} from "./theme.stylex.ts";
+import { fontSize, fontWeight, lineHeight, sizes, space, theme } from "./theme.stylex.ts";
 import { styled, ui } from "./ui.tsx";
 
 const live = import.meta.env.DEV;
