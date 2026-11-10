@@ -99,9 +99,11 @@ function useData(
         (error) => live && setLoaded({ error: String(error?.message ?? error) }),
       );
     };
+    // The page scrolls in its own element, which clips the chart before the window's margin
+    // applies, so the margin is set on that element.
     const observer = new IntersectionObserver(
       (entries) => entries.some((e) => e.isIntersecting) && start(),
-      { rootMargin: "800px 0px" },
+      { root: element.closest("[data-scroll-root]"), rootMargin: "800px 0px" },
     );
     observer.observe(element);
     window.addEventListener("beforeprint", start);
