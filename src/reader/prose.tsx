@@ -281,10 +281,11 @@ function codeText(pre: HTMLPreElement) {
 }
 
 /**
- * Spans are mostly highlighted tokens and pass through. A code line marked with
- * `[!code highlight]`, `[!code ++]`, or `[!code --]` gets its mark's background and gutter.
- * A line of a source file shows its number in the file beside it; a line the reader picked
- * in the file view is highlighted.
+ * Spans are code lines and the highlighted tokens inside them; tokens pass through. Every line
+ * has the same box, so tab stops line up across lines. A line marked with `[!code highlight]`,
+ * `[!code ++]`, or `[!code --]` gets its mark's background and gutter. A line of a source file
+ * shows its number in the file beside it; a line the reader picked in the file view is
+ * highlighted.
  */
 function Span(
   props: HTMLAttributes<HTMLSpanElement> & {
@@ -293,12 +294,10 @@ function Span(
     "data-selected"?: string;
   },
 ) {
+  if (!props.className?.split(" ").includes("line")) return <span {...props} />;
   const mark = props["data-selected"] ? "highlight" : props["data-mark"];
   const numbered = props["data-line"] !== undefined;
-  if (!mark && !numbered) return <span {...props} />;
-  return (
-    <span {...props} {...stylex.props(mark && s.mark, mark && s[mark], numbered && s.numbered)} />
-  );
+  return <span {...props} {...styled("line", s.line, mark && s[mark], numbered && s.numbered)} />;
 }
 
 const alertTitles: Record<AlertKind, string> = {
@@ -646,10 +645,11 @@ const s = stylex.create({
   replyPre: {
     marginBlock: space.md,
   },
-  // A marked line spans the block, from edge to edge of the padding, with a colored gutter.
+  // A line spans the block, from edge to edge of the padding, with a gutter that a mark colors.
   // It takes the block's line height, not the smaller code text's, so marked lines in a row
-  // join into one band.
-  mark: {
+  // join into one band. Every line has this box: a tab stop is measured from the line's box,
+  // so a marked line with its own box would shift tab-indented text.
+  line: {
     display: "inline-block",
     verticalAlign: "top",
     lineHeight: `calc(${lineHeight.relaxed} * ${fontSize.sm})`,
@@ -659,6 +659,7 @@ const s = stylex.create({
     paddingInline: `calc(${space.lg} - 3px) ${space.lg}`,
     borderLeftWidth: 3,
     borderLeftStyle: "solid",
+    borderLeftColor: "transparent",
   },
   highlight: {
     borderLeftColor: theme.accent,
