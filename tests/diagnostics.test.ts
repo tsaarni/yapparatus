@@ -21,7 +21,6 @@ const notCodes = new Set([
   "JSON",
   "POST",
   "YAML",
-  "YAPPARATUS_CONTENT",
   "YAPPARATUS_LOG",
 ]);
 

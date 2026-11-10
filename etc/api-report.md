@@ -734,11 +734,11 @@ export class YapparatusError extends Error {
 ## yapparatus/vite
 
 ```ts
-export const yapparatus: (options?: YapparatusOptions) => PluginOption[];
+export const yapparatus: (options: YapparatusOptions) => PluginOption[];
 
 export interface YapparatusOptions {
-  /** Folder holding the document's MDX pages and its document.json, relative to the Vite root. Default: "content". */
-  content?: string;
+  /** The document's directory, which holds its document.json and MDX pages, relative to the Vite root. */
+  document: string;
   /** Inline all application assets. Default: false. */
   singleFile?: boolean;
 }
@@ -747,6 +747,8 @@ export interface YapparatusOptions {
 ## yapparatus/theme.stylex
 
 ```ts
+export const dash: { dashed: string; dotted: string; };
+
 export const duration: { fast: string; slow: string; };
 
 export const fontSize: { xs: string; sm: string; base: string; lg: string; xl: string; xxl: string; };
@@ -766,6 +768,8 @@ export const radius: { sm: string; md: string; lg: string; full: string; };
 export const sizes: { headerHeight: string; sidebarWidth: string; textWidth: string; breakout: string; gutter: string; pageMaxWidth: string; chatWidth: string; control: string; controlSmall: string; };
 
 export const space: { xxs: string; xs: string; sm: string; md: string; lg: string; xl: string; xl2: string; xl3: string; xl4: string; xl5: string; };
+
+export const stroke: { hairline: string; line: string; strong: string; boost: string; };
 
 export const theme: VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 30 more ...; mono: string; }>, symbol>;
 

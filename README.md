@@ -10,10 +10,10 @@ Requires Node.js 22.18+ and pnpm.
 
 ```sh
 pnpm install
-pnpm dev
+pnpm dev docs/design
 ```
 
-This opens the design document. Set `YAPPARATUS_CONTENT` to show another content directory.
+This starts the design document. `pnpm dev tests/fixtures/content` starts the test document.
 
 ## Write a document
 
@@ -22,13 +22,13 @@ npx giget gh:tsaarni/yapparatus/starter my-document
 cd my-document && pnpm install
 ```
 
-Start your coding agent in that directory and ask for a document. When it is done, run `pnpm dev`, open the address, and give the prompt the chat shows to the same agent session. Agents write pages by the [authoring guide](starter/docs/guide.md).
+Start your coding agent in that directory and ask for a document. When it is done, run `pnpm dev content`, open the address, and give the prompt the chat shows to the same agent session. Agents write pages by the [authoring guide](starter/docs/guide.md).
 
 ## Check
 
 ```sh
-pnpm verify      # Biome, TypeScript, style rules
+pnpm verify              # Biome, TypeScript, style rules
 pnpm test:unit
-pnpm test        # browser tests; first run: pnpm exec playwright install chromium
-pnpm build       # static site in dist/
+pnpm test                # browser tests; first run: pnpm exec playwright install chromium
+pnpm build docs/design   # static site in dist/docs/design/
 ```

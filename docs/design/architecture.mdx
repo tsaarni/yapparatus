@@ -7,10 +7,20 @@ Yapparatus consists of an app that runs in the browser and a development server.
 A new document starts as a copy of the [`starter/`](/-/files/yapparatus/starter/README.md) template:
 
 1. The user copies `starter/` to a new directory and installs its dependencies. The starter is a working document of one page that says it is empty.
-2. The user starts the dev server with the project's `dev` script and opens the address that it prints. The browser shows the empty document.
+2. The user starts the dev server with `pnpm dev content` and opens the address that it prints. The browser shows the empty document.
 3. The user chooses **Ask** to open the chat. No agent is connected yet, so the chat offers a **Copy prompt** button.
 4. The user starts a coding agent in the project directory and pastes the prompt into it. The prompt tells the agent how to connect to the chat.
 5. The user asks in the chat for a document on some topic. The agent writes the pages in `content/`, and the browser shows them as they change. From here on, the [reading loop](overview#purpose) runs.
+
+## Document directories
+
+A project can hold several documents. Each one is a document directory: a directory with its own `document.json` and pages, such as `content/` in the starter or `docs/design/` in this repository. The project's `icons/`, `docs/`, and dependencies are shared.
+
+1. **The server runs one document at a time,** given as a path relative to the project directory: `pnpm dev docs/design`. The `yap` command in [`src/cli.ts`](/-/files/yapparatus/src/cli.ts) takes the path and passes it to the Vite plugin, as `vitepress dev docs` does for VitePress. A Vite script cannot take it, because `vite <path>` reads the path as Vite's root. There is no default document, so the command always names the one it serves.
+2. **A project's `vite.config.ts` is loaded when it exists,** so a project can add Vite options and plugins. The command adds `yapparatus()` itself, and the plugin refuses to run twice. The server listens only on `127.0.0.1`, and the command has no option to change that, because the chat server trusts every process that can reach it. See [the library implementation](chat#library-implementation).
+3. **Every output mirrors the document's path.** The chat is in `.yapparatus/<directory>/`, the website build in `dist/<directory>/`, and the single file in `dist-single/<directory>/index.html`. A document's chat and builds therefore never mix with another document's.
+4. **A document directory cannot contain another one.** The pages are every MDX file under the directory, and the chat state mirrors the path. A document in `docs/` would therefore take the pages of `docs/design/` as its own. The server refuses to start, and names both directories.
+5. **The project has one `.yapparatus/server.json`.** The newest server writes it, so the agent library finds whichever document is running, and the snippets do not name a document.
 
 ## System overview
 
@@ -83,9 +93,9 @@ All text that the agent reads, from prompts to error messages, is written in [`s
 |---|---|---|
 | `docs/design/` | This document's pages and `document.json` | An agent or a person |
 | `icons/` | Extra SVG icons for this project | An agent or a person |
-| `.yapparatus/chat.jsonl` | The chat, one message per line | The chat server |
-| `.yapparatus/chat/` | Accepted replies, one MDX file per message | The chat server |
-| `.yapparatus/sequence` | The last number used in the agent channel | The chat server |
+| `.yapparatus/docs/design/chat.jsonl` | This document's chat, one message per line | The chat server |
+| `.yapparatus/docs/design/chat/` | Accepted replies, one MDX file per message | The chat server |
+| `.yapparatus/docs/design/sequence` | The last number used in the agent channel | The chat server |
 | `.yapparatus/server.json` | The address of the running dev server, for the agent library | The dev server |
 | Directories under `"files"` | External files that the document shows. This document shows its own repository. | Their own authors. The server only reads them. |
 
@@ -100,6 +110,7 @@ The code is organized by where it runs, as <Ref to="source-layout" /> shows.
 <FileTree>
 
 - src/
+  - cli.ts the `yap` command, which starts the dev server or a build for one document
   - vite.ts the Vite plugin, in the dev server, with its compile steps in files next to it
   - server/ the chat server and the diagnostic store
   - reader/ the reader app, in the browser
@@ -120,7 +131,7 @@ The dev server is [Vite](https://vite.dev). The package adds one Vite plugin, `y
 
 | Piece | What it does | Source |
 |---|---|---|
-| Page list | Checks the page files against `document.json` and combines them into one module | [`src/vite.ts`](/-/files/yapparatus/src/vite.ts), [`src/document.ts`](/-/files/yapparatus/src/document.ts) |
+| Page list | Checks the document directory and its page files against `document.json`, and combines the pages into one module | [`src/vite.ts`](/-/files/yapparatus/src/vite.ts), [`src/document.ts`](/-/files/yapparatus/src/document.ts), [`src/document-directory.ts`](/-/files/yapparatus/src/document-directory.ts) |
 | MDX compiler | Turns MDX into React code | [`src/vite.ts`](/-/files/yapparatus/src/vite.ts) |
 | Icon step | Turns `<Icon name="…">` into SVG imports | [`src/icon-plugin.ts`](/-/files/yapparatus/src/icon-plugin.ts) |
 | Markdown conventions | Turns alerts and file trees into components, marks code lines, and checks code languages and heading depth | [`src/markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |

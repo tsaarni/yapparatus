@@ -3,13 +3,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
-    "build:single": "vite build --mode single --outDir dist-single",
-    "preview": "vite preview --host 127.0.0.1"
+    "dev": "yap dev",
+    "build": "yap build",
+    "build:single": "yap build --single",
+    "preview": "yap preview"
   },
   "dependencies": {
-    "yapparatus": "github:tsaarni/yapparatus",
-    "vite": "^8.3.6"
+    "yapparatus": "github:tsaarni/yapparatus"
   }
 }

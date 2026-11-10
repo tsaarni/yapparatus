@@ -66,7 +66,7 @@ function serverUrl(): string {
     }
     if (path.dirname(dir) === dir)
       throw new YapparatusError(
-        `No Yapparatus server found: there is no .yapparatus/server.json in ${process.cwd()} or above. Start the dev server in the project directory with \`pnpm dev\`, then run this again from that directory.`,
+        `No Yapparatus server found: there is no .yapparatus/server.json in ${process.cwd()} or above. Start the dev server in the project directory with \`pnpm dev <directory>\`, then run this again from that directory.`,
       );
   }
 }
@@ -83,7 +83,7 @@ async function call(url: string, init: RequestInit, timeout: number): Promise<Re
   } catch (error) {
     log.debug("no answer:", error);
     throw new YapparatusError(
-      `The Yapparatus server at ${new URL(url).origin} did not answer. Start it with \`pnpm dev\` in the project directory, then run this again.`,
+      `The Yapparatus server at ${new URL(url).origin} did not answer. Start it with \`pnpm dev <directory>\` in the project directory, then run this again.`,
     );
   }
 }

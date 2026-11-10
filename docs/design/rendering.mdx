@@ -117,9 +117,9 @@ A document includes files from outside its project, such as the code it explains
 
 <Diagram id="three-outputs" caption="The same reader app, in three forms. Only live mode has the chat." draw={(d) => {
   const source = d.box("Document directory", { id: "document-directory", sub: "pages and document.json" })
-  const live = d.box("pnpm dev", { id: "out-live", mono: true, sub: "live, with chat", role: "accent" })
-  const site = d.box("pnpm build", { id: "out-site", mono: true, sub: "dist/ website" })
-  const single = d.box("pnpm build:single", { id: "out-single", mono: true, sub: "one HTML file" })
+  const live = d.box("pnpm dev <directory>", { id: "out-live", mono: true, sub: "live, with chat", role: "accent" })
+  const site = d.box("pnpm build <directory>", { id: "out-site", mono: true, sub: "dist/<directory>/ website" })
+  const single = d.box("pnpm build:single <directory>", { id: "out-single", mono: true, sub: "one HTML file" })
   d.equalSize([live, site, single])
   const outs = d.row([live, site, single], { gap: 32 })
   d.place(source, { above: outs, gap: 64 })
@@ -129,7 +129,7 @@ A document includes files from outside its project, such as the code it explains
 
 1. **The same app is built in three forms,** as <Ref to="three-outputs" /> shows. All three use the same reader, styles, and diagram code. In each form, the browser draws the diagrams from the same program.
 2. **Builds have no chat** and make no requests to a backend. A shared document is only for reading.
-3. **A build never contains chat state.** Only the pages of the content directory are built, and `.yapparatus/` is left out, because sharing a document must not share the conversation about it.
+3. **A build never contains chat state.** Only the pages of the document directory are built, and `.yapparatus/` is left out, because sharing a document must not share the conversation about it.
 4. **Every address is a file in the website build,** and the build also contains `404.html`. Any static host can therefore serve links to any page and section.
 5. **The single file uses `#/page#anchor` addresses** and embeds all pages, fonts, and assets. The file has no server, and it must work offline when opened from disk.
 6. **A build contains the external files that its pages name, and no other files.** For every file address in a page that names a readable file, the build contains the highlighted file. In the website build, each such address is its own file. An author publishes a file by naming it in a page. A build never copies a whole directory.

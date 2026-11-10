@@ -14,6 +14,7 @@ import { viteSingleFile } from "vite-plugin-singlefile";
 import { charts, dataModule, dataModuleCode, readChartFile } from "./chart-plugin.ts";
 import { codeHighlighting, excerptFiles, excerpts, fileView } from "./code-plugin.ts";
 import { checkIcons, checkPages, checkTheme, pageIdOf, type ThemeSetting } from "./document.ts";
+import { documentError } from "./document-directory.ts";
 import { checkFiles, type FileAddress, parseFileAddress } from "./files.ts";
 import { iconImports } from "./icon-plugin.ts";
 import { logLevel } from "./logger.ts";
@@ -25,8 +26,8 @@ import { SourceFiles } from "./source-files.ts";
 import { sourceContext } from "./source-plugin.ts";
 
 export interface YapparatusOptions {
-  /** Folder holding the document's MDX pages and its document.json, relative to the Vite root. Default: "content". */
-  content?: string;
+  /** The document's directory, which holds its document.json and MDX pages, relative to the Vite root. */
+  document: string;
   /** Inline all application assets. Default: false. */
   singleFile?: boolean;
 }
@@ -75,12 +76,15 @@ function indexHtml(theme: ThemeSetting): string {
 /** Every source file address written in a page, whole: links, excerpts, and examples alike. */
 const fileAddresses = /\/-\/files\/[^\s"'`()<>[\]#]+/g;
 
-export function yapparatus(options: YapparatusOptions = {}): PluginOption[] {
+export function yapparatus(options: YapparatusOptions): PluginOption[] {
   let root = process.cwd();
-  const content = (options.content ?? "content").replace(/^\.?\/+|\/+$/g, "");
-  if (!content || content.split("/").includes(".."))
+  const content = options.document
+    .split(path.sep)
+    .join("/")
+    .replace(/^\.?\/+|\/+$/g, "");
+  if (!content || content === "." || content.split("/").includes(".."))
     throw new Error(
-      `yapparatus: content must be a directory inside the project, got "${options.content}".`,
+      `yapparatus: document must be a directory inside the project, got "${options.document}".`,
     );
   const iconCollections: Record<string, CustomCollectionIconLoader> = {};
   const sourceFiles = new SourceFiles(() => root, content);
@@ -156,7 +160,11 @@ export function yapparatus(options: YapparatusOptions = {}): PluginOption[] {
             : [],
         },
         // Beside the pages, under the application's prefix, so no page name can collide with it.
-        build: { assetsDir: `${appPrefix.slice(1)}/assets` },
+        // Each document builds to its own directory, which mirrors the document's path.
+        build: {
+          assetsDir: `${appPrefix.slice(1)}/assets`,
+          outDir: path.join(options.singleFile ? "dist-single" : "dist", content),
+        },
         // A single file opened from disk has no server to answer page paths.
         // The browser logs at the same level as the server.
         define: {
@@ -271,6 +279,13 @@ export function yapparatus(options: YapparatusOptions = {}): PluginOption[] {
       },
       configResolved(config) {
         root = config.root;
+        // The yap command adds the plugin, and a project's vite.config.ts may add it again.
+        if (config.plugins.filter((plugin) => plugin.name === "yapparatus:workspace").length > 1)
+          throw new Error(
+            "yapparatus: the plugin is added twice. The yap command adds it, so remove yapparatus() from vite.config.ts.",
+          );
+        const error = documentError(root, content);
+        if (error) throw new Error(`yapparatus: ${error}`);
         // The React plugin asks for React by its plain name, which a project that installed
         // yapparatus need not have; the same entries resolve through yapparatus.
         if (installedIn(root)) {

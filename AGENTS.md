@@ -7,7 +7,7 @@ Rules for agents working on this project.
 | Question | Read |
 |---|---|
 | How do I write or edit a document page? | [starter/docs/guide.md](starter/docs/guide.md) and its references |
-| Why is it built this way? | [docs/design/](docs/design/overview.mdx), a Yapparatus document: `pnpm dev` |
+| Why is it built this way? | [docs/design/](docs/design/overview.mdx), a Yapparatus document: `pnpm dev docs/design` |
 | How do I run it? | [README.md](README.md) |
 
 Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtures/`. Follow the design documents when changing the reader, the diagram compiler, or the server. When a change settles a design question, update the design document in the same change; when it changes what authors write, update the guide too.
@@ -24,7 +24,7 @@ Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtur
 - Every style value is a token from `src/reader/theme.stylex.ts`; components keep their own styles. A new value goes into the scale with a comment on what it is for. See [styling](docs/design/styling.mdx).
 - The server API sorts messages by kind: commands (`POST`), reports (`PUT /-/api/diagnostics/{scope}`), events (`GET /-/api/events`), and reads (`GET`, which may wait). Types in `src/protocol.ts`; everything the agent reads is written in `src/server/prompt.ts`.
 - Browser tests run in an isolated temporary workspace with their own Vite cache.
-- `yapparatus/vite` and `yapparatus/agent` load from `lib/`, compiled by `pnpm build:lib`; `pnpm dev` and `pnpm test` run it. A project installs this package, as `starter/` does: test a change to how it installs with `pnpm pack` into a copy of the starter.
+- `yapparatus/vite`, `yapparatus/agent`, and the `yap` command load from `lib/`, compiled by `pnpm build:lib`; `pnpm dev`, `pnpm build`, and `pnpm test` run it. A project installs this package, as `starter/` does: test a change to how it installs with `pnpm pack` into a copy of the starter.
 
 ## Writing
 

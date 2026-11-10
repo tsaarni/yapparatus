@@ -36,9 +36,6 @@ import type { Sequence } from "./sequence.ts";
 
 const log = createLogger("chat");
 
-/** Where an accepted reply is stored, from the project folder. Only the server names it. */
-const replyFile = (seq: number) => `.yapparatus/chat/${seq}.mdx`;
-
 const kinds: TargetKind[] = [
   "page",
   "text",
@@ -179,6 +176,8 @@ export interface ChatOptions {
   root: string;
   server: ViteDevServer;
   content: string;
+  /** The document's chat state directory, from the project folder: `.yapparatus/<directory>`, with `/` between parts. */
+  state: string;
   /** The shared number series; the chat raises it to the newest number in its log. */
   sequence: Sequence;
   /** The source files the document shows. */
@@ -191,7 +190,7 @@ export interface ChatOptions {
 
 /**
  * The chat: an append-only log of reader messages and agent replies, stored in
- * `.yapparatus/chat.jsonl`, with each reply's MDX in `.yapparatus/chat/<seq>.mdx`.
+ * `<state>/chat.jsonl`, with each reply's MDX in `<state>/chat/<seq>.mdx`.
  * Numbers come from the agent channel's sequence; the reader never sees them.
  */
 export class ChatStore {
@@ -202,9 +201,14 @@ export class ChatStore {
   /** The number the last clear took; earlier messages are gone. */
   cleared = 0;
 
+  /** Where a reply file is stored, from the project folder. Only the server names it. */
+  private replyFile(name: string): string {
+    return `${this.options.state}/chat/${name}`;
+  }
+
   constructor(options: ChatOptions) {
     this.options = options;
-    this.dir = path.join(options.root, ".yapparatus");
+    this.dir = path.join(options.root, options.state);
     this.file = path.join(this.dir, "chat.jsonl");
     mkdirSync(path.join(this.dir, "chat"), { recursive: true });
     if (existsSync(this.file))
@@ -280,7 +284,7 @@ export class ChatStore {
     const seq = this.next();
     for (const message of this.entries)
       if (message.author === "agent")
-        rmSync(path.join(this.options.root, replyFile(message.seq)), { force: true });
+        rmSync(path.join(this.options.root, this.replyFile(`${message.seq}.mdx`)), { force: true });
     this.entries = [];
     this.cleared = seq;
     const record: Cleared = { seq, cleared: true, createdAt: new Date().toISOString() };
@@ -363,7 +367,7 @@ export class ChatStore {
     const name = `pending-${randomUUID()}.mdx`;
     const pending = path.join(this.dir, "chat", name);
     writeFileSync(pending, mdx);
-    const errors = await this.check(realpathSync(pending), `/.yapparatus/chat/${name}`);
+    const errors = await this.check(realpathSync(pending), `/${this.replyFile(name)}`);
     if (errors.length) {
       log.info(`reply to #${to} refused: ${errors.length} errors`);
       for (const error of errors) log.debug(`reply to #${to}: ${error.code} ${error.message}`);
@@ -371,13 +375,13 @@ export class ChatStore {
       return { errors };
     }
     const seq = this.next();
-    renameSync(pending, path.join(this.options.root, replyFile(seq)));
+    renameSync(pending, path.join(this.options.root, this.replyFile(`${seq}.mdx`)));
     const message: AgentMessage = {
       seq,
       author: "agent",
       to,
       ...(readAt ? { readAt } : {}),
-      module: `/${replyFile(seq)}`,
+      module: `/${this.replyFile(`${seq}.mdx`)}`,
       createdAt: new Date().toISOString(),
     };
     this.append(message);

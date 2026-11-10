@@ -22,7 +22,9 @@ const log = createLogger("server");
 export function installApi(server: ViteDevServer, content: string, files: SourceFiles) {
   const root = server.config.root;
   const events = new EventHub();
-  const sequence = new Sequence(path.join(root, ".yapparatus", "sequence"));
+  // Each document keeps its chat state under its own path; one server runs at a time.
+  const state = `.yapparatus/${content}`;
+  const sequence = new Sequence(path.join(root, state, "sequence"));
   // Each module reports that it changed; this file decides who hears about it.
   const chatState = (): ChatState => ({
     messages: [...chat.messages],
@@ -43,6 +45,7 @@ export function installApi(server: ViteDevServer, content: string, files: Source
   });
   const chat: ChatStore = new ChatStore({
     root,
+    state,
     content,
     server,
     files,

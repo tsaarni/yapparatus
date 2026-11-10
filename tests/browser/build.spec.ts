@@ -34,29 +34,29 @@ test.beforeAll(async () => {
   cpSync("tests/fixtures/content", path.join(root, "content"), { recursive: true });
   cpSync("tests/fixtures/source", path.join(root, "source"), { recursive: true });
   symlinkSync(path.resolve("node_modules"), path.join(root, "node_modules"), "dir");
-  mkdirSync(path.join(root, ".yapparatus/chat"), { recursive: true });
-  writeFileSync(path.join(root, ".yapparatus/chat/private.mdx"), `# ${privateSentinel}`);
+  mkdirSync(path.join(root, ".yapparatus/content/chat"), { recursive: true });
+  writeFileSync(path.join(root, ".yapparatus/content/chat/private.mdx"), `# ${privateSentinel}`);
   writeFileSync(
-    path.join(root, ".yapparatus/chat.jsonl"),
+    path.join(root, ".yapparatus/content/chat.jsonl"),
     `${JSON.stringify({ seq: 1, author: "reader", text: privateSentinel })}\n`,
   );
   await build({
     root,
     configFile: false,
     logLevel: "error",
-    plugins: yapparatus(),
+    plugins: yapparatus({ document: "content" }),
   });
   await build({
     root,
     configFile: false,
     logLevel: "error",
-    plugins: yapparatus({ singleFile: true }),
-    build: { outDir: "dist-single" },
+    plugins: yapparatus({ document: "content", singleFile: true }),
   });
   server = await preview({
     root,
     configFile: false,
     logLevel: "error",
+    plugins: yapparatus({ document: "content" }),
     preview: { host: "127.0.0.1", port: 4174, strictPort: true },
   });
 });
@@ -90,8 +90,8 @@ test("static reading retains navigation without the chat or its records", async 
     await expect(page.getByRole("img", { name: label, exact: true })).toBeVisible();
   }
   await expect(page.getByRole("img", { name: "Redis", exact: true })).toHaveCSS("width", "28px");
-  for (const entry of readdirSync(path.join(root, "dist/-/assets"))) {
-    const output = readFileSync(path.join(root, "dist/-/assets", entry), "utf8");
+  for (const entry of readdirSync(path.join(root, "dist/content/-/assets"))) {
+    const output = readFileSync(path.join(root, "dist/content/-/assets", entry), "utf8");
     expect(output).not.toContain(privateSentinel);
   }
   // Every page has its own file, so a deep link works on any static host.
@@ -152,8 +152,8 @@ test("a build carries the source files its pages name, and only those", async ({
   await expect(page.locator("main article [data-file]")).toContainText("color: teal;");
   await page.goto("http://127.0.0.1:4174/-/files/sample/unnamed.txt");
   await expect(page.getByRole("alert")).toContainText("does not include it");
-  const built = readdirSync(path.join(root, "dist/-/assets")).map((entry) =>
-    readFileSync(path.join(root, "dist/-/assets", entry), "utf8"),
+  const built = readdirSync(path.join(root, "dist/content/-/assets")).map((entry) =>
+    readFileSync(path.join(root, "dist/content/-/assets", entry), "utf8"),
   );
   expect(built.some((output) => output.includes("no page names it"))).toBe(false);
 });
@@ -161,9 +161,9 @@ test("a build carries the source files its pages name, and only those", async ({
 test("a file's chart loads its data from its own asset when it nears the screen", async ({
   page,
 }) => {
-  const assets = readdirSync(path.join(root, "dist/-/assets"));
+  const assets = readdirSync(path.join(root, "dist/content/-/assets"));
   const data = assets.filter((entry) => {
-    const output = readFileSync(path.join(root, "dist/-/assets", entry), "utf8");
+    const output = readFileSync(path.join(root, "dist/content/-/assets", entry), "utf8");
     return /\\?"name\\?":\\?"minute\\?"/.test(output) && output.includes("JSON.parse");
   });
   expect(data).toHaveLength(1);
@@ -185,7 +185,7 @@ test("single HTML works from disk without external assets", async ({ page }) => 
   page.on("request", (request) => {
     if (/^https?:/.test(request.url())) remoteRequests.push(request.url());
   });
-  await page.goto(pathToFileURL(path.join(root, "dist-single/index.html")).href);
+  await page.goto(pathToFileURL(path.join(root, "dist-single/content/index.html")).href);
   await page.evaluate(() => document.fonts.load('17px "Inter Variable"'));
   expect(await page.evaluate(() => document.fonts.check('17px "Inter Variable"'))).toBe(true);
   await expect(page.getByRole("heading", { name: "First page" })).toBeVisible();
@@ -201,16 +201,18 @@ test("single HTML works from disk without external assets", async ({ page }) => 
   await expect(page.getByRole("img", { name: "Redis", exact: true })).toHaveCSS("width", "28px");
   // Source files open from the single file too.
   await page.goto(
-    `${pathToFileURL(path.join(root, "dist-single/index.html")).href}#/-/files/sample/greet.ts#L2`,
+    `${pathToFileURL(path.join(root, "dist-single/content/index.html")).href}#/-/files/sample/greet.ts#L2`,
   );
   await expect(page.locator("[data-selected]")).toHaveCount(1);
   // A file's chart loads its data from inside the single file.
-  await page.goto(`${pathToFileURL(path.join(root, "dist-single/index.html")).href}#/charts`);
+  await page.goto(
+    `${pathToFileURL(path.join(root, "dist-single/content/index.html")).href}#/charts`,
+  );
   const chart = page.locator("figure", { hasText: "Figure 7.3" });
   await chart.scrollIntoViewIfNeeded();
   await expect(chart.locator("svg [aria-label=line]")).toHaveCount(1);
   expect(remoteRequests).toEqual([]);
-  expect(readFileSync(path.join(root, "dist-single/index.html"), "utf8")).not.toContain(
+  expect(readFileSync(path.join(root, "dist-single/content/index.html"), "utf8")).not.toContain(
     privateSentinel,
   );
 });

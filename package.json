@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "bin": {
+    "yap": "./lib/cli.js"
+  },
   "exports": {
     ".": "./src/index.ts",
     "./agent": {
@@ -17,10 +20,10 @@
     "./theme.stylex": "./src/reader/theme.stylex.ts"
   },
   "scripts": {
-    "dev": "pnpm build:lib && vite --host 127.0.0.1",
-    "build": "vite build",
-    "build:single": "vite build --mode single --outDir dist-single",
-    "preview": "vite preview --host 127.0.0.1",
+    "dev": "pnpm build:lib && node lib/cli.js dev",
+    "build": "pnpm build:lib && node lib/cli.js build",
+    "build:single": "pnpm build:lib && node lib/cli.js build --single",
+    "preview": "pnpm build:lib && node lib/cli.js preview",
     "verify": "biome check . && tsc --noEmit && node scripts/check-styles.ts",
     "format": "biome check --write .",
     "test": "pnpm build:lib && playwright test",

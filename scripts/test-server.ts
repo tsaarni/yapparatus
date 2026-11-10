@@ -22,7 +22,7 @@ const server = await createServer({
   configFile: false,
   // Own dependency cache: sharing node_modules/.vite with a running dev server can stall both.
   cacheDir: path.join(root, ".vite"),
-  plugins: yapparatus(),
+  plugins: yapparatus({ document: "content" }),
   server: {
     host: "127.0.0.1",
     port: 4173,

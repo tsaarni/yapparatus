@@ -4,16 +4,16 @@ A Yapparatus document is a directory of MDX pages that a reader reads in the bro
 
 ## Start a document
 
-A document lives in its own project, made from the starter, which carries this guide in `docs/`. The user asks you for a document; Yapparatus is not running yet.
+A document lives in a project made from the starter, which carries this guide in `docs/`. A project can hold several documents, each in its own document directory with a `document.json`. One document directory cannot be inside another. The user asks you for a document; Yapparatus is not running yet.
 
-1. If the current directory has no `content/document.json`, create the project next to the repository the document is about, and continue with its copy of this guide:
+1. If the current directory has no `docs/guide.md`, create the project next to the repository the document is about, and continue with its copy of this guide:
 
 ```sh
 npx giget gh:tsaarni/yapparatus/starter my-document && cd my-document && pnpm install
 ```
 
-2. Write `content/document.json` and the pages in `content/`. Name the documented repository under `"files"`.
-3. End your turn: tell the user to run `pnpm dev` in the project directory, open the address it prints, and paste the prompt the document's chat shows back to you.
+2. Write `document.json` and the pages in the document directory: `content/` for the first document, or a new directory such as `tutorial/` when `content/` already holds one. Name the documented repository under `"files"`.
+3. End your turn: tell the user to run `pnpm dev <directory>`, such as `pnpm dev content`, in the project directory, open the address it prints, and paste the prompt the document's chat shows back to you.
 4. The prompt connects you to the chat. It lists diagnostics, including diagrams and charts, which are checked only once the browser shows them. Fix them, then answer the reader's questions there.
 
 A minimal document for a repository `myapp` next to the project `my-document`:

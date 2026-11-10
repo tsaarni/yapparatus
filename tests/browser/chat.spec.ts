@@ -205,7 +205,9 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   ]);
   expect(replied?.author === "agent" && replied.readAt).toBeTruthy();
   // The log is one JSON line per message, with no copy of the page.
-  const log = readFileSync(path.join(root, ".yapparatus/chat.jsonl"), "utf8").trim().split("\n");
+  const log = readFileSync(path.join(root, ".yapparatus/content/chat.jsonl"), "utf8")
+    .trim()
+    .split("\n");
   expect(log.map((line) => (JSON.parse(line) as { seq: number }).seq)).toEqual([1, 2, 3]);
   expect(log[0]).not.toContain("pageSource");
   expect(errors).toEqual([]);
@@ -351,8 +353,10 @@ test("clearing the chat deletes it, keeps numbering, and tells a waiting agent",
   expect(clearedAt).toBeGreaterThan(last);
   // Everything is gone from disk, and the next message continues the numbering.
   for (const seq of replyFiles)
-    expect(existsSync(path.join(root, `.yapparatus/chat/${seq}.mdx`))).toBe(false);
-  const log = readFileSync(path.join(root, ".yapparatus/chat.jsonl"), "utf8").trim().split("\n");
+    expect(existsSync(path.join(root, `.yapparatus/content/chat/${seq}.mdx`))).toBe(false);
+  const log = readFileSync(path.join(root, ".yapparatus/content/chat.jsonl"), "utf8")
+    .trim()
+    .split("\n");
   expect(log).toHaveLength(1);
   await page.getByLabel("Message", { exact: true }).fill("A fresh start.");
   await page.getByLabel("Message", { exact: true }).press("Enter");

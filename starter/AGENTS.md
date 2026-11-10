@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This directory is a Yapparatus document. Its pages are in `content/`. Run `pnpm install` first if `node_modules/` is missing.
+This directory is a Yapparatus project. Each document is a directory with a `document.json` and its pages; the first one is `content/`. Run `pnpm install` first if `node_modules/` is missing. The user starts a document with `pnpm dev <directory>`, such as `pnpm dev content`.
 
 Write and edit the pages following [docs/guide.md](docs/guide.md). Read the reference for what you use before writing it:
 
