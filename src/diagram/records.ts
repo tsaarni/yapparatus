@@ -19,10 +19,11 @@ export interface GridLayout {
   top: number;
   left: number;
   unit: number;
+  columns: number;
   rows: number;
   /** Where each tab-separated column of text starts, from the start of the cell's text. */
   stops: number[];
-  /** Each cell's rectangle, in the order of `node.members`. */
+  /** Each cell's rectangle at the natural width, in the order of `node.members`. */
   cells: Rect[];
   font: FontSpec;
   /** Ruler labels over each column and beside each row; empty when that side has none. */
@@ -138,6 +139,7 @@ export function createRecords(
       top,
       left: gutter,
       unit,
+      columns,
       rows,
       stops,
       cells: placed.map((p) => ({
@@ -151,6 +153,19 @@ export function createRecords(
     };
     grids.set(node, g);
     return g;
+  }
+
+  /**
+   * The columns and cells at the record's final width. A record can be wider than its grid
+   * needs, as with `equalWidth`; its columns then share the extra width.
+   */
+  function fitted(g: GridLayout, width: number): { unit: number; cells: Rect[] } {
+    const unit = Math.max(g.unit, (width - g.left) / g.columns);
+    const k = g.unit > 0 ? unit / g.unit : 1;
+    return {
+      unit,
+      cells: g.cells.map((c) => ({ ...c, x: g.left + (c.x - g.left) * k, width: c.width * k })),
+    };
   }
 
   /** One row of tab-separated text, its columns at the record's tab stops. */
@@ -177,7 +192,12 @@ export function createRecords(
 
   function cell(node: Node, record: Node, outer: Rect) {
     const g = grid(record);
-    const r = g.cells[record.members.indexOf(node)] ?? { x: 0, y: 0, width: 0, height: 0 };
+    const r = fitted(g, outer.width).cells[record.members.indexOf(node)] ?? {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+    };
     const rect = { ...r, x: outer.x + r.x, y: outer.y + r.y };
     const cy = rect.y + rect.height / 2;
     // On a grid of several columns, as in a packet header, a field's name is centered. In a
@@ -265,6 +285,7 @@ export function createRecords(
   /** A record's header, ruler labels, and the lines under its title and between its cells. */
   function recordLines(node: Node, rect: Rect) {
     const g = grid(node);
+    const fit = fitted(g, rect.width);
     const lines: TextLine[] = [];
     let divider: number | undefined;
     const top = rect.y + g.top;
@@ -283,10 +304,10 @@ export function createRecords(
     }
     // Hairlines between cells: each cell draws the right and bottom sides it shares
     // with another. The outline draws the outer sides, over the cells' fills.
-    for (const p of g.cells) {
+    for (const p of fit.cells) {
       const x = rect.x + p.x;
       const y = rect.y + p.y;
-      if (p.x + p.width < g.width - 0.5)
+      if (p.x + p.width < rect.width - 0.5)
         rules.push([
           { x: x + p.width, y },
           { x: x + p.width, y: y + p.height },
@@ -300,7 +321,7 @@ export function createRecords(
     const label = (text: string, x: number, y: number) =>
       text ? [{ ...textAt(text, x, y, fonts.ruler, true), align: "middle" as const }] : [];
     g.ruler.top.forEach((t, k) => {
-      lines.push(...label(t, left + (k + 0.5) * g.unit, top - shapes.record.ruler / 2));
+      lines.push(...label(t, left + (k + 0.5) * fit.unit, top - shapes.record.ruler / 2));
     });
     g.ruler.left.forEach((t, r) => {
       lines.push(...label(t, rect.x + g.left / 2, top + (r + 0.5) * shapes.record.row));

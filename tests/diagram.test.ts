@@ -216,6 +216,21 @@ test("record cells are rectangles: the rest of a row, or whole rows", () => {
   assert.deepEqual(spans, ["ip.b"], "B needs 16 columns, but 8 remain");
 });
 
+test("a record widened by equalWidth widens its cells to its right side", () => {
+  const d = new DiagramBuilder();
+  const wide = d.record(["a\t4294967296"], { title: "HTTPProxy weights", id: "wide" });
+  const narrow = d.record(["a\t0", "b\t1"], { title: "Envoy", id: "narrow" });
+  d.equalWidth([wide, narrow]);
+  d.row([wide, narrow], { gap: 40 });
+  const out = compile(d, measure);
+  const r = out.nodes.find((n) => n.id === "narrow")?.rect;
+  const a = out.nodes.find((n) => n.id === "narrow.a")?.rect;
+  const w = out.nodes.find((n) => n.id === "wide")?.rect;
+  assert.ok(r && a && w);
+  assert.equal(r.width, w.width);
+  assert.equal(a.x + a.width, r.x + r.width, "the cell reaches the record's right side");
+});
+
 test("member ids follow their record's id, even when it is derived and repeated", () => {
   const d = new DiagramBuilder();
   const a = d.record(["key", "next"], { title: "entry" });
