@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { compile, type Measure } from "../src/diagram/compile.ts";
+import { compile } from "../src/diagram/compile.ts";
+import type { Measure } from "../src/diagram/metrics.ts";
 import { DiagramBuilder } from "../src/diagram/scene.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */
@@ -533,4 +534,35 @@ test("a ruler labels each side from a function, and crowded labels are reported"
   assert.deepEqual(labels, ["0", "8", "16", "24", "0x0"]);
   const crowdedIds = out.diagnostics.filter((x) => x.code === "RULER_CROWDED").map((x) => x.ids[0]);
   assert.deepEqual(crowdedIds, ["crowded"]);
+});
+
+test("a cell is as wide as the columns it spans", () => {
+  const d = new DiagramBuilder();
+  d.record(
+    [
+      ["Flags", 8],
+      ["Window", 24],
+    ],
+    { columns: 32, id: "tcp" },
+  );
+  const out = compile(d, measure);
+  const width = (id: string) => out.nodes.find((n) => n.id === id)?.rect.width ?? 0;
+  assert.ok(width("tcp.flags") > 0);
+  assert.equal(width("tcp.window"), 3 * width("tcp.flags"), "Window is three times Flags");
+  assert.deepEqual(out.diagnostics, []);
+});
+
+test("an edge leaves a wide cell through the side its line crosses first", () => {
+  const d = new DiagramBuilder();
+  const rec = d.record([["Options", 32]], { columns: 32, width: 420, id: "tcp" });
+  const note = d.note("Up to 40 bytes", { id: "note" });
+  // Far to the right, but below: the line from the cell's center leaves through its bottom.
+  d.place(note, { below: rec, gap: 40, align: "end" });
+  d.arrow(note, rec.part("options"));
+  const out = compile(d, measure);
+  const cell = out.nodes.find((n) => n.id === "tcp.options")?.rect;
+  // The head's first point is its tip, where the edge meets the cell.
+  const tip = out.edges[0]?.heads[0]?.[0];
+  assert.ok(cell && tip);
+  assert.deepEqual(tip, { x: cell.x + cell.width / 2, y: cell.y + cell.height });
 });

@@ -131,14 +131,38 @@ export function segmentHitsRect(a: Vec, b: Vec, rect: Rect): boolean {
 }
 
 /** Where a ray from the rectangle's center toward `toward` leaves the rectangle. */
+/**
+ * The side of `rect` that a line from its center toward `toward` crosses first, of `allowed`.
+ * A wide rectangle therefore takes its bottom for a point below it, even one far to the side.
+ */
+export function sideToward(
+  rect: Rect,
+  toward: Vec,
+  allowed: readonly Side[] = ["top", "bottom", "left", "right"],
+): Side {
+  const c = anchorOf(rect, "center");
+  const dx = toward.x - c.x;
+  const dy = toward.y - c.y;
+  // The line reaches a side after half the rectangle's size divided by its progress toward
+  // that side, so the side with the most progress per unit of half-size comes first. Scaled by
+  // both half-sizes, the comparison needs no division and holds for flat rectangles too.
+  const w = rect.width / 2;
+  const h = rect.height / 2;
+  const progress = { left: -dx * h, right: dx * h, top: -dy * w, bottom: dy * w };
+  return allowed.reduce((a, b) => (progress[b] > progress[a] ? b : a));
+}
+
+/** Where a line from the center of `rect` toward `toward` crosses its outline. */
 export function boundaryToward(rect: Rect, toward: Vec): Vec {
   const c = anchorOf(rect, "center");
   const dx = toward.x - c.x;
   const dy = toward.y - c.y;
   if (dx === 0 && dy === 0) return c;
-  const sx = dx === 0 ? Number.POSITIVE_INFINITY : rect.width / 2 / Math.abs(dx);
-  const sy = dy === 0 ? Number.POSITIVE_INFINITY : rect.height / 2 / Math.abs(dy);
-  const s = Math.min(sx, sy);
+  const side = sideToward(rect, toward);
+  const s =
+    side === "left" || side === "right"
+      ? rect.width / 2 / Math.abs(dx)
+      : rect.height / 2 / Math.abs(dy);
   return { x: c.x + dx * s, y: c.y + dy * s };
 }
 

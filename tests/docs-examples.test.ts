@@ -6,7 +6,8 @@
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
-import { compile, type Measure } from "../src/diagram/compile.ts";
+import { compile } from "../src/diagram/compile.ts";
+import type { Measure } from "../src/diagram/metrics.ts";
 import { DiagramBuilder } from "../src/diagram/scene.ts";
 import { diagnosticCodes } from "../src/protocol.ts";
 

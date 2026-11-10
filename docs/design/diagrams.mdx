@@ -1,6 +1,6 @@
 # Diagrams
 
-This page describes the design of the diagram API, how the diagram compiler turns a program into a figure, and how a figure can explain itself in steps. The diagram reference, [`starter/docs/diagrams.md`](/-/files/yapparatus/starter/docs/diagrams.md), explains how to use the API. The code is in `src/diagram/`.
+This page describes the design of the diagram API, how the diagram compiler turns a program into a figure, and how a figure can explain itself in steps. The diagram reference, [`starter/docs/diagrams.md`](/-/files/yapparatus/starter/docs/diagrams.md), explains how to use the API. The code is in `src/diagram/`: `scene.ts` is the authoring API, `compile.ts` runs the compiler, and `DiagramView.tsx` draws the result. Each compiler step has a file: `text.ts` measures text, `layout.ts` sizes and places shapes, `records.ts` lays out record cells, `nodes.ts` and `edges.ts` produce the drawing, and `validate.ts` checks it. `compile.ts` passes each step what the steps before it made. Layout and records need each other, so `layout.ts` creates the records step and passes it its own `bounds`.
 
 ## Goal
 
@@ -158,8 +158,7 @@ Some figures are about the pieces of one shape: a field of a protocol header, a 
   ], { title: "TCP header", columns: 32, ruler: { top: (i) => (i % 8 ? "" : i), left: (row) => row * 4 }, id: "tcp" })
   const why = d.note("1  CWR and ECE signal congestion", { id: "why" })
   const options = d.note("Up to 40 bytes", { id: "options" })
-  d.place(options, { below: tcp, gap: 40 })
-  d.place(why, { leftOf: options, gap: 40 })
+  d.place(d.row([why, options], { gap: 40 }), { below: tcp, gap: 40 })
   d.arrow(options, tcp.part("options-variable-length"))
 }}>
   <Step focus="tcp">The fixed header is five 32-bit rows, followed by options.</Step>

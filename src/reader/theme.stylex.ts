@@ -318,6 +318,23 @@ export const layer = stylex.defineConsts({
   toast: 60,
 });
 
+/**
+ * Diagram stroke weights: dividers and quiet parts, ordinary parts, the accent, and the extra
+ * weight of a part a step focuses or the reader points at.
+ */
+export const stroke = stylex.defineConsts({
+  hairline: "1px",
+  line: "1.5px",
+  strong: "2px",
+  boost: "0.75px",
+});
+
+/** Diagram dash patterns: dashed for boundaries and replies, dotted for lifelines and markers. */
+export const dash = stylex.defineConsts({
+  dashed: "5 4",
+  dotted: "2 3",
+});
+
 /** Durations. Reduced motion is honored globally in styles.css. */
 export const duration = stylex.defineConsts({
   fast: "120ms",

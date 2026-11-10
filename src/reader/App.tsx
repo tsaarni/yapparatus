@@ -17,7 +17,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { flashPart } from "../diagram/Diagram.tsx";
+import { flashPart } from "../diagram/part.tsx";
 import { partSeparator, splitAddress, textFragment } from "../document.ts";
 import { type FileAddress, fileAddress, parseFileAddress } from "../files.ts";
 import type { ContextItem, ReportedDiagnostic } from "../protocol.ts";

@@ -40,8 +40,7 @@ const tcp = d.record([
 ], { title: "TCP header", columns: 32, ruler: { top: (i) => (i % 8 ? "" : i), left: (row) => row * 4 }, id: "tcp" })
 const flags = d.note("1  CWR and ECE signal congestion")
 const options = d.note("Up to 40 bytes")
-d.place(options, { below: tcp, gap: 40 })
-d.place(flags, { leftOf: options, gap: 40 })
+d.place(d.row([flags, options], { gap: 40 }), { below: tcp, gap: 40 })
 d.arrow(options, tcp.part("options-variable-length"))
 ```
 
@@ -131,7 +130,7 @@ A record's cells and a text's marks are members. A member is a part like any oth
 
 - `shape.part(id)` returns a member by its own id. A wrong id is reported with the valid ones, and the shape stands in.
 - A member's id is its parent's, a dot, and its own: `users.team-id`, `req.path`. Its own id comes from its label (a cell's first tab column), from a mark's name, or from `id`.
-- An edge leaves a cell from the middle of a side on the record's outline, the side facing the other end best.
+- An edge leaves a cell from the middle of a side on the record's outline: the side that a line from the cell's center toward the other end crosses first. A wide field takes its bottom for a note below it, even one off to the side.
 - `<Step focus="users">` focuses the record and its cells; `<Step focus="users.team-id">` focuses one cell and fades the rest.
 
 ### Diagnostics

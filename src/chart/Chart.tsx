@@ -1,6 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Diagnostics, useFontsReady } from "../diagram/Diagram.tsx";
+import { Diagnostics } from "../diagram/Diagnostics.tsx";
+import { useFontsReady } from "../diagram/fonts.ts";
 import { diagnosticCodes } from "../protocol.ts";
 import { FigureFrame } from "../reader/components.tsx";
 import { useDiagramReport } from "../reader/diagnostics.tsx";

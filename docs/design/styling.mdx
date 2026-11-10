@@ -21,7 +21,13 @@ This page describes the visual design rules of the reader and the conventions fo
     - appearance.ts applies the theme by toggling `lightTheme` on the root
     - styles.css only a reset and the reduced-motion rule
   - diagram/
-    - Diagram.tsx
+    - Diagram.tsx the figure's frame, step controls, and step text
+    - DiagramView.tsx the SVG of a figure, its parts in drawing order
+    - part.tsx what every part shares: step states, role and category colors, text lines
+    - NodeView.tsx shapes, record cells, marks, badges, and pins
+    - EdgeView.tsx edges, enclosures, and frames
+    - Legend.tsx the category legend under a figure
+    - Diagnostics.tsx the list of a figure's diagnostics, also used by charts
 
 </FileTree>
 
