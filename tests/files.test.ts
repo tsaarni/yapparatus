@@ -242,6 +242,14 @@ test("an excerpt shows its file's lines with their numbers, exactly as written",
       /names lines by number/,
     );
     assert.match(await message('<Excerpt from="main.ts" />'), /not a file address/);
+    const wrapped = await compileExcerpt(
+      '<Excerpt from="/-/files/app/src/main.ts" start="export function greet(" wrap />',
+    );
+    assert.deepEqual(wrapped.issues, []);
+    assert.match(
+      await message('<Excerpt from="/-/files/app/src/main.ts" start="greet(" wrap="yes" />'),
+      /a bare wrap/,
+    );
   }));
 
 test("an excerpt's block follows indentation, and a closing line that opens again continues it", () => {

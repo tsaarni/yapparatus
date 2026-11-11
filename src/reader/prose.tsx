@@ -66,6 +66,8 @@ export interface SourceFileCode {
   whole: boolean;
   /** The widest line number's digits, so numbers line up. */
   digits: number;
+  /** Long lines wrap under their own number instead of scrolling. */
+  wrap: boolean;
 }
 export const SourceFileContext = createContext<SourceFileCode | undefined>(undefined);
 
@@ -262,7 +264,7 @@ function Pre({
             {copied === "copied" ? "Copied" : copied === "failed" ? "Not copied" : "Copy"}
           </Button>
         </div>
-        <pre ref={ref} {...props} {...stylex.props(s.pre)} />
+        <pre ref={ref} {...props} {...stylex.props(s.pre, sourceFile?.wrap && s.wrapPre)} />
       </div>
     </CodeContext.Provider>
   );
@@ -294,10 +296,22 @@ function Span(
     "data-selected"?: string;
   },
 ) {
+  const wrap = useContext(SourceFileContext)?.wrap ?? false;
   if (!props.className?.split(" ").includes("line")) return <span {...props} />;
   const mark = props["data-selected"] ? "highlight" : props["data-mark"];
   const numbered = props["data-line"] !== undefined;
-  return <span {...props} {...styled("line", s.line, mark && s[mark], numbered && s.numbered)} />;
+  return (
+    <span
+      {...props}
+      {...styled(
+        "line",
+        s.line,
+        mark && s[mark],
+        numbered && s.numbered,
+        numbered && wrap && s.hanging,
+      )}
+    />
+  );
 }
 
 const alertTitles: Record<AlertKind, string> = {
@@ -423,6 +437,8 @@ export const prose = {
 
 /** Code blocks: 16 px padding on each side and a 1 px border on each side. */
 const codeInset = `calc(2 * ${space.lg} + 2px)`;
+/** A source line's number and the space after it, sized for the widest number in the block. */
+const lineNumberWidth = "calc(var(--line-digits, 3) * 1ch + 1.5ch)";
 
 const s = stylex.create({
   block: {
@@ -599,13 +615,20 @@ const s = stylex.create({
       content: "attr(data-line)",
       display: "inline-block",
       boxSizing: "border-box",
-      width: "calc(var(--line-digits, 3) * 1ch + 1.5ch)",
+      width: lineNumberWidth,
       paddingRight: "1.5ch",
       textAlign: "right",
       color: theme.textMuted,
       opacity: 0.7,
       userSelect: "none",
       cursor: "pointer",
+    },
+  },
+  /** A wrapped line continues after its number, so the number stands alone in the gutter. */
+  hanging: {
+    paddingInlineStart: `calc(${space.lg} - 3px + ${lineNumberWidth})`,
+    "::before": {
+      marginInlineStart: `calc(-1 * ${lineNumberWidth})`,
     },
   },
   codeBar: {
@@ -641,6 +664,11 @@ const s = stylex.create({
     "--shiki-token-punctuation": theme.textMuted,
     "--shiki-token-parameter": theme.textBody,
     "--shiki-token-link": theme.accent,
+  },
+  /** An excerpt with `wrap`: long lines break at the block's edge instead of scrolling. */
+  wrapPre: {
+    whiteSpace: "pre-wrap",
+    overflowWrap: "anywhere",
   },
   replyPre: {
     marginBlock: space.md,

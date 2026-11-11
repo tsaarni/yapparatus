@@ -402,7 +402,7 @@ export interface EncloseOptions {
   category?: string;
 }
 
-export const Excerpt: { ({ from, children }: ExcerptProps): Element; breakout: boolean; };
+export const Excerpt: { ({ from, wrap, children }: ExcerptProps): Element; breakout: boolean; };
 
 export interface ExcerptProps {
   /** The file, as an address without lines: "/-/files/app/main.go". */
@@ -413,6 +413,8 @@ export interface ExcerptProps {
   end?: string;
   /** Text of lines to highlight, or a list: every line of the excerpt that contains one. */
   mark?: string | string[];
+  /** Wrap long lines, for a file whose words matter more than its layout, such as Markdown. */
+  wrap?: boolean;
   /** The code, read from the file when the page is compiled. */
   children?: ReactNode;
 }

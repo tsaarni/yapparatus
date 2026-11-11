@@ -134,7 +134,7 @@ export function FileView({
       {view && !("error" in view) && (
         <div {...stylex.props(s.code)}>
           <SourceFileContext.Provider
-            value={{ file, whole: true, digits: String(view.lines).length }}
+            value={{ file, whole: true, digits: String(view.lines).length, wrap: false }}
           >
             {code}
           </SourceFileContext.Provider>

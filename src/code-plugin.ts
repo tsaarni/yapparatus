@@ -266,11 +266,18 @@ export function excerpts(files: SourceFiles) {
       const start = literal(node, "start");
       const end = literal(node, "end");
       const mark = texts(node, "mark");
-      if (start === null || end === null || mark === null || (end !== undefined && !start)) {
+      const wrap = node.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === "wrap");
+      if (
+        start === null ||
+        end === null ||
+        mark === null ||
+        (end !== undefined && !start) ||
+        (wrap && wrap.value !== null)
+      ) {
         issue(
           "EXCERPT_INVALID",
           from as string,
-          '<Excerpt> takes start="text", end="text", and mark="text" or mark={["text", "text"]}, written as strings; end needs start.',
+          '<Excerpt> takes start="text", end="text", and mark="text" or mark={["text", "text"]}, written as strings, and a bare wrap; end needs start.',
         );
         return;
       }

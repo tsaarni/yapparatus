@@ -17,12 +17,15 @@ function lineNumberAt(event: MouseEvent): HTMLElement | undefined {
   const line = (event.target as Element | null)?.closest?.<HTMLElement>("[data-line]");
   if (!line) return;
   const style = getComputedStyle(line);
-  const number = Number.parseFloat(getComputedStyle(line, "::before").width) || 0;
-  const start =
+  const number = getComputedStyle(line, "::before");
+  // A wrapped line's number hangs into its padding with a negative margin.
+  const end =
     line.getBoundingClientRect().left +
     Number.parseFloat(style.borderLeftWidth) +
-    Number.parseFloat(style.paddingLeft);
-  return event.clientX <= start + number ? line : undefined;
+    Number.parseFloat(style.paddingLeft) +
+    (Number.parseFloat(number.marginLeft) || 0) +
+    (Number.parseFloat(number.width) || 0);
+  return event.clientX <= end ? line : undefined;
 }
 
 /** Keep the browser from starting a text selection when a line number is pressed. */

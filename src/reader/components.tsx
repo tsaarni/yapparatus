@@ -281,6 +281,8 @@ export interface ExcerptProps {
   end?: string;
   /** Text of lines to highlight, or a list: every line of the excerpt that contains one. */
   mark?: string | string[];
+  /** Wrap long lines, for a file whose words matter more than its layout, such as Markdown. */
+  wrap?: boolean;
   /** The code, read from the file when the page is compiled. */
   children?: ReactNode;
 }
@@ -289,13 +291,13 @@ export interface ExcerptProps {
  * Lines of a source file, read when the page is compiled. They show as a code block with the
  * file's line numbers, and its bar links to the file. Inside a `Listing`, the listing titles it.
  */
-export function Excerpt({ from, children }: ExcerptProps) {
+export function Excerpt({ from, wrap = false, children }: ExcerptProps) {
   const file = parseFileAddress(from);
   if (!file || !children)
     return <p {...stylex.props(s.unavailable)}>The lines from {from} cannot be shown.</p>;
   const digits = String(file.lines?.end ?? 999).length;
   return (
-    <SourceFileContext.Provider value={{ file, whole: false, digits }}>
+    <SourceFileContext.Provider value={{ file, whole: false, digits, wrap }}>
       {children}
     </SourceFileContext.Provider>
   );

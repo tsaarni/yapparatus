@@ -35,6 +35,34 @@ test("an excerpt links to its file, which opens at the lines and lists where pag
   await expect(page.locator("[data-selected]")).toHaveCount(2);
 });
 
+test("an excerpt with wrap breaks long lines under their own number", async ({ page }) => {
+  await page.goto("/source-code");
+  const line = page.locator("[data-file='/-/files/sample/notes.md'] [data-line='5']");
+  await expect(line).toContainText("why it was not used");
+  await line.scrollIntoViewIfNeeded();
+  // The block does not scroll: the line takes several rows instead.
+  const pre = page.locator("[data-file='/-/files/sample/notes.md'] pre");
+  expect(await pre.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
+  const row = await page
+    .locator("[data-file='/-/files/sample/greet.ts'] [data-line='1']")
+    .boundingBox();
+  const box = await line.boundingBox();
+  expect(box?.height ?? 0).toBeGreaterThan(1.5 * (row?.height ?? Infinity));
+  // The number hangs in the gutter: the text starts after it, on every row.
+  const { number, text } = await line.evaluate((el) => {
+    const before = getComputedStyle(el, "::before");
+    const left =
+      el.getBoundingClientRect().left + Number.parseFloat(getComputedStyle(el).paddingLeft);
+    return { number: left - Number.parseFloat(before.width) / 2, text: left + 4 };
+  });
+  const y = (box?.y ?? 0) + 10;
+  // A press on the text starts a selection; it does not open the file.
+  await page.mouse.click(text, y);
+  await expect(page).toHaveURL(/\/source-code$/);
+  await page.mouse.click(number, y);
+  await expect(page).toHaveURL(/\/-\/files\/sample\/notes\.md#L5$/);
+});
+
 test("asking about lines of a file gives the agent the file and its lines", async ({
   page,
   request,
