@@ -362,6 +362,18 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
     // Not for pages: their updates go to the page list, which swaps them in place. Fast Refresh
     // would refuse them for exporting `outline` and reload the app.
     react({ include: /\.(js|jsx|ts|tsx)$/ }),
-    ...(options.singleFile ? [viteSingleFile()] : []),
+    ...(options.singleFile
+      ? [
+          viteSingleFile(),
+          {
+            // vite-plugin-singlefile turns off CSS code splitting. Vite then emits the CSS file after
+            // StyleX looks for one to append its rules to, and StyleX writes them to a separate file.
+            // Code splitting is off, so the one chunk still has one CSS file to inline.
+            name: "yapparatus:single-file-css",
+            enforce: "post",
+            config: () => ({ build: { cssCodeSplit: true } }),
+          } satisfies PluginOption,
+        ]
+      : []),
   ];
 }

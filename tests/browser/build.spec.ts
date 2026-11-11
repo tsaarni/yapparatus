@@ -212,6 +212,9 @@ test("single HTML works from disk without external assets", async ({ page }) => 
   await chart.scrollIntoViewIfNeeded();
   await expect(chart.locator("svg [aria-label=line]")).toHaveCount(1);
   expect(remoteRequests).toEqual([]);
+  expect(readdirSync(path.join(root, "dist-single/content"), { recursive: true })).toEqual([
+    "index.html",
+  ]);
   expect(readFileSync(path.join(root, "dist-single/content/index.html"), "utf8")).not.toContain(
     privateSentinel,
   );
