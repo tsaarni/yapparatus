@@ -12,9 +12,12 @@
     "diagrams.mdx",
     "charts.mdx",
     "addresses-and-context.mdx",
+    "reader-app.mdx",
     "diagnostics.mdx",
     "chat.mdx",
-    "styling.mdx"
+    "api.mdx",
+    "styling.mdx",
+    "directions.mdx"
   ],
   "files": {
     "yapparatus": "../.."

@@ -1,7 +1,9 @@
 /**
  * Diagnostics the browser finds, and the header's list of all of them. The browser reports
  * what only exists when a page runs: diagram layout, render and runtime errors, and replies
- * that fail to show. The server checks the source itself and tells the agent about both.
+ * that fail to show. Each report is about the revision of the page it rendered, so it never
+ * has to take anything back: a changed page has a new revision. The server checks the source
+ * itself and tells the agent about both.
  */
 
 import { pages } from "virtual:yapparatus/document";
@@ -9,9 +11,9 @@ import * as stylex from "@stylexjs/stylex";
 import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState } from "react";
 import { createLogger } from "../logger.ts";
 import type { Diagnostic, ReportedDiagnostic } from "../protocol.ts";
-import { dropDiagnosticsOnClose, reportDiagnostics } from "./api.ts";
+import { reportDiagnostics } from "./api.ts";
 import { AppIcon as Icon } from "./icons.tsx";
-import { href, navigate } from "./router.ts";
+import { currentPage, href, navigate } from "./router.ts";
 import {
   duration,
   fontSize,
@@ -29,20 +31,30 @@ import { Button, ui } from "./ui.tsx";
 const log = createLogger("diagnostics");
 const live = import.meta.env.DEV;
 
+/** The most runtime errors a tab reports for one revision of a page. */
+const runtimeLimit = 20;
+
 /**
- * Report this tab's uncaught errors, under its own scope, and clear them when a hot update starts.
+ * Report this tab's uncaught errors against the revision of the page on screen, so they stop
+ * counting when the page changes. On a source file's view they are only logged.
  * Call once at startup in live mode.
  */
 export function installGlobalReporters() {
   if (!live) return;
-  const scope = `runtime:${crypto.randomUUID()}`;
-  dropDiagnosticsOnClose(scope);
-  const runtime: Diagnostic[] = [];
+  const reported = new Map<string, Set<string>>();
   const add = (message: string) => {
-    if (!message || runtime.some((d) => d.message === message)) return;
-    runtime.push({ origin: "runtime", code: "RUNTIME_FAILED", message });
-    if (runtime.length > 20) runtime.shift();
-    reportDiagnostics(scope, [...runtime]);
+    const page = currentPage();
+    if (!message || !page?.outline) return;
+    const { revision } = page.outline;
+    const messages = reported.get(revision) ?? new Set<string>();
+    reported.set(revision, messages);
+    if (messages.has(message) || messages.size >= runtimeLimit) return;
+    messages.add(message);
+    reportDiagnostics({
+      source: page.source,
+      revision,
+      diagnostics: [{ origin: "runtime", code: "RUNTIME_FAILED", message }],
+    });
   };
   window.addEventListener("error", (event) =>
     add(`${event.message}${event.filename ? ` (${event.filename}:${event.lineno})` : ""}`),
@@ -50,16 +62,12 @@ export function installGlobalReporters() {
   window.addEventListener("unhandledrejection", (event) =>
     add(event.reason instanceof Error ? event.reason.message : String(event.reason)),
   );
-  // A hot update replaces the code that failed. Clearing before it runs keeps the errors the
-  // new code throws while it renders.
-  import.meta.hot?.on("vite:beforeUpdate", () => {
-    if (!runtime.length) return;
-    runtime.length = 0;
-    reportDiagnostics(scope, []);
-  });
 }
 
-/** Report one diagram's diagnostics against the page block it sits in. */
+/**
+ * Report what a diagram or chart found against the revision of the page it sits in. A figure
+ * with nothing to report sends nothing: the page's own report says it was rendered.
+ */
 export function useDiagramReport(
   marker: string,
   figure: string,
@@ -68,22 +76,21 @@ export function useDiagramReport(
   const signature = JSON.stringify(diagnostics ?? null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: The signature captures the diagnostics.
   useEffect(() => {
-    if (!live || !diagnostics) return;
+    if (!live || !diagnostics?.length) return;
     const element = document.querySelector(`[data-diagram="${CSS.escape(marker)}"]`);
     const block = element?.closest<HTMLElement>("[data-source]");
-    const source = block?.dataset.source;
-    if (!source) return;
-    reportDiagnostics(
-      `diagram:${source}#${figure}`,
-      diagnostics.map((d) => ({
+    const page = pages.find((p) => p.source === block?.dataset.source);
+    if (!page?.outline) return;
+    reportDiagnostics({
+      source: page.source,
+      revision: page.outline.revision,
+      diagnostics: diagnostics.map((d) => ({
         ...d,
         origin: "diagram",
-        source,
         // The parts identify a diagram diagnostic; its message may mention a step that moves.
         ...(!d.subject && d.elements?.length ? { subject: d.elements.join(",") } : {}),
       })),
-      pages.find((page) => page.source === source)?.outline.revision,
-    );
+    });
   }, [marker, figure, signature]);
 }
 
@@ -102,21 +109,14 @@ export class PageBoundary extends Component<
   }
   private report(error?: Error) {
     const { source, revision } = this.props;
-    if (!source) return;
-    reportDiagnostics(
-      `render:${source}`,
-      error
-        ? [
-            {
-              origin: "render",
-              code: "RENDER_FAILED",
-              message: error.message,
-              source,
-            },
-          ]
-        : [],
+    if (!source || !revision) return;
+    reportDiagnostics({
+      source,
       revision,
-    );
+      diagnostics: error
+        ? [{ origin: "render", code: "RENDER_FAILED", message: error.message }]
+        : [],
+    });
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
     log.error(`${this.props.source ?? "a page"} failed to render:`, error, info.componentStack);

@@ -1,26 +1,26 @@
 # Architecture
 
-Yapparatus consists of an app that runs in the browser and a development server. Both use the same project directory. The reader's own agent runs in a terminal alongside them. This page describes how a project is created, what the browser, the server, and the agent each do, how they communicate, and where their code is.
+Yapparatus has two programs: the reader app, which runs in the browser, and a dev server. Both use the same project directory. The reader's agent runs in a terminal beside them. This page describes how a project is created, what the browser, the server, and the agent each do, how they communicate, and where their code is.
 
 ## Creating a document
 
 A new document starts as a copy of the [`starter/`](/-/files/yapparatus/starter/README.md) template:
 
-1. The user copies `starter/` to a new directory and installs its dependencies. The starter is a working document of one page that says it is empty.
-2. The user starts the dev server with `pnpm dev content` and opens the address that it prints. The browser shows the empty document.
-3. The user chooses **Ask** to open the chat. No agent is connected yet, so the chat offers a **Copy prompt** button.
-4. The user starts a coding agent in the project directory and pastes the prompt into it. The prompt tells the agent how to connect to the chat.
-5. The user asks in the chat for a document on some topic. The agent writes the pages in `content/`, and the browser shows them as they change. From here on, the [reading loop](overview#purpose) runs.
+1. The reader copies `starter/` to a new directory and installs its dependencies. The starter is a document with one page that says it is empty.
+2. The reader starts the dev server with `pnpm dev content`. The server prints an address, and the reader opens it. The browser shows the empty document.
+3. The reader chooses **Ask** to open the chat. No agent is connected yet, so the chat offers a **Copy prompt** button.
+4. The reader starts a coding agent in the project directory and pastes the prompt into it. The prompt tells the agent how to connect to the chat.
+5. The reader asks in the chat for a document on some topic. The agent writes the pages in `content/`, and the browser shows them as they change. From here on, the [reading loop](overview#purpose) runs.
 
 ## Document directories
 
 A project can hold several documents. Each one is a document directory: a directory with its own `document.json` and pages, such as `content/` in the starter or `docs/design/` in this repository. The project's `icons/`, `docs/`, and dependencies are shared.
 
-1. **The server runs one document at a time,** given as a path relative to the project directory: `pnpm dev docs/design`. The `yap` command in [`src/cli.ts`](/-/files/yapparatus/src/cli.ts) takes the path and passes it to the Vite plugin, as `vitepress dev docs` does for VitePress. A Vite script cannot take it, because `vite <path>` reads the path as Vite's root. There is no default document, so the command always names the one it serves.
-2. **A project's `vite.config.ts` is loaded when it exists,** so a project can add Vite options and plugins. The command adds `yapparatus()` itself, and the plugin refuses to run twice. The server listens only on `127.0.0.1`, and the command has no option to change that, because the chat server trusts every process that can reach it. See [the library implementation](chat#library-implementation).
-3. **Every output mirrors the document's path.** The chat is in `.yapparatus/<directory>/`, the website build in `dist/<directory>/`, and the single file in `dist-single/<directory>/index.html`. A document's chat and builds therefore never mix with another document's.
-4. **A document directory cannot contain another one.** The pages are every MDX file under the directory, and the chat state mirrors the path. A document in `docs/` would therefore take the pages of `docs/design/` as its own. The server refuses to start, and names both directories.
-5. **The project has one `.yapparatus/server.json`.** The newest server writes it, so the agent library finds whichever document is running, and the snippets do not name a document.
+1. **The server runs one document at a time,** given as a path relative to the project directory: `pnpm dev docs/design`. The `yap` command in [`src/cli.ts`](/-/files/yapparatus/src/cli.ts) takes the path and passes it to the Vite plugin, like `vitepress dev docs` for VitePress. A Vite script cannot take the path, because `vite <path>` reads the path as Vite's root. The command has no default document, so the command line always names the document.
+2. **The command loads the project's `vite.config.ts` when it exists.** A project can therefore add Vite options and plugins. The command adds `yapparatus()` itself, and the plugin refuses to run twice. The server listens only on `127.0.0.1`. The command has no option to change this address, because the chat server trusts every process that can reach it. See [the library implementation](chat#library-implementation).
+3. **Every output mirrors the document's path.** The chat is in `.yapparatus/<directory>/`, the website build in `dist/<directory>/`, and the single file in `dist-single/<directory>/index.html`. A document's chat and builds therefore stay separate from those of other documents.
+4. **A document directory cannot contain another one.** The pages are every MDX file under the directory, and the chat state mirrors the path. A document in `docs/` would take the pages of `docs/design/` as its own. The server therefore refuses to start and names both directories.
+5. **The project has one `.yapparatus/server.json`.** The newest dev server writes it. The `yapparatus/agent` library reads this file to find the running document. The snippets (short TypeScript programs that the agent runs) therefore do not name a document.
 
 ## System overview
 
@@ -67,21 +67,14 @@ A project can hold several documents. Each one is a document directory: a direct
   <Step focus="chat-panel http-api chat-server saves-state yapparatus-dir">When the reader sends a message from the chat panel, the chat server receives it and saves it in `.yapparatus/`.</Step>
   <Step focus="agent wait-reply">The reader's agent uses the `yapparatus/agent` library to wait for messages and to reply. See [the agent channel](chat#how-the-agent-connects).</Step>
   <Step focus="agent-edits page-files">The agent can also edit pages. The compiler picks up the change, and the page view updates without a reload.</Step>
-  <Step focus="in-every-build">A built document contains only these: the pages, which are compiled once, and the page view. See [builds](rendering#building-for-sharing).</Step>
+  <Step focus="in-every-build">A built document contains the pages, which are compiled once, and the page view. See [builds](rendering#building-for-sharing).</Step>
 </Diagram>
 
 ## Communication
 
-The programs do not share memory. They communicate in only two ways: through HTTP messages and through files in the project directory.
+The programs communicate through HTTP messages and through files in the project directory.
 
-**The server API sorts messages by kind.** Each kind of message travels in one direction and has one module that handles it. The types are defined in [`src/protocol.ts`](/-/files/yapparatus/src/protocol.ts):
-
-- **Commands** are `POST` requests, such as a new message from the reader or a reply from the agent.
-- **Reports** are `PUT /-/api/diagnostics/{scope}` requests. The browser uses them to send the problems it found, by code: the server adds each code's severity and refuses a code it does not know. See [diagnostics](diagnostics#codes-and-severity).
-- **Events** are sent to the browser as a stream from `GET /-/api/events`.
-- **Reads** are `GET` requests. A read with a `timeout` parameter waits until there is new data, and `GET /-/api/agent/diagnostics` waits until the checks of recent edits are done. The [agent channel](chat#api) uses such reads.
-
-All text that the agent reads, from prompts to error messages, is written in [`src/server/prompt.ts`](/-/files/yapparatus/src/server/prompt.ts).
+**The server API has three resources, `chat`, `diagnostics`, and `files`, under `/-/api`.** Each is named after a part of the document. The browser and the agent use the same resources. A request names what it needs in parameters. The server sends changes to the browser on Vite's hot-update connection. [The server API](api) describes every request, its parameters and JSON bodies, and the updates.
 
 ## The project directory
 
@@ -95,8 +88,7 @@ All text that the agent reads, from prompts to error messages, is written in [`s
 | `icons/` | Extra SVG icons for this project | An agent or a person |
 | `.yapparatus/docs/design/chat.jsonl` | This document's chat, one message per line | The chat server |
 | `.yapparatus/docs/design/chat/` | Accepted replies, one MDX file per message | The chat server |
-| `.yapparatus/docs/design/sequence` | The last number used in the agent channel | The chat server |
-| `.yapparatus/server.json` | The address of the running dev server, for the agent library | The dev server |
+| `.yapparatus/server.json` | The address of the running dev server, for the `yapparatus/agent` library | The dev server |
 | Directories under `"files"` | External files that the document shows. This document shows its own repository. | Their own authors. The server only reads them. |
 
 </Table>
@@ -136,22 +128,21 @@ The dev server is [Vite](https://vite.dev). The package adds one Vite plugin, `y
 | Icon step | Turns `<Icon name="…">` into SVG imports | [`src/icon-plugin.ts`](/-/files/yapparatus/src/icon-plugin.ts) |
 | Markdown conventions | Turns alerts and file trees into components, marks code lines, and checks code languages and heading depth | [`src/markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
 | Outline step | Records each page's title, sections, numbered blocks, ids, links, and references | [`src/outline-plugin.ts`](/-/files/yapparatus/src/outline-plugin.ts) |
-| Source marks | Tags each block, list item, and table row with its file, lines, and hash | [`src/source-plugin.ts`](/-/files/yapparatus/src/source-plugin.ts) |
+| Source marks | Tags each block, list item, and table row with its file and lines, and each line of a code block with its line | [`src/source-plugin.ts`](/-/files/yapparatus/src/source-plugin.ts) |
 | Code highlighting | Highlights code blocks, fills excerpts from their files, and highlights whole files | [`src/code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts) |
 | External files | Reads files only from the directories that `document.json` names | [`src/source-files.ts`](/-/files/yapparatus/src/source-files.ts), [`src/files.ts`](/-/files/yapparatus/src/files.ts) |
 | File API | Serves an external file to the file view and watches it for changes | [`src/server/files.ts`](/-/files/yapparatus/src/server/files.ts) |
-| Chat | Keeps the message log, clears the chat, and checks replies | [`src/server/chat.ts`](/-/files/yapparatus/src/server/chat.ts) |
-| Agent channel | Handles waiting reads, listeners, error numbers, and the prompts the agent reads | [`src/server/agent.ts`](/-/files/yapparatus/src/server/agent.ts) |
-| Sequence | Keeps the single number series that messages, replies, clears, and errors share | [`src/server/sequence.ts`](/-/files/yapparatus/src/server/sequence.ts) |
-| API | Routes HTTP requests under `/-/api/` and writes `.yapparatus/server.json` | [`src/server/api.ts`](/-/files/yapparatus/src/server/api.ts), [`http.ts`](/-/files/yapparatus/src/server/http.ts) |
-| Diagnostic store | Runs the server's checks, holds the browser's reports, and tracks which pages were rendered | [`src/server/diagnostics.ts`](/-/files/yapparatus/src/server/diagnostics.ts) |
+| Chat log | Keeps the message log, clears the chat, and checks replies | [`src/server/chat.ts`](/-/files/yapparatus/src/server/chat.ts) |
+| Chat resource | Answers reads of the chat, which may wait, accepts messages and replies, and computes the agent's state | [`src/server/chat-resource.ts`](/-/files/yapparatus/src/server/chat-resource.ts) |
+| API | Routes HTTP requests under `/-/api/`, sends changes to the browser, and writes `.yapparatus/server.json` | [`src/server/api.ts`](/-/files/yapparatus/src/server/api.ts), [`http.ts`](/-/files/yapparatus/src/server/http.ts) |
+| Diagnostic store | Runs the server's checks, holds what browsers found in each page revision, remembers which errors the agent was given, and tracks which pages were rendered | [`src/server/diagnostics.ts`](/-/files/yapparatus/src/server/diagnostics.ts) |
 | Prompt text | Holds all text the agent reads, including the snippet the agent runs next | [`src/server/prompt.ts`](/-/files/yapparatus/src/server/prompt.ts) |
 
 </Table>
 
 ### Browser
 
-The browser runs one React app, which consists of the modules listed in <Ref to="browser-pieces" />.
+The reader app is one React app that runs in the browser. <Ref to="browser-pieces" /> lists its modules.
 
 <Table id="browser-pieces" caption="The modules of the reader app in the browser.">
 
@@ -174,12 +165,12 @@ The browser runs one React app, which consists of the modules listed in <Ref to=
 
 ### Agent library
 
-[`src/agent.ts`](/-/files/yapparatus/src/agent.ts) is the package's `yapparatus/agent` export. It provides the functions `wait()`, `reply()`, and `check()`. The agent calls them from snippets, which are short TypeScript programs that the agent runs. The library runs in the agent's Node process. It finds the server through `.yapparatus/server.json`, and it prints only the text that the server writes. [The section on waiting](chat#waiting) describes the library's behavior.
+[`src/agent.ts`](/-/files/yapparatus/src/agent.ts) is the package's `yapparatus/agent` export. It provides the functions `waitForMessage()`, `sendReply()`, and `checkDocument()`. The agent calls them from snippets. The library runs in the agent's Node process and finds the server through `.yapparatus/server.json`. It prints only the text that the server writes. [Waiting for messages](chat#waiting-for-messages) describes the library's behavior.
 
 ### Logging
 
-[`src/logger.ts`](/-/files/yapparatus/src/logger.ts) is the logger for the dev server, the browser, and the agent library. `createLogger("chat")` returns the functions `debug`, `info`, `warn`, and `error`. Each line they write is tagged `[yapparatus:chat]`.
+[`src/logger.ts`](/-/files/yapparatus/src/logger.ts) is the logger for the dev server, the browser, and the `yapparatus/agent` library. `createLogger("chat")` returns the functions `debug`, `info`, `warn`, and `error`. Each line they write is tagged `[yapparatus:chat]`.
 
-1. **One setting, `YAPPARATUS_LOG`, sets the level everywhere:** `debug`, `info`, `warn` (the default), `error`, or `silent`. Node reads the setting from the environment. The plugin passes the value to the browser through Vite's `define` option, so the browser logs at the same level as its server.
-2. **In Node, every level is written to stderr,** because the agent reads the agent library's stdout as its prompt.
-3. **The default level shows only what needs attention.** Requests, events, and reply checks are logged at `debug`. Changes to the chat and to diagnostics are logged at `info`. When a snippet fails, the agent reads the snippet's stderr. For this reason, the library logs nothing at the default level.
+1. **`YAPPARATUS_LOG` sets the log level everywhere.** The levels are `debug`, `info`, `warn` (the default), `error`, and `silent`. Node reads the setting from the environment. The plugin passes the value to the browser through Vite's `define` option, so the browser logs at the same level as the server.
+2. **In Node, every level is written to stderr,** because the agent reads the `yapparatus/agent` library's stdout as its prompt.
+3. **The default level logs only warnings and errors.** The code logs requests, updates sent to the browser, and reply checks at `debug`. It logs changes to the chat and to diagnostics at `info`. When a snippet fails, the agent reads the snippet's stderr, so the library logs nothing at the default level.

@@ -3,9 +3,10 @@ import type { Element, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
+import { excerptFiles } from "./code-plugin.ts";
 import type { NumberedKind, PageOutline } from "./document.ts";
 import { contentIssues } from "./markdown-plugin.ts";
-import { revision } from "./source-plugin.ts";
+import { pageRevision } from "./source-plugin.ts";
 
 /** Which MDX components are numbered blocks, and of which kind. */
 const numberedComponents: Record<string, NumberedKind> = {
@@ -23,11 +24,21 @@ function literal(node: MdxJsxFlowElementHast | MdxJsxTextElementHast, name: stri
     : undefined;
 }
 
+/** The lines of a component with an id, such as a figure, in its page's source. */
+export interface Place {
+  start: number;
+  end: number;
+}
+
 /**
- * Outlines and the capitalized components each compiled file uses, by absolute path. The
- * dev server reads them to check an agent's reply with the same pipeline that compiles pages.
+ * Outlines, the capitalized components, and where each component with an id is, for each
+ * compiled file, by absolute path. The dev server reads them to check an agent's reply with
+ * the same pipeline that compiles pages, and to say where a diagnostic about a figure is.
  */
-export const compiled = new Map<string, { outline: PageOutline; components: string[] }>();
+export const compiled = new Map<
+  string,
+  { outline: PageOutline; components: string[]; places: Record<string, Place> }
+>();
 
 /**
  * Record the page's sections and figures and export them as `outline`, so the reader can
@@ -37,7 +48,8 @@ export const compiled = new Map<string, { outline: PageOutline; components: stri
 export function pageOutline(isPage: (file: string) => boolean) {
   return (tree: Root, file: { path: string; value: unknown }) => {
     const outline: PageOutline = {
-      revision: revision(String(file.value)),
+      // Excerpts and charts ran first, so the files the page reads are known.
+      revision: pageRevision(String(file.value), excerptFiles.get(file.path) ?? []),
       title: "",
       headings: [],
       numbered: [],
@@ -49,6 +61,7 @@ export function pageOutline(isPage: (file: string) => boolean) {
     /** Each heading's and numbered block's anchor, with its kind and line, in page order. */
     const anchored: Array<{ kind: string; id: string; line: number }> = [];
     const components = new Set<string>();
+    const places: Record<string, Place> = {};
     /** The heading the walk is under, so each link knows its section. */
     let section: string | undefined;
     const link = (href: string, line: number) =>
@@ -89,6 +102,8 @@ export function pageOutline(isPage: (file: string) => boolean) {
       const id = literal(jsx, "id");
       const caption = literal(jsx, "caption");
       if (id) outline.anchors.push(id);
+      if (id && jsx.position)
+        places[id] = { start: jsx.position.start.line, end: jsx.position.end.line };
       if (id && caption) {
         outline.numbered.push({ kind, id, caption });
         anchored.push({ kind, id, line });
@@ -100,7 +115,7 @@ export function pageOutline(isPage: (file: string) => boolean) {
         `${file.path}: a page has exactly one # heading, its title; found ${titles.length}.`,
       );
     outline.title = titles[0] ?? "";
-    compiled.set(file.path, { outline, components: [...components] });
+    compiled.set(file.path, { outline, components: [...components], places });
 
     // Two anchors with one id: links and references go to the first. The page still renders.
     const ids = new Map<string, string>();

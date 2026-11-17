@@ -4,15 +4,13 @@ import { createLogger } from "../logger.ts";
 
 const log = createLogger("http");
 
-export type Method = "GET" | "POST" | "PUT" | "DELETE";
+export type Method = "GET" | "POST" | "DELETE";
 
 export interface ApiRequest {
   params: Record<string, string>;
   query: URLSearchParams;
-  /** A JSON body. */
+  /** The JSON body of a POST. */
   body: Record<string, unknown>;
-  /** A plain-text body, such as an MDX reply. */
-  text: string;
   req: IncomingMessage;
   res: ServerResponse;
 }
@@ -20,14 +18,11 @@ export interface ApiRequest {
 export interface Reply {
   status: number;
   headers?: Record<string, string>;
-  /** JSON body; a string is sent as plain text. Omit for 204. */
+  /** JSON body. Omit for 204. */
   body?: unknown;
 }
 
-/** Returned by handlers that wrote the response themselves, such as event streams. */
-export const handled = Symbol("handled");
-
-type Handler = (request: ApiRequest) => Reply | typeof handled | Promise<Reply | typeof handled>;
+type Handler = (request: ApiRequest) => Reply | Promise<Reply>;
 
 export class HttpError extends Error {
   readonly status: number;
@@ -41,7 +36,7 @@ export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-async function readText(req: IncomingMessage): Promise<string> {
+async function readBody(req: IncomingMessage): Promise<string> {
   let data = "";
   for await (const chunk of req) {
     data += String(chunk);
@@ -85,15 +80,12 @@ export class Router {
         log.debug(req.method, req.url, res.statusCode, `${Date.now() - started} ms${failure}`),
       );
       const send = ({ status, headers = {}, body }: Reply) => {
-        const text = typeof body === "string";
         res.writeHead(status, {
           "Cache-Control": "no-store",
-          ...(body === undefined
-            ? {}
-            : { "Content-Type": text ? "text/plain; charset=utf-8" : "application/json" }),
+          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
           ...headers,
         });
-        res.end(body === undefined ? undefined : text ? body : JSON.stringify(body));
+        res.end(body === undefined ? undefined : JSON.stringify(body));
       };
       void (async () => {
         if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`)
@@ -116,17 +108,14 @@ export class Router {
           route.keys.map((key, i) => [key, decodeURIComponent(values[i] ?? "")]),
         );
         let body: Record<string, unknown> = {};
-        let text = "";
-        if (req.method === "POST" || req.method === "PUT") {
-          const type = req.headers["content-type"] ?? "";
-          const data = await readText(req);
-          if (type.startsWith("text/")) text = data;
-          else if (data && !type.startsWith("application/json"))
-            throw new HttpError(415, "Expected JSON or text.");
-          else body = parseJson(data);
+        if (req.method === "POST") {
+          const data = await readBody(req);
+          if (data && !(req.headers["content-type"] ?? "").startsWith("application/json"))
+            throw new HttpError(415, "Expected JSON.");
+          body = parseJson(data);
         }
-        const reply = await route.handle({ params, query: url.searchParams, body, text, req, res });
-        if (reply !== handled) send(reply);
+        const reply = await route.handle({ params, query: url.searchParams, body, req, res });
+        send(reply);
       })().catch((error: unknown) => {
         if (error instanceof HttpError) failure = `: ${error.message}`;
         else log.error(req.method, req.url, error);

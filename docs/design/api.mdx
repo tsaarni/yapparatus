@@ -1,0 +1,413 @@
+# Server API
+
+The dev server has an HTTP API under `/-/api`. The reader app and the `yapparatus/agent` library use it to read and write the chat and the diagnostics, and to read external files. This page describes the API's rules, each request with its parameters and JSON bodies, example requests, and the updates that the server sends to the browser.
+
+## Principles
+
+1. **The API has three resources, named after what the document is made of:** `chat`, `diagnostics`, and `files`.
+2. **Methods mean what HTTP says.** A `GET` changes nothing the reader sees. A `POST` adds to a collection. A `DELETE` empties one. The chat is the collection of its messages, so all three use `/chat`.
+3. **The browser and the agent use the same resources.** A request says what it needs with query parameters, so the same query returns the same result whoever sends it. A header says who asks, when the server needs to know.
+4. **A read may wait.** The `wait` parameter makes an ordinary read wait, so waiting needs no separate request.
+5. **Changes reach the browser on Vite's hot-update connection,** which already tells the page when its files change. See [updates](#updates).
+6. **The server writes all text that the agent reads.** Reads for the agent carry a `prompt`, and errors carry the instructions for the fix.
+
+## Requests and responses
+
+<Ref to="api-requests" /> lists every request. Each one is described in its own section below.
+
+<Table id="api-requests" caption="The requests under /-/api.">
+
+| Request | What it does | Success |
+|---|---|---|
+| [`GET /chat`](#read-the-chat) | Reads the chat, or what an agent has to do | `200` with the chat |
+| [`POST /chat`](#add-a-message) | Adds a reader message or an agent reply | `201` with `{ "seq" }` for a reader message, `204` for a reply |
+| [`DELETE /chat`](#clear-the-chat) | Clears the chat | `204` |
+| [`GET /diagnostics`](#read-the-diagnostics) | Reads every diagnostic, once the checks of recent edits are done | `200` with the diagnostics |
+| [`POST /diagnostics`](#report-diagnostics) | Adds what a browser found in one revision of a page, or in a reply | `204` |
+| [`GET /files/{directory}/{path}`](#read-a-source-file) | Reads an external file, highlighted | `200` with the file |
+
+</Table>
+
+These rules apply to every request:
+
+1. **Bodies are JSON objects.** A `POST` sends `Content-Type: application/json`, and its body must be a JSON object of at most 512,000 characters. Every response with a body has `Content-Type: application/json`.
+2. **Every response has `Cache-Control: no-store`,** because every read can change.
+3. **Only local callers may use the API.** The server listens on `127.0.0.1` and refuses a request whose `Origin` header names another host. A request without `Origin`, such as one from the `yapparatus/agent` library, is accepted. See [the library implementation](chat#library-implementation).
+4. **An error is a status code and `{ "error": "…" }`.** The text says what is wrong. For the agent, it also says what to run next. <Ref to="api-status-codes" /> lists the codes.
+
+<Table id="api-status-codes" caption="The error status codes of the API.">
+
+| Status | When |
+|---|---|
+| `400` | A parameter or the body is invalid |
+| `403` | The `Origin` header names another host |
+| `404` | No route has this path, or the external file does not exist |
+| `405` | The path exists and does not allow this method. The `Allow` header lists the methods. |
+| `409` | The agent was taken over, or a reply answers nothing |
+| `413` | The body is longer than 512,000 characters |
+| `415` | A `POST` body is not JSON |
+| `422` | A reply was refused. See [add a message](#add-a-message). |
+| `503` | The server closed while a read was waiting. There is no body. |
+
+</Table>
+
+An unknown method on a known path returns `405`:
+
+```http
+PUT /-/api/chat HTTP/1.1
+```
+
+```http
+HTTP/1.1 405 Method Not Allowed
+Allow: GET, POST, DELETE
+Content-Type: application/json
+
+{"error":"PUT is not supported here."}
+```
+
+The examples on this page are JSON with comments that describe each field. A field marked *optional* is left out when it has no value. Long values are shortened with `…`.
+
+## Chat
+
+The chat is a log of messages. Each message has a number, `seq`, which is its place in the log. After the chat is cleared, numbering starts again at 1. [Chat and the agent](chat) describes what the chat contains and how the agent uses it.
+
+### Read the chat
+
+`GET /-/api/chat` reads the chat. A read without the `Yapparatus-Agent` header returns the whole chat. An agent's read returns what the agent has to do: the reader messages that no reply has answered, and the errors that the agent has not been given. <Ref to="chat-read-parameters" /> lists the parameters.
+
+<Table id="chat-read-parameters" caption="The parameters of GET /-/api/chat.">
+
+| Parameter | Values | Effect |
+|---|---|---|
+| `author` | `reader` or `agent` | Returns only that author's messages |
+| `include` | `diagnostics` | Adds diagnostics: every one in a whole read, or the new errors in an agent's read |
+| `wait` | Seconds, at most 25 | Holds an agent's read until it has something. Needs the `Yapparatus-Agent` header. |
+| `Yapparatus-Agent` header | The agent's id | Makes the read an agent's read |
+
+</Table>
+
+1. **An agent's read is empty when it has no messages and no errors.** With `wait`, an empty read stays open until there is something or `wait` seconds pass. A larger `wait` is treated as 25. When the time ends, the server answers with the empty read.
+2. **The server remembers what an agent's read returned.** The newest reader message in it is the one that the next reply answers. The errors in it are given, so a later read does not return them again.
+3. **The header drives the agent's state.** The newest id takes the chat over. A waiting read of the previous id ends with `409`, and so does every later read with that id. See [the agent's state](chat#the-agents-state).
+
+The browser reads the whole chat and every diagnostic once when it starts. The response shows every field of a read and of each kind of message.
+
+```http
+GET /-/api/chat?include=diagnostics HTTP/1.1
+```
+
+```jsonc
+{
+  // The messages since the chat was last cleared, oldest first.
+  "messages": [
+    {
+      "seq": 347,
+      // A message the reader wrote in the browser.
+      "author": "reader",
+      "text": "Why does a read wait?",
+      // What the reader attached. Empty: a question about the document in general.
+      "context": [
+        {
+          // page, text, section, figure, table, listing, code, diagram-part, file, or lines.
+          "kind": "section",
+          // The address of what the reader asked about.
+          "address": "/api#read-the-chat",
+          // Its file, relative to the project directory, and its lines when the reader asked:
+          // a section runs to the next heading of its level, and code is the lines selected.
+          "source": "docs/design/api.mdx",
+          "startLine": 66,
+          "endLine": 104,
+          // Optional: the diagram step the reader had open, with its text.
+          "step": "Step 2 of 5: …"
+        }
+      ],
+      "createdAt": "2026-11-10T20:38:29.587Z"
+    },
+    {
+      "seq": 348,
+      // A reply the agent sent.
+      "author": "agent",
+      // The newest reader message the reply answers. Earlier ones are answered too.
+      "inReplyTo": 347,
+      // Optional: when the server first gave message 347 to an agent.
+      "readAt": "2026-11-10T20:38:30.102Z",
+      // The reply's MDX module, which the browser imports to show it.
+      "module": "/.yapparatus/docs/design/chat/0b6e1f52-….mdx",
+      "createdAt": "2026-11-10T20:39:42.177Z"
+    }
+  ],
+  // The highest reader message an agent replied to, or 0 before the first reply.
+  "repliedTo": 347,
+  // waiting, working, or away. See the agent's state.
+  "agent": "waiting",
+  // Only with include=diagnostics: every diagnostic, or in an agent's read the new errors.
+  // Each item is a diagnostic as GET /-/api/diagnostics lists it.
+  "diagnostics": [],
+  // Text for an agent. In a whole read, the prompt a person gives an agent to connect.
+  // In an agent's read, the messages and errors, ending with the snippet to run next.
+  "prompt": "You are connected to a Yapparatus document. …"
+}
+```
+
+The `waitForMessage()` call of the `yapparatus/agent` library makes an agent's read. It asks only for the reader's messages and the new errors, and it waits up to 25 s. When there is something, the `prompt` lists it and ends with the snippet to run next.
+
+```http
+GET /-/api/chat?author=reader&include=diagnostics&wait=25 HTTP/1.1
+Yapparatus-Agent: 5f0c2d4e-…
+```
+
+```jsonc
+{
+  // The unanswered reader messages, because of author=reader.
+  "messages": [
+    {
+      "seq": 347,
+      "author": "reader",
+      "text": "Why does a read wait?",
+      "context": [],
+      "createdAt": "…"
+    }
+  ],
+  "repliedTo": 346,
+  // The read returned a message, so the agent now works on it.
+  "agent": "working",
+  // No errors that the agent has not been given.
+  "diagnostics": [],
+  "prompt": "Reader, 22:38:\n--- reader ---\nWhy does a read wait?\n--- end reader ---\n…"
+}
+```
+
+When the wait ends with nothing, the read is empty, and the prompt tells the agent to wait again:
+
+```jsonc
+{
+  "messages": [],
+  "repliedTo": 347,
+  "agent": "waiting",
+  "diagnostics": [],
+  "prompt": "Nothing new. Wait again:\n\nnode --input-type=module-typescript -e '…'"
+}
+```
+
+### Add a message
+
+`POST /-/api/chat` adds a message. The body's `author` says who wrote it, and the author decides which checks apply. The server takes the author only from the body. A reader message returns `201` with its number, and a reply returns `204`.
+
+The browser sends a reader message. The server checks that each context item points at a page or an external file of the document.
+
+```http
+POST /-/api/chat HTTP/1.1
+Content-Type: application/json
+```
+
+```jsonc
+{
+  "author": "reader",
+  // Not blank, at most 20,000 characters.
+  "text": "Why does a read wait?",
+  // What the reader attached, as in a read of the chat. May be empty.
+  "context": [
+    {
+      "kind": "section",
+      "address": "/api#read-the-chat",
+      "source": "docs/design/api.mdx",
+      "startLine": 66,
+      "endLine": 104
+    }
+  ]
+}
+```
+
+```http
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{"seq":347}
+```
+
+The `sendReply()` call of the `yapparatus/agent` library sends a reply. It answers the newest reader message that the agent's last read returned, and the earlier unanswered messages too. The server compiles and checks the reply like a page before it stores it. See [replying](chat#replying).
+
+```http
+POST /-/api/chat HTTP/1.1
+Content-Type: application/json
+```
+
+```jsonc
+{
+  "author": "agent",
+  // The reply, as MDX. It may use the page components.
+  "mdx": "A read waits so that the agent needs one request …"
+}
+```
+
+```http
+HTTP/1.1 204 No Content
+```
+
+A reply with problems is refused with `422`. The body has the text for the agent and the problems, as diagnostics with the codes that pages use:
+
+```http
+HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/json
+```
+
+```jsonc
+{
+  // Text for the agent: the problems, and what to do next.
+  "error": "The reply was not sent:\n\n- error BROKEN_LINK: …\n\nFix the MDX and run …",
+  // The problems, each a diagnostic without severity and address.
+  "diagnostics": [
+    { "origin": "link", "code": "BROKEN_LINK", "message": "…", "subject": "/missing" }
+  ]
+}
+```
+
+A reply with nothing to answer returns `409`. That happens when no agent's read has returned a reader message, or when the chat was cleared after the last one. The `error` ends with the snippet that waits for new messages.
+
+### Clear the chat
+
+`DELETE /-/api/chat` deletes every message and reply. The server also forgets which reader message it gave the agent, so a reply sent after this has nothing to answer.
+
+```http
+DELETE /-/api/chat HTTP/1.1
+```
+
+```http
+HTTP/1.1 204 No Content
+```
+
+## Diagnostics
+
+The diagnostics are the errors and warnings in the document. [Diagnostics](diagnostics) describes where they come from and who sees them.
+
+### Read the diagnostics
+
+`GET /-/api/diagnostics` takes no parameters. It answers once the checks of recent edits are done, or after at most 8 s. It returns every diagnostic, the pages that no browser has checked since they changed, and the diagnostics as text for the agent. The errors it returns count as given to the agent, so the agent's next read does not return them again. The read claims no agent, so the agent can run it while a wait is open.
+
+```http
+GET /-/api/diagnostics HTTP/1.1
+```
+
+```jsonc
+{
+  // Every diagnostic in the document.
+  "diagnostics": [
+    {
+      // Who found it. The server: compile, link, pages. A browser: diagram, render,
+      // runtime, reply.
+      "origin": "link",
+      // What is wrong. The codes are listed in diagnostics, codes and severity.
+      "code": "BROKEN_LINK",
+      // error or warning. The code decides it.
+      "severity": "error",
+      "message": "The link \"/chat#api\" names #api, which chat.mdx does not have.",
+      // Optional: the file, relative to the project directory, and the line in it.
+      "source": "docs/design/architecture.mdx",
+      "line": 77,
+      // Optional: the figure's last line, when `line` is a figure's first.
+      "endLine": 77,
+      // Optional: a figure id, or a reply's message number, inside the source.
+      "target": "system-map",
+      // Optional: what the diagnostic is about, such as a link's target. With the code,
+      // source, and target it identifies the diagnostic.
+      "subject": "/chat#api",
+      // Optional: the diagram parts involved.
+      "elements": ["chat-server"],
+      // Optional: the page address to link, "/page" or "/page#figure".
+      "address": "/architecture#system-map"
+    }
+  ],
+  // The pages no browser has rendered since they changed.
+  "unchecked": [
+    {
+      "source": "docs/design/chat.mdx",
+      "address": "/chat",
+      // What was found in the revision rendered last, as in `diagnostics`.
+      "previous": []
+    }
+  ],
+  // The same list, written for the agent.
+  "prompt": "Diagnostics (1). Fix them:\n- error BROKEN_LINK docs/design/architecture.mdx:77, …"
+}
+```
+
+### Report diagnostics
+
+`POST /-/api/diagnostics` adds what a browser found when it rendered one revision of a page, or a reply. It returns `204` without a body. [What the browser reports](diagnostics#what-the-browser-reports) describes how the server uses these reports.
+
+```http
+POST /-/api/diagnostics HTTP/1.1
+Content-Type: application/json
+```
+
+```jsonc
+{
+  // A page of the document, or a reply's module file, relative to the project directory.
+  "source": "docs/design/architecture.mdx",
+  // The page's revision, as the compiler wrote it into the page. A reply's report has none.
+  "revision": "c41a…",
+  // At most 200 items. Empty: the revision was rendered and nothing was found.
+  "diagnostics": [
+    {
+      // diagram, render, runtime, or reply: the origins a browser finds.
+      "origin": "diagram",
+      // A known diagnostic code.
+      "code": "TEXT_OVERFLOW",
+      "message": "The text of chat-server does not fit its box.",
+      // Optional: line, target, subject, and elements, as in a read of the diagnostics.
+      // The server sets source and severity itself.
+      "line": 41,
+      "target": "system-map",
+      "elements": ["chat-server"]
+    }
+  ]
+}
+```
+
+```http
+HTTP/1.1 204 No Content
+```
+
+The server shortens long text and drops unknown fields. It returns `400` when the `source` is not a page or a reply, a page's report has no `revision`, a reply's report has one, or the origin or code is unknown.
+
+## Files
+
+### Read a source file
+
+`GET /-/api/files/{directory}/{path}` reads a file from an external directory that `document.json` names. The path is the file's address, `/-/files/{directory}/{path}`, placed under `/-/api`. The request takes no lines, because a file view always reads the whole file. The server highlights the file as it highlights code on pages, and then watches the file, so that an open view can reload it after a change. See [addresses](addresses-and-context#addresses).
+
+```http
+GET /-/api/files/yapparatus/src/server/http.ts HTTP/1.1
+```
+
+```jsonc
+{
+  // The file's address in the document.
+  "address": "/-/files/yapparatus/src/server/http.ts",
+  // The file, relative to the project directory.
+  "source": "src/server/http.ts",
+  // The highlighter's language, or "text".
+  "language": "ts",
+  // The number of lines.
+  "lines": 130,
+  // The highlighted code: a `pre` element as a hast tree.
+  // Each line is a `span` with `data-line`.
+  "code": { "type": "root", "children": [{ "type": "element", "tagName": "pre", … }] }
+}
+```
+
+An address with lines, such as `/-/api/files/yapparatus/src/agent.ts#L4-L9` sent as a path, returns `400`. A file that does not exist, or that the document may not show, returns `404`.
+
+## Updates
+
+The server sends changes to the browser on Vite's hot-update connection, as the events in <Ref to="api-updates" />. Each event carries what the matching read returns. The browser therefore reads the chat and the diagnostics once when it starts, and the updates keep them current. The server combines changes within 50 ms, so the browser receives only the latest of each event.
+
+<Table id="api-updates" caption="The events the server sends to the browser.">
+
+| Event | Data | Sent when |
+|---|---|---|
+| `yapparatus:chat` | The chat, as `GET /chat` returns it | A message or a reply is added, the chat is cleared, or the agent's state changes |
+| `yapparatus:diagnostics` | The list of diagnostics, as `GET /chat?include=diagnostics` returns it | The diagnostics change |
+| `yapparatus:file` | The address of an external file, as a JSON string | A file that the browser has read changes on disk |
+
+</Table>

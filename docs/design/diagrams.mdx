@@ -1,28 +1,28 @@
 # Diagrams
 
-This page describes the design of the diagram API, how the diagram compiler turns a program into a figure, and how a figure can explain itself in steps. The diagram reference, [`starter/docs/diagrams.md`](/-/files/yapparatus/starter/docs/diagrams.md), explains how to use the API. The code is in `src/diagram/`: `scene.ts` is the authoring API, `compile.ts` runs the compiler, and `DiagramView.tsx` draws the result. Each compiler step has a file: `text.ts` measures text, `layout.ts` sizes and places shapes, `records.ts` lays out record cells, `nodes.ts` and `edges.ts` produce the drawing, and `validate.ts` checks it. `compile.ts` passes each step what the steps before it made. Layout and records need each other, so `layout.ts` creates the records step and passes it its own `bounds`.
+This page describes the design of the diagram API and the diagram compiler. The compiler turns a program into an SVG drawing, and a diagram can explain itself in steps. The diagram reference, [`starter/docs/diagrams.md`](/-/files/yapparatus/starter/docs/diagrams.md), explains how to use the API. The code is in `src/diagram/`. `scene.ts` is the authoring API, `compile.ts` runs the compiler, and `DiagramView.tsx` draws the result. Each compiler stage has a file: `text.ts` measures text, `layout.ts` sizes and places nodes, `records.ts` lays out record cells, `nodes.ts` and `edges.ts` produce the drawing, and `validate.ts` checks it. `compile.ts` gives each stage the results of the stages before it. Layout and records need each other, so `layout.ts` creates the records stage and passes it its own `bounds`.
 
 ## Goal
 
-An agent writes a short TypeScript program, called the draw program, inside an MDX page. The program produces an SVG figure that is precise and readable. When the author makes an ordinary edit, such as a longer label, a new node, or a different font, the figure keeps its arrangement.
+An agent writes a short TypeScript program, called the draw program, inside an MDX page. The program produces an SVG diagram that is precise and readable. A diagram is made of parts. A node is a part such as a box or a cylinder. An edge is a part that connects nodes, such as an arrow. When the author makes an ordinary edit, such as a longer label, a new node, or a different font, the diagram keeps its arrangement.
 
-The design is judged by the number of repair rounds a figure needs. A repair round is one cycle in which the agent reads a reported problem and edits the program. A short program that often produces overlaps costs more than a longer program that is correct on the first attempt.
+The design is judged by the number of repair rounds a diagram needs. A repair round is one cycle in which the agent reads a reported problem and edits the program. A short program that often produces overlaps needs more repair rounds than a longer program that is correct on the first attempt.
 
 ## Principles
 
-1. **The author composes, and the compiler measures.** The author decides which elements share a row, which element is below another, and which path an edge takes. The compiler measures text, sizes shapes, calculates points, attaches edge endpoints to outlines, draws arrowheads, and reports problems. This division follows what a language model does well: it is good at expressing intent and bad at arithmetic.
-2. **No silent repairs.** The compiler never moves a node, changes the route of an edge, or shrinks text. It reports what is wrong and where. A silent fix would hide the problem and change what the author meant.
-3. **The API builds a retained scene.** A retained scene is a description of the figure that the compiler keeps and resolves later. Each call returns a handle and records relationships between elements, and the compiler calculates positions at compile time. Statement order therefore does not matter, and a revision can insert lines anywhere.
-4. **Each position has one owner.** One row, one column, or one `place()` call sets the position of an element. A second owner is an error. The compiler does not let the last write win, because two rules for one position would eventually disagree.
-5. **No implicit cursor.** Every relationship names the element it refers to. The API has no "previous object" that a call refers to without naming it. Inserting a line therefore never changes the meaning of the lines after it.
-6. **Diagrams are TypeScript code,** so they can use loops, variables, and helper functions. String mini-languages, such as Mermaid or grid templates, get no type checks and only vague diagnostics.
-7. **No graph layout.** The compiler never infers an arrangement from the connections between nodes. With automatic layout, adding a single edge can change the shape of the whole figure.
+1. **The author decides the arrangement, and the compiler does the measuring.** The author decides which parts share a row, which part is below another, and which path an edge takes. The compiler measures text, sizes nodes, calculates points, attaches edge endpoints to outlines, draws arrowheads, and reports problems. A language model expresses intent well and calculates poorly, and this division follows that.
+2. **The compiler makes no silent repairs.** It does not move a node, change the route of an edge, or shrink text. It reports what is wrong and where. A silent fix would hide the problem and change what the author meant.
+3. **The API builds a retained scene.** A retained scene is a description of the diagram that the compiler keeps and resolves later. Each call returns a handle and records relationships between parts. The compiler calculates positions at compile time. Statement order therefore does not matter, and a revision can insert lines anywhere.
+4. **Each position has one owner.** One row, one column, or one `place()` call sets the position of a part. A second owner is an error, because two rules for one position would eventually disagree.
+5. **The API has no implicit cursor.** Every relationship names the part it refers to. No call refers to a "previous object" without naming it. Inserting a line therefore does not change the meaning of the lines after it.
+6. **Diagrams are TypeScript code.** They can use loops, variables, and helper functions. String mini-languages, such as Mermaid or grid templates, get no type checks and only vague diagnostics.
+7. **The compiler does no graph layout.** It does not infer an arrangement from the connections between nodes. With automatic layout, adding a single edge can change the arrangement of the whole diagram.
 
 ## The compiler
 
-<Ref to="diagram-steps" /> shows the stages of the compiler. The rules after the figure describe how the stages work.
+<Ref to="diagram-steps" /> shows the stages of the compiler. The rules after the diagram describe how the stages work.
 
-<Diagram id="diagram-steps" caption="The stages that turn the draw program into a figure." draw={(d) => {
+<Diagram id="diagram-steps" caption="The stages that turn the draw program into a diagram." draw={(d) => {
   const steps = [
     d.box("1. Record", { sub: "run the draw program", id: "record" }),
     d.box("2. Measure", { sub: "width of each text", id: "measure" }),
@@ -40,66 +40,66 @@ The design is judged by the number of repair rounds a figure needs. A repair rou
   d.arrow(steps[3].right, steps[4].left, { route: { viaX: d.lerp(steps[3].right, steps[4].left, 0.5) } })
   for (let i = 4; i < 6; i++) d.arrow(steps[i], steps[i + 1])
 }}>
-  <Step focus="record">Running `draw` only records shapes and relationships. Nothing is positioned yet, so statement order does not matter.</Step>
-  <Step focus="measure size">The compiler measures text with the page font, and each shape grows to fit its text. See [size and text](#size-and-text).</Step>
+  <Step focus="record">Running `draw` records the parts and their relationships. Nothing is positioned yet, so statement order does not matter.</Step>
+  <Step focus="measure size">The compiler measures text with the page font, and each node grows to fit its text. See [size and text](#size-and-text).</Step>
   <Step focus="place">Rows, columns, and placements set positions in dependency order. See [geometry](#geometry).</Step>
-  <Step focus="route">Each edge attaches to the outlines of its shapes and gets its label. See [edges](#edges).</Step>
-  <Step focus="check">The compiler reports overlaps and crossings as diagnostics. It does not move anything to fix them.</Step>
+  <Step focus="route">Each edge attaches to the outlines of its nodes and gets its label. See [edges](#edges).</Step>
+  <Step focus="check">The compiler reports overlaps and crossings as diagnostics and moves nothing.</Step>
   <Step focus="draw">The result is inline SVG, and each part in it has an address. See [output](#output).</Step>
 </Diagram>
 
-1. **Layout is resolved in dependency order.** Sizes are calculated from children up to their parents, and positions from parents down to their children. A real cycle is an error that names its chain (`PLACEMENT_CYCLE: api → cache → api`). The compiler never repeats the layout until the coordinates stop changing, because repeating would hide contradictions.
-2. **Diagnostics name a code, the parts, and a fix.** A [diagnostic](diagnostics) appears under the figure, in the browser console, as a dashed outline on the parts, in the list in the page header, and in the agent's prompt. The agent can repair the problem from the message alone.
-3. **Overlap means a real conflict.** The compiler does not report containment, edge endpoints that touch their nodes, or passive decorations such as lifelines as overlaps. False warnings would teach everyone to ignore warnings.
-4. **A drawing compiles once per source text.** `draw` must be pure: it must return the same result for the same source and change nothing else. Re-renders, step changes, and typing elsewhere on the page reuse the compiled result. Measuring text is the expensive stage, and a page can contain many figures.
-5. **A failed compile keeps the last valid drawing.** The page shows the last valid drawing dimmed, above the errors, so the figure does not disappear while an edit is in progress.
+1. **The compiler resolves layout in dependency order.** It calculates sizes from children up to their parents, and positions from parents down to their children. A real cycle is an error that names its chain (`PLACEMENT_CYCLE: api → cache → api`). The compiler does not repeat the layout until the coordinates stop changing. Repeating would hide contradictions.
+2. **Each diagnostic names a code, the parts, and a fix.** A [diagnostic](diagnostics) appears under the diagram, in the browser console, as a dashed outline on the parts, in the list in the page header, and in the agent's prompt. The agent can repair the problem from the message alone.
+3. **The compiler reports an overlap only for a real conflict.** It does not report containment, edge endpoints that touch their nodes, or passive decorations such as lifelines. False warnings would teach everyone to ignore warnings.
+4. **A drawing compiles once per source text.** `draw` must be pure: for the same source it returns the same result and changes nothing else. Re-renders, step changes, and typing elsewhere on the page reuse the compiled result. Measuring text is the most expensive stage, and a page can contain many diagrams.
+5. **A failed compile keeps the last valid drawing.** The page shows it dimmed, above the errors. The diagram stays visible while an edit is in progress.
 
 ## Names in the API
 
-1. **Clear words over short ones.** Every name must be readable without decoding, even if it costs an extra token. One misread abbreviation costs a whole repair round.
-2. **Screen words for positions.** Anchors are `top`, `bottom`, `left`, `right`, `center`, and the corners `topLeft`, `topRight`, `bottomLeft`, `bottomRight`. Ports, rulers, loops, and enclosure titles use the same words, and relations use `above`, `below`, `leftOf`, `rightOf`. Map words such as `north` and `ne` require the reader to translate them into screen directions.
-3. **Semantic options over glyphs.** The option `dashed: true` replaces a glyph such as `"-->"`. The same glyph means different things in Mermaid, D2, and PlantUML, and a word has one meaning.
-4. **The common case is positional.** In `d.arrow(a, b, "label")`, a string as the third argument is the label. An object as the third argument holds the options. Most edges need only a label.
-5. **One way to do each thing.** The API has no aliases and does not expose internal pieces. The library draws activation bars, lifelines, and spacing itself, and they are not options.
-6. **Defaults over numbers.** Gaps, sizes, and spacing have good defaults, and options express intent. Without defaults, models invent arbitrary numbers that differ in every figure.
+1. **Names are clear words.** Every name is readable without decoding, even if it costs an extra token. One misread abbreviation costs a whole repair round.
+2. **Positions use screen words.** Anchors are `top`, `bottom`, `left`, `right`, `center`, and the corners `topLeft`, `topRight`, `bottomLeft`, `bottomRight`. Ports, rulers, loops, and enclosure titles use the same words, and relations use `above`, `below`, `leftOf`, `rightOf`. Map words such as `north` and `ne` would require the author to translate them into screen directions.
+3. **Options are words.** The option `dashed: true` replaces a glyph such as `"-->"`. The same glyph means different things in Mermaid, D2, and PlantUML. A word has one meaning.
+4. **The common case is positional.** In `d.arrow(a, b, "label")`, a string as the third argument is the label, and an object holds the options. Most edges need only a label.
+5. **There is one way to do each thing.** The API has no aliases and does not expose internal pieces. The library draws activation bars, lifelines, and spacing itself. They are not options.
+6. **Numbers have defaults.** Gaps, sizes, and spacing have good defaults, and options express intent. Without defaults, models invent arbitrary numbers that differ in every diagram.
 
 ## Ids
 
-An id is the address of a diagram part. The link `/page#figure--part` points to a part, and steps, diagnostics, and reader questions refer to parts by id.
+An id is the address of a diagram part. The link `/page#figure--part` points to a part. Steps, diagnostics, and reader questions refer to parts by id.
 
-1. **Ids are derived.** The compiler derives the id of a shape from its label as a slug, which is the label written in lowercase with hyphens between words. The id of an edge joins the ids of its two ends (`client->api`), and the id of a sequence message comes from its label. An explicit id that repeats the label costs tokens and adds nothing.
-2. **Explicit ids are for parts that are named from outside the figure.** A link from prose and an earlier question from a reader both refer to a part by id, and Show on page finds the part by its id. Show on page is the button on a context pill in a sent message. A derived id changes when its label changes, and the question would then stop working without any report. An explicit id is also needed for a long or unclear label, and for two edges between the same shapes.
-3. **Steps may use derived ids, because they are checked.** The compiler reports a step that names a missing part, together with the list of valid ids. A label edit that breaks a step is therefore caught at once.
+1. **Ids are derived.** The compiler derives the id of a node from its label as a slug, which is the label written in lowercase with hyphens between words. The id of an edge joins the ids of its two ends (`client->api`). The id of a sequence message comes from its label. An explicit id that repeats the label costs tokens and adds nothing.
+2. **Explicit ids are for parts that something outside the diagram refers to.** A link in prose refers to a part by id. A question that a reader sent earlier also refers to a part by id, and the Show on page button on its context item finds the part by that id. A derived id changes when its label changes. The link or the question then stops working without any report. An explicit id is also needed for a long or unclear label and for two edges between the same nodes.
+3. **Steps may use derived ids, because the compiler checks them.** The compiler reports a step that names a missing part, together with the list of valid ids. It therefore catches a label edit that breaks a step at once.
 
 ## Geometry
 
-1. **Coordinates:** x grows to the right and y grows downward. One unit is one CSS pixel when the figure is shown at its natural size.
-2. **Each element has three boxes.** The compiler uses the layout bounds for placement and gaps, the outline for attaching edges, and the ink bounds for everything that is painted. The outline is needed because an arrow to a cylinder must touch its curved outline, and the bounding box does not follow that curve. A label at a start or end point counts only in the ink bounds. The label sits beside the dot, so the dot stays on the axis of its column. The label still counts in the overlap checks, in the size of the enclosure around it, and in the size of the figure.
-3. **Gaps are measured between bounds,** so two boxes that are 64 units apart stay 64 units apart when one of them grows.
-4. **Rows and columns are elements.** They can nest and can be placed like any other element, so compositions need no special cases.
-5. **Grids, when needed, are arrays of handles** (`[[a, b], [c, null, d]]`). Cells have integer positions, and the first version has no cells that span several rows or columns. A grid adds column alignment that nested rows cannot express.
+1. **Coordinates grow to the right and downward.** The x value grows to the right and the y value grows downward. One unit is one CSS pixel when the diagram is shown at its natural size.
+2. **Each part has three boxes.** The compiler uses the layout bounds for placement and gaps, the outline for attaching edges, and the ink bounds for everything that is painted. The outline is a separate box because an arrow to a cylinder must touch its curved outline, and the bounding box does not follow that curve. A label at a start or end point counts only in the ink bounds. The label sits beside the dot, so the dot stays on the axis of its column. The label still counts in the overlap checks, in the size of the enclosure around it, and in the size of the diagram.
+3. **Gaps are measured between bounds.** Two parts that are 64 units apart stay 64 units apart when one of them grows.
+4. **Rows and columns can nest and can be placed.** They are placed like any other part, so compositions need no special cases.
+5. **Grids are arrays of handles** (`[[a, b], [c, null, d]]`). Cells have integer positions, and the first version has no cells that span several rows or columns. A grid adds column alignment that nested rows cannot express.
 
 ## Size and text
 
-1. **Shapes fit their measured text.** A fixed `width` makes the text wrap, a fixed `height` makes the compiler report overflow, and `equalSize` gives all the listed shapes the largest measured size.
-2. **Text never shrinks to fit.** An unreadable label is worse than a reported problem.
+1. **Nodes fit their measured text.** A fixed `width` makes the text wrap. A fixed `height` makes the compiler report overflow. `equalSize` gives all the listed nodes the largest measured size.
+2. **The compiler keeps text at its measured size.** When text does not fit, the compiler reports the problem. A shrunken label would be unreadable.
 3. **Text is measured with the page font.** The fonts load before the compiler runs, and the browser measures the text. Counting characters gives wrong widths for proportional fonts.
-4. **The compiler sets every font.** Each text that the compiler places carries the size and weight it was measured with, and the renderer draws the text with exactly those values. Diagram text has three sizes: 13.5 px for node labels, 12 px for everything else, and 11 px for tabs. It uses the three font weights of the interface. A size chosen by the renderer could differ from the measured size, and the text could then overflow without a report.
+4. **The compiler sets every font.** Each text that the compiler places carries the size and weight it was measured with, and the renderer draws the text with exactly those values. Diagram text has three sizes: 13.5 px for node labels, 12 px for all other text, and 11 px for tabs. It uses the three font weights of the reader app. A size chosen by the renderer could differ from the measured size, and the text could then overflow without a report.
 5. **Labels are plain text.** A label can contain line breaks, a second line (`sub`), and monospace text. Markdown, HTML, and math in labels would each need their own design.
 
 ## Edges
 
-1. **Endpoints, route, and decoration are separate.** An endpoint at an element attaches to the side of the outline that faces the route. An endpoint at an anchor stays exactly where the author put it. Arrowheads, dashes, and rounded corners never change the route, so the author can reason about each of these separately.
-2. **The route vocabulary is small.** A route is straight, has one elbow, runs in a channel at a given x or y, or follows explicit vertices. Point expressions (`offset`, `xy`, `lerp`) cover the remaining cases.
-3. **Routes are never replaced.** The compiler reports an edge that passes through a node, and the edge keeps its route.
-4. **A label belongs to one segment of its edge.** The label stays horizontal and takes part in the overlap checks. The words for sides of the canvas (`above`, `left`) and the words for sides relative to the path are different words.
-5. **Curves and loops are general edges.** `bend` curves a straight edge to its left, as seen in the direction of travel. An A→B edge and a B→A edge with the same `bend` value therefore separate. `d.arrow(a, a)` draws a loop on one side of `a`. The compiler places the labels of curves and loops outside them. State diagrams need both curves and loops, as in [the agent's state](chat#the-agents-state), and they need no component of their own.
+1. **Endpoints, route, and decoration are separate.** An endpoint at a part attaches to the side of the outline that faces the route. An endpoint at an anchor stays exactly where the author put it. Arrowheads, dashes, and rounded corners do not change the route. The author can therefore reason about each of them separately.
+2. **A route has one of four forms.** A route is straight, has one elbow, runs in a channel at a given x or y, or follows explicit vertices. Point expressions (`offset`, `xy`, `lerp`) cover the remaining cases.
+3. **The compiler keeps every route as written.** It reports an edge that passes through a node, and the edge keeps its route.
+4. **A label belongs to one segment of its edge.** The label stays horizontal and takes part in the overlap checks. The words for sides of the canvas (`above`, `left`) differ from the words for sides relative to the path.
+5. **Curves and loops are general edges.** `bend` curves a straight edge to its left, as seen in the direction of travel. An A→B edge and a B→A edge with the same `bend` value therefore separate. `d.arrow(a, a)` draws a loop on one side of `a`. The compiler places the labels of curves and loops outside them. State diagrams need both curves and loops, as in [the agent's state](chat#the-agents-state). They need no component of their own.
 
 ## Color
 
-Color in a figure has two uses, as in maps and charts. It highlights parts, and it shows which parts belong together. Both uses work only when the rest of the figure is plain, so most of a figure is neutral. <Ref to="color-demo" /> shows every role and two categories.
+Color in a diagram has two uses, as in maps and charts: it highlights parts, and it shows which parts belong together. Both uses work only when the rest of the diagram is neutral, so most of a diagram has no color. An author asks for color with a role or a category, and the rules below define both. <Ref to="color-demo" /> shows every role and two categories.
 
-<Diagram id="color-demo" caption="Roles and categories. A role has the same meaning in every figure, and the legend names each category." description="A small system showing the accent, warning, muted, and external roles, and two categories" draw={(d) => {
+<Diagram id="color-demo" caption="Roles and categories. A role has the same meaning in every diagram, and the legend names each category." description="A small system showing the accent, warning, muted, and external roles, and two categories" draw={(d) => {
   const client = d.actor("Browser", { role: "external" })
   const api = d.box("API", { role: "accent" })
   const cache = d.cylinder("Cache", { category: "New" })
@@ -119,33 +119,33 @@ Color in a figure has two uses, as in maps and charts. It highlights parts, and 
 }}>
   <Step focus="api">`accent` marks the one part to look at. The part is drawn with a heavier outline.</Step>
   <Step focus="batch-job">`warning` marks a failure or a risk. The part gets a badge.</Step>
-  <Step focus="browser logs">`external` marks a part outside the system, which is drawn dashed. `muted` makes a part less prominent and draws it with a hairline.</Step>
-  <Step focus="new to-be-removed">All parts in a category share one color, and the legend under the figure names each category.</Step>
+  <Step focus="browser logs">`external` marks a part outside the system and draws it dashed. `muted` makes a part less prominent and draws it with a hairline.</Step>
+  <Step focus="new to-be-removed">All parts in a category share one color, and the legend under the diagram names each category.</Step>
 </Diagram>
 
-1. **Authors name a meaning, and the theme picks the color.** The API has no option for a color, a fill, or a stroke. A literal color would break in the light theme, in print, or with increased contrast. It would also escape the contrast test, and it would let every agent invent its own palette.
+1. **The author names a meaning, and the theme picks the color.** The API has no option for a color, a fill, or a stroke. A literal color would break in the light theme, in print, or with increased contrast. It would also escape the contrast test, and every agent would invent its own palette.
 2. **A role says what a part is for.** `accent` is the one part to look at, `warning` is a failure or a risk, `muted` makes a part less prominent, and `external` is outside the system.
-3. **A category says what sets parts apart, in the author's words.** Parts with the same `category` share a color, and a legend names each color. The author takes the words from the figure, such as "New" and "To be removed", because the differences that matter change from figure to figure.
-4. **Categories get colors in order of first use.** Every theme defines four category colors in every mode. The first two colors lie on the blue–yellow axis, which readers with red-green color blindness can still tell apart. The theme test checks that all four colors also stay distinct for these readers.
-5. **Four categories at most.** Readers with normal color vision can match about six colors to a legend, and readers with color blindness can match fewer. The compiler reports a fifth category and draws it without a color.
+3. **A category says what sets parts apart, in the author's words.** Parts with the same `category` share a color, and a legend names each color. The author takes the words from the diagram, such as "New" and "To be removed". The differences that matter change from diagram to diagram.
+4. **Categories get colors in order of first use.** Every theme defines four category colors in every mode. The first two colors lie on the blue–yellow axis, which readers with red-green color blindness can tell apart. The theme test checks that all four colors are distinct for these readers.
+5. **A diagram has at most four categories.** Readers with normal color vision can match about six colors to a legend, and readers with color blindness can match fewer. The compiler reports a fifth category and draws it without a color.
 6. **A category changes only the hue of a part.** An accent part keeps its heavier outline, a warning part keeps its badge, and an external part keeps its dashes. A part can therefore be both new and the one to look at.
-7. **One table defines the look of every kind of part.** Each role sets an ink, a fill, a label color, and a stroke weight, and each category replaces the ink and the fill. Shapes, edges, enclosures, and sequence messages all read the same properties from this table.
-8. **Hue shows meaning, and stroke weight shows state.** When the reader hovers over a part or a step focuses it, the part is drawn heavier in its own color. Keyboard focus and arriving at a part by a link draw the reader's focus ring.
+7. **One table defines the look of every kind of part.** Each role sets an ink, a fill, a label color, and a stroke weight. Each category replaces the ink and the fill. Nodes, edges, enclosures, and sequence messages read the same properties from this table.
+8. **Hue shows meaning, and stroke weight shows state.** When the reader hovers over a part or a step focuses it, the part is drawn heavier in its own color. Keyboard focus and arriving at a part by a link draw the focus ring.
 9. **No meaning depends on color alone.** The accent part is heavier, a warning part has a badge, an external part is dashed, a muted part has a hairline, and the legend names each category. Hovering over or focusing a legend entry highlights the parts in that category, and a step can focus a whole category by its id.
-10. **One accent per figure.** The compiler reports a second accent as `ACCENT_OVERUSED`.
-11. **Shapes are flat.** Only the folded corner of a note has a shade, because the fold is part of the shape.
+10. **A diagram has one accent.** The compiler reports a second accent as `ACCENT_OVERUSED`.
+11. **Parts are flat.** Only the folded corner of a note has a shade, because the fold is part of the note.
 
 ## Shapes and composites
 
-1. **Few shapes, each with one meaning.** Box, cylinder, actor, note, decision, record, start, and end stand for components, storage, people, remarks, questions, structured data, and the ends of a flow. Ellipses, parallelograms, and hexagons are left out for three reasons: few readers know what they mean, `role` and `category` already show how parts differ, and each shape needs its own outline for attaching edges. The trigger of a flow is a `start()` with a label, so the trigger stays one part with one id.
-2. **An enclosure draws around elements and never moves them.** The bounds of an enclosure come from its members, so the enclosure cannot be placed. An enclosure that moved its contents would create a cycle.
-3. **Composite diagrams are built only from public primitives.** A composite diagram, such as a sequence diagram, takes node handles, returns an element that can be placed, and exposes its parts as handles or ids. A sequence diagram can therefore sit beside a component diagram, inside an enclosure, or next to a note.
-4. **An algorithm is added only where one is needed.** Sequence diagrams compute activation bars from calls and replies. State diagrams need no algorithm, because rows, boxes, `start()`, `end()`, and general edges are enough.
-5. **Lists stay plain data.** Sequence steps are an array of objects, because a model writes and edits an array more easily than callbacks. Participants are ordinary shapes, messages have derived ids, and `d.sequence` returns one element that can be placed. [The agent channel](chat#how-the-agent-connects) shows an example.
+1. **There are few node shapes, each with one meaning.** Box, cylinder, actor, note, decision, record, start, and end stand for components, storage, people, remarks, questions, structured data, and the ends of a flow. The API has no ellipse, parallelogram, or hexagon, for three reasons: few readers know what they mean, `role` and `category` already show how nodes differ, and each shape needs its own outline for attaching edges. The trigger of a flow is a `start()` with a label, so the trigger is one part with one id.
+2. **An enclosure is drawn around parts and does not move them.** The bounds of an enclosure come from the parts it encloses, so the enclosure cannot be placed. An enclosure that moved its contents would create a cycle.
+3. **Composite diagrams are built from public primitives.** A composite diagram, such as a sequence diagram, takes node handles, returns a part that can be placed, and exposes its parts as handles or ids. A sequence diagram can therefore sit beside a component diagram, inside an enclosure, or next to a note.
+4. **An algorithm is added only where it is needed.** Sequence diagrams compute activation bars from calls and replies. State diagrams need no algorithm, because rows, nodes, `start()`, `end()`, and general edges are enough.
+5. **Lists are plain data.** The entries of a sequence are an array of objects, because a model writes and edits an array more easily than callbacks. Participants are ordinary nodes, messages have derived ids, and `d.sequence` returns one part that can be placed. [The agent channel](chat#how-the-agent-connects) shows an example.
 
 ## Members
 
-Some figures are about the pieces of one shape: a field of a protocol header, a row of a table, a slot of an array, or a word of a request. A **member** is such a piece: a record's cell or a text's mark. Every member is a part, so pointers, steps, categories, links, and questions work on it without anything new. <Ref to="member-header" /> through <Ref to="member-text" /> show the forms.
+Some diagrams show the pieces of one node: a field of a protocol header, a row of a table, a slot of an array, or a word of a request. A **member** is such a piece: a record's cell or a text's mark. Every member is a part, so edges, steps, categories, links, and questions work on it without special handling. <Ref to="member-header" /> through <Ref to="member-text" /> show the forms.
 
 <Diagram id="member-header" caption="The TCP header, 32 bits per row: bit numbers on top, byte offsets on the left. A pin marks the inner field that the note explains." build draw={(d) => {
   const tcp = d.record([
@@ -167,7 +167,7 @@ Some figures are about the pieces of one shape: a field of a protocol header, a 
   <Step focus="tcp.options-variable-length options options->tcp.options-variable-length">A field on the outline takes an arrow.</Step>
 </Diagram>
 
-<Diagram id="member-tables" caption="Tables with a header row. A pointer leaves a row's side and enters the row it refers to." draw={(d) => {
+<Diagram id="member-tables" caption="Tables with a header row. An edge leaves a row's side and enters the row it refers to." draw={(d) => {
   const orders = d.record([
     "id\tuuid\tPK",
     ["user_id\tuuid\tFK", { role: "accent" }],
@@ -199,7 +199,7 @@ Some figures are about the pieces of one shape: a field of a protocol header, a 
   d.arrow(ant.part("next"), cat.part("key-cat"))
 }} />
 
-<Diagram id="member-text" caption="An HTTP request with its parts marked. The path picks the handler; the Host header picks the site." draw={(d) => {
+<Diagram id="member-text" caption="An HTTP request with marked text. The path picks the handler, and the Host header picks the site." draw={(d) => {
   const req = d.text("GET /users/42?fields=name HTTP/1.1\nHost: api.example.com\nAccept: application/json\nAuthorization: Bearer eyJhbGciOi…", {
     mono: true,
     id: "req",
@@ -218,18 +218,18 @@ Some figures are about the pieces of one shape: a field of a protocol header, a 
   d.arrow(secret, req.part("auth"))
 }} />
 
-1. **A member is a part.** It has an id after its parent's (`users.team-id`), takes a `role` and a `category`, and steps focus it. Focusing the parent focuses all its members. Pointers, steps, links, and questions therefore need no special case.
-2. **A record is cells on a grid.** One mechanism covers a type, a table, a protocol header, a register, and an array: `columns` sets the grid, and each cell spans some of it. A separate shape for each would repeat the same layout with different names.
-3. **A cell is a rectangle.** It fills the rest of its row, or starts a row and covers whole rows. A field that crosses a row is split by the author. Cells that wrap would make shapes that are not rectangles, with no clear side for an edge, and well-designed protocols align their fields anyway.
-4. **Tabs align the columns of a table.** A table row stays one member, because a pointer refers to a row, not to its type. A header row names the columns with the same tabs.
-5. **A ruler numbers positions in the reader's units.** It is a function from the index to the label, one for each side, because the units differ between figures: bits from either end, byte offsets, addresses, or letters. A fixed numbering would be wrong for most of them. A ruler is not a header: a header names content, and a ruler numbers positions.
-6. **Edges leave a cell through the record's outline.** A cell takes an edge on a side that lies on the outline and faces the other end best: a table row from its left or right, an array slot from its bottom. A cell inside the grid has no such side, and an edge to it crosses its neighbors and is reported. A **pin** numbers it instead, and a note or the text refers to the number.
-7. **A mark matches one place.** A mark is a substring that occurs exactly once, or whole lines. A repeated or missing substring is reported, never guessed. The marked text is drawn again over its highlight, so the highlight never covers it.
-8. **The record draws its own lines.** The cells' fills lie between the record's background and its outline, and the record draws the dividers in its own ink. A cell's fill therefore never covers the outline, and its color never leaks into a neighbor's border.
+1. **A member is a part.** It has an id after its parent's (`users.team-id`), takes a `role` and a `category`, and steps focus it. Focusing the parent focuses all its members. Edges, steps, links, and questions therefore need no special case.
+2. **A record is cells on a grid.** One mechanism covers a type, a table, a protocol header, a register, and an array: `columns` sets the grid, and each cell spans some of it. A separate node shape for each would repeat the same layout with different names.
+3. **A cell is a rectangle.** It fills the rest of its row, or starts a row and covers whole rows. The author splits a field that crosses a row. Cells that wrap would make outlines that are not rectangles, with no clear side for an edge. Well-designed protocols align their fields anyway.
+4. **Tabs align the columns of a table.** A table row is one member, because an edge refers to a whole row. A header row names the columns with the same tabs.
+5. **A ruler numbers positions in the units that the diagram needs.** It is a function from the index to the label, one for each side. The units differ between diagrams: bits from either end, byte offsets, addresses, or letters. A fixed numbering would be wrong for most of them. A header names content, and a ruler numbers positions.
+6. **Edges leave a cell through the record's outline.** A cell takes an edge on a side that lies on the outline and faces the other end best: a table row from its left or right, an array slot from its bottom. A cell inside the grid has no such side, so an edge to it crosses its neighbors and is reported. A **pin** numbers such a cell, and a note or the text refers to the number.
+7. **A mark matches one place.** A mark is a substring that occurs exactly once, or whole lines. The compiler reports a repeated or missing substring and does not guess. The marked text is drawn again over its highlight, so the highlight never covers it.
+8. **The record draws its own lines.** The fills of the cells lie between the record's background and its outline, and the record draws the dividers in its own ink. A cell's fill therefore does not cover the outline, and its color does not leak into a neighbor's border.
 
 ## Steps
 
-A figure can be shown in different states. In each state, some parts are emphasized, other parts are faded or hidden, and a short text explains them. The same mechanism is used for stepping through an explanation, for clicking a part, and for opening a deep link, which is a link to one step or part. <Ref to="step-demo" /> uses `build` and step-only notes, and <Ref to="step-source" /> shows its source.
+A diagram can be shown in different states. In each state, some parts are emphasized, other parts are faded or hidden, and a short text explains them. A **step** is one such state in an explanation that the reader moves through in order. Stepping through an explanation, clicking a part, and opening a deep link, which is a link to one step or part, all use the same mechanism. <Ref to="step-demo" /> uses `build` and a step-only note, which the rules below explain, and <Ref to="step-source" /> shows its source.
 
 <Diagram id="step-demo" caption="A cached read, told in steps." build draw={(d) => {
   const client = d.box("Client")
@@ -264,38 +264,38 @@ A figure can be shown in different states. In each state, some parts are emphasi
 
 ### Writing steps
 
-An explanation in steps needs more than pointing at parts. It also needs an overview, groups of parts, words next to the thing they describe, change over time, a way back to the plain figure, and addresses. Each of these comes from one of the rules below, and none of them needs a new component.
+A step does more than point at parts. An explanation also needs an overview, groups of parts, words next to what they describe, change over time, a way back to the plain diagram, and addresses. The rules below provide each of these without a new component.
 
-1. **Geometry is written in `draw`, and the step text is written in MDX.** Step text in JavaScript strings would lose Markdown, links, `<Ref>`, and link checking.
-2. **Steps never move anything.** The layout is compiled once, and a step changes only emphasis and visibility. Readers therefore keep their memory of where each part is in the figure.
-3. **`build` is the only animation switch.** With `build`, a part stays hidden until the first step that focuses it. Revealing parts in order is the useful part of animation, and it needs no timelines.
+1. **Geometry is written in `draw`, and step text is written in MDX.** Step text in JavaScript strings would lose Markdown, links, `<Ref>`, and link checking.
+2. **Steps move nothing.** The layout is compiled once, and a step changes only emphasis and visibility. Readers therefore keep their memory of where each part is.
+3. **`build` is the only animation switch.** With `build`, a part stays hidden until the first step that focuses it. This reveals parts in order and needs no timelines.
 4. **Motion is optional.** Fading follows the reader's `prefers-reduced-motion` setting.
-5. **Nothing is lost without interaction.** In print, the page shows the whole figure with the steps as a numbered list. Screen readers read each step aloud when it opens. Hidden content must not be the only copy of an explanation.
-6. **Steps are optional, and the static figure is the default.** Dividing a sequence into segments helps learners, but dividing a simple picture only adds clicks (Mayer).
-7. **No separate animation API.** A second figure component would duplicate the diagram component and gradually differ from it.
+5. **Every step can be read without interaction.** In print, the page shows the whole diagram with the steps as a numbered list. Screen readers read each step aloud when it opens.
+6. **Steps are optional, and the static diagram is the default.** Dividing a sequence into segments helps learners. Dividing a simple picture adds only clicks (Mayer).
+7. **There is no separate animation API.** A separate animation component would duplicate the diagram component, and the two would gradually differ.
 8. **A container stands for its contents.** Focusing an enclosure, row, column, sequence, or fragment focuses everything it contains. An explanation often refers to whole subsystems, and a list of every id would break when a part is added.
-9. **Step-only parts carry words and show change.** A part with `stepOnly` appears only in the steps that focus it. Words placed next to the thing they describe work better than words under the caption, which Mayer calls spatial contiguity. Two step-only parts in the same place show a change without moving anything.
-10. **Decorations follow their edge.** An activation bar appears and fades with the message that opens it, so a figure with `build` does not reveal later steps early.
-11. **A step is recognized by a marker.** Hot reload, which updates the page when its file changes, replaces the `Step` function, and the page may still hold the old function. The page therefore cannot recognize a step by comparing functions.
+9. **Step-only parts carry words and show change.** A part with `stepOnly` appears only in the steps that focus it. Words placed next to what they describe work better than words under the caption, which Mayer calls spatial contiguity. Two step-only parts in the same place show a change without moving anything.
+10. **Decorations follow their edge.** An activation bar appears and fades with the message that opens it, so a diagram with `build` does not reveal later steps early.
+11. **The page recognizes a step by a marker.** Hot reload, which updates the page when its file changes, replaces the `Step` function, and the page may still hold the old function. The page therefore cannot recognize a step by comparing functions.
 
 ### What the reader sees
 
-1. **Clicking opens a state, and hover only highlights.** Touch screens have no hover, and popups that follow the mouse cover the drawing.
+1. **A click opens a state, and hover highlights a part.** Touch screens have no hover, and popups that follow the mouse would cover the drawing.
 2. **The step text appears under the caption.** Focused parts take the accent color, and the other parts fade. **Show all** or the Esc key returns to the plain figure. The caption keeps the number of the figure, and the drawing stays visible.
 3. **Step controls are under the caption.** The controls are a previous button, a counter such as "Step 2 of 5", and a next button. The arrow keys also move between steps.
-4. **Clicking a part opens the next step that focuses it.** After the last such step, the next click returns to the first one. A reader who explores one part therefore sees all of its steps in turn. In live mode, where the development server adds the chat, the click also adds the part to the message box.
-5. **Steps have addresses** in the same namespace as parts: `/page#figure--step`. A deep link opens that step, and `<Ref>` links to steps in the same way.
-6. **A question includes the open step.** When the reader asks about a figure or a part, the context records "Step 2 of 5 (id): text". The source of the figure contains all of its steps.
-7. **Focused parts scroll into view** when a figure is wider than the page and scrolls sideways.
+4. **A click on a part opens the next step that focuses it.** After the last such step, the next click returns to the first one. A reader who explores one part therefore sees all of its steps in turn. In live mode, where the dev server adds the chat, the click also adds the part to the message box.
+5. **Steps have addresses** in the same form as parts: `/page#figure--step`. A deep link opens that step, and `<Ref>` links to steps in the same way.
+6. **A question includes the open step.** When the reader asks about a diagram or a part, the context records "Step 2 of 5 (id): text". The source of the diagram contains all of its steps.
+7. **Focused parts scroll into view** when a diagram is wider than the page and scrolls sideways.
 8. **Parts that steps focus are buttons in built pages too.** Other parts are buttons only in live mode.
 
 ## Output
 
-1. **The output is inline SVG.** Its `viewBox` is the ink bounds plus padding. Text stays real SVG text, so it can be selected, read aloud, and measured.
-2. **Part ids are namespaced** as `figure--part`, because many figures share one page.
-3. **The figure is named with `aria-label`.** It has no SVG `<title>`, because browsers show `<title>` as a tooltip that covers the drawing.
-4. **A figure with steps has the role `group`.** The role `img` would hide its parts, which are buttons, from assistive technology.
-5. **Width follows the reading layout.** A figure can grow into the breakout track, which is the space beside the text column for wide content. A figure can shrink to 75 % of its natural size, and beyond that it scrolls sideways. See [layout](rendering#layout).
+1. **The output is inline SVG.** Its `viewBox` is the ink bounds plus padding. Text is real SVG text, so it can be selected, read aloud, and measured.
+2. **Part ids start with the figure id** (`figure--part`), because many figures share one page.
+3. **The diagram is named with `aria-label`.** It has no SVG `<title>`, because browsers show `<title>` as a tooltip that covers the drawing.
+4. **A diagram with steps has the role `group`.** The role `img` would hide its parts, which are buttons, from assistive technology.
+5. **Width follows the reading layout.** A diagram can grow into the breakout track, which is the space beside the text column for wide content. It can shrink to 75 % of its natural size, and below that it scrolls sideways. See [layout](rendering#layout).
 
 ## Sources
 

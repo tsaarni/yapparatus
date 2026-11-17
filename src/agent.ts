@@ -1,8 +1,8 @@
 /**
  * The agent's side of the chat. An agent calls these from short snippets run with Node:
  *
- *   node --input-type=module-typescript -e 'import { wait } from "yapparatus/agent";
- *     console.log((await wait({ after: 0 })).prompt);'
+ *   node --input-type=module-typescript -e 'import { waitForMessage } from "yapparatus/agent";
+ *     console.log((await waitForMessage()).prompt);'
  *
  * The library only transports. Every prompt and error comes from the server, which also
  * writes the next snippet to run; the library writes only transport errors.
@@ -12,20 +12,26 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { createLogger } from "./logger.ts";
 import {
-  type AgentDiagnostics,
-  type AgentPrompt,
+  agentHeader,
   apiPrefix,
+  type Chat,
   type Diagnostic,
+  type DocumentDiagnostics,
+  type NewMessage,
   type ReplyRefusal,
 } from "./protocol.ts";
 
 export type {
-  AgentDiagnostics,
-  AgentPrompt,
+  AgentMessage,
+  AgentState,
+  Chat,
   ContextItem,
   Diagnostic,
+  DocumentDiagnostics,
+  Message,
   ReaderMessage,
   ReportedDiagnostic,
+  UncheckedPage,
 } from "./protocol.ts";
 
 const log = createLogger("agent");
@@ -98,23 +104,29 @@ async function failure(response: Response): Promise<YapparatusError> {
 
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** How long the server may stay unreachable before `wait` gives up, in milliseconds. */
+/** How long the server may stay unreachable before `waitForMessage` gives up, in milliseconds. */
 const reconnectFor = 30_000;
 
 /**
- * Wait for reader messages after #`after`, for as long as it takes. Resolves with the messages
- * and the prompt to read, which ends with the next snippet to run. A cleared chat and new errors
- * in the document end the wait too. Calling it again with the same `after` gives the same messages.
+ * Wait until there is something for the agent: reader messages not answered yet, or errors in
+ * the document that the agent has not been given. Resolves with them and the prompt to read,
+ * which ends with the next snippet. The server remembers what it gave the agent, so calling
+ * it again without replying gives the same messages.
  */
-export async function wait(options: { after: number }): Promise<AgentPrompt> {
-  const listener = randomUUID();
-  const base = serverUrl();
-  const url = `${base}${apiPrefix}/agent/prompt?after=${options.after}&timeout=${requestWait}&listener=${listener}`;
+export async function waitForMessage(): Promise<Chat> {
+  const query = new URLSearchParams({
+    author: "reader",
+    include: "diagnostics",
+    wait: String(requestWait),
+  });
+  const url = `${serverUrl()}${apiPrefix}/chat?${query}`;
+  // One agent for the whole wait: its reads are one long wait, and a newer one takes over.
+  const headers = { [agentHeader]: randomUUID() };
   let unreachableSince: number | undefined;
   for (;;) {
     let response: Response;
     try {
-      response = await call(url, {}, requestWait);
+      response = await call(url, { headers }, requestWait);
     } catch (error) {
       // A restarting dev server drops waiting requests; a stopped one stays away.
       unreachableSince ??= Date.now();
@@ -125,41 +137,43 @@ export async function wait(options: { after: number }): Promise<AgentPrompt> {
     }
     unreachableSince = undefined;
     if (!response.ok) throw await failure(response);
-    const prompt = (await response.json()) as AgentPrompt;
-    // A clear ends the wait too: the agent should drop what it remembers of the chat.
-    // New errors in the document end it as well: the agent may have caused them.
-    if (prompt.messages.length || prompt.cleared || prompt.newErrors.length) return prompt;
+    const chat = (await response.json()) as Chat;
+    if (chat.messages.length || chat.diagnostics?.length) return chat;
   }
 }
 
 /**
- * Send the agent's reply. `to` is the cursor from the prompt: the reply answers every reader
- * message up to it. The MDX is read from stdin: inline with a quoted heredoc, or from a file
- * with `< reply.mdx`. The server compiles it and checks its components and links first; a
- * refused reply rejects with what to fix.
+ * Send the agent's reply to the reader messages that the last wait returned. Check the
+ * document first if you edited pages. The MDX is read from stdin: inline with a quoted
+ * heredoc, or from a file with `< reply.mdx`. The server compiles it and checks its
+ * components and links first; a refused reply rejects with what to fix.
  */
-export async function reply(options: { to: number }): Promise<{ seq: number }> {
+export async function sendReply(): Promise<void> {
   if (process.stdin.isTTY)
     throw new YapparatusError(
-      "reply() reads the MDX from stdin, and none was given. Add it with <<'MDX' … MDX or < reply.mdx.",
+      "sendReply() reads the MDX from stdin, and none was given. Add it with <<'MDX' … MDX or < reply.mdx.",
     );
-  const mdx = readFileSync(0, "utf8");
+  const message: NewMessage = { author: "agent", mdx: readFileSync(0, "utf8") };
   const response = await call(
-    `${serverUrl()}${apiPrefix}/agent/reply?to=${options.to}`,
-    { method: "POST", headers: { "Content-Type": "text/markdown; charset=utf-8" }, body: mdx },
+    `${serverUrl()}${apiPrefix}/chat`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(message),
+    },
     requestWait,
   );
   if (!response.ok) throw await failure(response);
-  return (await response.json()) as { seq: number };
 }
 
 /**
  * The document's errors and warnings, once the checks of recent edits are done. Resolves with
- * them, the pages no browser has checked since they changed, and the prompt to read. It does
- * not touch the chat: run it after editing pages, before replying, or without a chat at all.
+ * them, the pages no browser has checked since they changed with what was found before, and
+ * the prompt to read. The errors it returns are given to the agent, so a later wait does not
+ * return them again. Run it after editing pages, before replying, or without a chat at all.
  */
-export async function check(): Promise<AgentDiagnostics> {
-  const response = await call(`${serverUrl()}${apiPrefix}/agent/diagnostics`, {}, requestWait);
+export async function checkDocument(): Promise<DocumentDiagnostics> {
+  const response = await call(`${serverUrl()}${apiPrefix}/diagnostics`, {}, requestWait);
   if (!response.ok) throw await failure(response);
-  return (await response.json()) as AgentDiagnostics;
+  return (await response.json()) as DocumentDiagnostics;
 }

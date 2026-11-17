@@ -100,7 +100,8 @@ export function FileView({
         ? {
             ask: () => {
               const region = document.querySelector<HTMLElement>("main article [data-file]");
-              if (region) void fileContext(region).then((item) => item && onAsk([item]));
+              const item = region && fileContext(region);
+              if (item) onAsk([item]);
             },
           }
         : {}),

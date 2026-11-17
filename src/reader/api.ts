@@ -1,17 +1,18 @@
 /**
- * Client for the dev server API: commands, diagnostic reports, and the event stream.
- * Every function here is a no-op outside live mode, so built pages never touch /-/api.
+ * Client for the dev server API: the chat, diagnostic reports, and source files. Changes
+ * arrive on Vite's hot-update connection. Every function here is a no-op outside live mode,
+ * so built pages never touch /-/api.
  */
 import { useSyncExternalStore } from "react";
 import { createLogger } from "../logger.ts";
 import {
   apiPrefix,
-  type ChatState,
-  type Diagnostic,
-  type NewReaderMessage,
+  type Chat,
+  type DiagnosticReport,
+  type NewMessage,
   type ReportedDiagnostic,
-  type ServerEvent,
   type SourceFileView,
+  type UpdateEvents,
 } from "../protocol.ts";
 
 const log = createLogger("api");
@@ -47,64 +48,56 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
-/* ---------- Commands ---------- */
+/* ---------- The chat ---------- */
 
 const id = (value: string) => encodeURIComponent(value);
 export const commands = {
-  send: (input: NewReaderMessage) => call<{ seq: number }>("POST", "/chat/reader", input),
-  clear: () => call<{ seq: number }>("POST", "/chat/clear"),
+  send: (input: Omit<Extract<NewMessage, { author: "reader" }>, "author">) =>
+    call<{ seq: number }>("POST", "/chat", { author: "reader", ...input }),
+  clear: () => call<void>("DELETE", "/chat"),
 };
 
 /* ---------- Diagnostic reports ---------- */
 
-const sent = new Map<string, string>();
-const queued = new Map<string, { diagnostics: Diagnostic[]; revision?: string }>();
+const sent = new Set<string>();
+const queued = new Map<string, DiagnosticReport>();
 let flushTimer: number | undefined;
 
 /**
- * Report the complete current set of diagnostics for one scope. Repeated identical reports
- * are dropped, and reports within a short window are sent together.
+ * Report what this browser found in one revision of a page, or in a reply. Findings only add,
+ * so a report the server already has is not sent again, and reports within a short window
+ * are sent together.
  */
-export function reportDiagnostics(scope: string, diagnostics: Diagnostic[], revision?: string) {
+export function reportDiagnostics(report: DiagnosticReport) {
   if (!live) return;
-  const report = { diagnostics, ...(revision ? { revision } : {}) };
-  if (sent.get(scope) === JSON.stringify(report) && !queued.has(scope)) return;
-  queued.set(scope, report);
+  const key = JSON.stringify(report);
+  if (sent.has(key)) return;
+  queued.set(key, report);
   if (flushTimer === undefined) flushTimer = window.setTimeout(flushReports, 150);
 }
 
 function flushReports() {
   flushTimer = undefined;
-  for (const [scope, report] of queued) {
-    sent.set(scope, JSON.stringify(report));
-    void call("PUT", `/diagnostics/${id(scope)}`, report).catch(() => sent.delete(scope));
+  for (const [key, report] of queued) {
+    sent.add(key);
+    void call("POST", "/diagnostics", report).catch(() => sent.delete(key));
   }
   queued.clear();
 }
 
-/** Remove a scope as the tab closes, such as its runtime errors. */
-export function dropDiagnosticsOnClose(scope: string) {
-  if (!live) return;
-  window.addEventListener("pagehide", () => {
-    void fetch(`${prefix}/diagnostics/${id(scope)}`, { method: "DELETE", keepalive: true });
-  });
-}
-
-/* ---------- Live state from the event stream ---------- */
+/* ---------- Live state ---------- */
 
 export interface LiveState {
-  chat: ChatState;
+  chat: Chat;
   diagnostics: ReportedDiagnostic[];
-  connected: boolean;
 }
 
 let state: LiveState = {
-  chat: { messages: [], repliedTo: 0, agent: "away", start: "" },
+  chat: { messages: [], repliedTo: 0, agent: "away", prompt: "" },
   diagnostics: [],
-  connected: false,
 };
 const listeners = new Set<() => void>();
-let source: EventSource | undefined;
+let connected = false;
 
 function update(next: Partial<LiveState>) {
   state = { ...state, ...next };
@@ -113,28 +106,38 @@ function update(next: Partial<LiveState>) {
 
 const fileListeners = new Set<(address: string) => void>();
 
-function apply(event: ServerEvent) {
-  log.debug(`${event.type} event`, event);
-  if (event.type === "chat") update({ chat: event.chat });
-  else if (event.type === "diagnostics") update({ diagnostics: event.diagnostics });
-  else for (const listener of fileListeners) listener(event.address);
+function on<E extends keyof UpdateEvents>(event: E, handle: (data: UpdateEvents[E]) => void) {
+  import.meta.hot?.on(event, (data: UpdateEvents[E]) => {
+    log.debug(event, data);
+    handle(data);
+  });
 }
 
+/** Listen for changes, then read the chat and diagnostics once; changes keep them current. */
 function connect() {
-  if (!live || source) return;
-  source = new EventSource(`${prefix}/events`);
-  for (const type of ["chat", "diagnostics", "file"] as const)
-    source.addEventListener(type, (message) =>
-      apply(JSON.parse((message as MessageEvent<string>).data) as ServerEvent),
-    );
-  source.onopen = () => {
-    log.info("event stream connected");
-    update({ connected: true });
-  };
-  source.onerror = () => {
-    if (state.connected) log.info("event stream lost; reconnecting");
-    update({ connected: false });
-  };
+  if (!live || connected) return;
+  connected = true;
+  // An update that arrives before the first read answers is newer than the read.
+  const updated = new Set<keyof LiveState>();
+  on("yapparatus:chat", (chat) => {
+    updated.add("chat");
+    update({ chat });
+  });
+  on("yapparatus:diagnostics", (diagnostics) => {
+    updated.add("diagnostics");
+    update({ diagnostics });
+  });
+  on("yapparatus:file", (address) => {
+    for (const listener of fileListeners) listener(address);
+  });
+  void call<Chat>("GET", "/chat?include=diagnostics")
+    .then(({ diagnostics = [], ...chat }) =>
+      update({
+        ...(updated.has("chat") ? {} : { chat }),
+        ...(updated.has("diagnostics") ? {} : { diagnostics }),
+      }),
+    )
+    .catch((error: unknown) => log.warn("could not read the chat:", error));
 }
 
 function subscribe(listener: () => void) {
@@ -143,7 +146,7 @@ function subscribe(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-/** The chat and diagnostics, kept current by the server's event stream. */
+/** The chat and diagnostics, kept current by the server's updates. */
 export function useLive(): LiveState {
   return useSyncExternalStore(subscribe, () => state);
 }
@@ -157,6 +160,9 @@ export function onFileChanged(listener: (address: string) => void): () => void {
 }
 
 /** A source file the server shows, highlighted. Live mode only. */
-export function readFile(folder: string, path: string): Promise<SourceFileView> {
-  return call<SourceFileView>("GET", `/files/${id(folder)}/${path.split("/").map(id).join("/")}`);
+export function readFile(directory: string, path: string): Promise<SourceFileView> {
+  return call<SourceFileView>(
+    "GET",
+    `/files/${id(directory)}/${path.split("/").map(id).join("/")}`,
+  );
 }

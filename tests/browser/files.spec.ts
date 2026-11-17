@@ -1,8 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import type { ChatState, ContextItem } from "../../src/protocol.ts";
-import { root, runSnippet, snippets } from "./workspace.ts";
+import { agentHeader, type Chat, type ContextItem } from "../../src/protocol.ts";
+import { replySnippet, root, runSnippet, snippets } from "./workspace.ts";
 
 const storedContext = () =>
   JSON.parse(sessionStorage.getItem("yapparatus:context") ?? "[]") as ContextItem[];
@@ -96,18 +96,19 @@ test("asking about lines of a file gives the agent the file and its lines", asyn
   await page.getByRole("button", { name: "Ask about greet.ts" }).click();
   await expect(page.locator(".context-items")).toContainText(/greet\.ts$/m);
 
-  const created = await request.post("/-/api/chat/reader", {
-    data: { text: "Why a template string?", context: [lines] },
+  const created = await request.post("/-/api/chat", {
+    data: { author: "reader", text: "Why a template string?", context: [lines] },
   });
   expect(created.status()).toBe(201);
-  const { seq } = (await created.json()) as { seq: number };
-  const read = await request.get(`/-/api/agent/prompt?after=${seq - 1}&timeout=0&listener=files`);
+  const read = await request.get("/-/api/chat?author=reader", {
+    headers: { [agentHeader]: "files" },
+  });
   const { prompt } = (await read.json()) as { prompt: string };
   expect(prompt).toContain("- file lines, source/greet.ts:2-3, /-/files/sample/greet.ts#L2-L3");
 
   // A file outside the folders, or lines that disagree with the address, are refused.
-  const refused = await request.post("/-/api/chat/reader", {
-    data: { text: "x", context: [{ ...lines, source: "content/document.json" }] },
+  const refused = await request.post("/-/api/chat", {
+    data: { author: "reader", text: "x", context: [{ ...lines, source: "content/document.json" }] },
   });
   expect(refused.status()).toBe(400);
   expect((await request.get("/-/api/files/sample/../content/document.json")).status()).not.toBe(
@@ -115,33 +116,24 @@ test("asking about lines of a file gives the agent the file and its lines", asyn
   );
 });
 
-test("Show on page finds lines again after the file changed", async ({ page }) => {
-  const file = path.join(root, "source/greet.ts");
-  const original = readFileSync(file, "utf8");
-  try {
-    await page.goto("/-/files/sample/greet.ts");
-    const code = page.locator("main article [data-file]");
-    await code.evaluate((region) => {
-      const range = document.createRange();
-      range.selectNodeContents(region.querySelector("[data-line='2']") as Node);
-      window.getSelection()?.removeAllRanges();
-      window.getSelection()?.addRange(range);
-    });
-    await page
-      .getByRole("toolbar", { name: "Selection actions" })
-      .getByRole("button", { name: "Ask", exact: true })
-      .click();
-    await page.getByLabel("Message", { exact: true }).fill("What does this line build?");
-    await page.getByRole("button", { name: "Send", exact: true }).click();
-    // Two lines are added above; the open view reloads the file.
-    writeFileSync(file, `// A greeting.\n\n${original}`);
-    await expect(code.locator("[data-line]")).toHaveCount(6);
-    await page.getByRole("button", { name: "Show greet.ts, line 2 on the page" }).last().click();
-    await expect(page).toHaveURL(/\/-\/files\/sample\/greet\.ts#L4$/);
-    await expect(code.locator("[data-line='4'][data-selected]")).toHaveCount(1);
-  } finally {
-    writeFileSync(file, original);
-  }
+test("Show on page opens a source file at the lines asked about", async ({ page }) => {
+  await page.goto("/-/files/sample/greet.ts");
+  const code = page.locator("main article [data-file]");
+  await code.evaluate((region) => {
+    const range = document.createRange();
+    range.selectNodeContents(region.querySelector("[data-line='2']") as Node);
+    window.getSelection()?.removeAllRanges();
+    window.getSelection()?.addRange(range);
+  });
+  await page
+    .getByRole("toolbar", { name: "Selection actions" })
+    .getByRole("button", { name: "Ask", exact: true })
+    .click();
+  await page.getByLabel("Message", { exact: true }).fill("What does this line build?");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+  await page.getByRole("button", { name: "Show greet.ts, line 2 on the page" }).last().click();
+  await expect(page).toHaveURL(/\/-\/files\/sample\/greet\.ts#L2$/);
+  await expect(code.locator("[data-line='2'][data-selected]")).toHaveCount(1);
 });
 
 test("Show on page shows the section when the text asked about was rewritten", async ({ page }) => {
@@ -226,7 +218,7 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   page,
   request,
 }) => {
-  expect((await request.post("/-/api/chat/clear")).status()).toBe(201);
+  expect((await request.delete("/-/api/chat")).status()).toBe(204);
   // The reader picks two lines in the file view, and one word in an excerpt on a page.
   await page.goto("/-/files/sample/greet.ts");
   await lineNumber(page, 2).click({ position: { x: 4, y: 4 } });
@@ -253,9 +245,9 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The agent connects and reads where to look: the file from its folder, the lines, the words.
-  const state = (await (await request.get("/-/api/chat")).json()) as ChatState;
-  expect(state.start).toContain("- sample: source");
-  const [start] = snippets(state.start);
+  const state = (await (await request.get("/-/api/chat")).json()) as Chat;
+  expect(state.prompt).toContain("- sample: source");
+  const [start] = snippets(state.prompt);
   const read = await runSnippet(start ?? "");
   expect(read.stderr).toBe("");
   expect(read.stdout).toContain("--- reader ---\nWhy does it build the text first?");
@@ -270,9 +262,9 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   expect(lines.slice(1, 3).join("\n")).toContain("return text;");
 
   // It answers with the code and a link to the line.
-  const [replyAndWait] = snippets(read.stdout);
+  const replyAndWait = replySnippet(read.stdout);
   const waiting = runSnippet(
-    replyAndWait ?? "",
+    replyAndWait,
     [
       "The function names the text before it returns it, so [line 2](/-/files/sample/greet.ts#L2) reads as one step.",
       "",
@@ -286,10 +278,13 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   await answer.getByRole("link", { name: "line 2" }).click();
   await expect(page).toHaveURL(/\/-\/files\/sample\/greet\.ts#L2$/);
   // A reply naming a file the document cannot show is refused, with the reason.
-  const [again] = snippets(read.stdout);
-  const refused = await runSnippet(again ?? "", "See [this](/-/files/sample/missing.ts).\n");
+  const again = replySnippet(read.stdout);
+  const refused = await runSnippet(again, "See [this](/-/files/sample/missing.ts).\n");
   expect(refused.stderr).toContain("names no file it can show");
-  // Clearing ends the agent's wait.
-  await request.post("/-/api/chat/clear");
-  expect((await waiting).stdout).toContain("The reader cleared the chat");
+  // After the chat is cleared, the next message ends the agent's wait.
+  await request.delete("/-/api/chat");
+  await request.post("/-/api/chat", { data: { author: "reader", text: "Thanks.", context: [] } });
+  const next = (await waiting).stdout;
+  expect(next).toContain("--- reader ---\nThanks.");
+  expect(next).not.toContain("Why does it build the text first?");
 });

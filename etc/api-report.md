@@ -52,17 +52,15 @@ export type ColumnType = "number" | "date" | "text";
 export interface ContextItem {
   kind: TargetKind;
   /**
-   * "/page", "/page#id", "/page#figure--part", or for selected words the nearest section with a
-   * text fragment: "/page#section:~:text=start,end". For a source file, "/-/files/app/x.go",
-   * or with its lines, "/-/files/app/x.go#L4-L9".
+   * "/page", "/page#id", "/page#figure--part", or for selected words the figure, table, listing,
+   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
+   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
    */
   address: string;
   /** The page's or source file's file, relative to the project folder. */
   source: string;
   startLine: number;
   endLine: number;
-  /** Content hash of lines `startLine`–`endLine` when the reader asked. */
-  hash: string;
   /** The diagram step the reader had open, with its text: "Step 2 of 5 (miss): …". */
   step?: string;
 }
@@ -650,37 +648,48 @@ export interface TerminalOptions
 ## yapparatus/agent
 
 ```ts
-export interface AgentDiagnostics {
-  diagnostics: ReportedDiagnostic[];
-  unchecked: string[];
+export interface AgentMessage {
+  seq: number;
+  author: "agent";
+  /** The newest reader message the reply answers; earlier ones are answered too. */
+  inReplyTo: number;
+  /** When the server first handed message `inReplyTo` to an agent; absent if the server restarted. */
+  readAt?: string;
+  /** The reply's MDX module, which the browser imports to show it. */
+  module: string;
+  createdAt: string;
+}
+
+export type AgentState = "waiting" | "working" | "away";
+
+export interface Chat {
+  messages: Message[];
+  /** The highest reader message an agent replied to; 0 before the first reply. */
+  repliedTo: number;
+  agent: AgentState;
+  /** With `include=diagnostics`: every diagnostic, or in an agent's read the new errors. */
+  diagnostics?: ReportedDiagnostic[];
+  /**
+   * The same read written for an agent. Without the agent header, the text a person gives an
+   * agent to connect; with it, the messages and diagnostics, ending with the snippet to run next.
+   */
   prompt: string;
 }
 
-export interface AgentPrompt {
-  messages: ReaderMessage[];
-  /** The number the chat was cleared at, when that happened after the cursor. */
-  cleared?: number;
-  /** Errors the agent has not been shown before. They end a wait, like a reader message. */
-  newErrors: ReportedDiagnostic[];
-  prompt: string;
-}
-
-export const check: () => Promise<AgentDiagnostics>;
+export const checkDocument: () => Promise<DocumentDiagnostics>;
 
 export interface ContextItem {
   kind: TargetKind;
   /**
-   * "/page", "/page#id", "/page#figure--part", or for selected words the nearest section with a
-   * text fragment: "/page#section:~:text=start,end". For a source file, "/-/files/app/x.go",
-   * or with its lines, "/-/files/app/x.go#L4-L9".
+   * "/page", "/page#id", "/page#figure--part", or for selected words the figure, table, listing,
+   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
+   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
    */
   address: string;
   /** The page's or source file's file, relative to the project folder. */
   source: string;
   startLine: number;
   endLine: number;
-  /** Content hash of lines `startLine`–`endLine` when the reader asked. */
-  hash: string;
   /** The diagram step the reader had open, with its text: "Step 2 of 5 (miss): …". */
   step?: string;
 }
@@ -705,6 +714,14 @@ export interface Diagnostic {
   elements?: string[];
 }
 
+export interface DocumentDiagnostics {
+  diagnostics: ReportedDiagnostic[];
+  unchecked: UncheckedPage[];
+  prompt: string;
+}
+
+export type Message = ReaderMessage | AgentMessage;
+
 export interface ReaderMessage {
   seq: number;
   author: "reader";
@@ -713,15 +730,24 @@ export interface ReaderMessage {
   createdAt: string;
 }
 
-export const reply: (options: { to: number; }) => Promise<{ seq: number; }>;
-
 export interface ReportedDiagnostic extends Diagnostic {
   severity: Severity;
-  scope: string;
-  reportedAt: string;
+  /** The figure's last line, when `line` is a figure's first. The server reads both from the page. */
+  endLine?: number;
+  /** The page address to link: "/page" or "/page#figure". */
+  address?: string;
 }
 
-export const wait: (options: { after: number; }) => Promise<AgentPrompt>;
+export const sendReply: () => Promise<void>;
+
+export interface UncheckedPage {
+  source: string;
+  /** "/page" */
+  address: string;
+  previous: ReportedDiagnostic[];
+}
+
+export const waitForMessage: () => Promise<Chat>;
 
 export class YapparatusError extends Error {
   readonly diagnostics: Diagnostic[];

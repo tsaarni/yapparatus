@@ -96,6 +96,11 @@ export function useRoute(): Route {
   return useSyncExternalStore(subscribe, snapshot);
 }
 
+/** The page on screen, for code outside React. */
+export function currentPage(): DocumentPage | undefined {
+  return snapshot().page;
+}
+
 /**
  * The element the page scrolls in. It ends at the chat's left edge, so the page's scrollbar
  * is drawn there and not beside the chat's own scrollbar at the window's edge.

@@ -91,7 +91,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 - `<Ref to="…" />` takes a figure, table, or listing id, a heading id on this page, or an address: `/setup` for a page, `/setup#install` for anything on it. Add `--part` for a diagram part or step: `request-flow--lookup`.
 - Give an explicit `id` to every figure, table, and listing. Ids are addresses: renaming one breaks links.
 - Diagram parts get ids from their labels. Set `id` on a part when prose, a link, or a `Ref` points at it, or when the derived id is long or unclear; see [the diagram reference](diagrams.md#ids).
-- Ids are unique per page; do not use `--` in your own ids.
+- A heading id is unique on its page, and a figure, table, or listing id in the whole document; do not use `--` in your own ids.
 - Renaming a page file, a heading, or an id changes its address. Update `document.json` and every link in the same edit; the diagnostics list the links you missed.
 
 ## External files
@@ -139,13 +139,13 @@ Put a `.tsx` file next to the pages and import it: `import { Swatch } from "./sw
 
 ## Checking your work
 
-Fix every diagnostic. Broken links, `Ref`s, and anchors, duplicate ids, compile errors, and every diagram and chart diagnostic are reported with file and line, one per line: `- error BROKEN_LINK content/intro.mdx:12: …`. Each code is an `error`, which you must fix, or a `warning`, which reads badly but renders.
+Fix every diagnostic. Broken links, `Ref`s, and anchors, duplicate ids, compile errors, and every diagram and chart diagnostic are reported one per line, with the file and lines, the page address, and for a diagram the parts involved: `- error BROKEN_LINK content/intro.mdx:12, /intro: …` or `- warning LABEL_OVERLAP content/cache.mdx:40-62, /cache#flow, parts api, db: …`. Each code is an `error`, which you must fix, or a `warning`, which reads badly but renders.
 
 - After editing, read them from the running dev server, from the project directory. It waits until your edits are checked; `Diagnostics: none` means none:
 
 ```sh
-node --input-type=module-typescript -e 'import { check } from "yapparatus/agent"; console.log((await check()).prompt);'
+node --input-type=module-typescript -e 'import { checkDocument } from "yapparatus/agent"; console.log((await checkDocument()).prompt);'
 ```
 
-- In the chat, new errors also end your `wait`, and a reply is refused while errors that appeared after you read the message remain.
-- Diagrams and charts are checked only when a browser shows the page, because text is measured with the page font. The diagnostics list the pages no browser has shown since they changed. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.
+- In the chat, read them after editing and fix them before you reply. Errors found later, when a browser opens a changed page, end your wait for messages.
+- Diagrams and charts are checked only when a browser shows the page, because text is measured with the page font. The diagnostics list the pages no browser has shown since they changed, with what was found before the change. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.

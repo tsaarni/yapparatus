@@ -19,7 +19,7 @@ import {
 } from "react";
 import { flashPart } from "../diagram/part.tsx";
 import { partSeparator, splitAddress, textFragment } from "../document.ts";
-import { type FileAddress, fileAddress, parseFileAddress } from "../files.ts";
+import { parseFileAddress } from "../files.ts";
 import type { ContextItem, ReportedDiagnostic } from "../protocol.ts";
 import { useLive } from "./api.ts";
 import { type ThemeChoice, themeSwitchable, useThemeChoice } from "./appearance.ts";
@@ -50,7 +50,6 @@ import {
   contextFromTarget,
   contextsFromRange,
   fileContextsFromRange,
-  relocateLines,
   selectedCode,
   useSelectionMenu,
 } from "./selection.ts";
@@ -215,10 +214,11 @@ export function App() {
     );
   }
 
-  /** Find the target of an earlier context item, by its source hash and address, and show it. */
+  /** Find the target of an earlier context item by its address, and show it. */
   function showOnPage(item: ContextItem) {
+    // A source file opens at the item's lines, which the file view highlights.
     const sourceFile = parseFileAddress(item.address);
-    if (sourceFile) return showLinesOnPage(item, sourceFile);
+    if (sourceFile) return navigate(fileHref(sourceFile));
     const { page: target, fragment } = parseAddress(item.address);
     if (target && target !== page) {
       setPendingShow(item);
@@ -256,31 +256,6 @@ export function App() {
           id: Date.now(),
         });
       },
-    );
-  }
-  /**
-   * Open a source file at an earlier item's lines. When the file changed, find the lines by
-   * their hash and go there instead; with no single match, say so.
-   */
-  function showLinesOnPage(item: ContextItem, target: FileAddress) {
-    navigate(fileHref(target));
-    if (item.kind !== "lines") return;
-    const whole = fileAddress({ folder: target.folder, path: target.path });
-    const changed = () =>
-      setNotice({ text: "These lines changed or disappeared.", id: Date.now() });
-    whenPresent(
-      () =>
-        document.querySelector<HTMLElement>(
-          `main article [data-file="${CSS.escape(whole)}"]:has([data-line])`,
-        ),
-      (region) =>
-        void relocateLines(region, item).then((lines) => {
-          if (!lines) changed();
-          else if (lines.start !== item.startLine)
-            navigate(fileHref({ ...target, lines }), { replace: true });
-        }),
-      changed,
-      30,
     );
   }
   // biome-ignore lint/correctness/useExhaustiveDependencies: Run once the page arrives.
@@ -452,9 +427,7 @@ export function App() {
                 const range = selection.menu?.range;
                 if (range) {
                   const text = page ? contextsFromRange(range, page) : [];
-                  void fileContextsFromRange(range).then((lines) =>
-                    addContext([...text, ...lines]),
-                  );
+                  addContext([...text, ...fileContextsFromRange(range)]);
                 }
                 window.getSelection()?.removeAllRanges();
                 selection.dismiss();
@@ -616,25 +589,56 @@ function Notice({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   );
 }
 
-/** The elements on the page that an earlier context item points at. */
+/**
+ * The elements on the page that an earlier context item points at, found by its address: the
+ * id it names, and the part or the selected words in it. Text and code have no id of their own,
+ * so they are the blocks of the item's page that hold the words or code; among several, those
+ * at the item's lines, where they are while the page has not changed since.
+ */
 function findTarget(item: ContextItem): Element[] {
-  const blocks = [...document.querySelectorAll<HTMLElement>("main article [data-source]")].filter(
-    (block) => block.dataset.source === item.source && block.dataset.hash === item.hash,
-  );
   const { anchor, text } = splitAddress(item.address);
-  const flat = (words: string | null | undefined) => (words ?? "").replace(/\s+/g, " ");
-  if (item.kind === "text")
-    return blocks.filter((block) => {
-      const content = flat(block.textContent);
-      return !!text && content.includes(text.start) && content.includes(text.end ?? "");
-    });
+  if (item.kind === "page")
+    return [...document.querySelectorAll("main article [data-target=page]")];
   if (item.kind === "diagram-part") {
-    const part = anchor.slice(anchor.indexOf(partSeparator) + partSeparator.length);
-    return blocks.flatMap((b) => [
-      ...b.querySelectorAll(`[data-element-id="${CSS.escape(part)}"]`),
-    ]);
+    const at = anchor.indexOf(partSeparator);
+    const figure = document.getElementById(anchor.slice(0, at));
+    const part = anchor.slice(at + partSeparator.length);
+    return figure ? [...figure.querySelectorAll(`[data-element-id="${CSS.escape(part)}"]`)] : [];
   }
-  return blocks.flatMap((b) => [...b.querySelectorAll(`[data-target="${item.kind}"]`)]);
+  if (item.kind !== "text" && item.kind !== "code") {
+    const element = anchor ? document.getElementById(anchor) : null;
+    return element?.dataset.target === item.kind ? [element] : [];
+  }
+  const blocks = [...document.querySelectorAll<HTMLElement>("main article [data-source]")].filter(
+    (block) => block.dataset.source === item.source,
+  );
+  const flat = (words: string | null | undefined) => (words ?? "").replace(/\s+/g, " ");
+  const holds = (block: Element) => {
+    const content = flat(block.textContent);
+    return !!text && content.includes(text.start) && content.includes(text.end ?? "");
+  };
+  const found =
+    item.kind === "text"
+      ? blocks.filter(
+          (block) =>
+            holds(block) &&
+            !blocks.some((inner) => inner !== block && block.contains(inner) && holds(inner)),
+        )
+      : [...new Set(blocks.flatMap((block) => [...block.querySelectorAll("[data-target=code]")]))];
+  // A text item's lines are in its block; a code item's are its code's lines.
+  const at = found.filter((element) => {
+    const lines =
+      item.kind === "code"
+        ? [...element.querySelectorAll<HTMLElement>("[data-source-line]")].map((line) =>
+            Number(line.dataset.sourceLine),
+          )
+        : [
+            Number(element.getAttribute("data-start-line")),
+            Number(element.getAttribute("data-end-line")),
+          ];
+    return (lines[0] ?? 0) <= item.startLine && item.endLine <= (lines.at(-1) ?? 0);
+  });
+  return at.length ? at : found;
 }
 
 /** Run `found` once `find` returns an element, retrying briefly while diagrams render. */

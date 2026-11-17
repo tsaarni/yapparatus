@@ -21,7 +21,7 @@ import {
   parseFileAddress,
   parseLines,
 } from "./files.ts";
-import { codeMarks, contentIssues } from "./markdown-plugin.ts";
+import { codeMarks, contentIssues, type MarksMeta } from "./markdown-plugin.ts";
 import type { DiagnosticCode, SourceFileView } from "./protocol.ts";
 import type { SourceFile, SourceFiles } from "./source-files.ts";
 
@@ -49,11 +49,23 @@ function excerptMeta(raw: unknown): ExcerptMeta | undefined {
   return { start, marks };
 }
 
-/** Each line of a file's code carries its line number in the file, and marked lines their mark. */
-const fileLines: ShikiTransformer = {
-  name: "yapparatus:file-lines",
+/**
+ * Each line of code carries its line in its file. A file's line, in an excerpt or the file view,
+ * is `data-line`, which shows as a line number, and a marked line gets its mark. A page's code
+ * block shows no numbers: its lines are lines of the page, `data-source-line`, so a selection
+ * in it points at the lines selected.
+ */
+const sourceLines: ShikiTransformer = {
+  name: "yapparatus:source-lines",
   line(node, line) {
-    const meta = excerptMeta(this.options.meta?.__raw);
+    const raw = this.options.meta?.__raw;
+    const page = typeof raw === "string" ? /^page start=(\d+)/.exec(raw) : null;
+    if (page) {
+      const written = (this.meta as MarksMeta).codeLines?.[line - 1] ?? line;
+      node.properties["data-source-line"] = Number(page[1]) + written - 1;
+      return;
+    }
+    const meta = excerptMeta(raw);
     if (!meta) return;
     const number = meta.start + line - 1;
     node.properties["data-line"] = number;
@@ -72,7 +84,7 @@ export const codeHighlighting: [typeof rehypeShiki, RehypeShikiOptions] = [
     // biome-ignore format: a list of names reads best on few lines.
     langs: ["ts", "tsx", "js", "jsx", "json", "sh", "bash", "http", "html", "css", "mdx", "md", "py", "go", "rust", "yaml", "sql"],
     lazy: true,
-    transformers: [languageLabel, codeMarks, fileLines],
+    transformers: [languageLabel, codeMarks, sourceLines],
   },
 ];
 
@@ -144,7 +156,7 @@ export async function fileView(address: FileAddress, file: SourceFile): Promise<
     lang: language,
     theme: codeTheme,
     meta: { __raw: "excerpt start=1" },
-    transformers: [languageLabel, fileLines],
+    transformers: [languageLabel, sourceLines],
   });
   return {
     address: fileAddress({ folder: address.folder, path: address.path }),

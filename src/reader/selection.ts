@@ -22,6 +22,18 @@ function blockOf(node: Node) {
   return element?.closest<HTMLElement>("main article [data-source]") ?? undefined;
 }
 
+/**
+ * The element with an id that selected words are in: the figure, table, or listing around
+ * them, else the section they are under.
+ */
+function anchorOf(node: Node, block: Element): string | undefined {
+  const element = node instanceof Element ? node : node.parentElement;
+  const owner = element?.closest<HTMLElement>(
+    "main article [data-target][id]:not([data-target=page]):not([data-target=section])",
+  );
+  return owner?.id || sectionOf(block)?.id;
+}
+
 /** The section heading a block sits under, if it has an id. */
 function sectionOf(block: Element): HTMLElement | undefined {
   let found: HTMLElement | undefined;
@@ -33,9 +45,41 @@ function sectionOf(block: Element): HTMLElement | undefined {
 }
 
 function sourceOf(block: HTMLElement) {
-  const { source, hash, startLine, endLine } = block.dataset;
-  if (!source || !hash || !startLine || !endLine) return;
-  return { source, startLine: Number(startLine), endLine: Number(endLine), hash };
+  const { source, startLine, endLine } = block.dataset;
+  if (!source || !startLine || !endLine) return;
+  return { source, startLine: Number(startLine), endLine: Number(endLine) };
+}
+
+/** The lines of a page's code inside `element`, by their line in the page. */
+function pageCodeLines(element: Element): HTMLElement[] {
+  return [...element.querySelectorAll<HTMLElement>("[data-source-line]")];
+}
+
+/** The first and last of these code lines, as lines of the page. */
+function linesOf(lines: HTMLElement[]): LineRange | undefined {
+  const numbers = lines.map((line) => Number(line.dataset.sourceLine));
+  const [first] = numbers;
+  return first === undefined ? undefined : { start: first, end: numbers.at(-1) ?? first };
+}
+
+/**
+ * The last line of a section: the line before the next heading of the same or a higher level,
+ * or the end of the page's last block.
+ */
+function sectionEnd(heading: HTMLElement, block: HTMLElement): number {
+  const level = Number(heading.tagName.slice(1));
+  const headings = [
+    ...document.querySelectorAll<HTMLElement>("main article [data-target=section]"),
+  ];
+  const next = headings
+    .slice(headings.indexOf(heading) + 1)
+    .find((other) => Number(other.tagName.slice(1)) <= level);
+  const after = next && blockOf(next);
+  if (after) return Number(after.dataset.startLine) - 1;
+  const blocks = document.querySelectorAll<HTMLElement>(
+    `main article [data-source="${CSS.escape(block.dataset.source ?? "")}"]`,
+  );
+  return Math.max(...[...blocks].map((b) => Number(b.dataset.endLine)));
 }
 
 function excerpt(text: string) {
@@ -43,13 +87,20 @@ function excerpt(text: string) {
   return clean.length > excerptLength ? `${clean.slice(0, excerptLength)}…` : clean;
 }
 
-/** A context item for a whole target: a page, section, figure, table, listing, code, or diagram part. */
+/**
+ * A context item for a whole target: a page, section, figure, table, listing, code, or diagram
+ * part. Its lines are its block's. A section runs to the next heading of its level, and a code
+ * block is its code's lines, which are fewer than its block's when it is inside a list or panel.
+ */
 export function contextFromTarget(element: Element, page: DocumentPage): ContextItem | undefined {
   const target = element.closest<HTMLElement>("[data-target]");
   const block = target && blockOf(target);
   const source = block && sourceOf(block);
   if (!target || !source) return;
   const kind = target.dataset.target as TargetKind;
+  if (kind === "section") source.endLine = sectionEnd(target, block);
+  const code = kind === "code" ? linesOf(pageCodeLines(target)) : undefined;
+  if (code) Object.assign(source, { startLine: code.start, endLine: code.end });
   const figure =
     kind === "diagram-part" ? target.closest<HTMLElement>("[data-target=figure]") : null;
   const anchor =
@@ -83,7 +134,9 @@ function clip(range: Range, node: Node): Range {
 
 /**
  * One text item per source range the selection touches: each block, list item, or table row,
- * addressed by its section with the selected words as a text fragment.
+ * addressed by the figure, table, listing, or section it is in, with the selected words as a
+ * text fragment. In a page's code block,
+ * the item's lines are the code lines selected.
  */
 export function contextsFromRange(range: Range, page: DocumentPage): ContextItem[] {
   const article = document.querySelector("main article");
@@ -105,38 +158,27 @@ export function contextsFromRange(range: Range, page: DocumentPage): ContextItem
     const source = sourceOf(block);
     const words = span.toString().trim();
     if (!source || !words) return [];
-    const section = addressOf(page, sectionOf(block)?.id);
+    const code = linesOf(
+      pageCodeLines(block).filter(
+        (line) =>
+          blockOf(line) === block &&
+          span.intersectsNode(line) &&
+          clip(span, line).toString().trim(),
+      ),
+    );
+    const owner = addressOf(page, anchorOf(span.startContainer, block));
     return [
       {
         kind: "text" as const,
-        address: `${section}${section.includes("#") ? "" : "#"}${textFragment(words)}`,
+        address: `${owner}${owner.includes("#") ? "" : "#"}${textFragment(words)}`,
         ...source,
+        ...(code ? { startLine: code.start, endLine: code.end } : {}),
       },
     ];
   });
 }
 
 /* ---------- Source files ---------- */
-
-/**
- * The server's block hash: the first 16 hex digits of the SHA-256 of the lines joined by
- * newlines. The browser computes it from the code it shows, whose lines are the file's.
- */
-export async function linesHash(lines: string[]): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(lines.join("\n")));
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 16);
-}
-
-/** The lines of a source file's code block, by their number in the file. */
-export function shownLines(region: Element): Map<number, string> {
-  const lines = new Map<number, string>();
-  for (const line of region.querySelectorAll<HTMLElement>("[data-line]"))
-    lines.set(Number(line.dataset.line), line.textContent ?? "");
-  return lines;
-}
 
 /** The file a source file's code block shows, without lines. */
 function fileOf(region: HTMLElement): FileAddress | undefined {
@@ -161,29 +203,23 @@ export function codeAddress({ region, lines, words }: CodeSelection): string | u
 }
 
 /** A context item for a whole source file, or for code in it, from the code that shows them. */
-export async function fileContext(
+export function fileContext(
   region: HTMLElement,
   selected?: CodeSelection,
-): Promise<ContextItem | undefined> {
-  const lines = selected?.lines;
+): ContextItem | undefined {
   const file = fileOf(region);
   const source = file && fileSource(contentDir, foldersOf(settings), file);
   if (!file || !source) return;
-  const shown = shownLines(region);
-  const range = lines ?? { start: 1, end: shown.size };
-  const text: string[] = [];
-  for (let n = range.start; n <= range.end; n++) {
-    const line = shown.get(n);
-    if (line === undefined) return;
-    text.push(line);
-  }
+  const range = selected?.lines ?? {
+    start: 1,
+    end: region.querySelectorAll("[data-line]").length,
+  };
   return {
-    kind: lines ? "lines" : "file",
+    kind: selected ? "lines" : "file",
     address: (selected && codeAddress(selected)) ?? fileAddress(file),
     source,
     startLine: range.start,
     endLine: range.end,
-    hash: await linesHash(text),
   };
 }
 
@@ -215,39 +251,8 @@ export function selectedCode(range: Range): CodeSelection[] {
 }
 
 /** One lines item for each source file code block the selection touches. */
-export async function fileContextsFromRange(range: Range): Promise<ContextItem[]> {
-  const items = await Promise.all(
-    selectedCode(range).map((selected) => fileContext(selected.region, selected)),
-  );
-  return items.filter((item) => item !== undefined);
-}
-
-/**
- * Where an earlier lines item's lines are now in the code shown: the same lines if they still
- * hash the same, else the one run of lines that does, else undefined. The server places
- * items for the agent the same way.
- */
-export async function relocateLines(
-  region: Element,
-  item: ContextItem,
-): Promise<LineRange | undefined> {
-  const shown = shownLines(region);
-  const length = item.endLine - item.startLine + 1;
-  const holds = async (start: number) => {
-    const text: string[] = [];
-    for (let n = start; n < start + length; n++) {
-      const line = shown.get(n);
-      if (line === undefined) return false;
-      text.push(line);
-    }
-    return (await linesHash(text)) === item.hash;
-  };
-  if (await holds(item.startLine)) return { start: item.startLine, end: item.endLine };
-  const found: number[] = [];
-  for (let start = 1; start + length - 1 <= shown.size && found.length < 2; start++)
-    if (await holds(start)) found.push(start);
-  const [start] = found;
-  return found.length === 1 && start !== undefined ? { start, end: start + length - 1 } : undefined;
+export function fileContextsFromRange(range: Range): ContextItem[] {
+  return selectedCode(range).flatMap((selected) => fileContext(selected.region, selected) ?? []);
 }
 
 /** The diagram part under an event target, as a context item. */

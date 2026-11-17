@@ -1,6 +1,6 @@
 /**
- * The chat's messages and the context they carry. The log is in `chat.ts`; the agent's side,
- * with waiting reads and prompts, is in `agent.ts`.
+ * The chat's log: reader messages with the context they carry, and agent replies, checked
+ * before they are stored. Reads of the chat, with waiting and prompts, are in `agent.ts`.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -29,10 +29,7 @@ import type {
   TargetKind,
 } from "../protocol.ts";
 import type { SourceFiles } from "../source-files.ts";
-import { blockHash } from "../source-plugin.ts";
-import { HttpError, isRecord, type Router } from "./http.ts";
-import type { Placement } from "./prompt.ts";
-import type { Sequence } from "./sequence.ts";
+import { HttpError, isRecord } from "./http.ts";
 
 const log = createLogger("chat");
 
@@ -55,23 +52,9 @@ function optionalText(value: unknown, max: number): string | undefined {
   return value;
 }
 
-/** The last line of the Markdown section whose heading is on `start`, skipping code fences. */
-export function sectionEnd(lines: string[], start: number): number {
-  const depth = /^(#+)\s/.exec(lines[start - 1] ?? "")?.[1]?.length ?? 6;
-  let fenced = false;
-  for (let i = start; i < lines.length; i++) {
-    const line = lines[i] ?? "";
-    if (/^\s*(```|~~~)/.test(line)) fenced = !fenced;
-    const heading = !fenced && /^(#+)\s/.exec(line);
-    if (heading && (heading[1]?.length ?? 7) <= depth) return i;
-  }
-  return lines.length;
-}
-
 /**
  * Check the browser's context items and keep them as sent: the file must be a document page,
- * or a source file the document shows, and the lines must have existed. Whether they still
- * hold is decided when the prompt is written.
+ * or a source file the document shows. The lines are those the reader saw.
  */
 export function acceptContext(
   root: string,
@@ -87,8 +70,6 @@ export function acceptContext(
       typeof item.address !== "string" ||
       item.address.length > 2000 ||
       typeof item.source !== "string" ||
-      typeof item.hash !== "string" ||
-      item.hash.length > 64 ||
       !Number.isInteger(item.startLine) ||
       !Number.isInteger(item.endLine)
     )
@@ -108,7 +89,6 @@ export function acceptContext(
       source: path.relative(realpathSync(root), filename),
       startLine,
       endLine,
-      hash: item.hash,
       ...(step ? { step } : {}),
     };
   });
@@ -134,42 +114,7 @@ function acceptFileItem(files: SourceFiles, item: Record<string, unknown>): Cont
     source: file.source,
     startLine: lines.start,
     endLine: lines.end,
-    hash: item.hash as string,
   };
-}
-
-/**
- * Where an item's source is now: its lines if they still hash the same, else the one place in
- * the file that does, else "changed". A section runs from its heading to the next of its level.
- * A page or a whole source file has no lines: the agent reads the file.
- */
-export function placeContext(root: string, item: ContextItem): Placement {
-  if (item.kind === "page" || item.kind === "file") return undefined;
-  let lines: string[];
-  try {
-    lines = readFileSync(path.resolve(root, item.source), "utf8").split("\n");
-  } catch {
-    return "changed";
-  }
-  const length = item.endLine - item.startLine + 1;
-  const holds = (start: number) =>
-    start + length - 1 <= lines.length && blockHash(lines, start, start + length - 1) === item.hash;
-  let start: number | undefined = holds(item.startLine) ? item.startLine : undefined;
-  if (start === undefined) {
-    const found: number[] = [];
-    for (let at = 1; at + length - 1 <= lines.length; at++) if (holds(at)) found.push(at);
-    if (found.length !== 1) return "changed";
-    start = found[0] as number;
-  }
-  const end = item.kind === "section" ? sectionEnd(lines, start) : start + length - 1;
-  return { start, end };
-}
-
-/** The log's record of a clear: the number it took. */
-interface Cleared {
-  seq: number;
-  cleared: true;
-  createdAt: string;
 }
 
 export interface ChatOptions {
@@ -178,28 +123,25 @@ export interface ChatOptions {
   content: string;
   /** The document's chat state directory, from the project folder: `.yapparatus/<directory>`, with `/` between parts. */
   state: string;
-  /** The shared number series; the chat raises it to the newest number in its log. */
-  sequence: Sequence;
   /** The source files the document shows. */
   files: SourceFiles;
   /** Page outlines, for checking the links in a reply. */
   outlines: () => Promise<Array<{ id: string; outline: PageOutline }>>;
-  /** Something the reader sees changed: a message, a reply, or a clear. */
+  /** Something the reader sees changed: a message or a reply was added, or the chat was cleared. */
   changed: () => void;
 }
 
 /**
  * The chat: an append-only log of reader messages and agent replies, stored in
- * `<state>/chat.jsonl`, with each reply's MDX in `<state>/chat/<seq>.mdx`.
- * Numbers come from the agent channel's sequence; the reader never sees them.
+ * `<state>/chat.jsonl`, with each reply's MDX in `<state>/chat/<id>.mdx`. Messages are numbered
+ * by their place in the log, so the numbers start again after the chat is cleared. A reply's
+ * file has a random name, so a new reply never reuses the module of a deleted one.
  */
 export class ChatStore {
   private entries: Message[] = [];
   private readonly dir: string;
   private readonly file: string;
   private readonly options: ChatOptions;
-  /** The number the last clear took; earlier messages are gone. */
-  cleared = 0;
 
   /** Where a reply file is stored, from the project folder. Only the server names it. */
   private replyFile(name: string): string {
@@ -215,25 +157,20 @@ export class ChatStore {
       for (const line of readFileSync(this.file, "utf8").split("\n")) {
         if (!line.trim()) continue;
         try {
-          const record = JSON.parse(line) as Message | Cleared;
-          if ("cleared" in record) this.cleared = record.seq;
-          else this.entries.push(record);
+          const record = JSON.parse(line) as Message;
+          if (record.author === "reader" || Number.isInteger(record.inReplyTo))
+            this.entries.push(record);
+          else log.warn(`${this.file}: skipped a reply without inReplyTo`);
         } catch {
           // A line cut short by a crash while appending; the messages before it are whole.
           log.warn(`${this.file}: skipped a line that is not JSON`);
         }
       }
     log.debug(`loaded ${this.entries.length} messages from ${this.file}`);
-    options.sequence.raiseTo(this.newestSeq);
-  }
-
-  /** The newest number the log holds, so the sequence never goes back below it. */
-  get newestSeq(): number {
-    return Math.max(this.entries.at(-1)?.seq ?? 0, this.cleared);
   }
 
   private next(): number {
-    return this.options.sequence.next();
+    return (this.entries.at(-1)?.seq ?? 0) + 1;
   }
 
   get messages(): readonly Message[] {
@@ -249,7 +186,16 @@ export class ChatStore {
   repliedTo(): number {
     return Math.max(
       0,
-      ...this.entries.filter((m): m is AgentMessage => m.author === "agent").map((m) => m.to),
+      ...this.entries
+        .filter((m): m is AgentMessage => m.author === "agent")
+        .map((m) => m.inReplyTo),
+    );
+  }
+
+  /** The module files of the replies in the chat, from the project folder. */
+  replyModules(): Set<string> {
+    return new Set(
+      this.entries.filter((m) => m.author === "agent").map((m) => m.module.replace(/^\//, "")),
     );
   }
 
@@ -276,23 +222,15 @@ export class ChatStore {
     return message;
   }
 
-  /**
-   * Delete every message and reply. The clear takes a number and is kept in the log, so an
-   * agent whose cursor is from before is told the chat was cleared.
-   */
-  clear(): number {
-    const seq = this.next();
+  /** Delete every message and reply, and their files. */
+  clear() {
     for (const message of this.entries)
       if (message.author === "agent")
-        rmSync(path.join(this.options.root, this.replyFile(`${message.seq}.mdx`)), { force: true });
+        rmSync(path.join(this.options.root, message.module.replace(/^\//, "")), { force: true });
     this.entries = [];
-    this.cleared = seq;
-    const record: Cleared = { seq, cleared: true, createdAt: new Date().toISOString() };
-    writeFileSync(`${this.file}.tmp`, `${JSON.stringify(record)}\n`);
-    renameSync(`${this.file}.tmp`, this.file);
-    log.info(`cleared at #${seq}`);
+    writeFileSync(this.file, "");
+    log.info("cleared");
     this.options.changed();
-    return seq;
   }
 
   /**
@@ -354,11 +292,11 @@ export class ChatStore {
   }
 
   /**
-   * Check a reply and store it as answering reader message `to`. Returns the errors that kept
-   * it out, or the stored message.
+   * Check a reply and store it as answering reader message `inReplyTo`. Returns the errors that
+   * kept it out, or the stored message.
    */
   async addReply(
-    to: number,
+    inReplyTo: number,
     mdx: string,
     readAt: string | undefined,
   ): Promise<{ errors: Diagnostic[] } | { message: AgentMessage }> {
@@ -369,34 +307,26 @@ export class ChatStore {
     writeFileSync(pending, mdx);
     const errors = await this.check(realpathSync(pending), `/${this.replyFile(name)}`);
     if (errors.length) {
-      log.info(`reply to #${to} refused: ${errors.length} errors`);
-      for (const error of errors) log.debug(`reply to #${to}: ${error.code} ${error.message}`);
+      log.info(`reply to #${inReplyTo} refused: ${errors.length} errors`);
+      for (const error of errors)
+        log.debug(`reply to #${inReplyTo}: ${error.code} ${error.message}`);
       rmSync(pending, { force: true });
       return { errors };
     }
     const seq = this.next();
-    renameSync(pending, path.join(this.options.root, this.replyFile(`${seq}.mdx`)));
+    const file = this.replyFile(`${randomUUID()}.mdx`);
+    renameSync(pending, path.join(this.options.root, file));
     const message: AgentMessage = {
       seq,
       author: "agent",
-      to,
+      inReplyTo,
       ...(readAt ? { readAt } : {}),
-      module: `/${this.replyFile(`${seq}.mdx`)}`,
+      module: `/${file}`,
       createdAt: new Date().toISOString(),
     };
     this.append(message);
-    log.info(`agent #${seq} replied to #${to}`);
+    log.info(`agent #${seq} replied to #${inReplyTo}`);
     this.options.changed();
     return { message };
-  }
-
-  /** The reader's commands. The reader's view, `GET /-/api/chat`, also needs the agent's state. */
-  mount(router: Router) {
-    router
-      .on("POST", "/chat/reader", ({ body }) => {
-        const message = this.addReader(body);
-        return { status: 201, body: { seq: message.seq } };
-      })
-      .on("POST", "/chat/clear", () => ({ status: 201, body: { seq: this.clear() } }));
   }
 }

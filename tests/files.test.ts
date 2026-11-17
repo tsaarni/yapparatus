@@ -11,10 +11,10 @@ import { codeHighlighting, excerptRange, excerpts, languageOf } from "../src/cod
 import { checkLinks, type PageOutline, quoteOf, resolveLink } from "../src/document.ts";
 import { checkFiles, fileAddress, fileSource, parseFileAddress, parseLines } from "../src/files.ts";
 import { contentIssues } from "../src/markdown-plugin.ts";
-import { acceptContext, placeContext } from "../src/server/chat.ts";
+import { acceptContext } from "../src/server/chat.ts";
 import { messagesPrompt, startPrompt } from "../src/server/prompt.ts";
 import { SourceFiles } from "../src/source-files.ts";
-import { blockHash } from "../src/source-plugin.ts";
+import { sourceContext } from "../src/source-plugin.ts";
 
 const main = [
   "export function greet(name: string) {",
@@ -157,22 +157,17 @@ test("links to files and lines are checked against the file", () =>
     assert.match(problems[2]?.message ?? "", /not a file address/);
   }));
 
-test("lines of a source file are context, found again by hash", () =>
+test("lines of a source file are context", () =>
   withProject((root, files) => {
-    const lines = main.split("\n");
     const item = {
       kind: "lines",
       address: "/-/files/app/src/main.ts#L2-L3",
       source: "app/src/main.ts",
       startLine: 2,
       endLine: 3,
-      hash: blockHash(lines, 2, 3),
     };
     const [accepted] = acceptContext(root, "content", files, [item]);
-    assert.ok(accepted);
-    assert.deepEqual(placeContext(root, accepted), { start: 2, end: 3 });
-    writeFileSync(path.join(root, "app/src/main.ts"), `// A greeting.\n\n${main}`);
-    assert.deepEqual(placeContext(root, accepted), { start: 4, end: 5 });
+    assert.deepEqual(accepted, item);
     // The address, the source, and the lines must agree.
     assert.throws(
       () => acceptContext(root, "content", files, [{ ...item, source: "secret.txt" }]),
@@ -186,6 +181,43 @@ test("lines of a source file are context, found again by hash", () =>
       () => acceptContext(root, "content", files, [{ ...item, kind: "file" }]),
       /Invalid/,
     );
+  }));
+
+test("each line of a page's code block carries its line in the page, without a number", () =>
+  withProject(async (root) => {
+    const page = [
+      "# Page",
+      "",
+      "- Item:",
+      "",
+      "  ```ts",
+      "  // [!code highlight:1]",
+      "  const a = 1;",
+      "  const b = 2;",
+      "  ```",
+      "",
+    ].join("\n");
+    const file = path.join(root, "content/page.mdx");
+    writeFileSync(file, page);
+    const js = String(
+      await compile(
+        { value: page, path: file },
+        {
+          outputFormat: "function-body",
+          rehypePlugins: [sourceContext(() => root), codeHighlighting],
+        },
+      ),
+    );
+    const { default: Content } = await run(js, { ...runtime, baseUrl: import.meta.url });
+    const html = renderToStaticMarkup(createElement(Content));
+    // The comment alone on line 6 is removed; the code lines keep their lines in the page.
+    const lines = [...html.matchAll(/data-source-line="(\d+)"/g)].map((m) => Number(m[1]));
+    assert.deepEqual(lines, [7, 8]);
+    assert.match(
+      html,
+      /data-mark="highlight" data-source-line="7"|data-source-line="7"[^>]*data-mark/,
+    );
+    assert.doesNotMatch(html, /data-line=/);
   }));
 
 test("an excerpt shows its file's lines with their numbers, exactly as written", () =>
@@ -324,7 +356,6 @@ test("two folders with the same paths stay apart, in context and in the agent's 
         source: read.source,
         startLine: 2,
         endLine: 2,
-        hash: blockHash(read.lines, 2, 2),
       };
     };
     const context = acceptContext(root, "guide", files, [item("app"), item("lib")]);
@@ -344,13 +375,7 @@ test("two folders with the same paths stay apart, in context and in the agent's 
       context,
       createdAt: new Date().toISOString(),
     };
-    const prompt = messagesPrompt(
-      [message],
-      (c) => placeContext(root, c),
-      "Diagnostics: none",
-      "guide.md",
-      1,
-    );
+    const prompt = messagesPrompt([message], "Diagnostics: none", "guide.md");
     assert.match(
       prompt,
       /- file text, app\/src\/main\.ts:2, \/-\/files\/app\/src\/main\.ts#L2: “name”/,
@@ -360,7 +385,7 @@ test("two folders with the same paths stay apart, in context and in the agent's 
       /- file text, lib\/src\/main\.ts:2, \/-\/files\/lib\/src\/main\.ts#L2: “name”/,
     );
     // The start prompt names each folder and where it is, from the project folder.
-    const start = startPrompt(0, "/project/docs/guide.md", { app: "app", lib: "lib" }, "/project");
+    const start = startPrompt("/project/docs/guide.md", { app: "app", lib: "lib" }, "/project");
     assert.match(start, /- app: app\n- lib: lib/);
     assert.match(start, /Run this from the project directory, \/project,/);
   } finally {

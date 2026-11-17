@@ -16,13 +16,13 @@ Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtur
 
 - **No backwards compatibility.** Change any API, format, or address when a better design appears; update every caller and document in the same change.
 - **One way to do each thing.** Prefer an opinionated API with a single elegant, clear path over options and aliases.
-- **Docs describe what exists.** The authoring reference covers only built features; agreed but unbuilt rules are marked **Direction** in design documents.
+- **Docs describe what exists.** Covers only built features; agreed but unbuilt rules start with `**[Direction](directions):**` in design documents and are listed in [docs/design/directions.mdx](docs/design/directions.mdx).
 
 - `pnpm verify`, `pnpm test:unit`, and `pnpm test` pass before work is done; `pnpm api:report` when exports change.
 - StyleX: longhand properties only (`borderWidth`, `backgroundColor`). Shorthands with theme variables are dropped silently; `pnpm verify` rejects them and literal colors.
 - Keep semantic class names with `styled("name", …styles)`; spreading `stylex.props()` after `className` erases it.
 - Every style value is a token from `src/reader/theme.stylex.ts`; components keep their own styles. A new value goes into the scale with a comment on what it is for. See [styling](docs/design/styling.mdx).
-- The server API sorts messages by kind: commands (`POST`), reports (`PUT /-/api/diagnostics/{scope}`), events (`GET /-/api/events`), and reads (`GET`, which may wait). Types in `src/protocol.ts`; everything the agent reads is written in `src/server/prompt.ts`.
+- The server API is resources named after what the document is made of: `chat`, `diagnostics`, `files`. Methods mean what HTTP says, bodies are JSON, a read may wait (`wait=S`), and the browser and the agent use the same resources with parameters. Changes reach the browser on Vite's hot-update connection. Types in `src/protocol.ts`; everything the agent reads is written in `src/server/prompt.ts`.
 - Browser tests run in an isolated temporary workspace with their own Vite cache.
 - `yapparatus/vite`, `yapparatus/agent`, and the `yap` command load from `lib/`, compiled by `pnpm build:lib`; `pnpm dev`, `pnpm build`, and `pnpm test` run it. A project installs this package, as `starter/` does: test a change to how it installs with `pnpm pack` into a copy of the starter.
 

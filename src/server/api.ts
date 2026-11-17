@@ -1,46 +1,57 @@
 /**
- * The dev server's API under /-/api. Each concern is its own module; this file only wires
- * them together, connects them to Vite's file watcher, and tells agents where the server is.
+ * The dev server's API under /-/api. Each resource is its own module; this file only wires
+ * them together, connects them to Vite's file watcher, sends changes to the browser on Vite's
+ * hot-update connection, and tells agents where the server is.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
 import { createLogger } from "../logger.ts";
-import { apiPrefix, type ChatState } from "../protocol.ts";
+import { apiPrefix, type UpdateEvents } from "../protocol.ts";
 import type { SourceFiles } from "../source-files.ts";
-import { AgentChannel } from "./agent.ts";
 import { ChatStore } from "./chat.ts";
+import { ChatResource } from "./chat-resource.ts";
 import { DiagnosticStore } from "./diagnostics.ts";
-import { EventHub } from "./events.ts";
 import { FileServer } from "./files.ts";
 import { Router } from "./http.ts";
-import { Sequence } from "./sequence.ts";
 
 const log = createLogger("server");
 
 export function installApi(server: ViteDevServer, content: string, files: SourceFiles) {
   const root = server.config.root;
-  const events = new EventHub();
   // Each document keeps its chat state under its own path; one server runs at a time.
   const state = `.yapparatus/${content}`;
-  const sequence = new Sequence(path.join(root, state, "sequence"));
+
+  // Changes within a short window collapse into the latest of each, so a burst of edits sends
+  // the browser one update.
+  const pending = new Map<string, () => void>();
+  let flushTimer: NodeJS.Timeout | undefined;
+  const send = <E extends keyof UpdateEvents>(
+    event: E,
+    data: () => UpdateEvents[E],
+    key: string = event,
+  ) => {
+    pending.set(key, () => server.ws.send(event as string, data() as unknown));
+    flushTimer ??= setTimeout(() => {
+      flushTimer = undefined;
+      for (const flush of pending.values()) flush();
+      log.debug(`sent ${[...pending.keys()].join(", ")}`);
+      pending.clear();
+    }, 50);
+  };
+
   // Each module reports that it changed; this file decides who hears about it.
-  const chatState = (): ChatState => ({
-    messages: [...chat.messages],
-    repliedTo: chat.repliedTo(),
-    agent: agent.status,
-    start: agent.start,
-  });
-  const publishChat = () => events.publish({ type: "chat", chat: chatState() });
+  const chatChanged = () => send("yapparatus:chat", () => resource.whole());
   const diagnostics: DiagnosticStore = new DiagnosticStore({
     root,
     content,
     server,
     files,
+    replies: () => chat.replyModules(),
     changed: () => {
-      events.publish({ type: "diagnostics", diagnostics: diagnostics.list() });
-      agent.diagnosticsChanged();
+      send("yapparatus:diagnostics", () => diagnostics.list());
+      resource.changed();
     },
   });
   const chat: ChatStore = new ChatStore({
@@ -49,46 +60,34 @@ export function installApi(server: ViteDevServer, content: string, files: Source
     content,
     server,
     files,
-    sequence,
     outlines: () => diagnostics.outlines(),
     changed: () => {
-      publishChat();
-      agent.chatChanged();
+      chatChanged();
+      resource.changed();
     },
   });
-  const agent: AgentChannel = new AgentChannel({
+  const resource: ChatResource = new ChatResource({
     root,
     folders: () => files.folders(),
     content,
     chat,
-    sequence,
-    diagnostics: {
-      list: () => diagnostics.list(),
-      unchecked: () => diagnostics.unchecked(),
-      settled: () => diagnostics.settled(),
-    },
-    changed: publishChat,
+    diagnostics,
+    changed: chatChanged,
   });
 
   const router = new Router();
-  router.on("GET", "/chat", () => ({ status: 200, body: chatState() }));
-  chat.mount(router);
-  agent.mount(router);
+  resource.mount(router);
   diagnostics.mount(router);
   const fileServer = new FileServer({ files, server });
   fileServer.mount(router);
-  events.mount(router, () => [
-    { type: "chat", chat: chatState() },
-    { type: "diagnostics", diagnostics: diagnostics.list() },
-  ]);
   server.middlewares.use(apiPrefix, router.middleware());
 
   const onFile = (file: string) => {
     if (file.startsWith(path.join(root, ".yapparatus") + path.sep)) return;
     diagnostics.fileChanged();
     const address = fileServer.addressOf(file);
-    // Keyed by address: two files saved together are two events.
-    if (address) events.publish({ type: "file", address }, `file:${address}`);
+    // Keyed by address: two files saved together are two updates.
+    if (address) send("yapparatus:file", () => address, `file:${address}`);
   };
   server.watcher.on("add", onFile);
   server.watcher.on("change", onFile);
@@ -115,8 +114,8 @@ export function installApi(server: ViteDevServer, content: string, files: Source
   if (server.httpServer?.listening) start();
   else server.httpServer?.once("listening", start);
   server.httpServer?.once("close", () => {
-    agent.close();
-    events.close();
+    resource.close();
+    clearTimeout(flushTimer);
     const current = existsSync(serverFile) ? readFileSync(serverFile, "utf8") : "";
     if (written && current === written) rmSync(serverFile, { force: true });
     log.info("closed");

@@ -1,12 +1,15 @@
 /**
  * The wire protocol between the dev server, the reader app, and the agent library.
  *
- * Messages by kind, each with its own resource:
- *   Commands      intent                       POST /-/api/chat/reader, /-/api/chat/clear, /-/api/agent/reply?to=N
- *   Reports       facts the browser observes   PUT|DELETE /-/api/diagnostics/{scope}
- *   Events        server → browser updates     GET /-/api/events (Server-Sent Events)
- *   Reads         state, possibly blocking     GET /-/api/chat, GET /-/api/diagnostics, GET /-/api/agent/prompt?after=N&timeout=S,
- *                                              GET /-/api/agent/diagnostics, GET /-/api/files/{folder}/{path}
+ * Resources under /-/api, named after what the document is made of:
+ *   GET    /chat?after=C&author=reader&include=diagnostics&wait=S   the chat, or what is new since C
+ *   POST   /chat                                                    add a message
+ *   DELETE /chat                                                    clear the chat
+ *   GET    /diagnostics                                             the document's problems
+ *   POST   /diagnostics                                             what a browser found
+ *   GET    /files/{directory}/{path}                                a source file
+ * An agent's reads of the chat carry its id in the `Yapparatus-Agent` header.
+ * Changes reach the browser on Vite's hot-update connection, as the events in `UpdateEvents`.
  */
 
 import type { Root } from "hast";
@@ -17,6 +20,12 @@ import type { Root } from "hast";
  */
 export const appPrefix = "/-";
 export const apiPrefix = `${appPrefix}/api`;
+
+/**
+ * The request header that names the agent session reading the chat. Who reads changes nothing
+ * in the response; it drives the agent's state, and the newest agent takes over.
+ */
+export const agentHeader = "Yapparatus-Agent";
 
 /* ---------- Chat ---------- */
 
@@ -37,24 +46,23 @@ export type TargetKind =
   | "lines";
 
 /**
- * One thing the reader asked about: an address, and where its source was when the reader asked.
- * The compiler embeds the source range in the page; the browser sends it back. The server keeps
- * the item as sent and finds the lines again, by hash, when it writes the prompt.
+ * One thing the reader asked about: an address, and the lines of its source when the reader
+ * asked. The compiler embeds the source lines in the page; the browser sends them back, and the
+ * server keeps the item as sent. The page the reader sees is the file on disk, because the page
+ * reloads when its file changes.
  */
 export interface ContextItem {
   kind: TargetKind;
   /**
-   * "/page", "/page#id", "/page#figure--part", or for selected words the nearest section with a
-   * text fragment: "/page#section:~:text=start,end". For a source file, "/-/files/app/x.go",
-   * or with its lines, "/-/files/app/x.go#L4-L9".
+   * "/page", "/page#id", "/page#figure--part", or for selected words the figure, table, listing,
+   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
+   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
    */
   address: string;
   /** The page's or source file's file, relative to the project folder. */
   source: string;
   startLine: number;
   endLine: number;
-  /** Content hash of lines `startLine`–`endLine` when the reader asked. */
-  hash: string;
   /** The diagram step the reader had open, with its text: "Step 2 of 5 (miss): …". */
   step?: string;
 }
@@ -76,8 +84,8 @@ export interface AgentMessage {
   seq: number;
   author: "agent";
   /** The newest reader message the reply answers; earlier ones are answered too. */
-  to: number;
-  /** When the server first handed message `to` to an agent; absent if the server restarted. */
+  inReplyTo: number;
+  /** When the server first handed message `inReplyTo` to an agent; absent if the server restarted. */
   readAt?: string;
   /** The reply's MDX module, which the browser imports to show it. */
   module: string;
@@ -86,36 +94,41 @@ export interface AgentMessage {
 
 export type Message = ReaderMessage | AgentMessage;
 
-/** Body of GET /-/api/chat. Status is computed from the log, never stored. */
-export interface ChatState {
-  /** The messages since the chat was last cleared. */
+/**
+ * Body of POST /-/api/chat. The author says which checks apply: a reader message
+ * carries what the reader selected; an agent reply is MDX, compiled and checked first. A
+ * reply answers the reader messages that the agent's last read returned.
+ */
+export type NewMessage =
+  | { author: "reader"; text: string; context: ContextItem[] }
+  | { author: "agent"; mdx: string };
+
+/**
+ * "waiting": an agent is connected: a waiting read is open, or an empty read or a
+ * reply ended a moment ago. "working": no agent is connected, and the last one read messages
+ * it has not replied to, within the last 10 minutes. "away": neither, so the reader sees how
+ * to connect one. The server cannot see an agent between its requests.
+ */
+export type AgentState = "waiting" | "working" | "away";
+
+/**
+ * Body of GET /-/api/chat. A read without the agent header is the whole chat since it was last
+ * cleared, every diagnostic with `include=diagnostics`, and the start prompt. An agent's read
+ * holds what the agent has to do: the reader messages not answered yet (only the reader's with
+ * `author=reader`) and, with `include=diagnostics`, the errors the agent has not been given.
+ * `wait` holds an agent's read until there is something.
+ */
+export interface Chat {
   messages: Message[];
   /** The highest reader message an agent replied to; 0 before the first reply. */
   repliedTo: number;
+  agent: AgentState;
+  /** With `include=diagnostics`: every diagnostic, or in an agent's read the new errors. */
+  diagnostics?: ReportedDiagnostic[];
   /**
-   * "listening": an agent is connected: a wait is open, or a wait without news or a reply ended
-   * a moment ago. "read": no agent is connected, and the last one read messages it has not
-   * replied to, within the last 10 minutes; it is probably writing the answer. "away": neither,
-   * so the reader sees how to connect one. The server cannot see an agent between its commands.
+   * The same read written for an agent. Without the agent header, the text a person gives an
+   * agent to connect; with it, the messages and diagnostics, ending with the snippet to run next.
    */
-  agent: "listening" | "read" | "away";
-  /** The text a person gives their agent to connect, with the current number filled in. */
-  start: string;
-}
-
-/** Body of POST /-/api/chat/reader. */
-export interface NewReaderMessage {
-  text: string;
-  context: ContextItem[];
-}
-
-/** Body of GET /-/api/chat/prompt: the reader messages after the cursor, and text for the agent. */
-export interface AgentPrompt {
-  messages: ReaderMessage[];
-  /** The number the chat was cleared at, when that happened after the cursor. */
-  cleared?: number;
-  /** Errors the agent has not been shown before. They end a wait, like a reader message. */
-  newErrors: ReportedDiagnostic[];
   prompt: string;
 }
 
@@ -310,36 +323,49 @@ export interface Diagnostic {
 }
 
 /**
- * Body of PUT /-/api/diagnostics/{scope}: the complete current set for one scope. A scope is
- * one check: "diagram:<source>#<figure>", "render:<source>", "runtime:<tab>", "reply:<seq>".
- * An empty list clears the scope. A report with a revision expires when the file changes,
- * and a "render:" report marks its page as checked at that revision.
+ * Body of POST /-/api/diagnostics: what a browser found when it rendered one revision of a
+ * page, or a reply. Findings only add: they count while the page is at that revision, and a
+ * change to the page gives it a new one. A report with no diagnostics says the revision was
+ * rendered and nothing was found, which marks the page as checked. A reply never changes, so
+ * its report has no revision. The server fills in each diagnostic's `source`.
  */
 export interface DiagnosticReport {
-  diagnostics: Diagnostic[];
+  /** The page's file, or the reply's module file, relative to the project folder. */
+  source: string;
   revision?: string;
+  diagnostics: Omit<Diagnostic, "source">[];
 }
 
-/** A diagnostic as the server lists it, with its code's severity. */
+/** A diagnostic as the server lists it: its severity, and where it is now. */
 export interface ReportedDiagnostic extends Diagnostic {
   severity: Severity;
-  scope: string;
-  reportedAt: string;
+  /** The figure's last line, when `line` is a figure's first. The server reads both from the page. */
+  endLine?: number;
+  /** The page address to link: "/page" or "/page#figure". */
+  address?: string;
+}
+
+/** A page no browser has rendered since it changed, and what was found in its last checked revision. */
+export interface UncheckedPage {
+  source: string;
+  /** "/page" */
+  address: string;
+  previous: ReportedDiagnostic[];
 }
 
 /**
- * Body of GET /-/api/agent/diagnostics, which answers once the checks of recent edits are done:
- * every open diagnostic, the pages no browser has checked since they changed, and text for the agent.
+ * Body of GET /-/api/diagnostics, which answers once the checks of recent edits are done:
+ * every diagnostic, the pages no browser has checked since they changed, and text for the agent.
  */
-export interface AgentDiagnostics {
+export interface DocumentDiagnostics {
   diagnostics: ReportedDiagnostic[];
-  unchecked: string[];
+  unchecked: UncheckedPage[];
   prompt: string;
 }
 
 /**
- * Body of a refused POST /-/api/agent/reply (422): text for the agent, and the problems with
- * the reply or the errors that appeared after the agent read the message.
+ * Body of a refused agent reply (422): text for the agent, and the problems with the reply
+ * or the errors that appeared after the agent read the message.
  */
 export interface ReplyRefusal {
   error: string;
@@ -349,7 +375,7 @@ export interface ReplyRefusal {
 /* ---------- Source files ---------- */
 
 /**
- * Body of GET /-/api/files/{folder}/{path}: a source file, highlighted like the code on
+ * Body of GET /-/api/files/{directory}/{path}: a source file, highlighted like the code on
  * pages. Each line is a `span` with `data-line`. Builds carry the same object.
  */
 export interface SourceFileView {
@@ -364,10 +390,17 @@ export interface SourceFileView {
   code: Root;
 }
 
-/* ---------- Events ---------- */
+/* ---------- Updates ---------- */
 
-export type ServerEvent =
-  | { type: "chat"; chat: ChatState }
-  | { type: "diagnostics"; diagnostics: ReportedDiagnostic[] }
-  /** A source file a reader has open changed on disk. */
-  | { type: "file"; address: string };
+/**
+ * What the server sends the browser on Vite's hot-update connection when something changes.
+ * Each carries what the matching read returns.
+ */
+export interface UpdateEvents {
+  /** GET /-/api/chat */
+  "yapparatus:chat": Chat;
+  /** The `diagnostics` of GET /-/api/chat?include=diagnostics */
+  "yapparatus:diagnostics": ReportedDiagnostic[];
+  /** The address of a source file a reader has open, after it changed on disk. */
+  "yapparatus:file": string;
+}

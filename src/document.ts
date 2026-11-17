@@ -235,6 +235,11 @@ function normalize(path: string) {
 
 /* ---------- Link checking ---------- */
 
+/** A fragment's anchor, without the text fragment that may follow it: "id:~:text=…" → "id". */
+function anchorOf(fragment: string): string {
+  return fragment.split(":~:")[0] ?? "";
+}
+
 export interface LinkDiagnostic {
   page: string;
   line: number;
@@ -313,13 +318,13 @@ export function checkLinks(
             ? `The link "${href}" is not a file address. Write /-/files/<directory>/<path>#L10-L20.`
             : `No page matches the link "${href}".`,
         });
-      else if (!anchorExists(resolved.page, resolved.fragment))
+      else if (!anchorExists(resolved.page, anchorOf(resolved.fragment)))
         broken.push({
           page: page.id,
           line,
           code: "BROKEN_LINK",
           subject: href,
-          message: `The link "${href}" names #${resolved.fragment}, which ${resolved.page}.mdx does not have.`,
+          message: `The link "${href}" names #${anchorOf(resolved.fragment)}, which ${resolved.page}.mdx does not have.`,
         });
     }
     for (const { to: written, line } of page.outline.refs) {

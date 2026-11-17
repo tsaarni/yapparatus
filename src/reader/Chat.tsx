@@ -18,7 +18,14 @@ import {
 import { partSeparator, quoteOf, splitAddress } from "../document.ts";
 import { linesLabel, parseFileAddress } from "../files.ts";
 import { createLogger } from "../logger.ts";
-import type { AgentMessage, ChatState, ContextItem, Message, ReaderMessage } from "../protocol.ts";
+import type {
+  AgentMessage,
+  AgentState,
+  Chat as ChatRead,
+  ContextItem,
+  Message,
+  ReaderMessage,
+} from "../protocol.ts";
 import { commands, reportDiagnostics } from "./api.ts";
 import { type AppIconName, AppIcon as Icon } from "./icons.tsx";
 import { findTarget, numbering, numbersOf, PageContext } from "./numbering.ts";
@@ -40,16 +47,22 @@ import { Button, styled, ui, useCopy } from "./ui.tsx";
 
 const log = createLogger("chat");
 
-/** A reply that fails to render is an error; it ends the agent's wait, so it can send a fix. */
+/**
+ * A reply that fails to render is an error; it ends the agent's wait, so it can send a fix.
+ * A reply never changes, so the finding lasts as long as the reply.
+ */
 function reportReply(message: AgentMessage, error: string) {
-  reportDiagnostics(`reply:${message.seq}`, [
-    {
-      origin: "reply",
-      code: "REPLY_FAILED",
-      message: `A reply could not be shown: ${error}`,
-      target: String(message.seq),
-    },
-  ]);
+  reportDiagnostics({
+    source: message.module.replace(/^\//, ""),
+    diagnostics: [
+      {
+        origin: "reply",
+        code: "REPLY_FAILED",
+        message: `A reply could not be shown: ${error}`,
+        target: String(message.seq),
+      },
+    ],
+  });
 }
 
 class ReplyBoundary extends Component<
@@ -299,7 +312,11 @@ const MessageList = memo(function MessageList({
     message.author === "reader" ? (
       <ReaderView key={message.seq} message={message} onShowOnPage={onShowOnPage} />
     ) : (
-      <AgentView key={message.seq} message={message} asked={bySeq.get(message.to)?.createdAt} />
+      <AgentView
+        key={message.seq}
+        message={message}
+        asked={bySeq.get(message.inReplyTo)?.createdAt}
+      />
     ),
   );
 });
@@ -365,9 +382,9 @@ const AgentView = memo(function AgentView({
 }, sameMessage);
 
 /** What the server knows, and nothing more: it cannot see an agent between its commands. */
-const presence: Record<ChatState["agent"], string> = {
-  listening: "Agent connected",
-  read: "Agent working, not connected",
+const presence: Record<AgentState, string> = {
+  waiting: "Agent connected",
+  working: "Agent working, not connected",
   away: "Agent not connected",
 };
 
@@ -503,7 +520,7 @@ function ConfirmClear({ onClear, onCancel }: { onClear: () => void; onCancel: ()
 }
 
 export interface ChatProps {
-  chat: ChatState;
+  chat: ChatRead;
   /** What the next message is about: the pills above the message box. */
   context: ContextItem[];
   setContext: (update: (current: ContextItem[]) => ContextItem[]) => void;
@@ -574,7 +591,7 @@ export function Chat(props: ChatProps) {
             <div {...stylex.props(s.headerText)}>
               <h2 {...stylex.props(s.title)}>Ask about this document</h2>
               <p {...styled("presence", s.subtitle)} data-agent={chat.agent}>
-                <span {...stylex.props(s.presence, chat.agent === "listening" && s.presenceOn)} />
+                <span {...stylex.props(s.presence, chat.agent === "waiting" && s.presenceOn)} />
                 {presence[chat.agent]}
               </p>
             </div>
@@ -624,7 +641,7 @@ export function Chat(props: ChatProps) {
               />
               <Typing
                 label={
-                  chat.agent === "listening"
+                  chat.agent === "waiting"
                     ? "The agent has your message"
                     : "The agent is working on your message"
                 }
@@ -642,7 +659,7 @@ export function Chat(props: ChatProps) {
         }}
       >
         <div {...stylex.props(s.column, props.full && s.columnFull)}>
-          {chat.agent === "away" && <Connect start={chat.start} />}
+          {chat.agent === "away" && <Connect start={chat.prompt} />}
           <div {...stylex.props(s.box)}>
             {context.length > 0 && (
               <div {...styled("context-items", s.chips)}>

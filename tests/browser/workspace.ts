@@ -13,6 +13,11 @@ export function snippets(prompt: string): string[] {
   );
 }
 
+/** The snippet in a prompt that replies and waits. */
+export function replySnippet(prompt: string): string {
+  return snippets(prompt).find((code) => code.includes("await sendReply(")) ?? "";
+}
+
 /** Run a snippet in the workspace as an agent would, with `input` on stdin. */
 export function runSnippet(code: string, input = "") {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {

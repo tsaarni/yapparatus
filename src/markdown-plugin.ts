@@ -345,8 +345,12 @@ const markOf: Record<string, CodeMark> = { highlight: "highlight", "++": "add", 
 const notation =
   /[ \t]*(?:\/\/|#|--|;|%|\/\*|<!--)[ \t]*\[!code (highlight|\+\+|--)(?::(\d+))?\][ \t]*(?:\*\/|-->)?[ \t]*$/;
 
-/** Shiki shares `meta` between a block's hooks; options are copied between them. */
-type MarksMeta = { codeMarks?: Map<number, CodeMark> };
+/**
+ * Shiki shares `meta` between a block's hooks; options are copied between them. `codeLines`
+ * holds, for each line shown, its line in the code as written, which differs once a comment
+ * alone on its line is removed.
+ */
+export type MarksMeta = { codeMarks?: Map<number, CodeMark>; codeLines?: number[] };
 
 export const codeMarks: ShikiTransformer = {
   name: "yapparatus:code-marks",
@@ -354,9 +358,10 @@ export const codeMarks: ShikiTransformer = {
     if (!code.includes("[!code ") || String(this.options.meta?.__raw ?? "").startsWith("excerpt"))
       return;
     const lines: string[] = [];
+    const written: number[] = [];
     const marked = new Map<number, CodeMark>();
     let active: { mark: CodeMark; left: number } | undefined;
-    for (const raw of code.split("\n")) {
+    for (const [index, raw] of code.split("\n").entries()) {
       const match = notation.exec(raw);
       if (match?.[1]) {
         active = { mark: markOf[match[1]] as CodeMark, left: Number(match[2] ?? 1) };
@@ -364,12 +369,14 @@ export const codeMarks: ShikiTransformer = {
         if (!before.trim()) continue;
         lines.push(before);
       } else lines.push(raw);
+      written.push(index + 1);
       if (active && active.left > 0) {
         marked.set(lines.length, active.mark);
         active.left -= 1;
       }
     }
     (this.meta as MarksMeta).codeMarks = marked;
+    (this.meta as MarksMeta).codeLines = written;
     return lines.join("\n");
   },
   line(node, line) {
