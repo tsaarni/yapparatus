@@ -8,7 +8,7 @@ export interface FontSpec {
   weight: number;
 }
 
-/** Text measurement is injected: the browser uses canvas, tests use a fixed advance. */
+/** Text measurement is injected: the server measures with the font files, tests use a fixed advance. */
 export type Measure = (text: string, font: FontSpec) => number;
 
 /**
@@ -101,5 +101,5 @@ export function cylinderCap(width: number): number {
 /** Shape corners, by kind. */
 export const corner = { shape: 6, group: 10, frame: 4, mark: 3 };
 
-/** The warning badge on a part's corner. */
+/** The warning badge on an element's corner. */
 export const badge = { radius: 7 };

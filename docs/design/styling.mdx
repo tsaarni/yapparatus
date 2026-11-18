@@ -2,133 +2,146 @@ import { Swatch } from "./swatch.tsx";
 
 # Styling
 
-This page describes the visual design rules of the reader app and the conventions for writing styles. The reader app styles the shell, controls, figures, diagrams, icons, and MDX typography with StyleX, a styling library that compiles styles to atomic CSS at build time. StyleX keeps the styles of each component in the same file as the component and gives design tokens types. A design token is a named value, such as a color or a size. Components use tokens for every value. Every value, including every color, size, space, and duration, is defined only in [`src/reader/theme.stylex.ts`](/-/files/yapparatus/src/reader/theme.stylex.ts). This page does not repeat the values. <Ref to="style-files" /> shows which files contain the styles.
+This page explains how the web app, its components, and its figures are styled: the tokens that hold every style value, the colors and themes built from them, and the rules that `pnpm verify` enforces.
 
-<Figure id="style-files" caption="The files that contain the styles.">
+## Overview
+
+The web app is styled with [StyleX](https://stylexjs.com/), which compiles the styles of each component to atomic CSS at build time, so the style sheet grows only with the number of distinct values. Each component keeps its styles in its own file, next to its markup. Every value that a style uses, such as a color, a space, or a duration, is a token: a named, typed value defined once in [the theme file](/-/files/yapparatus/src/web/theme.stylex.ts). <Ref to="styling-files" /> shows where the styles are.
+
+<Figure id="styling-files" caption="The files that hold the styles.">
 
 <FileTree>
 
 - src/
-  - reader/
-    - **theme.stylex.ts** every token: colors, type, space, layers, conditions
-    - ui.tsx the focus ring, `Button` variants, `styled()`, and `useCopy()`
-    - prose.tsx Markdown elements as styled components, for pages and replies
-    - App.tsx the shell and the breakout grid
-    - Sidebar.tsx
-    - Chat.tsx
-    - components.tsx figures, tables, and file trees
-    - favicon.ts the document's favicon, in the accent of the browser's tab strip
-    - appearance.ts applies the theme by toggling `lightTheme` on the root
-    - styles.css only a reset and the reduced-motion rule
+  - web/
+    - **theme.stylex.ts** every token
+    - ui.tsx the focus ring, the button, and the class name helper
+    - prose.tsx Markdown elements, for pages and replies
+    - appearance.ts applies the theme
+    - styles.css a reset and the reduced-motion rule
+    - …
   - diagram/
-    - Diagram.tsx the figure's frame, step controls, and step text
-    - DiagramView.tsx the SVG of a figure, its parts in drawing order
-    - part.tsx what every part shares: step states, role and category colors, text lines
-    - NodeView.tsx shapes, record cells, marks, badges, and pins
-    - EdgeView.tsx edges, enclosures, and frames
-    - Legend.tsx the category legend under a figure
-    - shapes.ts outlines as path data, shared with the agent's pictures
-    - paint.ts reads the light theme's colors and diagram strokes for the agent's pictures
-    - Diagnostics.tsx the list of a figure's diagnostics, also used by charts
+    - element.tsx the styles that every diagram element shares
+    - paint.ts the theme as plain values, for pictures
+    - …
+- scripts/
+  - check-styles.ts the style check of `pnpm verify`
+- tests/
+  - theme.test.ts the contrast checks
 
 </FileTree>
 
 </Figure>
 
+Authors' own components import the same tokens from `yapparatus/theme.stylex`; see [custom components](/components#custom-components).
+
+## Tokens
+
+The colors, shadows, and font stacks change with the theme, so they are CSS variables. The scales, such as font sizes and spaces, are the same in every theme, so StyleX writes their values into each rule. Each color has a value for the screen, a light value for print, and a stronger value for increased contrast, which <Ref to="styling-role" /> combines into one.
+
+<Listing id="styling-role" caption="One role, with its screen, print, and increased-contrast values.">
+<Excerpt from="/-/files/yapparatus/src/web/theme.stylex.ts" start="/** One role in a theme:" end="const lightRole" />
+</Listing>
+
+Conditions, such as a narrow reading column, are tokens too, as <Ref to="styling-conditions" /> shows.
+
+<Listing id="styling-conditions" caption="The conditions.">
+<Excerpt from="/-/files/yapparatus/src/web/theme.stylex.ts" start="export const when =" mark="narrow" />
+</Listing>
+
+The narrow condition is a container query on the reading column, which narrows both when the window shrinks and when the reader widens the chat. The chat panel uses a media query, because on a phone it covers the window. See [page layout](/web-app#page-layout).
+
+The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run, so it reads the theme file as plain values. Pictures, tests, and the web app then use the same colors.
+
+A new value goes into a scale in the theme file, with a comment on what it is for. A new color role needs a dark and a light value and a contrast rule in the test.
+
 ## Color
 
-1. **Components ask for color roles.** A role is a named purpose for a color, such as `textMuted` or `accentSurface`. A component refers to a role by name and contains no hex value. Each theme gives every role a value, so adding a theme requires no change to any component.
-2. **The accent color has a few purposes.** It marks links, focus, the current position, and the primary action. The accent therefore means "you can act here" or "you are here".
-3. **Each hue has one meaning.** Indigo is the accent, red means an error, amber means a warning, and green means success. Diagrams and charts also use four category hues. The legend of each figure says what its categories mean.
-4. **Color is always combined with another signal.** Hues at the same lightness are easy to confuse, especially for readers with color blindness. Alerts have a title and an icon, and diagnostics have text. In diagrams, storage is drawn as a cylinder, and an external system has a dashed outline.
-5. **Surfaces show depth by their lightness.** Each surface is lighter than the one behind it. Only menus, notices, and panels that lie over the page cast a shadow.
+A component asks for a color by its role, such as `textMuted`, and contains no color values. Each theme gives every role a value, so a new theme changes no component. <Ref to="styling-roles" /> shows the main roles in the current theme.
 
-<Ref to="color-roles" /> shows the main roles with colors taken from the current theme. Switch the theme in the header to compare the themes.
-
-<Table id="color-roles" caption="Color roles, shown in the current theme.">
+<Table id="styling-roles" caption="Color roles, shown in the current theme.">
 
 | Role | Sample | Used for |
 |---|---|---|
 | `text` | <Swatch role="text" /> | Headings, emphasis |
 | `textBody` | <Swatch role="textBody" /> | Reading text, plain code |
 | `textMuted` | <Swatch role="textMuted" /> | Captions, labels, comments in code |
-| `accent` | <Swatch role="accent" /> | Focus marks, the current position, accent parts in diagrams |
+| `accent` | <Swatch role="accent" /> | Focus marks, the current position, accent elements in diagrams |
 | `accentStrong` | <Swatch role="accentStrong" /> | Links, focus rings |
-| `borderControl` | <Swatch role="borderControl" /> | Control edges, diagram boxes and lines |
+| `borderControl` | <Swatch role="borderControl" /> | Control edges, diagram outlines and lines |
 | `error` | <Swatch role="error" /> | Errors |
-| `warning` | <Swatch role="warning" /> | Warnings, warning parts in diagrams |
+| `warning` | <Swatch role="warning" /> | Warnings, warning elements in diagrams |
 | `success` | <Swatch role="success" /> | Success, added lines |
 | `category1`–`category4` | <Swatch role="category1" /> <Swatch role="category2" /> <Swatch role="category3" /> <Swatch role="category4" /> | Diagram and chart categories, in order |
 
 </Table>
 
+Each hue has one meaning. The indigo accent marks links, focus, the current position, and the primary action. Red is an error, amber a warning, and green success. The four category hues go, in order, to the [categories](/components#roles-and-categories) of a diagram or chart, and the first two stay apart with red-green color blindness. Color always comes with a second signal, such as an icon, text, or a shape.
+
+Surfaces step away from the background in lightness: `canvas`, `surface`, `surfaceRaised`, and `surfaceHover`. Each is lighter than the one behind it in the dark theme and darker in the light theme. Only menus, notices, and panels over the page cast a shadow.
+
 ## Contrast
 
-Every theme meets the same minimum contrast ratios. [`tests/theme.test.ts`](/-/files/yapparatus/tests/theme.test.ts) checks them for each theme, for print, and for increased contrast. A new theme must pass the same test.
+[The theme test](/-/files/yapparatus/tests/theme.test.ts) computes the WCAG contrast of each pair of roles drawn together, in the dark and light themes, each with increased contrast and in print. Text and status colors need 4.5:1, the [AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html). Control edges and diagram outlines need 3:1, the [minimum for graphics](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Tinted fills and dividers need 1.3:1. The test also checks that the category colors stay apart with red-green color blindness.
 
-1. **Text has a contrast of at least 4.5:1** on every surface, including tinted surfaces. This is the [WCAG AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html).
-2. **Control edges and diagram outlines have a contrast of at least 3:1.** This is the [WCAG minimum](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html) for graphics that carry meaning.
-3. **Tinted fills and dividers have a contrast of at least 1.3:1** against their surface. A smaller difference is not visible on an ordinary screen in daylight.
+<Ref to="styling-contrast" /> lists the ratios on `surface`, computed with the test's formula, and <Ref to="styling-contrast-chart" /> draws them. The smallest margin is `textMuted` on a tinted surface, at 4.82:1.
+
+<Table id="styling-contrast" caption="Contrast on surface, by role and theme.">
+
+| Role | Theme | Contrast | Minimum |
+|---|---|---:|---:|
+| `text` | Dark | 16.42 | 4.5 |
+| `text` | Light | 17.04 | 4.5 |
+| `textBody` | Dark | 11.17 | 4.5 |
+| `textBody` | Light | 12.07 | 4.5 |
+| `textMuted` | Dark | 6.90 | 4.5 |
+| `textMuted` | Light | 6.63 | 4.5 |
+| `accent` | Dark | 7.28 | 4.5 |
+| `accent` | Light | 5.91 | 4.5 |
+| `borderControl` | Dark | 4.57 | 3 |
+| `borderControl` | Light | 3.73 | 3 |
+| `border` | Dark | 1.45 | 1.3 |
+| `border` | Light | 1.46 | 1.3 |
+
+</Table>
+
+<Chart id="styling-contrast-chart" caption="Contrast on surface, on a log scale. The rules mark the minimums 1.3, 3, and 4.5." from="#styling-contrast" plot={(Plot, rows) => ({
+  marks: [
+    Plot.ruleX([1.3, 3, 4.5]),
+    Plot.dot(rows, { x: "Contrast", y: "Role", fill: "Theme", r: 5 }),
+  ],
+  x: { type: "log", grid: true },
+  y: { label: null },
+})} />
+
+Increased contrast raises the borders and the secondary text. With it, `borderControl` reaches 6.09:1 in the dark theme and 5.34:1 in the light theme.
 
 ## Themes
 
-1. **The document decides whether the reader can choose the theme.** The `"theme"` setting in `document.json` is `"dark"` (the default), `"light"`, or `"auto"`. A fixed theme is the same for every reader, so a document that has its own look keeps it.
-2. **With `"auto"`, the theme follows the system setting, and the reader can override it.** A button in the header switches between System, Light, and Dark in turn. The browser remembers the choice.
-3. **The first paint uses the correct color scheme.** The build writes the document's `color-scheme` into the HTML. The blank page and the scrollbars therefore appear in the correct scheme before the page loads.
+The `"theme"` setting in `document.json` is `"dark"`, the default, `"light"`, or `"auto"`. With `"auto"`, the theme follows the system, and a header button switches between System, Light, and Dark and remembers the choice. The theme is applied before the first render, and the HTML page already names the color scheme, so the page does not change once it shows.
 
 ## Typography and scales
 
-1. **Inter is the font for everything except code.** Inter is used for text, the interface, and diagrams, and JetBrains Mono for code. Size, weight, and color show the hierarchy.
-2. **There are six sizes and three weights.** Each size is at least 2 px from the next. The reader can therefore recognize each size as a separate level.
-3. **Every scale is a list of named values.** The scales are sizes, spaces on a 4 px grid, radii, layers, and durations. A component picks a value from the list. As a result, edges line up across components that are written independently.
-4. **The page title size follows the width of the reading column.** When the reader opens the chat, the column becomes narrower and the title becomes smaller.
-5. **Diagram labels are 13.5 px,** which is outside the scale. The diagram compiler measures text at this size to place the parts. See [size and text](diagrams#size-and-text).
-6. **Animation confirms a change.** Nothing moves for decoration.
+Inter is the font of text, the interface, and diagrams, and JetBrains Mono the font of code. Size, weight, and color show the hierarchy, with six font sizes and three weights. The page title scales with the reading column. The other scales hold spaces, which are multiples of 4 px, radii, sizes, layers, strokes, and durations, so that components written apart line up.
+
+Diagram labels are 13.5 px, outside the scale, because the diagram compiler [measures text](/diagram-compiler#text-measurement) at this size.
 
 ## Feedback
 
-The reader app shows feedback where the reader performed the action. It asks the reader only for what it needs.
-
-1. **The copy button confirms a copy on itself,** for a moment, through `useCopy()` in [`ui.tsx`](/-/files/yapparatus/src/reader/ui.tsx). The confirmation appears where the reader is looking, and the reader does not need to dismiss it.
-2. **Notices close automatically** after a few seconds, or when the reader presses Escape or clicks Dismiss. A notice stays open while the pointer is over it. A notice reports something that the reader does not need to act on.
-3. **Errors stay until the reader dismisses them,** because the reader may need to read them or act on them.
-4. **Confirmations appear inline in the page.** The reader app uses no browser dialogs. An action that cannot be undone asks for confirmation beside its control, with focus on Cancel. A browser dialog would block the whole page and cannot use the theme.
+The web app shows feedback where the reader acted. A copy button confirms on itself. A notice closes after a few seconds, and an error stays until dismissed. Clearing the chat asks for confirmation beside its button, because browser dialogs block the page and ignore the theme.
 
 ## Accessibility and print
 
-1. **Increased contrast** makes borders, text, and the accent stronger when the system requests it.
-2. **Forced colors** (Windows high contrast) keep focus visible with outlines, because the system replaces the usual focus color.
-3. **Reduced motion** makes every transition instant. One global rule in [`styles.css`](/-/files/yapparatus/src/reader/styles.css) does this, so no component can leave it out.
-4. **Focus is always visible.** It is shown as a 2 px ring in `accentStrong`.
-5. **Print uses the light theme,** because browsers leave out backgrounds when printing, and light text would then print gray on white. The header, navigation, and chat are hidden. Figures avoid page breaks, and diagram steps print as a numbered list.
+Keyboard focus shows a 2 px ring, which stays visible as an outline in forced-colors mode. Reduced motion makes every transition instant, with one rule in [the base style sheet](/-/files/yapparatus/src/web/styles.css). StyleX puts its own rules in cascade layers, so this rule wins over all of them.
 
-## Tokens
-
-1. **Values that change with the theme are variables, and scales are constants.** `theme` (created with `defineVars`) holds colors, shadows, and fonts. Each role is declared once with `role("name")`. This function takes the role's value from the dark set, from the light set for print, and from the increased-contrast set. StyleX cannot import values from plain modules into a `.stylex.ts` file, so the sets are defined in the theme file.
-
-   StyleX's compiler takes a value from another file only when that file is a `.stylex.ts` file, and then it gives a reference to a CSS variable, not the value. A plain module's value is a compile error in `defineVars` and in `create`. Node cannot import the theme file either, because StyleX's functions throw outside its compiler. The agent's pictures of diagrams are drawn in Node, so [`src/diagram/paint.ts`](/-/files/yapparatus/src/diagram/paint.ts) loads the theme file with a stub in which StyleX's functions return their input, and reads the role styles in `part.tsx` as text. It gives the light theme's colors, the role table, and the stroke and dash constants as plain values. The theme file and `part.tsx` stay the only places where a value is written. Values that are plain numbers outside a style, such as corner radii, are written once in `metrics.ts`, and the views and the picture import them.
-
-   `fontSize`, `fontWeight`, `lineHeight`, `letterSpacing`, `space`, `radius`, `sizes`, `layer`, `duration`, and `when` are created with `defineConsts`. StyleX compiles them into the rules that use them, so they need no CSS variables.
-2. **Components use only tokens.** A style uses a token for every color, size, weight, line height, space, radius, shadow, layer, and duration. A component that needs a new value adds it to the scale in the theme file, with a comment on what it is for. The scale therefore stays the only list of values. A new color role needs a value in every set and a rule in [`tests/theme.test.ts`](/-/files/yapparatus/tests/theme.test.ts).
-3. **Conditions are also tokens,** as <Ref to="conditions" /> shows. A condition is written as a key in a style value: `fontSize: { default: fontSize.lg, [when.narrow]: fontSize.base }`.
-4. **Reading styles depend on the width of the reading column.** The `main` element is a container named `reading`, and `when.narrow` is a container query on it. The column becomes narrower when the window shrinks and when the chat widens. One rule handles both cases. The chat panel is the only user of a media query, `when.smallScreen`, because on a phone the panel covers the whole window.
-5. **JavaScript layout is used only for the contents drawer.** [`App.tsx`](/-/files/yapparatus/src/reader/App.tsx) measures the space beside the chat. From 1100 px, it shows the contents beside the page. Below that width, it shows the contents in a drawer. This switch changes which elements are rendered: a menu button and a drawer replace the sidebar. For this reason, React does the switch.
-
-<Listing id="conditions" caption="The conditions, from the theme file.">
-<Excerpt from="/-/files/yapparatus/src/reader/theme.stylex.ts" start="export const when =" mark="narrow" />
-</Listing>
+Print uses the light theme, because browsers leave out backgrounds and a dark theme would print light text on white. The header, the contents, and the chat are hidden, every tab prints with its label, and a diagram prints with its steps as a numbered list.
 
 ## Style rules
 
-`pnpm verify` runs [`scripts/check-styles.ts`](/-/files/yapparatus/scripts/check-styles.ts). The script rejects the shorthand properties listed below and literal colors in any style call.
+`pnpm verify` runs [the style check](/-/files/yapparatus/scripts/check-styles.ts), which rejects two things that StyleX accepts. One is shorthand properties, such as `border`: StyleX silently drops a shorthand that holds a theme variable, so styles write longhands such as `borderWidth`. The other is literal colors, such as hex values.
 
-1. **Use longhand properties** (`borderWidth`, `borderStyle`, `borderColor`, `backgroundColor`). StyleX silently drops `border` and `background` shorthands that contain theme variables.
-2. **Keep semantic class names with `styled("name", ...styles)`.** Spreading `stylex.props()` after a `className` attribute replaces that class name. Browser tests and debugging use class names to find elements. Styles do not select elements by these class names.
-3. **Put a style on the element it belongs to.** A figure does not style every SVG element inside it. Icons and diagrams have their own styles. Values computed at runtime are needed only for positions and widths that are measured at runtime.
-4. **Use the shared `Button` variants** for controls of the reader app. The variants are default, primary, ghost, danger, and icon, and each has two sizes.
-
-Document authors can write their own components with the exported theme; see the components reference, [`starter/docs/components.md`](/-/files/yapparatus/starter/docs/components.md).
+Two more rules are kept by convention. A component that needs a class name, for tests and debugging, sets it with `styled("name", ...styles)`, because spreading StyleX's props after a `className` replaces it. Each element carries its own style: a figure does not style the elements inside it.
 
 ## Icons
 
-Icons are resolved at build time with [unplugin-icons](https://github.com/unplugin/unplugin-icons) and Iconify collections. They render as inline React SVG components. In MDX, the `name` shorthand compiles to an import that follows the upstream `~icons/<collection>/<name>` convention. `local` is the project's own collection, read from `icons/`. Multicolor icons keep the fill colors they were drawn with. Interface icons come from Lucide. They are outlined and use the color of the text around them, so all interface icons have a consistent style. See also [StyleX's Vite integration](https://stylexjs.com/docs/learn/installation/vite/).
+Interface icons come from Lucide and take the color of the text around them. Icons in pages come from Iconify and the document's own collection; see [icons](/page-compiler#icons).

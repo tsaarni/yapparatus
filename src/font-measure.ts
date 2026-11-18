@@ -1,9 +1,8 @@
 /**
- * Text measurement in Node, from the font files the reader loads, with the widths a browser's
- * canvas `measureText` gives. The diagram compiler takes it in place of `canvasMeasure` where
- * there is no browser.
+ * Text measurement in Node, from the font files the web app loads, with the widths a browser's
+ * canvas `measureText` gives. The diagram compiler on the server measures all diagram text with it.
  *
- * The reader loads its fonts from Fontsource stylesheets that split each family into subset
+ * The web app loads its fonts from Fontsource stylesheets that split each family into subset
  * files, each with a `unicode-range`. This module reads the same stylesheets and picks the
  * file for each character as a browser does, so the two cannot drift.
  */
@@ -13,7 +12,7 @@ import path from "node:path";
 import * as fontkit from "fontkit";
 import type { FontSpec, Measure } from "./diagram/metrics.ts";
 
-/** The stylesheets `src/reader/main.tsx` imports. A test checks that the two lists agree. */
+/** The stylesheets `src/web/main.tsx` imports. A test checks that the two lists agree. */
 export const fontStylesheets = [
   "@fontsource-variable/inter/standard.css",
   "@fontsource-variable/jetbrains-mono/wght.css",
@@ -259,8 +258,8 @@ function parseFaces(css: string, dir: string): Face[] {
 
 /** `U+0000-00FF,U+0131,U+4??` as inclusive code point ranges. */
 function parseUnicodeRange(value: string): Array<[number, number]> {
-  return value.split(",").map((part) => {
-    const range = part.trim().replace(/^U\+/i, "");
+  return value.split(",").map((item) => {
+    const range = item.trim().replace(/^U\+/i, "");
     if (range.includes("?"))
       return [
         Number.parseInt(range.replace(/\?/g, "0"), 16),

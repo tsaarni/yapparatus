@@ -1,8 +1,8 @@
-/** Turning what the reader points at on the page into context items. */
+/** Turning what the reader points at on the page into references. */
 
 import { contentDir, type DocumentPage, settings } from "virtual:yapparatus/document";
 import { useEffect, useState } from "react";
-import { partSeparator, textFragment } from "../document.ts";
+import { elementSeparator, textFragment } from "../document.ts";
 import {
   type FileAddress,
   fileAddress,
@@ -11,7 +11,7 @@ import {
   type LineRange,
   parseFileAddress,
 } from "../files.ts";
-import type { ContextItem, TargetKind } from "../protocol.ts";
+import type { Reference, TargetKind } from "../protocol.ts";
 import { addressOf } from "./router.ts";
 
 const excerptLength = 400;
@@ -88,11 +88,11 @@ function excerpt(text: string) {
 }
 
 /**
- * A context item for a whole target: a page, section, figure, table, listing, code, or diagram
- * part. Its lines are its block's. A section runs to the next heading of its level, and a code
+ * A reference for a whole target: a page, section, figure, table, listing, code, or diagram
+ * element. Its lines are its block's. A section runs to the next heading of its level, and a code
  * block is its code's lines, which are fewer than its block's when it is inside a list or panel.
  */
-export function contextFromTarget(element: Element, page: DocumentPage): ContextItem | undefined {
+export function referenceFromTarget(element: Element, page: DocumentPage): Reference | undefined {
   const target = element.closest<HTMLElement>("[data-target]");
   const block = target && blockOf(target);
   const source = block && sourceOf(block);
@@ -102,12 +102,12 @@ export function contextFromTarget(element: Element, page: DocumentPage): Context
   const code = kind === "code" ? linesOf(pageCodeLines(target)) : undefined;
   if (code) Object.assign(source, { startLine: code.start, endLine: code.end });
   const figure =
-    kind === "diagram-part" ? target.closest<HTMLElement>("[data-target=figure]") : null;
+    kind === "diagram-element" ? target.closest<HTMLElement>("[data-target=figure]") : null;
   const anchor =
     kind === "page"
       ? undefined
-      : kind === "diagram-part"
-        ? figure?.id && `${figure.id}${partSeparator}${target.dataset.elementId}`
+      : kind === "diagram-element"
+        ? figure?.id && `${figure.id}${elementSeparator}${target.dataset.elementId}`
         : target.id || sectionOf(block)?.id;
   const step = openStep(figure ?? target);
   return { kind, address: addressOf(page, anchor), ...source, ...(step ? { step } : {}) };
@@ -121,15 +121,15 @@ function openStep(figure: Element): string | undefined {
   return excerpt(`${controls.dataset.step}${text ? `: ${text}` : ""}`);
 }
 
-/** The part of `range` inside `node`. */
+/** The range that `range` and `node` share. */
 function clip(range: Range, node: Node): Range {
-  const part = document.createRange();
-  part.selectNodeContents(node);
-  if (part.compareBoundaryPoints(Range.START_TO_START, range) < 0)
-    part.setStart(range.startContainer, range.startOffset);
-  if (part.compareBoundaryPoints(Range.END_TO_END, range) > 0)
-    part.setEnd(range.endContainer, range.endOffset);
-  return part;
+  const inside = document.createRange();
+  inside.selectNodeContents(node);
+  if (inside.compareBoundaryPoints(Range.START_TO_START, range) < 0)
+    inside.setStart(range.startContainer, range.startOffset);
+  if (inside.compareBoundaryPoints(Range.END_TO_END, range) > 0)
+    inside.setEnd(range.endContainer, range.endOffset);
+  return inside;
 }
 
 /**
@@ -138,21 +138,21 @@ function clip(range: Range, node: Node): Range {
  * text fragment. In a page's code block,
  * the item's lines are the code lines selected.
  */
-export function contextsFromRange(range: Range, page: DocumentPage): ContextItem[] {
+export function referencesFromRange(range: Range, page: DocumentPage): Reference[] {
   const article = document.querySelector("main article");
   if (!article) return [];
   const spans = new Map<HTMLElement, Range>();
   const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (!range.intersectsNode(node) || node.parentElement?.closest(".target-actions")) continue;
-    // Source code becomes lines of its file; see `fileContextsFromRange`.
+    // Source code becomes lines of its file; see `fileReferencesFromRange`.
     if (node.parentElement?.closest("[data-file]")) continue;
-    const part = clip(range, node);
+    const inside = clip(range, node);
     const block = blockOf(node);
-    if (!block || !part.toString().trim()) continue;
+    if (!block || !inside.toString().trim()) continue;
     const span = spans.get(block);
-    if (span) span.setEnd(part.endContainer, part.endOffset);
-    else spans.set(block, part);
+    if (span) span.setEnd(inside.endContainer, inside.endOffset);
+    else spans.set(block, inside);
   }
   return [...spans].flatMap(([block, span]) => {
     const source = sourceOf(block);
@@ -189,24 +189,24 @@ function fileOf(region: HTMLElement): FileAddress | undefined {
 export interface CodeSelection {
   region: HTMLElement;
   lines: LineRange;
-  /** The selected text, when it leaves out part of the lines. */
+  /** The selected text, when it covers only some of the lines. */
   words?: string;
 }
 
 /**
  * The address of selected code: the file and lines, with the words as a text fragment when
- * the selection leaves out part of the lines, "/-/files/app/x.ts#L2:~:text=retry".
+ * the selection covers only some of the lines, "/-/files/app/x.ts#L2:~:text=retry".
  */
 export function codeAddress({ region, lines, words }: CodeSelection): string | undefined {
   const file = fileOf(region);
   return file && `${fileAddress({ ...file, lines })}${words ? textFragment(words) : ""}`;
 }
 
-/** A context item for a whole source file, or for code in it, from the code that shows them. */
-export function fileContext(
+/** A reference for a whole source file, or for code in it, from the code that shows them. */
+export function fileReference(
   region: HTMLElement,
   selected?: CodeSelection,
-): ContextItem | undefined {
+): Reference | undefined {
   const file = fileOf(region);
   const source = file && fileSource(contentDir, foldersOf(settings), file);
   if (!file || !source) return;
@@ -225,7 +225,7 @@ export function fileContext(
 
 /**
  * The code a selection touches in each source file code block: the lines whose selected text
- * is more than white space, and the selected words when they leave out part of those lines.
+ * is more than white space, and the selected words when they cover only some of those lines.
  */
 export function selectedCode(range: Range): CodeSelection[] {
   const found: CodeSelection[] = [];
@@ -236,12 +236,12 @@ export function selectedCode(range: Range): CodeSelection[] {
     const whole: string[] = [];
     const picked: string[] = [];
     for (const line of region.querySelectorAll<HTMLElement>("[data-line]")) {
-      const part = range.intersectsNode(line) ? clip(range, line).toString() : "";
-      if (!part.trim()) continue;
+      const text = range.intersectsNode(line) ? clip(range, line).toString() : "";
+      if (!text.trim()) continue;
       const n = Number(line.dataset.line);
       lines = lines ? { start: lines.start, end: n } : { start: n, end: n };
       whole.push(line.textContent ?? "");
-      picked.push(part);
+      picked.push(text);
     }
     if (!lines) continue;
     const words = flat(picked.join(" "));
@@ -251,18 +251,18 @@ export function selectedCode(range: Range): CodeSelection[] {
 }
 
 /** One lines item for each source file code block the selection touches. */
-export function fileContextsFromRange(range: Range): ContextItem[] {
-  return selectedCode(range).flatMap((selected) => fileContext(selected.region, selected) ?? []);
+export function fileReferencesFromRange(range: Range): Reference[] {
+  return selectedCode(range).flatMap((selected) => fileReference(selected.region, selected) ?? []);
 }
 
-/** The diagram part under an event target, as a context item. */
-export function contextFromDiagram(
+/** The diagram element under an event target, as a reference. */
+export function referenceFromDiagram(
   target: EventTarget | null,
   page: DocumentPage,
-): ContextItem | undefined {
+): Reference | undefined {
   if (!(target instanceof Element)) return;
-  const part = target.closest("[data-target=diagram-part]");
-  return part ? contextFromTarget(part, page) : undefined;
+  const element = target.closest("[data-target=diagram-element]");
+  return element ? referenceFromTarget(element, page) : undefined;
 }
 
 export interface SelectionMenu {
@@ -271,7 +271,7 @@ export interface SelectionMenu {
   y: number;
 }
 
-/** Track text selections inside the article and where to show the Ask menu. */
+/** Track text selections inside the article and where to show the selection menu. */
 export function useSelectionMenu(enabled: boolean) {
   const [menu, setMenu] = useState<SelectionMenu>();
   useEffect(() => {

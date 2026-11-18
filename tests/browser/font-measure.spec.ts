@@ -1,5 +1,5 @@
 /**
- * The font file measure in src/font-measure.ts must give the widths the reader's canvas gives,
+ * The font file measure in src/font-measure.ts must give the widths the web app's canvas gives,
  * so a diagram compiled in Node has the layout the browser would compute.
  */
 import { expect, test } from "@playwright/test";
@@ -56,7 +56,7 @@ function referenceTexts(): Array<{ text: string; font: FontSpec }> {
   return [...found.values()];
 }
 
-test("font file widths match the reader's canvas measurement", async ({ page }) => {
+test("font file widths match the web app's canvas measurement", async ({ page }) => {
   const corpus = [
     ...referenceTexts(),
     ...fonts.flatMap((font) => hard.map((text) => ({ text, font }))),

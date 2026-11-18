@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { root, runSnippet } from "./workspace.ts";
+import { root, runCommand } from "./workspace.ts";
 
 /** A PNG's size in pixels, from its header. */
 function pngSize(data: Buffer) {
@@ -14,14 +14,14 @@ test("a diagram's picture is a PNG at twice the drawing's size", async ({ page, 
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("image/png");
   const size = pngSize(await response.body());
-  // The reader draws the same drawing: its view box is the picture's size in units.
+  // The web app draws the same drawing: its view box is the picture's size in units.
   await page.goto("/first-page");
   const viewBox = await page.locator("#fixture-flow svg[data-diagram]").getAttribute("viewBox");
   const [, , width = 0, height = 0] = (viewBox ?? "").split(" ").map(Number);
   expect(size).toEqual({ width: Math.round(width * 2), height: Math.round(height * 2) });
 });
 
-test("ids label the parts", async ({ request }) => {
+test("ids label the elements", async ({ request }) => {
   const get = async (query: string) =>
     (await request.get(`/-/api/figures/second-page/step-flow${query}`)).body();
   const whole = await get("");
@@ -65,13 +65,13 @@ test("the picture is of the page as it is on disk, right after an edit", async (
 
 test("the agent saves a picture in the file it names", async () => {
   const file = path.join(root, "step-flow.png");
-  const saved = await runSnippet(
+  const saved = await runCommand(
     `import { savePicture } from "yapparatus/agent"; await savePicture("/second-page#step-flow", ${JSON.stringify(file)});`,
   );
   expect(saved.stderr).toBe("");
   expect(pngSize(readFileSync(file)).width).toBeGreaterThan(0);
   // An address that is not a diagram fails with the server's words alone.
-  const failed = await runSnippet(
+  const failed = await runCommand(
     'import { savePicture } from "yapparatus/agent"; await savePicture("/charts#latency", "chart.png");',
   );
   expect(failed.code).toBe(1);

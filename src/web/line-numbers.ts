@@ -1,7 +1,7 @@
 /**
  * Line numbers in source file code are links, as on GitHub. In the file view, a click selects
  * the line and a shift-click extends the selection to a range; the address gets `#L11-L14`,
- * and the lines become a text selection, so the selection menu offers Ask and Copy link. In an
+ * and the lines become a text selection, so the selection menu offers Comment and Copy link. In an
  * excerpt, a click opens the file at that line.
  */
 import type { MouseEvent } from "react";

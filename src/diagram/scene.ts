@@ -8,7 +8,7 @@ import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts
 
 export type { AnchorName, Side };
 
-/** What a part is for: the one to look at, a risk, a quiet part, or one outside the system. */
+/** What an element is for: the one to look at, a risk, a quiet element, or one outside the system. */
 export type Role = "default" | "accent" | "muted" | "warning" | "external";
 export type Align = "start" | "center" | "end";
 export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
@@ -17,9 +17,9 @@ export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
 export interface Diagnostic {
   code: DiagnosticCode;
   message: string;
-  /** The parts it is about, which also identify it. */
+  /** The elements it is about, which also identify it. */
   ids: string[];
-  /** What it is about when no part is, such as a step's id. */
+  /** What it is about when no element is, such as a step's id. */
   subject?: string;
 }
 
@@ -122,7 +122,7 @@ export interface NodeOptions {
   sub?: string;
   role?: Role;
   /**
-   * What sets this part apart, in a few words, such as "New" or "To be removed". Parts with
+   * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
@@ -183,15 +183,15 @@ export interface RecordOptions extends Omit<NodeOptions, "sub"> {
   ruler?: { top?: (column: number) => string | number; left?: (row: number) => string | number };
 }
 
-/** A highlighted part of a text: a substring that occurs once, or lines (`"2"`, `"2-4"`, from 1). */
+/** A highlighted span of a text: a substring that occurs once, or lines (`"2"`, `"2-4"`, from 1). */
 export type Mark = MemberOptions & ({ text: string } | { lines: string });
 
 export interface TextOptions extends NodeOptions {
-  /** Named spans or lines, each a member: `t.part("path")`. A string is the text to mark. */
+  /** Named spans or lines, each a member: `t.element("path")`. A string is the text to mark. */
   marks?: Record<string, string | Mark>;
 }
 
-/** What the library sets on nodes it draws itself; not part of the authoring API. */
+/** What the library sets on nodes it draws itself; outside the authoring API. */
 export interface NodeInternals {
   /** A derived id that is not the label's slug, such as `start-1`. */
   id?: string;
@@ -244,15 +244,15 @@ export class Node extends Element {
   /** Set by the builder: where a missing member is reported. */
   report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
   /**
-   * A member, by its own id: a record cell, such as `users.part("team-id")`, or a text mark.
-   * It is a part like any other: edges attach to it, steps focus it, and it takes a category.
+   * A member, by its own id: a record cell, such as `users.element("team-id")`, or a text mark.
+   * It is an element like any other: edges attach to it, steps focus it, and it takes a category.
    * A missing member is reported, and the parent stands in for it.
    */
-  part(id: string): Node {
+  element(id: string): Node {
     const found = this.members.find((m) => m.member?.own === id);
     if (found) return found;
     this.report?.(
-      "UNKNOWN_PART",
+      "UNKNOWN_ELEMENT",
       `${this.id} has no member "${id}". Members: ${this.members.map((m) => m.member?.own).join(", ") || "none"}.`,
       [this.id],
     );
@@ -289,7 +289,7 @@ export interface EncloseOptions {
   padding?: number;
   role?: Role;
   /**
-   * What sets this part apart, in a few words, such as "New" or "To be removed". Parts with
+   * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
@@ -345,7 +345,7 @@ export interface EdgeOptions {
   loop?: Side;
   role?: Role;
   /**
-   * What sets this part apart, in a few words, such as "New" or "To be removed". Parts with
+   * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
@@ -357,7 +357,7 @@ export interface EdgeOptions {
   stepOnly?: boolean;
 }
 
-/** What the library sets on edges it draws itself; not part of the authoring API. */
+/** What the library sets on edges it draws itself; outside the authoring API. */
 export interface EdgeInternals {
   /** Decoration only, such as a lifeline: drawn underneath and excluded from checks. */
   passive?: boolean;
@@ -476,7 +476,7 @@ export class DiagramBuilder {
   readonly owner = new Map<Element, Stack | Placement>();
   readonly sizeGroups: Array<{ members: Node[]; width: boolean; height: boolean }> = [];
   /**
-   * Parts a step focuses together with a container, beyond what it encloses or stacks:
+   * Elements a step focuses together with a container, beyond what it encloses or stacks:
    * a sequence's messages and notes, a fragment's messages.
    */
   readonly groups = new Map<Element | Frame, Array<Element | Edge | Frame>>();
@@ -538,7 +538,7 @@ export class DiagramBuilder {
   }
   /**
    * Cells on a grid under an optional title: a type, a table, a packet header, a register,
-   * an array. Each cell is a member: `rec.part("id")`.
+   * an array. Each cell is a member: `rec.element("id")`.
    */
   record(cells: Cell[], options: RecordOptions = {}): Node {
     const { title = "", ...rest } = options;
@@ -554,7 +554,7 @@ export class DiagramBuilder {
   /**
    * A member's id is its parent's, then its own, such as `users.team-id`. Its own comes from
    * the first tab-separated column of its label, and is unique in the parent. The parent's
-   * part is joined in later, when the parent's id is final.
+   * element is joined in later, when the parent's id is final.
    */
   private member(parent: Node, label: string, options: MemberOptions, place: Place) {
     const { id, pin, ...rest } = options;

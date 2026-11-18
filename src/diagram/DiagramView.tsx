@@ -1,15 +1,15 @@
 /**
- * The SVG of a compiled diagram: its parts in drawing order, and the debug layer.
+ * The SVG of a compiled diagram: its elements in drawing order, and the debug layer.
  */
 import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { diagnosticCodes } from "../protocol.ts";
-import { fontSize, space, theme } from "../reader/theme.stylex.ts";
-import type { CompiledDiagram, PartState } from "./compiled.ts";
+import { fontSize, space, theme } from "../web/theme.stylex.ts";
+import type { CompiledDiagram, ElementState } from "./compiled.ts";
 import { EdgeView, EnclosureView, FrameView } from "./EdgeView.tsx";
+import { interactive } from "./element.tsx";
 import { minScale } from "./metrics.ts";
 import { CellWarning, NodeView, Pin, RecordOutline } from "./NodeView.tsx";
-import { interactive } from "./part.tsx";
 import { outline } from "./shapes.ts";
 
 const dev = import.meta.env.DEV;
@@ -32,9 +32,9 @@ export function DiagramView({
   stale?: boolean;
   marker: string;
   figure: string | undefined;
-  stateOf: (part: string) => PartState;
-  stepped: (part: string) => boolean;
-  /** Delegated from the parts: open the step a part belongs to, and step with the keyboard. */
+  stateOf: (element: string) => ElementState;
+  stepped: (element: string) => boolean;
+  /** Delegated from the elements: open the step an element belongs to, and step with the keyboard. */
   onClick?: (event: MouseEvent) => void;
   onKeyDown?: (event: KeyboardEvent) => void;
 }) {
@@ -54,12 +54,12 @@ export function DiagramView({
   );
   const passive = diagram.edges.filter((e) => e.passive);
   const active = diagram.edges.filter((e) => !e.passive);
-  const part = (id: string, label: string) => ({
+  const element = (id: string, label: string) => ({
     state: stateOf(id),
     target: interactive(id, label, figure, dev || stepped(id)),
   });
   // Decorations fade and hide with their edge, but never take the accent themselves.
-  const decoration = (state: PartState) => (state && state !== "focus" ? { state } : {});
+  const decoration = (state: ElementState) => (state && state !== "focus" ? { state } : {});
   const anyStepped = [...diagram.nodes, ...diagram.edges].some((p) => stepped(p.id));
   // Clip paths are named per figure: several figures can have a record with the same id.
   const clip = `clip${marker.replace(/[^a-zA-Z0-9]/g, "")}`;
@@ -69,7 +69,7 @@ export function DiagramView({
       viewBox={`${vb.x} ${vb.y} ${vb.width} ${vb.height}`}
       width={vb.width}
       height={vb.height}
-      // An image hides its parts from assistive technology; interactive parts need a group.
+      // An image hides its elements from assistive technology; interactive elements need a group.
       role={dev || anyStepped ? "group" : "img"}
       onClick={onClick}
       onKeyDown={onKeyDown}
@@ -97,7 +97,7 @@ export function DiagramView({
           clip={clip}
           {...(node.passive
             ? decoration(node.follows ? stateOf(node.follows) : undefined)
-            : part(node.id, node.label))}
+            : element(node.id, node.label))}
         />
       ))}
       {/* Over every shape: records' outlines, which cover their cells' fills, then cells'
@@ -130,7 +130,7 @@ export function DiagramView({
           key={edge.id}
           edge={edge}
           flagged={flagged.has(edge.id)}
-          {...part(edge.id, edge.ariaLabel)}
+          {...element(edge.id, edge.ariaLabel)}
         />
       ))}
       {diagram.frames.map((frame) => (

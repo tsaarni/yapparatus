@@ -1,0 +1,250 @@
+# Web app
+
+The web app is the program in the browser that shows a document and its chat. This page describes the screen, how the web app moves between pages and follows edits, how it lays out and numbers a page, how the reader comments on the page, and how it shows the chat and the diagnostics. How each built-in component renders is on [components](components).
+
+## Screen
+
+The screen has four regions: the header, the contents, the page, and the chat panel. <Ref to="web-screen" /> shows them in the three layouts that the web app switches between.
+
+<Diagram id="web-screen" caption="The screen regions in the wide layout, the compact layout, and on a small screen with the chat open." description="Three screen layouts drawn as boxes: wide with header, contents, page, and chat panel; compact with header and page; small screen with the chat panel over the whole width" draw={(d) => {
+  const header = d.box("Header", { id: "header", sub: "title, page, Chat", width: 378, height: 60 })
+  const contents = d.box("Contents", { id: "contents", sub: "pages, sections", width: 100, height: 240 })
+  const page = d.box("Page", { id: "page", sub: "scrolls by itself", width: 270, height: 240, role: "accent" })
+  const body = d.row([contents, page], { gap: 8, align: "start" })
+  d.place(header, { above: body, gap: 8, align: "start" })
+  const chat = d.box("Chat panel", { id: "chat-panel", sub: "full height", width: 150, height: 308 })
+  d.place(chat, { rightOf: body, gap: 8, align: "end" })
+  d.enclose([header, contents, page, chat], { id: "wide", title: "Wide" })
+
+  const compactHeader = d.box("Header", { id: "compact-header", sub: "menu button", width: 200, height: 60 })
+  const compactPage = d.box("Page", { id: "compact-page", sub: "contents in a drawer", width: 200, height: 240 })
+  const compact = d.column([compactHeader, compactPage], { gap: 8 })
+  d.place(compact, { rightOf: chat, gap: 72, align: "end" })
+  d.enclose([compactHeader, compactPage], { id: "compact", title: "Compact" })
+
+  const phoneChat = d.box("Chat panel", { id: "phone-chat", sub: "whole width", width: 160, height: 308 })
+  d.place(phoneChat, { rightOf: compact, gap: 72, align: "end" })
+  d.enclose([phoneChat], { id: "small-screen", title: "Small screen" })
+}}>
+  <Step focus="header">The header shows the document title, the current page, and in dev mode the diagnostics count and the Chat button.</Step>
+  <Step focus="contents">The contents list the pages, and the sections of the current page.</Step>
+  <Step focus="page chat-panel">The page and the chat panel each scroll by themselves. The reader can drag the panel's left edge to resize it.</Step>
+  <Step focus="compact small-screen">When the space beside the chat is narrow, the contents move into a drawer. On a small screen, the open chat covers the whole width.</Step>
+</Diagram>
+
+The header also shows a theme button when `theme` in `document.json` is `"auto"`. The web app picks the layout from the width left beside the chat panel, so opening or widening the chat can change it.
+
+The window itself does not scroll, so each scrollbar is at the edge of its own region. The page takes the keyboard focus at startup and when the reader clicks it, so keys such as Page Down scroll it. Print shows only the page.
+
+## Navigation
+
+The router is the part of the web app that turns an [address](documents#addresses) into what the screen shows. It receives every navigation from the browser's Navigation API. <Ref to="web-navigation" /> follows one click on a link.
+
+<Diagram id="web-navigation" caption="From a click on a link to the new page on screen." description="Sequence between the reader, the browser, the router, the page code, and the screen" draw={(d) => {
+  const reader = d.actor("Reader")
+  const browser = d.box("Browser")
+  const router = d.box("Router", { role: "accent" })
+  const code = d.box("Page code", { id: "page-code" })
+  const screen = d.box("Screen")
+  d.sequence([reader, browser, router, code, screen], [
+    { from: reader, to: router, label: "points at link", id: "point" },
+    { from: router, to: code, label: "start loading", async: true, id: "prefetch" },
+    { from: reader, to: browser, label: "click", id: "click" },
+    { from: browser, to: router, label: "navigation", id: "event" },
+    { from: router, to: browser, label: "save scroll", id: "save", async: true },
+    { from: router, to: code, label: "wait for code", id: "await" },
+    { from: code, to: router, label: "page code", reply: true, id: "loaded" },
+    { from: router, to: screen, label: "new page", id: "route" },
+    { fragment: "alt", title: "Back or Forward", id: "scroll", steps: [
+      { from: screen, to: screen, label: "restore", id: "restore" },
+    ], else: [{ title: "other", steps: [
+      { from: screen, to: screen, label: "to target", id: "to-id" },
+    ] }] },
+  ], { gap: 64 })
+}}>
+  <Step focus="reader router point prefetch">When the pointer or the keyboard focus reaches a link, the router starts loading the code of its page.</Step>
+  <Step focus="browser click event">The browser changes the address at once. The router takes over if the address belongs to the document.</Step>
+  <Step focus="save">The router saves the scroll position of the page the reader leaves.</Step>
+  <Step focus="page-code await loaded">The old page stays on screen until the new page's code has loaded.</Step>
+  <Step focus="screen route scroll">The new page renders. Back and Forward restore the saved position. Other navigations scroll to the target or to the top.</Step>
+</Diagram>
+
+The router leaves reloads, downloads, and other sites to the browser. It does the scrolling itself, because the browser restores only the window's position, and the page scrolls in its own region. Each page's code loads once and is kept, so a prefetch and a click share one load. When the reader follows another link while a page loads, the latest navigation wins.
+
+While the reader reads, the web app also loads the next page in the contents. In a browser without the Navigation API, every link loads a page from the server, and links between pages of a [single-file build](page-compiler#builds) do not work.
+
+## Hot updates
+
+In dev mode, the web app shows an edited page without a reload. When a page or an external file that it excerpts changes, the page compiler compiles the page again, and the [document module](page-compiler#the-document-module) swaps in the new page and its outline. The web app then numbers the document again and renders the page with its new code. An edit to `document.json` reloads the web app.
+
+The chat panel is outside the page, so an update keeps the reader's draft, references, and place in the chat. Session storage keeps them across a reload too.
+
+## Page layout
+
+The page is a grid with a text column and a breakout track to its right, as <Ref to="web-breakout" /> shows.
+
+<Diagram id="web-breakout" caption="The breakout grid. Text stays in the text column, and wide content grows into the breakout track." description="Two columns, the text column and the breakout track, with a small figure that fills the text column and a large figure that extends into the breakout track" draw={(d) => {
+  const text = d.box("Text column", { id: "text-column", sub: "reading measure", width: 300, height: 88 })
+  const track = d.box("Breakout track", { id: "breakout-track", sub: "shrinks first", width: 220, height: 88, role: "muted" })
+  const columns = d.row([text, track], { gap: 12 })
+  const prose = d.box("Paragraph", { id: "paragraph", width: 300 })
+  const small = d.box("Small figure", { id: "small-figure", sub: "at least the text width", width: 300 })
+  const large = d.box("Large figure", { id: "large-figure", sub: "as wide as its content", width: 532, role: "accent" })
+  d.place(prose, { below: columns, gap: 20, align: "start" })
+  d.place(small, { below: prose, gap: 16, align: "start" })
+  d.place(large, { below: small, gap: 16, align: "start" })
+}} />
+
+Text stays in the text column. Code, tables, figures, file trees, tabs, and columns may grow into the breakout track as far as their content needs. When space is short, the breakout track shrinks first, then the text column. A diagram then scrolls sideways, and so do long code lines and wide tables.
+
+Reading styles, such as the title size, change when the text column becomes narrow, which also happens when the reader widens the chat. See [typography and scales](styling#typography-and-scales).
+
+## Numbering and references
+
+The web app numbers the document from the outlines in the document module, so it needs no page's code. A chapter number is the page's position in `document.json`. Sections are numbered 3.2 and 3.2.1 within their chapter. Figures, tables, and listings each have their own counter per chapter, and only items with an `id` are numbered. `document.json` can turn numbering off; the label is then the caption or the heading.
+
+The same pass collects every page, heading, figure, table, and listing that a `Ref` can point to. A `Ref` shows its target's current label, so it follows renumbering.
+
+## Commenting on the page
+
+In dev mode, the reader adds parts of the page to the next message as [references](documents#references), in three ways. Pages, sections, figures, tables, listings, and code blocks are targets. A target shows a Comment button, and a Link button that copies its address, when the pointer or the keyboard focus is on it. A diagram element is added by a click. Selected text opens a menu with Comment and Copy link, which copies the address of the words as a [text fragment](documents#text-fragments). Builds keep only the Link buttons and Copy link.
+
+<Ref to="web-selection" /> shows how a selection that touches three blocks becomes three references.
+
+<Diagram id="web-selection" caption="A selection across three blocks becomes three references." description="A paragraph, a list item, and a table row, each with its file and lines, each become one reference in the message box" build draw={(d) => {
+  const para = d.box("Paragraph", { id: "paragraph", sub: "lines 12–14" })
+  const item = d.box("List item", { id: "list-item", sub: "line 17" })
+  const row = d.box("Table row", { id: "table-row", sub: "line 23" })
+  d.equalSize([para, item, row])
+  const blocks = d.column([para, item, row], { gap: 24 })
+  const page = d.enclose([blocks], { id: "page", title: "Page" })
+  const a = d.box("text", { id: "item-1", sub: "/page#section:~:text=…", mono: true })
+  const b = d.box("text", { id: "item-2", sub: "line 17", mono: true })
+  const c = d.box("text", { id: "item-3", sub: "line 23", mono: true })
+  d.equalSize([a, b, c])
+  const items = d.column([a, b, c], { gap: 24 })
+  d.place(items, { rightOf: blocks, gap: 150 })
+  d.enclose([items], { id: "message-box", title: "Message box" })
+  d.arrow(para, a, { id: "to-1" })
+  d.arrow(item, b, { id: "to-2" })
+  d.arrow(row, c, { id: "to-3" })
+  const marks = d.note("Each block knows\nits file and lines", { id: "marks", stepOnly: true })
+  d.place(marks, { above: page, gap: 24 })
+}}>
+  <Step focus="page marks">The page compiler has marked each block, list item, and table row with its file and lines.</Step>
+  <Step focus="paragraph list-item table-row">The reader selects text that touches three of these blocks.</Step>
+  <Step focus="to-1 to-2 to-3 message-box">Each block becomes one `text` reference. Its address is the section or figure the words are in, followed by the words.</Step>
+</Diagram>
+
+These marks are described in [source marks](page-compiler#outline-and-source-marks). Code selected in an excerpt or the file view becomes a `lines` reference with the file address and the selected lines. A section reference runs from its heading to the next heading of the same or a higher level. An element's address is `figure--element`, and when the figure has a step open, the reference records the step and its text. Adding a reference opens the chat.
+
+## Show on page
+
+Each reference in a sent message has a Show on page button. The agent may have edited the page since then, so the web app finds the target again by its address and words. <Ref to="web-show-on-page" /> shows how it decides what to show.
+
+<Diagram id="web-show-on-page" caption="How Show on page decides what to show." description="Decision flow: open the reference's page or file, find the target by its address, show it when there is one match, else show its anchor and say that it changed, else say that it is gone" draw={(d) => {
+  const start = d.start("Show on page")
+  const isFile = d.decision("File?", { id: "is-file" })
+  const openFile = d.box("Open file view", { id: "open-file", sub: "at its lines" })
+  const samePage = d.decision("Page open?", { id: "page-open" })
+  const open = d.box("Open the page", { id: "open-page", sub: "then continue" })
+  const find = d.box("Find by address", { id: "find", sub: "id, words, lines" })
+  const one = d.decision("One match?", { id: "one-match" })
+  const show = d.box("Scroll and flash", { id: "show-it", role: "accent" })
+  const anchored = d.decision("Anchor?", { id: "anchor-there" })
+  const around = d.box("Show the anchor", { id: "show-anchor", sub: "say it changed" })
+  const gone = d.box("Say it is gone", { id: "say-gone", sub: "or ambiguous", role: "warning" })
+  d.equalSize([openFile, open, find, show, around, gone])
+  d.column([start, isFile, samePage, find, one, show], { gap: 40 })
+  d.place(openFile, { rightOf: isFile, gap: 88 })
+  d.place(open, { rightOf: samePage, gap: 88 })
+  d.place(anchored, { rightOf: one, gap: 88 })
+  d.place(around, { below: anchored, gap: 40 })
+  d.place(gone, { rightOf: anchored, gap: 88 })
+  d.arrow(start, isFile)
+  d.arrow(isFile, openFile, { label: "yes" })
+  d.arrow(isFile, samePage, { label: { text: "no", side: "left" } })
+  d.arrow(samePage, find, { label: { text: "yes", side: "left" } })
+  d.arrow(samePage, open, { label: "no" })
+  d.arrow(open.bottom, find.right, { id: "after-open", route: "vh", dashed: true })
+  d.arrow(find, one)
+  d.arrow(one, show, { label: { text: "yes", side: "left" } })
+  d.arrow(one, anchored, { label: "no" })
+  d.arrow(anchored, around, { label: { text: "yes", side: "left" } })
+  d.arrow(anchored, gone, { label: "no" })
+}}>
+  <Step focus="show-on-page is-file open-file">A reference to an external file opens the file view at its lines.</Step>
+  <Step focus="page-open open-page after-open">A page reference first opens its page if needed.</Step>
+  <Step focus="find">It looks for the target by its id, or for text and code by the selected words, preferring a match at the reference's lines.</Step>
+  <Step focus="one-match show-it">With exactly one match, it scrolls to the target and flashes it.</Step>
+  <Step focus="anchor-there show-anchor">Otherwise it shows the anchor, the section or figure around the target, with a notice that the target changed.</Step>
+  <Step focus="say-gone">When the anchor is also gone, the notice says that the target disappeared or is ambiguous.</Step>
+</Diagram>
+
+A diagram appears only after its fonts load, so the web app repeats the search for about a second before it falls back to the anchor. An element without an explicit `id` takes its id from its label, so its address changes with the label; see [ids](diagram-compiler#ids).
+
+## File view
+
+The file view shows a whole external file at its file address, `/-/files/<directory>/<path>`. In dev mode the web app reads the file from the server's [files resource](rest-api#read-an-external-file), and reads it again when the file changes. A build holds only the files that its pages name; see [builds](page-compiler#builds).
+
+The view draws the file like an excerpt. The file is a target, and under its title, "Discussed in" lists the sections that link to it or excerpt it. Line numbers work as on GitHub: a click selects a line, a shift-click extends the selection, and the address ends in a range such as `#L11-L14`. A click on a line number in an excerpt opens the file view at that line.
+
+## Chat panel
+
+The chat panel exists only in dev mode. It shows the [chat](server#chat-log) in order, a typing indicator, and the message box. The server's [updates](rest-api#updates) keep it current.
+
+A reader message shows its references, each with its address and the Show on page button. A reply is MDX that the server has compiled into a module. The web app loads the module and renders it with the same components as a page, without numbers or Comment buttons, and with ids prefixed so that they do not clash with the page's.
+
+The panel header shows the [agent state](server#agent-state). While the newest message is unanswered and an agent is connected, the thread ends with typing dots and the seconds since the message. While no agent is connected, Copy prompt copies the [start prompt](agent-library#prompts) for a new agent. Clear deletes the chat on the server after the reader confirms. The thread follows new messages while the reader is at its bottom.
+
+## Diagnostics display
+
+In dev mode, the header shows the number of errors and warnings, and opens a list of them grouped by page. An item opens the page at the diagnostic's place. Its Comment button writes a request to fix the diagnostic into the message box. Diagnostics also appear in place: a page that fails to render shows its error instead of its content, and a [diagram](components#diagram) or chart lists them under the figure.
+
+Some problems appear only when a page runs in the browser: render errors, runtime errors, chart problems, and replies that fail to show. The web app reports them to the server with the page's revision, and reports a clean revision too, so the server knows the page was checked. See [revisions and reports](diagnostics#revisions-and-reports).
+
+## Where the code is
+
+<Ref to="web-modules" /> lists the files of the web app. The diagram and chart components are on [components](components).
+
+<Table id="web-modules" caption="The files of the web app in src/web/.">
+
+| File | Job |
+|---|---|
+| [`main.tsx`](/-/files/yapparatus/src/web/main.tsx) | Startup: theme, error reports, favicon, the first page |
+| [`App.tsx`](/-/files/yapparatus/src/web/App.tsx) | The screen regions, layouts, scrolling, the selection menu, Show on page |
+| [`router.ts`](/-/files/yapparatus/src/web/router.ts) | Addresses, navigation, prefetching |
+| [`Sidebar.tsx`](/-/files/yapparatus/src/web/Sidebar.tsx) | The contents |
+| [`numbering.ts`](/-/files/yapparatus/src/web/numbering.ts) | Numbers and `Ref` targets |
+| [`prose.tsx`](/-/files/yapparatus/src/web/prose.tsx) | Markdown elements, alerts, code blocks, the breakout rule |
+| [`components.tsx`](/-/files/yapparatus/src/web/components.tsx) | `Figure`, `Table`, `Listing`, `Ref`, `FileTree`, `Excerpt` |
+| [`alternatives.tsx`](/-/files/yapparatus/src/web/alternatives.tsx) | `Tabs`, `Columns`, `Panel` |
+| [`icons.tsx`](/-/files/yapparatus/src/web/icons.tsx) | `Icon` and the web app's own icons |
+| [`registry.ts`](/-/files/yapparatus/src/web/registry.ts) | The components that pages and replies use without imports |
+| [`targets.tsx`](/-/files/yapparatus/src/web/targets.tsx) | Targets and the Link and Comment buttons |
+| [`selection.ts`](/-/files/yapparatus/src/web/selection.ts) | References and the selection menu |
+| [`line-numbers.ts`](/-/files/yapparatus/src/web/line-numbers.ts) | Clicks on line numbers |
+| [`FileView.tsx`](/-/files/yapparatus/src/web/FileView.tsx) | The file view |
+| [`Chat.tsx`](/-/files/yapparatus/src/web/Chat.tsx) | The chat panel |
+| [`api.ts`](/-/files/yapparatus/src/web/api.ts) | Requests to the server and its updates |
+| [`diagnostics.tsx`](/-/files/yapparatus/src/web/diagnostics.tsx) | Diagnostic reports, render errors, the header's list |
+| [`appearance.ts`](/-/files/yapparatus/src/web/appearance.ts) | The theme and the reader's choice |
+| [`favicon.ts`](/-/files/yapparatus/src/web/favicon.ts) | The favicon |
+| [`ui.tsx`](/-/files/yapparatus/src/web/ui.tsx) | Buttons, class names, the clipboard |
+| [`theme.stylex.ts`](/-/files/yapparatus/src/web/theme.stylex.ts) | The tokens; see [styling](styling) |
+| [`styles.css`](/-/files/yapparatus/src/web/styles.css) | The global reset and reduced motion |
+
+</Table>
+
+## Design decisions
+
+The router uses the Navigation API because it reports every navigation through one event, including Back, Forward, and links in replies. The address changes before the page loads because Safari lacks the option to delay it.
+
+Edited pages update in place because React's Fast Refresh reloads the whole app for a page module, which also exports its outline. A reload makes the page flash and loses the reader's place.
+
+## Sources
+
+- Line length: Bringhurst, *The Elements of Typographic Style*; [WCAG 1.4.8](https://www.w3.org/WAI/WCAG21/Understanding/visual-presentation).
+- Breakout grids: [Cloud Four](https://cloudfour.com/thinks/breaking-out-with-css-grid-layout/), [Ryan Mulligan](https://ryanmulligan.dev/blog/layout-breakouts/).
+- Numbering: [Chicago Manual of Style, ch. 3](https://www.chicagomanualofstyle.org/book/ed18/part1/ch03/toc.html).
+- Article layouts: [Quarto](https://quarto.org/docs/authoring/article-layout.html), [Distill](https://distill.pub/guide/), [MyST cross-references](https://mystmd.org/guide/cross-references).

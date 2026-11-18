@@ -1,124 +1,134 @@
 # Charts
 
-This page explains how the `<Chart>` component turns data into a figure. It covers where the data comes from, how the data is read, and what the chart adds to Observable Plot, the charting library that draws the charts. Instructions for writing a chart are in the chart reference, [`starter/docs/charts.md`](/-/files/yapparatus/starter/docs/charts.md). The code is in `src/chart/` and [`src/chart-plugin.ts`](/-/files/yapparatus/src/chart-plugin.ts).
+A chart is a figure that [Observable Plot](https://observablehq.com/plot/), a JavaScript charting library, draws from data. This page follows a chart's data from the page or a file to the drawing. Authors read [the chart reference](/-/files/yapparatus/starter/docs/charts.md).
 
-## Goal
+## Overview
 
-An agent should be able to show numbers as a chart that is correct on the first attempt. The numbers stay where the agent can read and change them: in the page, or in the file that a tool wrote. A large data file does not make the page slow.
+The [page compiler](page-compiler#charts) reads the data and gives each column a type, so data problems are reported at their lines without a browser. The browser runs the author's `plot` function and draws the chart at the width of the page. <Ref to="charts-path" /> shows the path.
 
-## Principles
-
-1. **The author chooses the marks, and the chart sets the rest of the figure.** A mark is one kind of drawn item in Plot, such as a line or a dot. The author picks the marks and the fields, which are the columns that the marks show. The chart sets the width, margins, fonts, and colors, as the diagram compiler does for diagrams; see [diagrams](diagrams#principles).
-2. **Charts use Observable Plot, which language models already know.** Its marks are short, typed JavaScript calls, and agents write them correctly. A custom chart library would be one more thing for agents to learn.
-3. **Data is written as data, which the compiler can check.** The numbers are in a table or a block of CSV in the page, or in a file that a tool wrote. The compiler can therefore check every cell and report a problem at its line. A JavaScript array of numbers in `plot` could be checked only by running it, and its problems would have no line number.
-4. **The chart reports problems.** It reports a field that names no column, a literal color, too many categories, and overlapping labels. It does not guess what the author meant.
-
-## Where the data comes from
-
-A chart takes its data from the page or from a file. Code has the same two sources: a fenced code block holds code that the author writes, and an `Excerpt` reads code from a file; see [code](components#code). Data in the page is either a `Table` that the reader sees or a block inside the chart that the reader does not see. Both are small. A file can hold thousands of rows. Rows in the page would make the page slow to open and every edit slow to compile. The page therefore refers to the file and does not contain its rows. <Ref to="chart-data" /> shows both paths.
-
-<Diagram id="chart-data" caption="Where a chart's data comes from. The rows of a table or a block are in the page. The rows of a file are in a separate module. The dashed arrow is the load that happens when the chart comes near the screen." draw={(d) => {
-  const block = d.box("Table or block", { id: "block", sub: "numbers the author writes" })
-  const file = d.cylinder("CSV or TSV file", { id: "file", sub: "numbers a tool wrote" })
-  const compiler = d.box("Chart step", { id: "chart-step", sub: "reads and types columns" })
-  const prop = d.box("data prop", { id: "data", mono: true, sub: "in the page" })
-  const module = d.cylinder("Data module", { id: "data-module", sub: "the file's rows" })
-  const chart = d.box("Chart", { id: "chart", sub: "Plot draws the marks", role: "accent" })
-  d.equalSize([block, file, compiler, prop, module, chart])
-  const sources = d.row([block, file], { gap: 96 })
-  const outputs = d.row([prop, module], { gap: 96 })
-  d.column([sources, compiler, outputs, chart], { gap: 56 })
-  d.arrow(block, compiler)
-  d.arrow(file, compiler)
-  d.arrow(compiler, prop)
-  d.arrow(compiler, module)
+<Diagram id="charts-path" caption="The path of a chart's data, from where the author writes it to the drawing." draw={(d) => {
+  const table = d.box("Table on the page", { id: "table-source", sub: "from=\"#id\"" })
+  const block = d.box("CSV block", { id: "csv-block", sub: "inside the chart" })
+  const file = d.cylinder("CSV or TSV file", { id: "data-file", sub: "in an external directory" })
+  const types = d.box("Read and check", { id: "column-types", sub: "one type per column", category: "Page compiler" })
+  const prop = d.box("In the page", { id: "data-prop", sub: "from a table or block", category: "Page compiler" })
+  const module = d.cylinder("Data module", { id: "data-module", sub: "from a file", category: "Page compiler" })
+  const chart = d.box("Chart", { id: "chart", sub: "rows and plot", category: "Browser" })
+  const figure = d.box("Figure", { id: "figure", sub: "drawn twice by Plot", role: "accent", category: "Browser" })
+  d.equalSize([table, block, file, types, prop, module, chart, figure])
+  d.row([table, block, file], { gap: 56 })
+  d.place(types, { below: block, gap: 56 })
+  d.place(prop, { below: table, gap: 192 })
+  d.place(module, { below: file, gap: 192 })
+  d.place(chart, { below: types, gap: 192 })
+  d.place(figure, { below: chart, gap: 56 })
+  d.arrow(table, types)
+  d.arrow(block, types)
+  d.arrow(file, types)
+  d.arrow(types, prop)
+  d.arrow(types, module)
   d.arrow(prop, chart)
-  d.arrow(module, chart, { dashed: true })
-}} />
+  d.arrow(module, chart, { id: "load", label: "load", dashed: true })
+  d.arrow(chart, figure)
+}}>
+  <Step focus="table-source csv-block data-file">The data is a table, a block, or a file.</Step>
+  <Step focus="column-types">Each column gets one type, and every problem is reported at its line.</Step>
+  <Step focus="data-prop data-module">Data from the page goes into the page. A file's data becomes its own module.</Step>
+  <Step focus="chart load">The chart loads a file's data when it comes near the screen.</Step>
+  <Step focus="figure">The chart runs `plot` and draws twice: once to measure, once to show.</Step>
+</Diagram>
 
-1. **The compiler checks the data, and the browser draws it.** The chart stage of the compiler reads the table, block, or file and gives each column a type. The compiler therefore reports every data problem with its line when it compiles the page, for rows in the page and for rows in a file.
-2. **The rows of a table or a block are in the page,** in the `data` prop. The prop holds the columns with their types and the cells grouped by column. `from="#id"` names a `<Table id>` on the same page, before or after the chart. The table stays where it is on the page. The reader does not see a block.
-3. **The rows of a file are in a separate module.** The page gets `load`, which is an `import()` of `virtual:yapparatus/data:<directory>/<path>`. The module id contains a hash of the file's content, so a changed file becomes a new module. On the dev server, Vite serves the module and watches the file. The page also depends on the file, because the page's checks read it. A website build writes the module to its own file with a hash in its name. The single HTML file includes the module inline. Observable Framework treats data the same way with its file attachments: the page names the data, and the data is a separate asset.
-4. **The chart loads the rows of a file when the chart comes near the screen,** within 800 pixels, and before printing. A long page with large files therefore opens quickly. A reader who never scrolls to a chart never loads its data. On the dev server, the rows also load when the browser is idle. As a result, the checks that need a drawing run for every chart.
-5. **Data is stored by column,** with one array per column. For example, a 1 MB CSV file with 26,000 rows becomes a data module of about the same size, which is 0.1 MB when compressed. The page that shows it is 19 kB. The 1 MB limit for external files applies to data files.
-6. **A table on the page shows the data to the reader.** The chart has no data view of its own. When the reader needs the exact numbers, the author writes them once as a `Table` on the page, and the chart names that table. A data view of the chart would hold a second copy of the data.
-7. **The header row names the columns.** A column's name is both the field in `plot` and the label on its axis, so the field and the label are always the same. The unit is part of the name, such as `p99 (ms)`.
-8. **A column has one type, which the compiler decides from all of its cells.** The compiler looks at every cell in the column to decide between numbers, ISO dates, and text. A column that mixes types is an error at the line of the cell that differs. For example, `12 ms` in a column of numbers means that the unit is in the wrong place. If the compiler read that column as text, the chart would draw a figure with no meaning and report nothing.
-9. **A reader asks about a chart as a whole,** as with any figure. The agent receives the chart's source, which contains its data or names its file. The agent uses the question to find the rows that the reader means.
-10. **[Direction](directions):** a reader can point at part of a chart: one dot, a whole line, or a range dragged on the x axis. A chart part is named after `--` by the data values that place it, as a diagram part is named by its id. In <Ref to="throughput-chart" />:
-    - One dot is `/charts#throughput-chart--Build=After&Connections=50`.
-    - The "After" line is `/charts#throughput-chart--Build=After`.
-    - The range from 10 to 50 connections is `/charts#throughput-chart--Connections=10..50`, and on one line `/charts#throughput-chart--Build=After&Connections=10..50`.
+<Ref to="charts-lines" /> lists the chart modules with their length and where each runs, and <Ref to="charts-modules" /> draws the same table.
 
-    Names and values are percent-encoded. The context item has the part's address, and its lines are the lines of the matching rows. The prompt and the context item's pill in the message box also show the rows' values, such as `Connections 50, Build After, Requests per second 5600`. Hovering a mark shows Ask, as hovering a diagram part does.
+<Table id="charts-lines" caption="The modules of charts, measured with wc -l.">
 
-    Values name a part because a line or a range has many rows, and a list of their lines is hard to read. Values still match when rows are added or sorted, so Show on page finds the same marks. If no row matches, Show on page shows the chart and says that the rows changed. The author writes no id, because the values come from the data.
-
-## Data formats
-
-A data format turns text into a header and rows of cell text. Each row keeps the number of the line it starts on. All formats share the later stages: typing the columns, the checks, and building the data that the chart receives. The formats are defined in [`src/chart/formats.ts`](/-/files/yapparatus/src/chart/formats.ts).
-
-1. **A format has one name for blocks and files.** The same name is the language of a block, as in ```` ```csv ````, and the extension of a file. Adding a format to the list therefore makes it available for both.
-2. **Cells are text until the columns are typed.** A format does not decide what a number or a date is. Every format therefore reports a column with mixed types in the same way.
-3. **Every row keeps its line number,** so a problem in any format is reported at its line.
-4. **CSV and TSV.** CSV follows RFC 4180, and TSV is the same with tabs.
-5. **A table is read into the same structure.** The chart stage reads the header and rows of a `<Table>`, with their lines in the page, into the same header and rows that a data format gives. It types the columns in the same way.
-
-## What is added to Plot
-
-The `plot` function returns options for Plot. The chart adds its own options and passes all of them to `Plot.plot`. <Ref to="throughput-chart" /> is drawn from <Ref to="throughput-table" />.
-
-<Table id="throughput-table" caption="Requests per second before and after a change.">
-
-| Connections | Build | Requests per second |
-|---|---|---|
-| 10 | Before | 1200 |
-| 50 | Before | 4100 |
-| 100 | Before | 5200 |
-| 10 | After | 1350 |
-| 50 | After | 5600 |
-| 100 | After | 8900 |
+| Module | Lines | Runs in |
+|---|---:|---|
+| `chart-plugin.ts` | 262 | Page compiler |
+| `chart/formats.ts` | 36 | Page compiler |
+| `chart/data.ts` | 195 | Both |
+| `chart/Chart.tsx` | 437 | Browser |
+| `chart/plot.ts` | 174 | Browser |
+| `chart/fonts.ts` | 31 | Browser |
 
 </Table>
 
-<Chart id="throughput-chart" caption="Requests per second before and after a change, by number of connections." from="#throughput-table" plot={(Plot, rows) => ({
+<Chart id="charts-modules" caption="Lines of code per chart module, by where the module runs." from="#charts-lines" plot={(Plot, rows) => ({
   marks: [
-    Plot.lineY(rows, { x: "Connections", y: "Requests per second", stroke: "Build" }),
-    Plot.dot(rows, { x: "Connections", y: "Requests per second", fill: "Build" }),
+    Plot.barX(rows, { y: "Module", x: "Lines", fill: "Runs in" }),
+    Plot.ruleX([0]),
   ],
-  y: { grid: true },
+  x: { grid: true },
 })} />
 
-1. **`plot` returns only marks and position scales.** The author sets `marks`, `x`, `y`, `fx`, `fy`, and `r`. The chart sets the width, height, margins, style, color, and legends. Any other option is an error. Every chart in a document therefore has the same appearance.
-2. **The width of a chart follows the reading layout.** A chart has no natural width, so it uses the wide track of the layout. The chart is drawn again whenever that width changes. Text in the chart therefore keeps its size. A scaled drawing would make the text smaller.
-3. **The margins are set from measured labels.** The chart draws once to measure the labels. It then draws again with larger margins, increased by how far labels extend past the edge or into each other. Plot places an axis label in the margin, so a larger margin moves the axis label away from the tick labels. This measurement changes nothing that the author chose.
-4. **The chart reports labels that overlap one another.** A margin cannot separate tick labels on the same axis. The fix is fewer ticks, rotated ticks, or the other axis. Only the author can choose between them.
-5. **Text uses the page font.** The chart waits for the fonts to load. Margins measured with a fallback font would be wrong after the real font loads.
-6. **A chart that fails keeps its last valid drawing,** dimmed, above the errors. A diagram does the same.
-7. **Plot loads when the first chart is shown,** so a document without charts does not load Plot.
-8. **Every row becomes an SVG element.** Plot draws SVG, which stays responsive up to a few thousand elements. A chart of thousands of rows should use a transform, such as `Plot.binX` or `Plot.windowY`, which reduces the number of elements.
+## Data sources
+
+A chart has one source of data. Without `from`, it holds a fenced `csv` or `tsv` block, which is not shown. `from="#id"` names a `<Table>` on the same page, and a file address names a `.csv` or `.tsv` file, read by the [external file](documents#external-files) rules. Data from a block or a table goes into the page. A file's data stays out of it, and the chart gets a function that loads it. Two sources, or a `from` that names no table, are `CHART_DATA`, and a missing `plot` is `CHART_PLOT`.
+
+## Column types and checks
+
+Each source gives a header and rows of cell text, each row with its line. The cells are then checked:
+
+1. Each column name must be present and unique, because `plot` names fields by it.
+2. Each row must have as many cells as the header.
+3. Each column is a number column when every cell is a plain number, a date column when every cell is an ISO date such as `2026-01-31`, and text otherwise. Empty cells do not count.
+4. A column that mixes types is reported at the first cell that differs from most cells.
+
+Each problem is `CHART_DATA`. <Ref to="charts-data-type" /> shows the typed data: one array per column, with `null` for an empty cell and dates as text, so the data is plain JSON.
+
+<Listing id="charts-data-type" caption="A chart's data, by column, as the page or the data module carries it.">
+<Excerpt from="/-/files/yapparatus/src/chart/data.ts" start="export interface ChartData {" />
+</Listing>
+
+## The data module
+
+A file's data is its own module, named with a hash of the file's text, so a browser never uses an old copy. An edit to the file compiles the page again and changes its [revision](page-compiler#revisions). The chart loads the data when it comes near the screen, and before printing. In dev mode every chart loads its data after a short delay, so the browser checks every chart.
+
+## Drawing
+
+The chart waits for the web app's fonts, because margins measured with a fallback font would be wrong, and draws again when its width changes. It calls `plot` with the rows and a [checked Plot library](#checks-on-the-marks), adds the width, the font, and the colors, and draws twice, off screen:
+
+1. The first drawing gives the categories and the extent of every label. Each margin grows by how far a label reaches past the edge.
+2. The second drawing uses the categories in their order and the new margins. Tick labels that still run into each other are `CHART_OVERLAP`.
+
+The chart shows the second drawing with a legend.
 
 ## Color
 
-Charts follow the same color rules as diagrams; see [color](diagrams#color).
+The author names the column of categories with `fill` or `stroke`, and the chart sets the colors: the four category colors of [the theme](styling#color), as CSS variables, so a theme switch needs no new drawing. Categories take the colors in the order the rows first use them, as diagram categories do. A fifth category and later ones are muted and reported as `TOO_MANY_CATEGORIES`, a warning.
 
-1. **The author names categories, and the chart chooses their colors.** `fill` and `stroke` take a column. The values of that column become categories, and they get the theme's four category colors. A literal color is an error, because it would display incorrectly in the light theme, in print, and with increased contrast.
-2. **Colors are assigned to categories in the order in which they first appear.** The first value in the rows gets the first color, as in diagrams. Plot would sort the values, and adding a row could then change every color.
-3. **A chart has at most four categories.** The chart draws additional categories in a muted color and reports them, because readers cannot reliably match more colors to a legend.
-4. **The chart draws its own legend.** The legend is under the drawing, like a diagram's legend. When the pointer is over an entry, the other categories fade. The reader can therefore find a category without telling colors apart.
-5. **Colors remain theme variables.** The chart gives Plot the category colors as CSS variables, and Plot writes them into the SVG unchanged. When the reader switches the theme, the chart changes color without being drawn again.
+**[Direction](directions):** a reader can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/charts#charts-modules--Module=chart%2FChart.tsx` or `Lines=100..300`, so it still finds the marks after rows are added or sorted.
 
 ## Checks on the marks
 
-The chart passes a wrapped Plot library to `plot`. Its functions check their options before they pass them to Plot.
+The library that `plot` receives checks each call before it calls Plot. <Ref to="charts-mark-checks" /> lists the checks.
 
-1. **A field must name a column.** A text value of a field option, such as `y: "p99"`, must name a column of the mark's data. Otherwise the error lists the columns. Plot itself draws nothing for an unknown field and reports nothing.
-2. **A constant color is reported as a literal color.** Plot treats a text value that parses as a color as a constant color. The check therefore catches `fill: "tomato"` before Plot draws it.
-3. **The chart creates the figure.** Calling `Plot.plot` or `Plot.legend` inside `plot` is an error.
-4. **Errors from Plot are reported unchanged,** as `CHART_FAILED` with Plot's message.
+<Table id="charts-mark-checks" caption="The checks on what plot asks of Plot. All are errors except CHART_OVERLAP.">
+
+| Code | Found when |
+|---|---|
+| `CHART_FIELD` | A field, such as `x` or `fill`, names no column |
+| `CHART_COLOR` | `fill` or `stroke` is a CSS color, such as `"tomato"` |
+| `CHART_OPTION` | `plot` calls `Plot.plot` or `Plot.legend`, or returns more than `marks`, `x`, `y`, `fx`, `fy`, and `r` |
+| `CHART_FAILED` | `plot` or Plot throws |
+| `CHART_OVERLAP` | Tick labels on one axis overlap |
+
+</Table>
+
+Plot alone draws nothing for an unknown field without an error, and reads a color name as a constant color. The chart reports its problems from the browser, as [revisions and reports](diagnostics#revisions-and-reports) describes, so they are known only after a browser has shown the page.
+
+## Design decisions
+
+**Charts use Observable Plot.** Agents already know Plot's marks.
+
+**Data is written as data.** A table, a block, or a file can be checked at compile time with a line for each problem, and an array in `plot` cannot.
+
+**Categories take colors in the order of first use.** Plot's default sorts the values, so one added row could change every color.
+
+**A file's data is a separate module.** Rows in the page would make it slow to open and to compile.
 
 ## Sources
 
-- [Observable Plot](https://observablehq.com/plot/): marks, scales, transforms, and the `render` option.
+- [Observable Plot](https://observablehq.com/plot/): marks, scales, and transforms.
 - [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180): the CSV format.
-- [Observable Framework, files](https://observablehq.com/framework/files): data named by the page and served as separate, content-hashed files.
+- [Observable Framework, files](https://observablehq.com/framework/files): data named by the page and served as separate files.

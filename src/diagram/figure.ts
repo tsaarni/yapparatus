@@ -1,6 +1,6 @@
 /**
  * A figure: its draw program, its steps, and `build`, compiled and checked together. The page
- * compiler runs it in Node with the reader's font files; tests run it with a fixed measure.
+ * compiler runs it in Node with the web app's font files; tests run it with a fixed measure.
  */
 import type { DiagnosticCode } from "../protocol.ts";
 import { compile } from "./compile.ts";
@@ -20,7 +20,7 @@ export interface Figure {
   /** Builds the scene: create elements, arrange them, connect them. */
   draw: (d: DiagramBuilder) => void;
   steps: FigureStep[];
-  /** Hide each part until the first step that focuses it. */
+  /** Hide each element until the first step that focuses it. */
   build: boolean;
 }
 
@@ -85,14 +85,17 @@ function checkSteps(
   diagram: CompiledDiagram,
   build: boolean,
 ): Diagnostic[] {
-  const steps = figureSteps.map((step) => ({ ...step, parts: expand(step.focus, diagram.groups) }));
-  const parts = [
+  const steps = figureSteps.map((step) => ({
+    ...step,
+    elements: expand(step.focus, diagram.groups),
+  }));
+  const elements = [
     ...diagram.nodes.filter((n) => !n.passive).map((n) => n.id),
     ...diagram.edges.filter((e) => !e.passive).map((e) => e.id),
     ...diagram.enclosures.map((e) => e.id),
     ...diagram.frames.map((f) => f.id),
   ];
-  const known = new Set([...parts, ...Object.keys(diagram.groups)]);
+  const known = new Set([...elements, ...Object.keys(diagram.groups)]);
   const diagnostic = (
     code: DiagnosticCode,
     message: string,
@@ -101,13 +104,13 @@ function checkSteps(
   ): Diagnostic => ({ code, message, ids, ...(subject ? { subject } : {}) });
   const diagnostics: Diagnostic[] = steps.flatMap((step, i) =>
     step.focus
-      .filter((part) => !known.has(part))
-      .map((part) =>
+      .filter((element) => !known.has(element))
+      .map((element) =>
         diagnostic(
-          "UNKNOWN_PART",
-          `Step ${i + 1} focuses "${part}", which is not a part of this diagram. Parts: ${parts.join(", ")}.`,
+          "UNKNOWN_ELEMENT",
+          `Step ${i + 1} focuses "${element}", which is not an element of this diagram. Elements: ${elements.join(", ")}.`,
           [],
-          part,
+          element,
         ),
       ),
   );
@@ -125,17 +128,17 @@ function checkSteps(
       );
     ids.add(step.id);
   }
-  // Step-only parts: each must appear somewhere, and those shown together must not collide.
+  // Step-only elements: each must appear somewhere, and those shown together must not collide.
   const stepOnly = diagram.nodes.filter((n) => n.stepOnly);
-  for (const part of [...stepOnly, ...diagram.edges.filter((e) => e.stepOnly)])
-    if (!steps.some((step) => step.parts.has(part.id)))
+  for (const element of [...stepOnly, ...diagram.edges.filter((e) => e.stepOnly)])
+    if (!steps.some((step) => step.elements.has(element.id)))
       diagnostics.push(
-        diagnostic("STEP_ONLY_UNUSED", `${part.id} is stepOnly, but no step focuses it.`, [
-          part.id,
+        diagnostic("STEP_ONLY_UNUSED", `${element.id} is stepOnly, but no step focuses it.`, [
+          element.id,
         ]),
       );
   steps.forEach((step, i) => {
-    const together = stepOnly.filter((n) => step.parts.has(n.id));
+    const together = stepOnly.filter((n) => step.elements.has(n.id));
     for (let a = 0; a < together.length; a++)
       for (let b = a + 1; b < together.length; b++) {
         const [x, y] = [together[a], together[b]];
@@ -153,7 +156,7 @@ function checkSteps(
     diagnostics.push(
       diagnostic(
         "BUILD_WITHOUT_STEPS",
-        "build reveals parts step by step, but the diagram has no <Step> children.",
+        "build reveals elements step by step, but the diagram has no <Step> children.",
       ),
     );
   return diagnostics;

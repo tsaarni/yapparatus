@@ -147,14 +147,14 @@ const counted = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 /**
  * The header's indicator, shown only when the document has errors or warnings, and its list.
- * An item opens where it is; Ask attaches that place to the message box.
+ * An item opens where it is; Comment attaches that place to the message box.
  */
 export function DiagnosticsMenu({
   diagnostics,
-  onAsk,
+  onComment,
 }: {
   diagnostics: ReportedDiagnostic[];
-  onAsk?: (diagnostic: ReportedDiagnostic) => void;
+  onComment?: (diagnostic: ReportedDiagnostic) => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -222,17 +222,17 @@ export function DiagnosticsMenu({
                             {diagnostic.message}
                           </span>
                         </button>
-                        {onAsk && page && (
+                        {onComment && page && (
                           <Button
                             size="small"
                             variant="ghost"
-                            aria-label={`Ask about ${diagnostic.code}`}
+                            aria-label={`Comment on ${diagnostic.code}`}
                             onClick={() => {
                               setOpen(false);
-                              onAsk(diagnostic);
+                              onComment(diagnostic);
                             }}
                           >
-                            <Icon name="ask" size={14} /> Ask
+                            <Icon name="comment" size={14} /> Comment
                           </Button>
                         )}
                       </li>

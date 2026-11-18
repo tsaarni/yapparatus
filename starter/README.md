@@ -1,6 +1,6 @@
 # Starter Document
 
-This is a [Yapparatus](https://github.com/tsaarni/yapparatus) document, written and revised in conversation with a coding agent. The agent writes the pages as [MDX](https://mdxjs.com/), with components for diagrams, charts, tables, code excerpts and more to make the document highly visual. In the browser, the document appears next to a chat where you can select any part of the document and ask the agent about it or request changes. The agent answers in the chat, edits the pages, or both.
+This is a [Yapparatus](https://github.com/tsaarni/yapparatus) document, written and revised in conversation with a coding agent. The agent writes the pages as [MDX](https://mdxjs.com/), with components for diagrams, charts, tables, code excerpts and more to make the document highly visual. In the browser, the document appears next to a chat where you can select anything in the document and comment on it: a question, a correction, or a change to make. The agent replies in the chat, edits the pages, or both.
 
 ## Create the project
 
@@ -33,10 +33,10 @@ To have it write a document, ask for one, for example:
 Write a document about the order service in ../orders.
 ```
 
-Select any part of the document as context and ask about it, and the agent answers in the chat or edits the pages.
+Select anything in the document and comment on it, and the agent replies in the chat or edits the pages.
 
 The agent finds the authoring guide through `AGENTS.md`.
-The chat is stored in `.yapparatus/` in the project directory. It holds your questions, so keep that directory private.
+The chat is stored in `.yapparatus/` in the project directory. It holds your messages, so keep that directory private.
 
 ## Build the document for readers
 

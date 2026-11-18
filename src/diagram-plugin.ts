@@ -1,6 +1,6 @@
 /**
  * `<Diagram>` drawings, compiled when the page is compiled. Each diagram's `draw` program runs
- * here, in the server process, and the drawing is measured with the reader's font files and
+ * here, in the server process, and the drawing is measured with the web app's font files and
  * checked with its steps. The drawing replaces `draw` as the `drawing` prop, so the browser
  * only draws it, and its problems are compile diagnostics of the page.
  */
@@ -229,7 +229,7 @@ function run(source: string, steps: FigureStep[], build: boolean): Compiled {
     const characters = [...uncovered];
     drawing.diagnostics.push({
       code: "FONT_FALLBACK",
-      message: `The text has ${characters.map((c) => `"${c}"`).join(", ")}, which the reader's fonts do not have. A browser draws ${characters.length === 1 ? "it" : "them"} in a system font, so the width is estimated and the text may not fit. Use characters the fonts have, such as "->" for "→".`,
+      message: `The text has ${characters.map((c) => `"${c}"`).join(", ")}, which the web app's fonts do not have. A browser draws ${characters.length === 1 ? "it" : "them"} in a system font, so the width is estimated and the text may not fit. Use characters the fonts have, such as "->" for "→".`,
       ids: [],
       subject: characters.join(""),
     });

@@ -1,11 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { agentHeader, type Chat, type ContextItem } from "../../src/protocol.ts";
-import { replySnippet, root, runSnippet, snippets } from "./workspace.ts";
+import { agentHeader, type Chat, type Reference } from "../../src/protocol.ts";
+import { commands, replyCommand, root, runCommand } from "./workspace.ts";
 
-const storedContext = () =>
-  JSON.parse(sessionStorage.getItem("yapparatus:context") ?? "[]") as ContextItem[];
+const storedReferences = () =>
+  JSON.parse(sessionStorage.getItem("yapparatus:references") ?? "[]") as Reference[];
 
 test("an excerpt links to its file, which opens at the lines and lists where pages discuss it", async ({
   page,
@@ -63,7 +63,7 @@ test("an excerpt with wrap breaks long lines under their own number", async ({ p
   await expect(page).toHaveURL(/\/-\/files\/sample\/notes\.md#L5$/);
 });
 
-test("asking about lines of a file gives the agent the file and its lines", async ({
+test("commenting on lines of a file gives the agent the file and its lines", async ({
   page,
   request,
 }) => {
@@ -80,10 +80,10 @@ test("asking about lines of a file gives the agent the file and its lines", asyn
   });
   await page
     .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Ask", exact: true })
+    .getByRole("button", { name: "Comment", exact: true })
     .click();
-  await expect(page.locator(".context-items")).toContainText("greet.ts, lines 2–3");
-  const [lines] = await page.evaluate(storedContext);
+  await expect(page.locator(".references")).toContainText("greet.ts, lines 2–3");
+  const [lines] = await page.evaluate(storedReferences);
   expect(lines).toMatchObject({
     kind: "lines",
     address: "/-/files/sample/greet.ts#L2-L3",
@@ -93,11 +93,11 @@ test("asking about lines of a file gives the agent the file and its lines", asyn
   });
 
   // The title stands for the whole file.
-  await page.getByRole("button", { name: "Ask about greet.ts" }).click();
-  await expect(page.locator(".context-items")).toContainText(/greet\.ts$/m);
+  await page.getByRole("button", { name: "Comment on greet.ts" }).click();
+  await expect(page.locator(".references")).toContainText(/greet\.ts$/m);
 
   const created = await request.post("/-/api/chat", {
-    data: { author: "reader", text: "Why a template string?", context: [lines] },
+    data: { author: "reader", text: "Why a template string?", references: [lines] },
   });
   expect(created.status()).toBe(201);
   const read = await request.get("/-/api/chat?author=reader", {
@@ -108,7 +108,11 @@ test("asking about lines of a file gives the agent the file and its lines", asyn
 
   // A file outside the folders, or lines that disagree with the address, are refused.
   const refused = await request.post("/-/api/chat", {
-    data: { author: "reader", text: "x", context: [{ ...lines, source: "content/document.json" }] },
+    data: {
+      author: "reader",
+      text: "x",
+      references: [{ ...lines, source: "content/document.json" }],
+    },
   });
   expect(refused.status()).toBe(400);
   expect((await request.get("/-/api/files/sample/../content/document.json")).status()).not.toBe(
@@ -116,7 +120,7 @@ test("asking about lines of a file gives the agent the file and its lines", asyn
   );
 });
 
-test("Show on page opens a source file at the lines asked about", async ({ page }) => {
+test("Show on page opens a source file at the lines commented on", async ({ page }) => {
   await page.goto("/-/files/sample/greet.ts");
   const code = page.locator("main article [data-file]");
   await code.evaluate((region) => {
@@ -127,7 +131,7 @@ test("Show on page opens a source file at the lines asked about", async ({ page 
   });
   await page
     .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Ask", exact: true })
+    .getByRole("button", { name: "Comment", exact: true })
     .click();
   await page.getByLabel("Message", { exact: true }).fill("What does this line build?");
   await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -136,7 +140,9 @@ test("Show on page opens a source file at the lines asked about", async ({ page 
   await expect(code.locator("[data-line='2'][data-selected]")).toHaveCount(1);
 });
 
-test("Show on page shows the section when the text asked about was rewritten", async ({ page }) => {
+test("Show on page shows the section when the text commented on was rewritten", async ({
+  page,
+}) => {
   const file = path.join(root, "content/first-page.mdx");
   const original = readFileSync(file, "utf8");
   try {
@@ -150,7 +156,7 @@ test("Show on page shows the section when the text asked about was rewritten", a
     });
     await page
       .getByRole("toolbar", { name: "Selection actions" })
-      .getByRole("button", { name: "Ask", exact: true })
+      .getByRole("button", { name: "Comment", exact: true })
       .click();
     await page.getByLabel("Message", { exact: true }).fill("Can you say this more simply?");
     await page.getByRole("button", { name: "Send", exact: true }).click();
@@ -167,7 +173,7 @@ test("Show on page shows the section when the text asked about was rewritten", a
       .click();
     await expect(page.getByRole("heading", { name: "Selection target" })).toBeInViewport();
     await expect(
-      page.getByText("This text changed since you asked. Showing where it was."),
+      page.getByText("This text changed since you commented. Showing where it was."),
     ).toBeVisible();
   } finally {
     writeFileSync(file, original);
@@ -179,7 +185,7 @@ function lineNumber(page: Page, line: number) {
   return page.locator(`main article [data-file] [data-line="${line}"]`).first();
 }
 
-test("clicking line numbers selects lines, and the selection menu asks about them", async ({
+test("clicking line numbers selects lines, and the selection menu comments on them", async ({
   page,
   context,
 }) => {
@@ -190,7 +196,7 @@ test("clicking line numbers selects lines, and the selection menu asks about the
   await lineNumber(page, 3).click({ position: { x: 4, y: 4 }, modifiers: ["Shift"] });
   await expect(page).toHaveURL(/greet\.ts#L2-L3$/);
   await expect(page.locator("[data-selected]")).toHaveCount(2);
-  // The picked lines are the text selection, so the selection menu offers Copy link and Ask.
+  // The picked lines are the text selection, so the selection menu offers Copy link and Comment.
   const menu = page.getByRole("toolbar", { name: "Selection actions" });
   await menu.getByRole("button", { name: "Copy link" }).click();
   expect(await page.evaluate(() => navigator.clipboard.readText())).toMatch(
@@ -198,8 +204,8 @@ test("clicking line numbers selects lines, and the selection menu asks about the
   );
   await lineNumber(page, 2).click({ position: { x: 4, y: 4 } });
   await lineNumber(page, 3).click({ position: { x: 4, y: 4 }, modifiers: ["Shift"] });
-  await menu.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page.locator(".context-items")).toContainText("greet.ts, lines 2–3");
+  await menu.getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(page.locator(".references")).toContainText("greet.ts, lines 2–3");
 
   // Clicking the code itself selects text as usual; no line is picked.
   await page
@@ -224,7 +230,7 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   await lineNumber(page, 2).click({ position: { x: 4, y: 4 } });
   await lineNumber(page, 3).click({ position: { x: 4, y: 4 }, modifiers: ["Shift"] });
   const menu = page.getByRole("toolbar", { name: "Selection actions" });
-  await menu.getByRole("button", { name: "Ask", exact: true }).click();
+  await menu.getByRole("button", { name: "Comment", exact: true }).click();
   await page.goto("/source-code");
   await page.locator("main article [data-file] [data-line='2']").evaluate((line) => {
     const walker = document.createTreeWalker(line, NodeFilter.SHOW_TEXT);
@@ -239,16 +245,16 @@ test("an agent gets the selected code's file, lines, and words, and answers with
       return;
     }
   });
-  await menu.getByRole("button", { name: "Ask", exact: true }).click();
-  await expect(page.locator(".context-items")).toContainText("greet.ts, line 2: “Hello”");
+  await menu.getByRole("button", { name: "Comment", exact: true }).click();
+  await expect(page.locator(".references")).toContainText("greet.ts, line 2: “Hello”");
   await page.getByLabel("Message", { exact: true }).fill("Why does it build the text first?");
   await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The agent connects and reads where to look: the file from its folder, the lines, the words.
   const state = (await (await request.get("/-/api/chat")).json()) as Chat;
   expect(state.prompt).toContain("- sample: source");
-  const [start] = snippets(state.prompt);
-  const read = await runSnippet(start ?? "");
+  const [start] = commands(state.prompt);
+  const read = await runCommand(start ?? "");
   expect(read.stderr).toBe("");
   expect(read.stdout).toContain("--- reader ---\nWhy does it build the text first?");
   expect(read.stdout).toContain(
@@ -262,8 +268,8 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   expect(lines.slice(1, 3).join("\n")).toContain("return text;");
 
   // It answers with the code and a link to the line.
-  const replyAndWait = replySnippet(read.stdout);
-  const waiting = runSnippet(
+  const replyAndWait = replyCommand(read.stdout);
+  const waiting = runCommand(
     replyAndWait,
     [
       "The function names the text before it returns it, so [line 2](/-/files/sample/greet.ts#L2) reads as one step.",
@@ -278,12 +284,14 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   await answer.getByRole("link", { name: "line 2" }).click();
   await expect(page).toHaveURL(/\/-\/files\/sample\/greet\.ts#L2$/);
   // A reply naming a file the document cannot show is refused, with the reason.
-  const again = replySnippet(read.stdout);
-  const refused = await runSnippet(again, "See [this](/-/files/sample/missing.ts).\n");
+  const again = replyCommand(read.stdout);
+  const refused = await runCommand(again, "See [this](/-/files/sample/missing.ts).\n");
   expect(refused.stderr).toContain("names no file it can show");
   // After the chat is cleared, the next message ends the agent's wait.
   await request.delete("/-/api/chat");
-  await request.post("/-/api/chat", { data: { author: "reader", text: "Thanks.", context: [] } });
+  await request.post("/-/api/chat", {
+    data: { author: "reader", text: "Thanks.", references: [] },
+  });
   const next = (await waiting).stdout;
   expect(next).toContain("--- reader ---\nThanks.");
   expect(next).not.toContain("Why does it build the text first?");

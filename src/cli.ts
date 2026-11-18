@@ -66,7 +66,7 @@ const config: InlineConfig = {
   root: process.cwd(),
   plugins: yapparatus({ document, singleFile: values.single }),
 };
-// Only on this machine: the chat server trusts local processes. See the design's chat page.
+// Only on this machine: the chat server trusts local processes. See the Security section of docs/design/server.mdx.
 const listen = { host: "127.0.0.1", open: values.open, ...(port === undefined ? {} : { port }) };
 try {
   if (command === "dev") {

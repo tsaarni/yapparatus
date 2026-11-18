@@ -18,7 +18,7 @@ declare module "virtual:yapparatus/document" {
   export interface DocumentPage {
     /** Path inside the content folder without `.mdx`, which is also its address: "reading". */
     id: string;
-    /** Path from the project root: "docs/design/rendering.mdx". */
+    /** Path from the project root: "docs/design/overview.mdx". */
     source: string;
     /** Loaded with the app. Empty, titled with the id, when the page does not compile. */
     outline: PageOutline;

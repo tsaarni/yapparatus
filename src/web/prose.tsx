@@ -129,7 +129,7 @@ function H1({ children, ...props }: Props) {
   return (
     <hgroup {...stylex.props(s.titleGroup)}>
       {chapter && <p {...stylex.props(s.chapter)}>Chapter {chapter}</p>}
-      {/* The title stands for the whole page: asking about it adds the page as context. */}
+      {/* The title stands for the whole page: commenting on it adds the page as a reference. */}
       <h1
         {...props}
         {...(reply ? {} : targetProps("page", chapter ? `Chapter ${chapter}` : undefined, title))}

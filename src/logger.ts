@@ -1,5 +1,5 @@
 /**
- * Diagnostic logging for the dev server, the browser reader, and the agent library.
+ * Diagnostic logging for the dev server, the web app, and the agent library.
  *
  * One setting, the `YAPPARATUS_LOG` environment variable, picks the level everywhere:
  * `debug`, `info`, `warn` (the default), `error`, or `silent`. Node reads it at startup; the

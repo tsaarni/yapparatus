@@ -1,6 +1,6 @@
 /**
  * A compiled drawing as a standalone SVG picture, for an agent that looks at a figure. It draws
- * what the reader draws, in the same order as `DiagramView.tsx`, with the light theme's colors
+ * what the web app draws, in the same order as `DiagramView.tsx`, with the light theme's colors
  * written into it and text as glyph outlines, so a rasterizer needs no fonts and no styles.
  */
 
@@ -8,7 +8,7 @@ import {
   type CompiledDiagram,
   type CompiledEdge,
   type CompiledNode,
-  stepOnlyParts,
+  stepOnlyElements,
   type TextLine,
 } from "./compiled.ts";
 import { type Rect, union } from "./geometry.ts";
@@ -27,7 +27,7 @@ export interface PictureFonts {
 }
 
 export interface PictureOptions {
-  /** Draw each part's id beside it, and outline the parts that diagnostics name. */
+  /** Draw each element's id beside it, and outline the elements that diagnostics name. */
   ids?: boolean;
 }
 
@@ -42,7 +42,7 @@ const m = defaultMetrics;
 /** The figure's own color, behind the drawing and in the halos. */
 const background = color.surface;
 
-/** The legend under the drawing, as the reader's legend buttons are laid out. */
+/** The legend under the drawing, as the web app's legend buttons are laid out. */
 const legend = {
   marginTop: 12,
   height: 28,
@@ -70,7 +70,7 @@ function attrs(values: Record<string, string | number | undefined>): string {
 const rect = (r: Rect, rx: number, style: Record<string, string | number | undefined>) =>
   `<rect${attrs({ x: r.x, y: r.y, width: r.width, height: r.height, rx: rx || undefined, ...style })}/>`;
 
-/** The colors and weight a part paints with: its role's, and its category's hue. */
+/** The colors and weight an element paints with: its role's, and its category's hue. */
 interface Ink {
   ink: string;
   fill: string;
@@ -78,9 +78,10 @@ interface Ink {
   weight: number;
 }
 
-function inkOf(part: { role: string; category?: number }): Ink {
-  const role = roles[part.role === "external" ? "default" : (part.role as keyof typeof roles)];
-  const category = part.category === undefined ? undefined : categories[part.category - 1];
+function inkOf(element: { role: string; category?: number }): Ink {
+  const role =
+    roles[element.role === "external" ? "default" : (element.role as keyof typeof roles)];
+  const category = element.category === undefined ? undefined : categories[element.category - 1];
   const fill = category?.fill ?? role.fill;
   return {
     ink: color[category?.ink ?? role.ink],
@@ -91,8 +92,8 @@ function inkOf(part: { role: string; category?: number }): Ink {
 }
 
 /**
- * Draws a compiled drawing as the reader shows it before any step: every part plain, and the
- * parts that only a step shows left out. The drawing must have compiled (`ok`).
+ * Draws a compiled drawing as the web app shows it before any step: every element plain, and the
+ * elements that only a step shows left out. The drawing must have compiled (`ok`).
  */
 export function pictureOf(
   diagram: CompiledDiagram,
@@ -100,7 +101,7 @@ export function pictureOf(
   fonts: PictureFonts,
 ): Picture {
   if (!diagram.ok) throw new Error("The drawing did not compile, so it has no picture.");
-  const stepOnly = stepOnlyParts(diagram);
+  const stepOnly = stepOnlyElements(diagram);
   const shown = (id: string) => !stepOnly.has(id);
   const flagged = new Set(options.ids ? diagram.diagnostics.flatMap((d) => d.ids) : []);
 
@@ -119,7 +120,7 @@ export function pictureOf(
   };
   const lines = (node: CompiledNode, label: string) =>
     node.lines.map((line) => text(line, line.muted ? color.textMuted : label)).join("");
-  /** A part's group, tagged with its id for tests and tools. A part not shown has none. */
+  /** An element's group, tagged with its id for tests and tools. An element not shown has none. */
   const group = (visible: boolean, body: string, tag: Record<string, string> = {}) => {
     if (!visible || !body) return "";
     const data = Object.fromEntries(Object.entries(tag).map(([k, v]) => [`data-${k}`, v]));
@@ -170,7 +171,7 @@ export function pictureOf(
       }
       case "actor": {
         const { head, body } = shape.actor(r);
-        // The reader draws a stick figure solid, even for an external part.
+        // The web app draws a stick figure solid, even for an external element.
         const figure = {
           ...style,
           fill: "none",
@@ -227,7 +228,7 @@ export function pictureOf(
     if (node.shape === "space") return "";
     // A decoration is shown with its edge.
     const visible = node.passive ? !node.follows || shown(node.follows) : shown(node.id);
-    const tag = { part: node.id, shape: node.shape };
+    const tag = { "element-id": node.id, shape: node.shape };
     if (node.shape === "bar")
       return group(
         visible,
@@ -302,7 +303,7 @@ export function pictureOf(
     for (const label of edge.labels)
       body += label.lines.map((l) => text(l, color.textBody, true)).join("");
     if (flagged.has(edge.id)) for (const label of edge.labels) body += flag(label.rect, 1, 4);
-    return group(shown(edge.id), body, { part: edge.id, shape: "edge" });
+    return group(shown(edge.id), body, { "element-id": edge.id, shape: "edge" });
   };
 
   const out: string[] = [];
@@ -316,7 +317,7 @@ export function pictureOf(
             `<path${attrs({ d: shape.rule(f.rect, divider.y), ...hairline, "stroke-dasharray": dash.dashed })}/>`,
         )
         .join("");
-    out.push(group(shown(f.id), body, { part: f.id, shape: "frame" }));
+    out.push(group(shown(f.id), body, { "element-id": f.id, shape: "frame" }));
   }
   for (const e of diagram.enclosures) {
     const k = inkOf(e);
@@ -330,7 +331,7 @@ export function pictureOf(
       body +=
         rect(e.titleRect, e.titleRect.height / 2, { fill: background, ...ink }) +
         text(e.title, e.title.muted ? color.textMuted : k.label);
-    out.push(group(shown(e.id), body, { part: e.id, shape: "enclosure" }));
+    out.push(group(shown(e.id), body, { "element-id": e.id, shape: "enclosure" }));
   }
   for (const edge of diagram.edges) if (edge.passive) out.push(edgeOf(edge));
   for (const node of diagram.nodes) out.push(nodeOf(node));
@@ -368,7 +369,7 @@ export function pictureOf(
 }
 
 /**
- * Each part's id beside it, small and in the error color, with a halo: nodes above their
+ * Each element's id beside it, small and in the error color, with a halo: nodes above their
  * top-left corner, cells inside theirs, edges under the middle of their longest segment, and
  * enclosures and frames inside their top-right corner.
  */
@@ -384,7 +385,7 @@ function idLayer(
   for (const node of diagram.nodes) {
     if (node.passive || node.shape === "space") continue;
     const r = node.rect;
-    // A cell's id goes inside it, since its neighbors touch it; any other part's above it.
+    // A cell's id goes inside it, since its neighbors touch it; any other element's above it.
     out.push(
       node.shape === "cell" ? tag(node.id, r.x + 3, r.y + 7) : tag(node.id, r.x + 2, r.y - 6),
     );
@@ -401,9 +402,9 @@ function idLayer(
     }
     if (best) out.push(tag(edge.id, best.x, best.y + 9, "middle"));
   }
-  for (const part of [...diagram.enclosures, ...diagram.frames]) {
-    const r = part.rect;
-    out.push(tag(part.id, r.x + r.width - 6 - measure(part.id, font), r.y + 9));
+  for (const element of [...diagram.enclosures, ...diagram.frames]) {
+    const r = element.rect;
+    out.push(tag(element.id, r.x + r.width - 6 - measure(element.id, font), r.y + 9));
   }
   return `<g data-layer="ids">${out.join("")}</g>`;
 }

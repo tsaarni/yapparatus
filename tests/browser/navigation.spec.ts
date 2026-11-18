@@ -58,7 +58,34 @@ test("Back returns to the position on a page that was loaded when it was opened"
   await follow(page, "/second-page");
   await expect(page.getByRole("heading", { name: "Second page", level: 1 })).toBeVisible();
   await expect.poll(() => scrollTop(page)).toBe(0);
+  await page.evaluate(() =>
+    document.querySelector("[data-scroll-root]")?.scrollBy({ top: 120, behavior: "instant" }),
+  );
+  const later = await scrollTop(page);
+  expect(later).toBeGreaterThan(0);
   await page.goBack();
   await expect(page.getByRole("heading", { name: "Diagram forms", level: 1 })).toBeVisible();
   await expect.poll(() => scrollTop(page)).toBe(position);
+  await page.goForward();
+  await expect(page.getByRole("heading", { name: "Second page", level: 1 })).toBeVisible();
+  await expect.poll(() => scrollTop(page)).toBe(later);
+});
+
+test("the latest navigation wins while a page is loading", async ({ page }) => {
+  await page.goto("/first-page");
+  let release = () => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/content/diagrams.mdx*", async (route) => {
+    await held;
+    await route.continue();
+  });
+  await follow(page, "/diagrams");
+  await follow(page, "/second-page");
+  await expect(page.getByRole("heading", { name: "Second page", level: 1 })).toBeVisible();
+  release();
+  await page.waitForResponse("**/content/diagrams.mdx*");
+  await expect(page.getByRole("heading", { name: "Second page", level: 1 })).toBeVisible();
+  await expect(page).toHaveURL(/\/second-page$/);
 });

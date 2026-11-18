@@ -6,20 +6,20 @@ import path from "node:path";
 
 export const root = path.join(realpathSync(os.tmpdir()), "yapparatus-browser");
 
-/** The snippets a prompt tells the agent to run, as `-e` code, in order. */
-export function snippets(prompt: string): string[] {
+/** The commands a prompt tells the agent to run, as `-e` code, in order. */
+export function commands(prompt: string): string[] {
   return [...prompt.matchAll(/node --input-type=module-typescript -e '([^']*)'/g)].map(
     (match) => match[1] ?? "",
   );
 }
 
-/** The snippet in a prompt that replies and waits. */
-export function replySnippet(prompt: string): string {
-  return snippets(prompt).find((code) => code.includes("await sendReply(")) ?? "";
+/** The command in a prompt that replies and waits. */
+export function replyCommand(prompt: string): string {
+  return commands(prompt).find((code) => code.includes("await sendReply(")) ?? "";
 }
 
-/** Run a snippet in the workspace as an agent would, with `input` on stdin. */
-export function runSnippet(code: string, input = "") {
+/** Run a command in the workspace as an agent would, with `input` on stdin. */
+export function runCommand(code: string, input = "") {
   return new Promise<{ code: number; stdout: string; stderr: string }>((resolve) => {
     const child = execFile(
       process.execPath,

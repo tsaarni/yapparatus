@@ -2,7 +2,7 @@ import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Why `document`, a path with `/` between parts, cannot be a document directory of the project
+ * Why `document`, a path with `/` between segments, cannot be a document directory of the project
  * at `root`, or undefined if it can. A document directory holds a document.json, and no other
  * document directory contains it or is inside it: its pages are every MDX file under it, and
  * its chat state mirrors its path.

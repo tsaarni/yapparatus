@@ -20,7 +20,7 @@ export interface ContentIssue {
   line?: number;
   /** The figure it is about, by id. */
   target?: string;
-  /** The diagram parts it is about. */
+  /** The diagram elements it is about. */
   elements?: string[];
   /**
    * What the issue is about, so the same problem keeps one identity as its wording changes.
@@ -117,7 +117,7 @@ function codeLanguage(pre: Element, line: number, issues: ContentIssue[]) {
 
 /**
  * `> [!NOTE]` as the first line of a blockquote makes it an alert of that kind. The marker is
- * removed and the kind is left on the blockquote for the reader to render.
+ * removed and the kind is left on the blockquote for the web app to render.
  */
 function alert(quote: Element, line: number, issues: ContentIssue[]) {
   const first = quote.children.find((c): c is Element => c.type === "element");
@@ -177,7 +177,7 @@ const containers = ["Tabs", "Columns"];
 
 /**
  * `<Tabs>` and `<Columns>` hold only `<Panel>`s, each with its own label. The compiler passes
- * the labels to the container, so the reader never inspects its children.
+ * the labels to the container, so the web app never inspects its children.
  */
 function panels(
   jsx: MdxJsxFlowElementHast,
@@ -259,21 +259,21 @@ function widen(jsx: MdxJsxFlowElementHast) {
 }
 
 /**
- * A figure frames and numbers its content, so a figure inside it is a part: it has no number,
+ * A figure frames and numbers its content, so a figure inside it belongs to it and has no number,
  * caption, or id of its own.
  */
 function figure(jsx: MdxJsxFlowElementHast, issues: ContentIssue[]) {
   visit(jsx, (inner) => {
     if (inner === jsx || inner.type !== "mdxJsxFlowElement") return;
-    const part = inner as MdxJsxFlowElementHast;
-    if (!figureKinds.includes(part.name ?? "")) return;
-    const named = ["id", "caption"].filter((a) => literal(part, a) !== undefined);
+    const nested = inner as MdxJsxFlowElementHast;
+    if (!figureKinds.includes(nested.name ?? "")) return;
+    const named = ["id", "caption"].filter((a) => literal(nested, a) !== undefined);
     if (named.length)
       issues.push({
         code: "FIGURE_NESTED",
-        line: part.position?.start.line ?? 0,
-        subject: literal(part, "id") || literal(part, "caption") || `${part.name}`,
-        message: `A <${part.name}> inside a <Figure> is part of it and has no ${named.join(" or ")} of its own. Number the outer figure.`,
+        line: nested.position?.start.line ?? 0,
+        subject: literal(nested, "id") || literal(nested, "caption") || `${nested.name}`,
+        message: `A <${nested.name}> inside a <Figure> belongs to it and has no ${named.join(" or ")} of its own. Number the outer figure.`,
       });
   });
 }

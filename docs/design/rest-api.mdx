@@ -1,0 +1,455 @@
+# REST API
+
+The server has an HTTP API under `/-/api`, which the web app and the agent library use. This page lists every request with its parameters, bodies, and status codes, and the updates the server sends to the web app. What the server does with the requests is described in [the server](server).
+
+## Conventions
+
+<Ref to="api-requests" /> lists every request. The types of the bodies are in [the protocol types](/-/files/yapparatus/src/protocol.ts).
+
+<Table id="api-requests" caption="The requests under /-/api.">
+
+| Request | What it does | Success |
+|---|---|---|
+| [`GET /chat`](#read-the-chat) | Reads the chat, or what an agent has to do | `200` with the chat |
+| [`POST /chat`](#add-a-message) | Adds a reader message or a reply | `201` with `{ "seq" }` for a reader message, `204` for a reply |
+| [`DELETE /chat`](#clear-the-chat) | Clears the chat | `204` |
+| [`GET /diagnostics`](#read-the-diagnostics) | Reads every diagnostic, once the checks of recent edits are done | `200` with the diagnostics |
+| [`POST /diagnostics`](#report-diagnostics) | Adds what a browser found in one revision of a page, or in a reply | `204` |
+| [`GET /files/{directory}/{path}`](#read-an-external-file) | Reads an external file, highlighted | `200` with the file |
+| [`GET /figures/{page}/{figure}`](#read-a-picture) | Draws a diagram as a picture | `200` with a PNG image |
+
+</Table>
+
+<Ref to="api-clients" /> shows which client sends which request.
+
+<Diagram id="api-clients" caption="The requests that the web app and the agent library send, and the updates the server sends back." description="Sequence of requests from the web app and the agent library to the server" draw={(d) => {
+  const web = d.box("Web app", { id: "web-app" })
+  const server = d.box("Server", { role: "accent" })
+  const library = d.box("Agent library", { id: "agent-library" })
+  d.equalSize([web, server, library])
+  d.sequence([web, server, library], [
+    { from: web, to: server, label: "GET /chat", id: "web-read" },
+    { from: web, to: server, label: "POST /chat", id: "web-post" },
+    { from: web, to: server, label: "DELETE /chat", id: "web-clear" },
+    { from: web, to: server, label: "POST /diagnostics", id: "web-report" },
+    { from: web, to: server, label: "GET /files/…", id: "web-file" },
+    { from: server, to: web, label: "updates", async: true, id: "updates" },
+    { from: library, to: server, label: "GET /chat, wait", id: "agent-wait" },
+    { from: library, to: server, label: "POST /chat", id: "agent-reply" },
+    { from: library, to: server, label: "GET /diagnostics", id: "agent-check" },
+    { from: library, to: server, label: "GET /figures/…", id: "agent-picture" },
+  ], { gap: 160 })
+}}>
+  <Step focus="web-read updates">The web app reads the chat once when it starts, and updates keep it current.</Step>
+  <Step focus="web-post web-clear web-report web-file">The web app also sends messages, clears the chat, reports diagnostics, and reads external files.</Step>
+  <Step focus="agent-wait agent-reply agent-check agent-picture">The [agent library](agent-library) sends one request for each of its four calls.</Step>
+</Diagram>
+
+These rules hold for every request:
+
+- A `GET` changes nothing the reader sees. A `POST` adds to a collection, and a `DELETE` empties one.
+- A `POST` sends `Content-Type: application/json` and a JSON object of at most 512,000 characters.
+- Every response with a body is JSON, except a picture, which is `image/png`.
+- Every response has `Cache-Control: no-store`, because every read can change.
+- An error is a status code and `{ "error": "…" }`. The text says what is wrong and what to run next. <Ref to="api-status-codes" /> lists the codes.
+
+<Table id="api-status-codes" caption="The error status codes of the API.">
+
+| Status | When |
+|---|---|
+| `400` | A parameter or the body is invalid |
+| `403` | The `Origin` header names another origin. See [security](server#security) |
+| `404` | No route has this path, the external file cannot be shown, or the page has no diagram with this id |
+| `405` | The path does not allow this method. The `Allow` header lists the methods |
+| `409` | The agent was taken over, or a reply has nothing to answer |
+| `413` | The body is longer than 512,000 characters |
+| `415` | A `POST` body is not JSON |
+| `422` | A reply was refused, or a diagram could not be drawn |
+| `503` | The server closed while a read was waiting. There is no body |
+
+</Table>
+
+An unknown method on a known path returns `405`:
+
+```http
+PUT /-/api/chat HTTP/1.1
+```
+
+```http
+HTTP/1.1 405 Method Not Allowed
+Allow: GET, POST, DELETE
+Content-Type: application/json
+
+{"error":"PUT is not supported here."}
+```
+
+The examples below are JSON with comments. A field marked *optional* is left out when it has no value, and `…` shortens long values.
+
+## Chat
+
+The chat is a log of numbered messages, described in [the chat log](server#chat-log).
+
+### Read the chat
+
+`GET /-/api/chat` reads the whole chat. With the `Yapparatus-Agent` header it is an agent's read, which returns [what the agent has to do](server#what-the-agent-has-to-do). <Ref to="api-chat-parameters" /> lists the parameters.
+
+<Table id="api-chat-parameters" caption="The parameters of GET /-/api/chat.">
+
+| Parameter | Values | Effect |
+|---|---|---|
+| `author` | `reader` or `agent` | Returns only that author's messages. An agent's read holds only reader messages, and `agent` empties it |
+| `include` | `diagnostics` | Adds diagnostics: every one in a whole read, or the new errors in an agent's read |
+| `wait` | Whole seconds, at most 25 | Holds an agent's read until it has something. A larger value counts as 25. Needs the header |
+| `Yapparatus-Agent` header | The agent's id | Makes the read an agent's read |
+
+</Table>
+
+An agent's read with `wait` stays open until it has messages or errors, or until `wait` seconds pass. A read with an id that a newer agent has replaced returns `409`.
+
+The web app reads the whole chat and every diagnostic once when it starts:
+
+```http
+GET /-/api/chat?include=diagnostics HTTP/1.1
+```
+
+```jsonc
+{
+  // The messages since the chat was last cleared, oldest first.
+  "messages": [
+    {
+      "seq": 12,
+      // A message the reader wrote in the web app.
+      "author": "reader",
+      "text": "Why does a read wait?",
+      // What the reader attached. Empty: a message about the document in general.
+      "references": [
+        {
+          // page, text, section, figure, table, listing, code, diagram-element, file, or lines.
+          "kind": "section",
+          // The address of what the reader commented on.
+          "address": "/rest-api#read-the-chat",
+          // Its file, relative to the project directory, and the lines the reader saw.
+          "source": "docs/design/rest-api.mdx",
+          "startLine": 88,
+          "endLine": 140,
+          // Optional: the diagram step the reader had open, with its text.
+          "step": "Step 2 of 3: …"
+        }
+      ],
+      "createdAt": "2026-11-18T14:02:00.000Z"
+    },
+    {
+      "seq": 13,
+      // A reply the agent sent.
+      "author": "agent",
+      // The newest reader message the reply answers. Earlier ones are answered too.
+      "inReplyTo": 12,
+      // Optional: when the server first gave message 12 to an agent.
+      "readAt": "2026-11-18T14:02:00.410Z",
+      // The reply's MDX module, which the web app imports to show it.
+      "module": "/.yapparatus/docs/design/chat/0b6e1f52-….mdx",
+      "createdAt": "2026-11-18T14:02:41.177Z"
+    }
+  ],
+  // The highest reader message a reply answered, or 0 before the first reply.
+  "repliedTo": 12,
+  // waiting, working, or away. See the agent state.
+  "agent": "waiting",
+  // Only with include=diagnostics: every diagnostic, or in an agent's read the new errors.
+  // Each item is a diagnostic as GET /-/api/diagnostics lists it.
+  "diagnostics": [],
+  // In a whole read, the start prompt. In an agent's read, the messages and errors as text,
+  // ending with the command to run next.
+  "prompt": "You are connected to a Yapparatus document. …"
+}
+```
+
+`waitForMessage()` in the agent library makes this agent's read:
+
+```http
+GET /-/api/chat?author=reader&include=diagnostics&wait=25 HTTP/1.1
+Yapparatus-Agent: 5f0c2d4e-…
+```
+
+```jsonc
+{
+  // The unanswered reader messages.
+  "messages": [
+    {
+      "seq": 14,
+      "author": "reader",
+      "text": "And the errors too?",
+      "references": [],
+      "createdAt": "…"
+    }
+  ],
+  "repliedTo": 12,
+  // The state at the moment of the read.
+  "agent": "waiting",
+  // The errors the agent has not been given.
+  "diagnostics": [],
+  "prompt": "Reader, 14:05:\n--- reader ---\nAnd the errors too?\n--- end reader ---\n…"
+}
+```
+
+A wait that ends with nothing returns an empty read:
+
+```jsonc
+{
+  "messages": [],
+  "repliedTo": 14,
+  "agent": "waiting",
+  "diagnostics": [],
+  "prompt": "Nothing new. Wait again:\n\nnode --input-type=module-typescript -e '…'"
+}
+```
+
+A read without the header that names `wait` returns `400`, and so does an `author` or `include` with another value.
+
+### Add a message
+
+`POST /-/api/chat` adds a message. The body's `author` decides which checks apply. The web app sends a reader message, and the server checks that each reference points at a page or a shown external file:
+
+```http
+POST /-/api/chat HTTP/1.1
+Content-Type: application/json
+```
+
+```jsonc
+{
+  "author": "reader",
+  // Not blank, at most 20,000 characters. The server trims it.
+  "text": "Why does a read wait?",
+  // At most 30 references, as in a read of the chat. May be empty or left out.
+  "references": [
+    {
+      "kind": "section",
+      "address": "/rest-api#read-the-chat",
+      "source": "docs/design/rest-api.mdx",
+      "startLine": 88,
+      "endLine": 140
+    }
+  ]
+}
+```
+
+```http
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{"seq":12}
+```
+
+`sendReply()` in the agent library sends a reply. The server [checks it](server#reply-checks) before it stores it:
+
+```http
+POST /-/api/chat HTTP/1.1
+Content-Type: application/json
+```
+
+```jsonc
+{
+  "author": "agent",
+  // The reply, as MDX. It may use the built-in components.
+  "mdx": "A read waits so that the agent needs one request …"
+}
+```
+
+```http
+HTTP/1.1 204 No Content
+```
+
+A reply with errors is refused with `422`:
+
+```http
+HTTP/1.1 422 Unprocessable Entity
+Content-Type: application/json
+```
+
+```jsonc
+{
+  // Text for the agent: one line per error, and what to do next.
+  "error": "The reply was not sent:\n\n- error BROKEN_LINK line 3: …\n\nFix the MDX and …",
+  // The errors, each a diagnostic without source, severity, and address.
+  "diagnostics": [
+    { "origin": "reply", "code": "BROKEN_LINK", "subject": "/missing", "message": "…", "line": 3 }
+  ]
+}
+```
+
+A reply with nothing to answer returns `409`, and its `error` ends with the wait command.
+
+### Clear the chat
+
+`DELETE /-/api/chat` deletes every message and reply.
+
+```http
+DELETE /-/api/chat HTTP/1.1
+```
+
+```http
+HTTP/1.1 204 No Content
+```
+
+## Diagnostics
+
+Where diagnostics come from is described in [diagnostics](diagnostics).
+
+### Read the diagnostics
+
+`GET /-/api/diagnostics` takes no parameters. It answers once the checks of recent edits are done, or after at most 8 s. The errors it returns count as given to the agent. It names no agent, so it can run while an agent's read waits.
+
+```http
+GET /-/api/diagnostics HTTP/1.1
+```
+
+```jsonc
+{
+  // Every diagnostic in the document.
+  "diagnostics": [
+    {
+      // Who found it. The server: compile (diagrams too), link, pages.
+      // A browser: chart, render, runtime, reply.
+      "origin": "link",
+      // What is wrong. See diagnostics, codes and severity.
+      "code": "BROKEN_LINK",
+      // error or warning. The code decides it.
+      "severity": "error",
+      "message": "The link \"/server#api\" names #api, which server.mdx does not have.",
+      // Optional: the file, relative to the project directory, and the line in it.
+      "source": "docs/design/overview.mdx",
+      "line": 40,
+      // Optional: the figure's last line, when `line` is a figure's first.
+      "endLine": 72,
+      // Optional: a figure id, or a reply's message number, inside the source.
+      "target": "system-map",
+      // Optional: what the diagnostic is about, such as a link's target.
+      "subject": "/server#api",
+      // Optional: the diagram elements involved.
+      "elements": ["router"],
+      // Optional: the page address to link, "/page" or "/page#figure".
+      "address": "/overview#system-map"
+    }
+  ],
+  // The pages no browser has rendered since they changed.
+  "unchecked": [
+    {
+      "source": "docs/design/charts.mdx",
+      "address": "/charts",
+      // What was found in the revision a browser rendered last, as in `diagnostics`.
+      "previous": []
+    }
+  ],
+  // The same lists, written for the agent.
+  "prompt": "Diagnostics (1). Fix them:\n- error BROKEN_LINK docs/design/overview.mdx:40-72, …"
+}
+```
+
+### Report diagnostics
+
+`POST /-/api/diagnostics` adds what a browser found in one revision of a page, or in a reply. How the server uses a report is described in [diagnostics](diagnostics#revisions-and-reports).
+
+```http
+POST /-/api/diagnostics HTTP/1.1
+Content-Type: application/json
+```
+
+```jsonc
+{
+  // A page of the document, or a reply's module file, relative to the project directory.
+  "source": "docs/design/charts.mdx",
+  // The page's revision, as the page compiler wrote it into the page. A reply's report has none.
+  "revision": "c41a…",
+  // At most 200 items. Empty: the revision was rendered and nothing was found.
+  "diagnostics": [
+    {
+      // chart, render, runtime, or reply: the origins a browser finds.
+      "origin": "chart",
+      // A code from the registry.
+      "code": "CHART_OVERLAP",
+      "message": "Tick labels on the x axis overlap.",
+      // Optional: line, target, subject, and elements, as in a read of the diagnostics.
+      // The server sets source and severity itself.
+      "target": "lines-chart"
+    }
+  ]
+}
+```
+
+```http
+HTTP/1.1 204 No Content
+```
+
+The server shortens long text and drops unknown fields. It returns `400` when the `source` is not a page or a reply, when only a page's report has no `revision`, or when an origin or code is unknown.
+
+## Files
+
+### Read an external file
+
+`GET /-/api/files/{directory}/{path}` reads a whole external file. The path is the file's address, `/-/files/{directory}/{path}`, under `/-/api`. The server highlights the file and then [watches it](server#external-files).
+
+```http
+GET /-/api/files/yapparatus/src/server/http.ts HTTP/1.1
+```
+
+```jsonc
+{
+  // The file's address in the document.
+  "address": "/-/files/yapparatus/src/server/http.ts",
+  // The file, relative to the project directory.
+  "source": "src/server/http.ts",
+  // The whole file as highlighted code, numbered from line 1.
+  "code": {
+    "language": "ts",
+    // Each token style once.
+    "styles": ["color:var(--shiki-token-comment)", "color:var(--shiki-token-keyword)", …],
+    // Each line's tokens: a style's index, then the token's text.
+    "lines": [[0, "/** A small router for the /-/api resources, …"], [1, "import", 1, " type", …], …],
+    "start": 1
+  }
+}
+```
+
+`code` has the form of all [highlighted code](page-compiler#code-and-excerpts). A path with lines, such as an encoded `#L4-L9`, returns `400`. A file that does not exist or that the document may not show returns `404`.
+
+## Figures
+
+### Read a picture
+
+`GET /-/api/figures/{page}/{figure}` draws a diagram as a PNG image in the light theme. The path is the figure's address, `/{page}#{figure}`, with the figure id as the last segment. [The server](server#pictures) describes how. <Ref to="api-figure-parameters" /> lists the parameters.
+
+<Table id="api-figure-parameters" caption="The parameters of GET /-/api/figures/{page}/{figure}.">
+
+| Parameter | Values | Effect |
+|---|---|---|
+| `ids` | `true` or `false` | With `true`, labels each element with its id and outlines the elements that diagnostics name |
+
+</Table>
+
+```http
+GET /-/api/figures/server/server-agent-state?ids=true HTTP/1.1
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: image/png
+Cache-Control: no-store
+```
+
+Only a diagram with an id has a picture. A chart, an unknown id, or an unknown page returns `404`. For an unknown id, the `error` lists the ids of the diagrams on the page. A diagram that could not be drawn, or a page that does not compile, returns `422`, and the `error` says to check the document first.
+
+## Updates
+
+The server sends changes to the web app on Vite's hot-update connection, as the events in <Ref to="api-updates" />. Each event carries what the matching read returns. How the server collects changes is described in [the server](server#updates).
+
+<Table id="api-updates" caption="The events the server sends to the web app.">
+
+| Event | Data | Sent when |
+|---|---|---|
+| `yapparatus:chat` | The chat, as `GET /chat` without parameters returns it | A message is added, the chat is cleared, or the agent state changes |
+| `yapparatus:diagnostics` | Every diagnostic, as the `diagnostics` of `GET /chat?include=diagnostics` | The diagnostics change |
+| `yapparatus:file` | The address of an external file, as a JSON string | A file that the server served changes on disk |
+
+</Table>
+
+The events are typed in [the protocol types](/-/files/yapparatus/src/protocol.ts#L428-L441).

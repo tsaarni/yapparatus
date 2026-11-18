@@ -41,7 +41,7 @@ export const compiled = new Map<
 >();
 
 /**
- * Record the page's sections and figures and export them as `outline`, so the reader can
+ * Record the page's sections and figures and export them as `outline`, so the web app can
  * number them and resolve cross-references across pages. Runs after heading ids exist.
  * `isPage` tells document pages, which must have one `#` title, from chat replies, which have none.
  */

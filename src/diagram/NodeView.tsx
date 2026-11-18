@@ -2,20 +2,20 @@
  * Shapes: boxes, cylinders, records and their cells, marks, notes, and their badges and pins.
  */
 import * as stylex from "@stylexjs/stylex";
-import { stroke, theme } from "../reader/theme.stylex.ts";
-import { styled } from "../reader/ui.tsx";
-import type { CompiledNode, PartState } from "./compiled.ts";
-import { type Rect, union } from "./geometry.ts";
-import { badge, corner, defaultMetrics } from "./metrics.ts";
+import { stroke, theme } from "../web/theme.stylex.ts";
+import { styled } from "../web/ui.tsx";
+import type { CompiledNode, ElementState } from "./compiled.ts";
 import {
   categoryStyle,
+  elementStyles,
   Lines,
-  partStyles,
   roleStyle,
   stateStyle,
   type Target,
   targetFor,
-} from "./part.tsx";
+} from "./element.tsx";
+import { type Rect, union } from "./geometry.ts";
+import { badge, corner, defaultMetrics } from "./metrics.ts";
 import * as shape from "./shapes.ts";
 
 const m = defaultMetrics;
@@ -32,7 +32,7 @@ export function NodeView({
   /** The prefix of this figure's clip paths, which keep cell fills inside their record. */
   clip: string;
   target?: Target;
-  state?: PartState;
+  state?: ElementState;
 }) {
   // A record with cells is drawn in two layers: this body, then its outline over the cells.
   // A cell's warning badge is drawn over that outline, with the pins.
@@ -47,7 +47,7 @@ export function NodeView({
         width={r.width}
         height={r.height}
         rx={2}
-        {...stylex.props(styles.bar, partStyles.fade, stateStyle(state))}
+        {...stylex.props(styles.bar, elementStyles.fade, stateStyle(state))}
       />
     );
   return (
@@ -55,10 +55,10 @@ export function NodeView({
       {...targetFor(target, state)}
       {...styled(
         "diagram-target",
-        partStyles.target,
+        elementStyles.target,
         roleStyle(node.role),
         categoryStyle(node.category),
-        partStyles.fade,
+        elementStyles.fade,
         stateStyle(state),
       )}
     >
@@ -69,7 +69,7 @@ export function NodeView({
         <rect
           {...shape.outline(node.labelRect ? (union([r, node.labelRect]) as Rect) : r, 4)}
           rx={8}
-          {...stylex.props(partStyles.flag)}
+          {...stylex.props(elementStyles.flag)}
         />
       )}
     </g>
@@ -77,7 +77,7 @@ export function NodeView({
 }
 
 /**
- * A warning part also says so without color: an exclamation mark on its top-right corner.
+ * A warning element also says so without color: an exclamation mark on its top-right corner.
  * Amber and the accent can look alike, at a glance and with color blindness.
  */
 function WarningBadge({ node }: { node: CompiledNode }) {
@@ -94,15 +94,15 @@ function WarningBadge({ node }: { node: CompiledNode }) {
  * A warning cell's badge, drawn over its record's outline and dividers, which would cross it.
  * It fades with the cell.
  */
-export function CellWarning({ node, state }: { node: CompiledNode; state: PartState }) {
+export function CellWarning({ node, state }: { node: CompiledNode; state: ElementState }) {
   return (
-    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The badge only paints; the cell is the part.
+    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The badge only paints; the cell is the element.
     <g
       aria-hidden="true"
       {...stylex.props(
         roleStyle(node.role),
         styles.passThrough,
-        partStyles.fade,
+        elementStyles.fade,
         stateStyle(state),
       )}
     >
@@ -115,17 +115,17 @@ export function CellWarning({ node, state }: { node: CompiledNode; state: PartSt
  * A member's number on its top-left corner, for a remark elsewhere that refers to it. It is
  * drawn over the record's outline, and fades with the member.
  */
-export function Pin({ node, state }: { node: CompiledNode; state: PartState }) {
+export function Pin({ node, state }: { node: CompiledNode; state: ElementState }) {
   const { x, y } = node.rect;
   return (
-    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The pin only paints; the member is the part.
+    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The pin only paints; the member is the element.
     <g
       aria-hidden="true"
       {...stylex.props(
         roleStyle(node.role),
         categoryStyle(node.category),
         styles.passThrough,
-        partStyles.fade,
+        elementStyles.fade,
         stateStyle(state),
       )}
     >
@@ -135,7 +135,7 @@ export function Pin({ node, state }: { node: CompiledNode; state: PartState }) {
         y={y}
         fontSize={m.tabSize}
         fontWeight={m.labelWeight}
-        {...stylex.props(partStyles.text, partStyles.sans, styles.pinText)}
+        {...stylex.props(elementStyles.text, elementStyles.sans, styles.pinText)}
       >
         {node.pin}
       </text>
@@ -154,18 +154,18 @@ export function RecordOutline({
 }: {
   node: CompiledNode;
   flagged: boolean;
-  state: PartState;
+  state: ElementState;
 }) {
   const { x, y, width: w, height: h } = node.rect;
   return (
-    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The outline only paints; the record's body is the part.
+    // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The outline only paints; the record's body is the element.
     <g
       aria-hidden="true"
       {...stylex.props(
         roleStyle(node.role),
         categoryStyle(node.category),
         styles.passThrough,
-        partStyles.fade,
+        elementStyles.fade,
         stateStyle(state),
       )}
     >
@@ -175,7 +175,7 @@ export function RecordOutline({
         width={w}
         height={h}
         rx={corner.shape}
-        {...stylex.props(styles.outlineOnly, node.role === "external" && partStyles.dashed)}
+        {...stylex.props(styles.outlineOnly, node.role === "external" && elementStyles.dashed)}
       />
       {node.divider !== undefined && (
         <path d={shape.rule(node.rect, node.divider)} {...stylex.props(styles.rule)} />
@@ -184,7 +184,7 @@ export function RecordOutline({
       {node.rules && <path d={shape.segments(node.rules)} {...stylex.props(styles.rule)} />}
       {node.role === "warning" && <WarningBadge node={node} />}
       {flagged && (
-        <rect {...shape.outline(node.rect, 4)} rx={8} {...stylex.props(partStyles.flag)} />
+        <rect {...shape.outline(node.rect, 4)} rx={8} {...stylex.props(elementStyles.flag)} />
       )}
     </g>
   );
@@ -193,7 +193,7 @@ export function RecordOutline({
 function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
   const r = node.rect;
   const { x, y, width: w, height: h } = r;
-  const outlined = stylex.props(styles.shape, node.role === "external" && partStyles.dashed);
+  const outlined = stylex.props(styles.shape, node.role === "external" && elementStyles.dashed);
   switch (node.shape) {
     case "box":
       return <rect x={x} y={y} width={w} height={h} rx={corner.shape} {...outlined} />;
@@ -318,7 +318,7 @@ const styles = stylex.create({
     strokeWidth: `calc(var(--weight) + var(--boost, 0px))`,
     strokeLinejoin: "round",
   },
-  /** A layer that only paints: the pointer reaches the part under it. */
+  /** A layer that only paints: the pointer reaches the element under it. */
   passThrough: { pointerEvents: "none" },
   /** A cell's ring: as wide as the boost, so it shows only on hover and focus. */
   cellRing: {

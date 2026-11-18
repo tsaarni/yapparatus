@@ -1,91 +1,172 @@
 # Overview
 
-This document describes how Yapparatus works and why. It is written for developers and agents who change its code. To write a document, see the authoring guide, [`starter/docs/guide.md`](/-/files/yapparatus/starter/docs/guide.md).
+This document describes how Yapparatus works, for the people and agents who change its code. To write a document with Yapparatus, read [the authoring guide](/-/files/yapparatus/starter/docs/guide.md).
 
+## What Yapparatus does
 
-## Purpose
+Yapparatus lets a person and their coding agent write and revise a technical document together. The agent writes the pages. The person, called the reader, reads them in the browser, selects something on a page, and comments on it in a message to the agent. A message can be a question, a correction, or a request to change the page. The agent revises the page, replies in the chat beside the page, or both. The agent is the reader's own coding agent, running in a terminal.
 
-Yapparatus is a tool for reading a document and asking questions about it. The document can cover any topic. You read it in the browser. When you do not understand something, you select it and ask about it in the chat. Your AI coding agent answers. For example:
+Three properties make this work. First, the agent can write a rich document with little effort. It writes short MDX pages, and Yapparatus lays them out and draws their diagrams, charts, and code excerpts. Yapparatus reports every error with its file and line, so the agent fixes its own pages. Second, everything on a page has an address: a sentence, a table row, a shape in a diagram, or a few lines of a source file. The reader can point at exactly what a comment is about. Third, the page is live. An edit by the agent appears while the reader reads.
 
-> **Reader** *(selecting a box in a diagram)*: Why does the gateway talk to the cache first?
->
-> **Agent:** A cache hit avoids a request to the database.
+People use Yapparatus for:
 
-You can also write a document together with your coding agent. You ask for a document and read it while the agent writes it. Then you ask for changes. The browser shows each change when the file is saved.
+- Understanding a codebase. The agent explains unfamiliar code with diagrams and excerpts of the real files, and the reader comments where something is unclear.
+- Design documents. The reader directs, and the agent writes and redraws.
+- Reviewing a plan or a change. The agent explains what it intends to do or what it did, and the reader marks what to change.
+- Reports, such as benchmarks, incident analyses, and comparisons, with charts drawn from the data files that a tool produced.
+- Teaching material about protocols, data layouts, and algorithms, with diagrams that the reader steps through.
 
-The name combines *yap*, an informal word for talk, and *apparatus*. <Ref to="reading-loop" /> shows the cycle of reading, asking, and answering.
+A finished document can be built as a static website or as one HTML file, without the chat.
 
-<Diagram id="reading-loop" caption="The reading loop. The reader asks, and the agent answers in the chat or changes the page." draw={(d) => {
-  const read = d.box("Read", { sub: "the page" })
-  const mark = d.box("Mark", { sub: "text or diagram parts" })
-  const ask = d.box("Ask", { sub: "a question or a change" })
-  const answer = d.box("Get an answer", { sub: "in chat, on the page, or both" })
-  d.equalSize([read, mark, ask, answer])
-  d.place(mark, { rightOf: read, gap: 120 })
-  d.place(ask, { below: mark, gap: 72 })
-  d.place(answer, { below: read, gap: 72 })
+## The system
 
-  d.arrow(read, mark, { label: "unclear part" })
-  d.arrow(mark, ask)
-  d.arrow(ask, answer, { label: "the agent replies" })
-  d.arrow(answer, read, { id: "read-again", label: "read again", role: "accent" })
+<Ref to="overview-system" /> shows the system in dev mode: the web app, the server, the project directory, and the agent. This is the mode in which the reader and the agent work on a document.
+
+<Diagram id="overview-system" caption="The system in dev mode. The legend shows what a build keeps." description="The web app in the browser, the server with the page compiler and the REST API, the project directory with pages and chat state, and the agent, with the data that flows between them" draw={(d) => {
+  const page = d.box("Page view", { id: "page-view", sub: "pages, figures", category: "In builds too" })
+  const chat = d.box("Chat panel", { id: "chat-panel", sub: "messages, replies", category: "Dev mode only" })
+  const compiler = d.box("Page compiler", { id: "page-compiler", sub: "MDX to modules", category: "In builds too" })
+  const api = d.box("REST API", { id: "rest-api", sub: "/-/api", mono: false, category: "Dev mode only" })
+  const pages = d.box("Pages", { id: "pages", sub: "document directory", category: "In builds too" })
+  const state = d.cylinder(".yapparatus/", { id: "state", sub: "chat log", mono: true, category: "Dev mode only" })
+  const agent = d.box("Agent", { id: "agent", sub: "yapparatus/agent", role: "external" })
+
+  d.equalSize([page, chat, compiler, api, pages, state, agent])
+  const browserRow = d.row([page, chat], { gap: 88 })
+  const serverRow = d.row([compiler, api], { gap: 88 })
+  const filesRow = d.row([pages, state], { gap: 88 })
+  d.place(browserRow, { above: serverRow, gap: 104, align: "start" })
+  d.place(filesRow, { below: serverRow, gap: 104, align: "start" })
+  d.place(agent, { rightOf: api, gap: 120 })
+
+  d.enclose([browserRow], { id: "browser", title: "Browser: web app" })
+  d.enclose([serverRow], { id: "server", title: "Server", titleAt: "bottomLeft" })
+  const project = d.enclose([filesRow], { id: "project", title: "Project directory", titleAt: "bottomRight" })
+
+  d.arrow(pages.top.offset(40, 0), compiler.bottom.offset(40, 0), { id: "reads", label: "MDX" })
+  d.arrow(compiler, page, { id: "modules", label: "page modules" })
+  d.arrow(chat, api, { id: "http", label: "HTTP" })
+  d.arrow(api, state, { id: "saves", label: "saves" })
+  d.arrow(agent, api, { id: "wait-reply", label: "wait, reply" })
+  d.arrow(agent.bottom, pages.bottom, {
+    id: "edits",
+    route: { viaY: project.bottom.offset(0, 28) },
+    label: { text: "edits pages", segment: 1, side: "below" },
+    role: "accent",
+  })
 }}>
-  <Step focus="read read->mark mark">The reader finds a part that is unclear and selects it, or picks a diagram part.</Step>
-  <Step focus="mark->ask ask">The selection becomes context for a question or a request for a change. See [what context is](addresses-and-context#what-context-is).</Step>
-  <Step focus="ask->get-an-answer get-an-answer">The agent replies in the chat, edits the page, or both. See [the chat](chat).</Step>
-  <Step focus="read-again read">An edited page updates in place, and the reader continues reading.</Step>
+  <Step focus="project">The project directory holds the pages and the chat log.</Step>
+  <Step focus="reads page-compiler modules page-view">The server compiles each page, and the web app shows it.</Step>
+  <Step focus="chat-panel http rest-api saves state">The server saves each message from the chat panel in the chat log.</Step>
+  <Step focus="agent wait-reply">The agent waits for messages and sends replies.</Step>
+  <Step focus="edits pages">The agent edits the page files, and the page view updates.</Step>
+  <Step focus="in-builds-too">A build keeps only the compiled pages and the page view.</Step>
 </Diagram>
 
-## Principles
+The [web app](web-app) is a React app that shows the pages and the chat panel. The [server](server) is a Vite dev server that the `yap` command starts for one [document directory](documents). Its [page compiler](page-compiler) compiles the pages with their [diagrams](diagram-compiler) and [charts](charts), and its [REST API](rest-api) keeps the chat and the [diagnostics](diagnostics). The agent calls the [agent library](agent-library) from shell commands, and everything it reads is text that the server writes.
 
-1. **The agent writes documents in a compact authoring format.** Yapparatus produces visually rich documents with text, figures, diagrams, and charts. The agent writes short MDX that uses ready-made components. The system provides layout, themes, and drawing code. The agent therefore does not write HTML or SVG, which is slow to generate.
-2. **The system tells the agent what failed.** When generated content does not work, the system reports the file, the line, and the context. The agent receives new errors when it waits and when it replies.
+## From a comment to a revised page
 
-## Terms
+<Ref to="overview-comment" /> follows one comment from the reader to a page edit and a reply.
 
-This section explains the words that these pages use with a special meaning. Each term links to the section that explains it in full.
+<Diagram id="overview-comment" caption="A comment, a page edit, and the reply." description="Sequence between the reader, the web app, the server, the agent, and the page files" draw={(d) => {
+  const reader = d.actor("Reader")
+  const web = d.box("Web app")
+  const server = d.box("Server")
+  const agent = d.box("Agent", { role: "external" })
+  const pages = d.cylinder("Page files")
+  d.sequence([reader, web, server, pages, agent], [
+    { from: agent, to: server, label: "wait", id: "wait" },
+    { from: reader, to: web, label: "select, Comment", id: "comment" },
+    { from: web, to: server, label: "POST /chat", id: "post" },
+    { from: server, to: agent, label: "prompt", reply: true, id: "prompt" },
+    { from: agent, to: pages, label: "edit", id: "edit" },
+    { from: pages, to: server, label: "file change", async: true, id: "change" },
+    { from: server, to: web, label: "hot update", async: true, id: "hot" },
+    { from: agent, to: server, label: "check", id: "check" },
+    { from: server, to: agent, label: "diagnostics", reply: true, id: "diagnostics" },
+    { from: agent, to: server, label: "reply", id: "reply" },
+    { from: server, to: web, label: "chat update", async: true, id: "chat-update" },
+  ], { gap: 72 })
+}}>
+  <Step focus="wait">The agent waits for the next message, and the server holds the request open until one arrives.</Step>
+  <Step focus="comment post">The reader selects text and comments on it. The web app sends the message to the [chat](rest-api#add-a-message).</Step>
+  <Step focus="prompt">The server returns a [prompt](agent-library#prompts) to the agent: the message, its references, and the document's errors.</Step>
+  <Step focus="edit change hot">The agent edits a page. The server compiles it, and the web app shows the new page [without a reload](web-app#hot-updates).</Step>
+  <Step focus="check diagnostics">The agent [checks the document](agent-library#checkdocument) and fixes the errors.</Step>
+  <Step focus="reply chat-update">The agent sends a reply. The server [checks it](server#reply-checks) and saves it, and the chat panel shows it.</Step>
+</Diagram>
 
-### Documents
+## Where the code is
 
-<Table id="document-terms" caption="Terms for what a reader reads.">
+<Ref to="overview-source" /> shows the main files. The files at the top of `src/` run in the server, except the agent library, which runs in the agent's process. The web app also imports the shared files, such as the address code.
 
-| Term | Meaning | Explained in |
-|---|---|---|
-| Document | Pages about one topic, shown in the browser. On disk, it is a set of MDX files and a `document.json` | [Purpose](overview#purpose) |
-| Project | The directory you run `pnpm dev` in to read a document. You create it by copying `starter/` | [Creating a document](architecture#creating-a-document) |
-| Document directory | The directory that holds one document's `document.json` and pages. A project can have several | [Document directories](architecture#document-directories) |
-| Page | One chapter of a document. Its file name is its address: `setup.mdx` is `/setup` | [Pages](rendering#pages) |
-| Address | The name of anything you can open, link to, or ask about, such as `/setup#install` | [Addresses](addresses-and-context#addresses) |
-| Anchor | The part of an address after `#`. It names one heading, figure, table, listing, or diagram part | [Addresses](addresses-and-context#addresses) |
-| External directory | A directory outside the project, such as the code being explained, whose files pages can include | [External files](rendering#external-files) |
-| File view | A page that shows one whole file from an external directory. You can select lines in it and ask about them | [External files](rendering#external-files) |
-| Excerpt | A few lines of a file from an external directory, shown inside a page | [External files](rendering#external-files) |
-| Diagnostic | An error or warning in a document, such as a broken link, shown in the header with its file and line | [Diagnostics](diagnostics) |
+<Figure id="overview-source" caption="The main source files and the pages that describe them.">
+
+<FileTree>
+
+- src/
+  - cli.ts the [`yap` command](server#starting)
+  - vite.ts the [page compiler](page-compiler)
+  - *-plugin.ts the [stages](page-compiler#pipeline) of the page compiler
+  - document.ts [pages and addresses](documents)
+  - files.ts [file addresses](documents#external-files)
+  - source-files.ts reading [external files](documents#external-files)
+  - protocol.ts the types of the [REST API](rest-api)
+  - agent.ts the [agent library](agent-library)
+  - …
+  - server/ the [server](server)
+  - diagram/ the [diagram compiler](diagram-compiler)
+  - chart/ the [chart](charts) component
+  - web/ the [web app](web-app)
+
+</FileTree>
+
+</Figure>
+
+<Ref to="overview-lines" /> gives the size of each directory, counted with `wc -l`, and <Ref to="overview-lines-chart" /> draws it.
+
+<Table id="overview-lines" caption="Lines of code in src/.">
+
+| Code | Lines |
+|---|---:|
+| `src/web/` | 6516 |
+| `src/diagram/` | 5688 |
+| Page compiler: `vite.ts`, `*-plugin.ts` | 2139 |
+| `src/server/` | 1919 |
+| Other files at the top of `src/` | 1723 |
+| `src/chart/` | 873 |
 
 </Table>
 
-### Diagrams
+<Chart id="overview-lines-chart" caption="Lines of code in src/." from="#overview-lines" plot={(Plot, rows) => ({
+  marks: [
+    Plot.barX(rows, { y: "Code", x: "Lines", sort: { y: "-x" } }),
+    Plot.ruleX([0]),
+  ],
+  x: { grid: true },
+})} />
 
-<Table id="diagram-terms" caption="Terms for figures drawn with Diagram.">
+## How to read this document
 
-| Term | Meaning | Explained in |
-|---|---|---|
-| Diagram | A drawing on a page, such as boxes and arrows, that the author describes in a few lines of code | [Principles](diagrams#principles) |
-| Part | One box, arrow, or other shape in a diagram. Click it to ask about that shape | [Ids](diagrams#ids) |
-| Step | One stage in a diagram that is explained in order. Each step highlights some parts and adds a sentence | [Steps](diagrams#steps) |
+<Ref to="overview-pages" /> lists the pages, which follow a document from its files to the reader and the agent.
 
-</Table>
+<Table id="overview-pages" caption="The pages of this document.">
 
-### Chat
-
-<Table id="chat-terms" caption="Terms for the chat beside the page.">
-
-| Term | Meaning | Explained in |
-|---|---|---|
-| Reader | You, the person reading the document and asking in the chat. The reader app is the code in the browser that shows the pages and the chat | [The reader app](reader-app) |
-| Agent | Your own coding agent, such as Claude Code, running in a terminal. It answers in the chat and edits the pages. None is included | [Chat and the agent](chat) |
-| Context | What a message is about: the text, figures, diagram parts, or code lines you attached. They are shown as pills. Each pill is a context item. In a sent message, clicking a pill takes you back to its place | [What context is](addresses-and-context#what-context-is) |
-| Prompt | What the agent reads: your messages, their context, and the document's errors, as plain text | [Chat and the agent](chat) |
-| Agent state | Connected, working, or not connected, shown at the top of the chat. The design pages call these states waiting, working, and away | [The agent's state](chat#the-agents-state) |
+| Page | Covers |
+|---|---|
+| [Terminology](terminology) | The terms these pages use |
+| [Documents and addresses](documents) | Files on disk, and how addresses name everything |
+| [Page compiler](page-compiler) | How a page becomes code for the web app, and builds |
+| [Diagram compiler](diagram-compiler) | How a diagram's code becomes a drawing and a picture |
+| [Charts](charts) | How chart data is read, checked, and drawn |
+| [Server](server) | The dev server and the state it keeps |
+| [REST API](rest-api) | Every request and response |
+| [Agent library](agent-library) | The functions the agent calls and the prompts it reads |
+| [Web app](web-app) | Navigation, layout, comments, and the chat panel |
+| [Components](components) | The built-in components |
+| [Diagnostics](diagnostics) | How errors are found, stored, and shown |
+| [Styling](styling) | Tokens, color, themes, and style rules |
+| [Directions](directions) | Agreed work that is not built yet |
 
 </Table>

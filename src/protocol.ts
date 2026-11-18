@@ -1,8 +1,8 @@
 /**
- * The wire protocol between the dev server, the reader app, and the agent library.
+ * The wire protocol between the dev server, the web app, and the agent library.
  *
  * Resources under /-/api, named after what the document is made of:
- *   GET    /chat?after=C&author=reader&include=diagnostics&wait=S   the chat, or what is new since C
+ *   GET    /chat?author=reader&include=diagnostics&wait=S           the chat, or what is new for the agent
  *   POST   /chat                                                    add a message
  *   DELETE /chat                                                    clear the chat
  *   GET    /diagnostics                                             the document's problems
@@ -34,7 +34,7 @@ export interface ServerFile {
 /* ---------- Chat ---------- */
 
 /**
- * What a context item points at. Text passages are the only kind without their own id.
+ * What a reference points at. Text passages are the only kind without their own id.
  * "file" and "lines" are a source file the document shows, whole or some of its lines.
  */
 export type TargetKind =
@@ -45,20 +45,20 @@ export type TargetKind =
   | "table"
   | "listing"
   | "code"
-  | "diagram-part"
+  | "diagram-element"
   | "file"
   | "lines";
 
 /**
- * One thing the reader asked about: an address, and the lines of its source when the reader
- * asked. The compiler embeds the source lines in the page; the browser sends them back, and the
- * server keeps the item as sent. The page the reader sees is the file on disk, because the page
- * reloads when its file changes.
+ * One thing the reader commented on: an address, and the lines of its source when the reader
+ * commented. The compiler embeds the source lines in the page; the browser sends them back,
+ * and the server keeps the reference as sent. The page the reader sees is the file on disk,
+ * because the page reloads when its file changes.
  */
-export interface ContextItem {
+export interface Reference {
   kind: TargetKind;
   /**
-   * "/page", "/page#id", "/page#figure--part", or for selected words the figure, table, listing,
+   * "/page", "/page#id", "/page#figure--element", or for selected words the figure, table, listing,
    * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
    * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
    */
@@ -72,14 +72,14 @@ export interface ContextItem {
 }
 
 /**
- * A message the reader wrote in the browser. Its context is only what the reader attached:
- * no context means a question about the document in general.
+ * A message the reader wrote in the browser. Its references are only what the reader attached:
+ * no references means a message about the document in general.
  */
 export interface ReaderMessage {
   seq: number;
   author: "reader";
   text: string;
-  context: ContextItem[];
+  references: Reference[];
   createdAt: string;
 }
 
@@ -104,7 +104,7 @@ export type Message = ReaderMessage | AgentMessage;
  * reply answers the reader messages that the agent's last read returned.
  */
 export type NewMessage =
-  | { author: "reader"; text: string; context: ContextItem[] }
+  | { author: "reader"; text: string; references: Reference[] }
   | { author: "agent"; mdx: string };
 
 /**
@@ -131,7 +131,7 @@ export interface Chat {
   diagnostics?: ReportedDiagnostic[];
   /**
    * The same read written for an agent. Without the agent header, the text a person gives an
-   * agent to connect; with it, the messages and diagnostics, ending with the snippet to run next.
+   * agent to connect; with it, the messages and diagnostics, ending with the command to run next.
    */
   prompt: string;
 }
@@ -242,7 +242,7 @@ export const diagnosticCodes = {
   DEGENERATE_EDGE: { severity: "error", meaning: "An edge starts and ends at the same point." },
   PLACEMENT_CYCLE: {
     severity: "error",
-    meaning: "Parts are placed relative to each other in a circle.",
+    meaning: "Elements are placed relative to each other in a circle.",
   },
   LABEL_SEGMENT: {
     severity: "error",
@@ -256,14 +256,17 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "An enclosure is placed; it takes its place from what it holds.",
   },
-  CONFLICTING_PLACEMENT: { severity: "error", meaning: "A part is positioned by two placements." },
+  CONFLICTING_PLACEMENT: {
+    severity: "error",
+    meaning: "An element is positioned by two placements.",
+  },
   UNPLACED: {
     severity: "error",
-    meaning: "A part has no placement, so it is drawn over another part.",
+    meaning: "An element has no placement, so it is drawn over another element.",
   },
-  UNKNOWN_PART: {
+  UNKNOWN_ELEMENT: {
     severity: "error",
-    meaning: "A step or part() names a part the diagram does not have.",
+    meaning: "A step or element() names an element the diagram does not have.",
   },
   STEP_NOT_TEXT: {
     severity: "error",
@@ -272,11 +275,11 @@ export const diagnosticCodes = {
   TEXT_OVERFLOW: { severity: "warning", meaning: "Text does not fit its box." },
   RULER_CROWDED: { severity: "warning", meaning: "A record's column labels run into each other." },
   LABEL_CROWDED: { severity: "warning", meaning: "An edge label has too little room." },
-  LABEL_OVERLAP: { severity: "warning", meaning: "A label overlaps another label or a part." },
-  NODE_OVERLAP: { severity: "warning", meaning: "Two parts shown together overlap." },
+  LABEL_OVERLAP: { severity: "warning", meaning: "A label overlaps another label or an element." },
+  NODE_OVERLAP: { severity: "warning", meaning: "Two elements shown together overlap." },
   EDGE_NODE_INTERSECTION: {
     severity: "warning",
-    meaning: "An edge crosses a part it does not connect.",
+    meaning: "An edge crosses an element it does not connect.",
   },
   ENCLOSURE_TITLE_CROSSED: {
     severity: "warning",
@@ -284,9 +287,9 @@ export const diagnosticCodes = {
   },
   ENCLOSURE_INTRUSION: {
     severity: "warning",
-    meaning: "A part it does not hold overlaps an enclosure.",
+    meaning: "An element it does not hold overlaps an enclosure.",
   },
-  ACCENT_OVERUSED: { severity: "warning", meaning: "Too many parts are accented to stand out." },
+  ACCENT_OVERUSED: { severity: "warning", meaning: "Too many elements are accented to stand out." },
   TOO_MANY_CATEGORIES: {
     severity: "warning",
     meaning: "More categories than colors; the rest are drawn muted.",
@@ -297,9 +300,9 @@ export const diagnosticCodes = {
   },
   FONT_FALLBACK: {
     severity: "warning",
-    meaning: "Diagram text has characters the reader's fonts lack, so their width is estimated.",
+    meaning: "Diagram text has characters the web app's fonts lack, so their width is estimated.",
   },
-  STEP_ONLY_UNUSED: { severity: "warning", meaning: "A stepOnly part is in no step." },
+  STEP_ONLY_UNUSED: { severity: "warning", meaning: "A stepOnly element is in no step." },
   BUILD_WITHOUT_STEPS: { severity: "warning", meaning: "A diagram has build but no steps." },
   // Found when a page or reply runs in the browser.
   RENDER_FAILED: { severity: "error", meaning: "A page threw while rendering." },
@@ -325,12 +328,12 @@ export interface Diagnostic {
   /** A figure id, or a reply's message number, inside that source. */
   target?: string;
   /**
-   * What the diagnostic is about, such as a link's target or a diagram's parts. With the code,
+   * What the diagnostic is about, such as a link's target or a diagram's elements. With the code,
    * source, and target it identifies the diagnostic, so its message may change wording.
    * Without it, the message identifies it.
    */
   subject?: string;
-  /** Diagram part ids involved. */
+  /** Diagram element ids involved. */
   elements?: string[];
 }
 

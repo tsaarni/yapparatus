@@ -31,8 +31,8 @@ function inFile(
 const near = (actual: number, expected: number) =>
   assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} is not ${expected}`);
 
-test("the reader loads the stylesheets the measure reads", () => {
-  const main = readFileSync("src/reader/main.tsx", "utf8");
+test("the web app loads the stylesheets the measure reads", () => {
+  const main = readFileSync("src/web/main.tsx", "utf8");
   const imported = [...main.matchAll(/^import "(@fontsource[^"]+)";$/gm)].map(([, s]) => s);
   assert.deepEqual(imported, fontStylesheets);
 });

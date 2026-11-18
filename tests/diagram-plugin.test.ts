@@ -96,12 +96,12 @@ test("steps are checked from the page, and a computed step attribute is an error
     issues.map(({ code, subject, line, target }) => ({ code, subject, line, target })),
     [
       { code: "STEP_NOT_TEXT", subject: "step 2 focus", line: 7, target: "steps" },
-      { code: "UNKNOWN_PART", subject: "nothing", line: undefined, target: "steps" },
+      { code: "UNKNOWN_ELEMENT", subject: "nothing", line: undefined, target: "steps" },
     ],
   );
 });
 
-test("characters the reader's fonts lack are a warning", async () => {
+test("characters the web app's fonts lack are a warning", async () => {
   const { issues } = await compilePage(`<Diagram id="arrow" draw={(d) => {
   d.box("client → server")
 }} />

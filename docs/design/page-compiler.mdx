@@ -1,0 +1,237 @@
+# Page compiler
+
+The page compiler turns an MDX page into a JavaScript module that the web app can show, and records what the page contains. This page follows a page through its stages, then covers the list of pages, replies, and builds.
+
+## Pipeline
+
+The page compiler is the MDX plugin for Vite, [set up with a list of stages](/-/files/yapparatus/src/vite.ts#L476-L491). Each stage reads or changes the page's syntax tree, which holds its headings, paragraphs, and components. <Ref to="compiler-pipeline" /> shows the stages in order.
+
+<Diagram id="compiler-pipeline" caption="The stages of the page compiler, in order. Each color is one form of the page's syntax tree." draw={(d) => {
+  const file = d.box("Page file", { id: "page-file", sub: "MDX" })
+  const parse = d.box("Parse", { id: "parse", sub: "MDX, tables, icons", category: "Markdown tree" })
+  const prepare = d.box("To HTML", { id: "to-html", sub: "heading ids, conventions", category: "HTML tree" })
+  const files = d.box("Read files", { id: "read-files", sub: "excerpts, chart data", category: "HTML tree" })
+  const diagrams = d.box("Diagrams", { id: "diagrams", sub: "run draw", category: "HTML tree" })
+  const record = d.box("Record", { id: "record", sub: "outline, source lines", category: "HTML tree" })
+  const highlight = d.box("Highlight", { id: "highlight", sub: "every code block", category: "HTML tree" })
+  const js = d.box("JavaScript", { id: "to-javascript", sub: "MDX, icons, styles", category: "JavaScript" })
+  const module = d.box("Page module", { id: "page-module", sub: "for the web app", role: "accent" })
+  const all = [file, parse, prepare, files, diagrams, record, highlight, js, module]
+  d.equalSize(all)
+  const rows = [
+    d.row([file, parse, prepare], { gap: 56 }),
+    d.row([files, diagrams, record], { gap: 56 }),
+    d.row([highlight, js, module], { gap: 56 }),
+  ]
+  d.column(rows, { gap: 56, align: "start" })
+  for (let i = 0; i + 1 < all.length; i++) {
+    const a = all[i]
+    const b = all[i + 1]
+    if (b === files || b === highlight)
+      d.arrow(a.bottom, b.top, { route: { viaY: d.lerp(a.bottom, b.top, 0.5) } })
+    else d.arrow(a, b)
+  }
+}}>
+  <Step focus="page-file parse">The parser reads the MDX into a Markdown tree, and each icon name becomes an import.</Step>
+  <Step focus="to-html">The tree becomes an HTML tree. Headings get ids, and [Markdown conventions](#markdown-conventions) become props.</Step>
+  <Step focus="read-files">Excerpts read lines from files, and charts read and check their data.</Step>
+  <Step focus="diagrams">Each draw program runs, and the [compiled diagram](#diagrams) replaces it.</Step>
+  <Step focus="record">The outline records what the page contains, and each block is marked with its lines.</Step>
+  <Step focus="highlight">Every code block is highlighted.</Step>
+  <Step focus="to-javascript page-module">The MDX compiler writes JavaScript, and other Vite plugins add the icons and the styles.</Step>
+</Diagram>
+
+Files are read before the outline is recorded, because the page's [revision](#revisions) covers those files. Highlighting runs after the excerpts and the source marks, so it colors every code block and numbers its lines.
+
+A stage that finds a problem adds an issue for the file. After each compile, the server turns the issues into diagnostics at the page's lines, as [origins](diagnostics#origins) describes. A stage that cannot continue throws, and the compile fails with `COMPILE_FAILED`. <Ref to="compiler-sample" /> shows a page and its module.
+
+<Listing id="compiler-sample" caption="A short page and the module the page compiler makes from it, shortened.">
+
+<Columns>
+<Panel label="Page">
+
+```mdx
+# Sample
+
+## Install the CLI
+
+Run `yap dev`.
+```
+
+</Panel>
+<Panel label="Module">
+
+```js
+export const outline = {
+  revision: "b957910178…",
+  title: "Sample",
+  headings: [{ depth: 2, id: "install-the-cli", text: "Install the CLI" }],
+  anchors: ["sample", "install-the-cli"],
+  numbered: [], links: [], refs: [],
+};
+function _createMdxContent(props) {
+  return _jsxs(_Fragment, { children: [
+    _jsx(_components.div, {
+      "data-source": "docs/sample.mdx",
+      "data-start-line": "3", "data-end-line": "3",
+      children: _jsx(_components.h2, {
+        id: "install-the-cli", children: "Install the CLI",
+      }),
+    }),
+    // … the title and the paragraph, each in its own div
+  ] });
+}
+```
+
+</Panel>
+</Columns>
+
+</Listing>
+
+## The document module
+
+The web app reads the list of pages from one module, which the plugin [writes from `document.json` and the page files](/-/files/yapparatus/src/vite.ts#L272-L365). <Ref to="compiler-document-module" /> shows what it holds.
+
+<Diagram id="compiler-document-module" caption="What the document module holds, and one entry of its page list." draw={(d) => {
+  const exports = d.record([
+    "settings\tdocument.json as written",
+    "document directory\twhere the pages are",
+    "pages\tone entry per listed page",
+    "page listeners\tcalled after a hot update",
+    "logo, favicon\ticons from document.json",
+  ], { title: "Document module", id: "document-module" })
+  const entry = d.record([
+    "id\tthe page's address",
+    "source\tits file, from the project",
+    "outline\tcompiled with the page",
+    ["load\timports the page module", { role: "accent" }],
+    "module, error\tset when loading ends",
+  ], { title: "Page entry", id: "page-entry" })
+  d.row([exports, entry], { gap: 80, align: "start" })
+  d.arrow(exports.element("pages"), entry)
+}} />
+
+The plugin first checks `document.json` and its page list against the files on disk, and reports errors as `PAGE_LIST`.
+
+The module holds every page's outline, so the contents, figure numbers, and `<Ref>` work before any page's code loads. To get the outlines, the plugin compiles every page. A page that fails to compile gets an empty outline, so the contents still list it.
+
+A page's code loads when the page is first shown. When it changes, the module swaps in the new page module and outline and tells the web app, as [hot updates](web-app#hot-updates) describes. Pages are compiled without React Fast Refresh, which would reload the browser for a module that exports an outline.
+
+## Markdown conventions
+
+The conventions stage reads Markdown forms and component children and writes what it finds into props, so each component receives plain data. <Ref to="compiler-conventions" /> lists them.
+
+<Table id="compiler-conventions" caption="What the conventions stage reads, what it makes, and the codes it reports.">
+
+| Written | Becomes | Codes |
+|---|---|---|
+| A blockquote that starts with `[!NOTE]` or another kind | An alert | `ALERT_TYPE` |
+| A Markdown list in `<FileTree>` | The tree's entries | `FILE_TREE_INVALID` |
+| `<Panel>`s in `<Tabs>` or `<Columns>` | The labels | `PANEL_CONTENT`, `PANEL_LABEL`, `PANEL_NESTED`, `TOO_MANY_COLUMNS` |
+| `<Columns>` in a `Figure` or `Listing` | A wide figure | |
+| A numbered figure in a `Figure` | Nothing | `FIGURE_NESTED` |
+| A fenced code block | A checked language | `CODE_LANGUAGE` |
+| A `####` heading or deeper | Nothing | `HEADING_DEPTH` |
+
+</Table>
+
+Code marks, such as `// [!code ++]`, are removed before highlighting, so they work in any language, including JSON.
+
+## Icons
+
+For each `<Icon name="collection:name">`, the icon stage imports that one icon, and a Vite plugin turns the import into an SVG component, so a page bundles only the icons it names. The icons come from the installed icon packages and the project's `icons/` directory. A name that is not a literal string cannot become an import, so the page fails with `COMPILE_FAILED`.
+
+## Diagrams
+
+The diagram stage runs each draw program in [a fresh JavaScript context](/-/files/yapparatus/src/diagram-plugin.ts#L201-L238) without Node's names or the page's, and hands the result and the steps to the [diagram compiler](diagram-compiler). The context keeps names out but is not a sandbox. A program that throws is `DRAW_FAILED` at the page's line.
+
+The compiled diagram replaces the draw program, so the browser receives only data, and its diagnostics become issues of the page. Compiled diagrams are cached by their source, so an edit elsewhere on the page does not compile them again.
+
+## Charts
+
+The chart stage reads and checks each chart's data. Data written on the page goes into the page. Data from a file is loaded separately, and an edit to the file compiles the page again. See [charts](charts#data-sources).
+
+## Code and excerpts
+
+Code blocks, excerpts, and the [file view](web-app#file-view) share [one highlighting function](/-/files/yapparatus/src/code-plugin.ts#L37-L82), which uses the Shiki highlighter with the theme's colors. <Ref to="compiler-highlighted-code" /> shows its result: each token style once, and each line as pairs of a style and a text.
+
+<Listing id="compiler-highlighted-code" caption="Highlighted code, as code blocks, excerpts, and the file view carry it.">
+<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface HighlightedCode {" />
+</Listing>
+
+For each `<Excerpt>`, the excerpt stage reads the file named in `from`, by the rules in [external files](documents#external-files), and finds the lines:
+
+1. The first line is the only line that contains the `start` text. No match or several are an `EXCERPT_TEXT` error.
+2. With `end`, the last line is the next line that contains the `end` text.
+3. Without `end`, the excerpt runs to the end of the block that the first line opens, by indentation.
+
+The stage adds a code block with those lines, numbered as in the file, and the bar above it links to them. A file that cannot be read leaves the excerpt empty and is reported as `BROKEN_LINK`.
+
+## Outline and source marks
+
+The outline stage records the page's outline, shown in <Ref to="compiler-outline" />, and exports it from the page module.
+
+<Listing id="compiler-outline" caption="The outline of a page.">
+<Excerpt from="/-/files/yapparatus/src/document.ts" start="export interface PageOutline {" />
+</Listing>
+
+Two headings or numbered items with the same id are `DUPLICATE_ID`. A page must have exactly one `#` heading.
+
+The source marks stage marks every top-level block, list item, and table row with its file and lines. The web app reads these marks to turn a selection into references, as [commenting on the page](web-app#commenting-on-the-page) describes.
+
+## Revisions
+
+A page's revision is a hash of the page's text and of every file it reads for excerpts and charts. The outline stage writes it into the outline. The diagnostic store computes it again from the files on disk, as [revisions and reports](diagnostics#revisions-and-reports) describes. A change to a component's code does not change a revision.
+
+## Replies
+
+The server compiles each reply from the agent with the same page compiler before it accepts it, so a reply's diagrams and excerpts get the checks of a page. [Reply checks](server#reply-checks) describes the rest.
+
+## Builds
+
+The `yap` command makes three outputs from one document directory, as <Ref to="compiler-builds" /> shows. A build holds the pages and the external files they name.
+
+<Diagram id="compiler-builds" caption="The three outputs of one document directory. Only dev mode has the chat." draw={(d) => {
+  const source = d.box("Document directory", { id: "document-directory", sub: "document.json and pages" })
+  const dev = d.box("yap dev <dir>", { id: "out-dev", mono: true, sub: "dev server with chat", role: "accent" })
+  const site = d.box("yap build <dir>", { id: "out-site", mono: true, sub: "dist/<dir>/" })
+  const single = d.box("yap build <dir> --single", { id: "out-single", mono: true, sub: "dist-single/<dir>/index.html" })
+  d.equalSize([dev, site, single])
+  const outs = d.row([dev, site, single], { gap: 32 })
+  d.place(source, { above: outs, gap: 64 })
+  for (const out of [dev, site, single])
+    d.arrow(source.bottom, out.top, { route: { viaY: d.lerp(source.bottom, out.top) } })
+}} />
+
+The website build writes an HTML file for every address, so any static host serves every page, as <Ref to="compiler-site" /> shows.
+
+<Figure id="compiler-site" caption="The website build of the document directory docs/design.">
+
+<FileTree>
+
+- dist/
+  - docs/
+    - design/
+      - index.html the first page
+      - 404.html
+      - overview/
+        - index.html
+      - …
+      - -/
+        - assets/ the app, page code, styles, and fonts
+        - files/
+          - yapparatus/ one index.html per external file a page names
+
+</FileTree>
+
+</Figure>
+
+The single file holds everything, so it opens from disk. It uses addresses of the form `#/page#id`, described in [addresses in builds](documents#addresses-in-builds).
+
+A build finds the external files by their addresses in the text of its pages, and stores each one highlighted for the file view.
+
+## Design decisions
+
+**Diagrams are compiled with the page.** Compiling in the server finds a diagram's problems on every save without a browser, lets the server refuse a reply with a broken diagram, and keeps the diagram compiler out of the reader's download. The cost is that a draw program cannot use the page's imports.
+
+**Excerpts find their lines by text.** Line numbers show the wrong code after lines are added above, and marker comments, as in [mdBook](https://rust-lang.github.io/mdBook/format/mdbook.html#including-portions-of-a-file), change the file. Quoted text, as in the `start-after` option of [Sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude), fails with an error at the page's line when the file changes.

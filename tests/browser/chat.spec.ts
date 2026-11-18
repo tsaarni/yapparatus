@@ -5,12 +5,12 @@ import { type APIRequestContext, expect, test } from "@playwright/test";
 import {
   agentHeader,
   type Chat,
-  type ContextItem,
   type DiagnosticReport,
   type DocumentDiagnostics,
+  type Reference,
 } from "../../src/protocol.ts";
 import { pageRevision } from "../../src/source-plugin.ts";
-import { replySnippet, root, runSnippet, snippets } from "./workspace.ts";
+import { commands, replyCommand, root, runCommand } from "./workspace.ts";
 
 /** A page with no excerpts or charts, so its revision is its text's. */
 const testPage = "content/first-page.mdx";
@@ -32,7 +32,7 @@ function changePage() {
 /** A reader message, as the browser sends it. */
 async function readerMessage(request: APIRequestContext, text: string): Promise<number> {
   const created = await request.post("/-/api/chat", {
-    data: { author: "reader", text, context: [] },
+    data: { author: "reader", text, references: [] },
   });
   expect(created.status()).toBe(201);
   return ((await created.json()) as { seq: number }).seq;
@@ -72,7 +72,7 @@ Backticks \`stay\` and $HOME is not expanded.
 
 test("an agent that stops while waiting is away at once", async ({ page }) => {
   await page.goto("/");
-  await page.locator(".ask-action").click();
+  await page.locator(".chat-action").click();
   // First in this file, so no earlier read leaves an agent counted as waiting.
   await expect(page.locator(".presence")).toHaveText("Agent not connected");
   const agent = spawn(
@@ -99,7 +99,7 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "First page" })).toBeVisible();
 
-  // The reader selects a paragraph and a diagram part, and sends a message.
+  // The reader selects a paragraph and a diagram element, and sends a message.
   const target = page.locator("main article p").filter({ hasText: "The target paragraph" });
   await target.scrollIntoViewIfNeeded();
   await target.evaluate((element) => {
@@ -110,10 +110,10 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   });
   await page
     .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Ask", exact: true })
+    .getByRole("button", { name: "Comment", exact: true })
     .click();
   await page.locator("article [data-element-id=fixture-edge] text").click();
-  await expect(page.locator(".context-items > div")).toHaveCount(2);
+  await expect(page.locator(".references > div")).toHaveCount(2);
   await page
     .getByLabel("Message", { exact: true })
     .fill("How does the miss edge relate to this paragraph?");
@@ -122,10 +122,10 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   await expect(page.locator(".presence")).toHaveText("Agent not connected");
   await expect(page.locator(".connect")).toBeVisible();
 
-  // The agent connects with the start prompt and gets the message with its context.
+  // The agent connects with the start prompt and gets the message with its references.
   const state = (await (await request.get("/-/api/chat")).json()) as Chat;
-  const [start] = snippets(state.prompt);
-  const first = await runSnippet(start ?? "");
+  const [start] = commands(state.prompt);
+  const first = await runCommand(start ?? "");
   expect(first.stderr).toBe("");
   expect(first.stdout).toMatch(/^Reader, \d\d:\d\d:$/m);
   expect(first.stdout).not.toMatch(/#\d+ reader/);
@@ -136,30 +136,30 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
     /- text, content\/first-page\.mdx:\d+, \/first-page#[a-z-]+: “The target paragraph/,
   );
   expect(first.stdout).toMatch(
-    /- diagram part, content\/first-page\.mdx:\d+-\d+, \/first-page#fixture-flow--fixture-edge/,
+    /- diagram element, content\/first-page\.mdx:\d+-\d+, \/first-page#fixture-flow--fixture-edge/,
   );
-  const replyAndWait = replySnippet(first.stdout);
+  const replyAndWait = replyCommand(first.stdout);
   expect(replyAndWait).toContain("await sendReply();");
 
   // Replies are checked before they are accepted.
-  const broken = await runSnippet(replyAndWait, "<Figure>\n\n{oops\n");
+  const broken = await runCommand(replyAndWait, "<Figure>\n\n{oops\n");
   expect(broken.code).not.toBe(0);
   expect(broken.stderr).toContain("The reply was not sent:");
   expect(broken.stderr).toMatch(/^- error COMPILE_FAILED line \d+: /m);
-  const unknown = await runSnippet(replyAndWait, "<Bogus />\n\nSee [nowhere](nowhere).\n");
+  const unknown = await runCommand(replyAndWait, "<Bogus />\n\nSee [nowhere](nowhere).\n");
   expect(unknown.stderr).toContain("- error UNKNOWN_COMPONENT: <Bogus> is not a component");
   expect(unknown.stderr).toContain(
     '- error BROKEN_LINK line 3: No page matches the link "nowhere"',
   );
   // A refused reply carries the same problems as data, for code that catches the error.
-  const caught = await runSnippet(
+  const caught = await runCommand(
     'import { sendReply } from "yapparatus/agent"; try { await sendReply(); } catch (error) { console.log(JSON.stringify(error.diagnostics)); }',
     "See [nowhere](nowhere).\n",
   );
   expect(JSON.parse(caught.stdout)).toEqual([
     expect.objectContaining({ origin: "reply", code: "BROKEN_LINK", line: 1, subject: "nowhere" }),
   ]);
-  const empty = await runSnippet(replyAndWait, "");
+  const empty = await runCommand(replyAndWait, "");
   expect(empty.stderr).toContain("- error REPLY_EMPTY: The reply is empty");
 
   // A marker on the window shows that page edits and replies arrive without a reload.
@@ -175,7 +175,7 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   await expect(page.locator("main article")).toContainText("can change");
   await expect(page.locator("main article h2").last()).toHaveText(/^1\.\d+\s*Added by the agent$/);
   // It replies and waits for the next message in the same run.
-  const next = runSnippet(replyAndWait, reply);
+  const next = runCommand(replyAndWait, reply);
   await expect(page.getByRole("heading", { name: "The fallback read" })).toBeVisible();
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => "notReloaded" in window)).toBe(true);
@@ -190,7 +190,7 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   );
   await expect(page.locator("main article")).toContainText("can change");
 
-  // The reader can always send; the waiting snippet returns with the new message.
+  // The reader can always send; the waiting command returns with the new message.
   // Shift+Enter starts a new line; Enter sends.
   const message = page.getByLabel("Message", { exact: true });
   await message.fill("And make the diagram");
@@ -227,8 +227,8 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   const saved = (await (await request.get("/-/api/chat")).json()) as Chat;
   expect(saved.messages.map((m) => m.author)).toEqual(["reader", "agent", "reader"]);
   expect(saved.repliedTo).toBe(1);
-  const [asked, replied] = saved.messages;
-  const selection = asked?.author === "reader" ? asked.context[0] : undefined;
+  const [sent, replied] = saved.messages;
+  const selection = sent?.author === "reader" ? sent.references[0] : undefined;
   // The item is the address with the selected words, and the source range as the page had it.
   expect(selection?.address).toMatch(/^\/first-page#[a-z-]+:~:text=The%20target%20paragraph/);
   expect(selection && Object.keys(selection).sort()).toEqual([
@@ -303,7 +303,7 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
   expect(chat.prompt).toContain(
     "- error RUNTIME_FAILED content/first-page.mdx, /first-page: A deliberate test error.",
   );
-  expect(chat.prompt).toContain("No context: a question about the document in general.");
+  expect(chat.prompt).toContain("No references: a message about the document in general.");
   // Unanswered messages stay in every read until the agent replies.
   const again = (await (await agentRead(request, "a")).json()) as Chat;
   expect(again.messages.map((m) => m.seq)).toContain(seq);
@@ -410,11 +410,11 @@ test("clearing the chat deletes it, starts numbering again, and refuses a late r
   expect(replyFiles.length).toBeGreaterThan(0);
   await answerAll(request);
   // An agent waits from before the chat is cleared.
-  const waiting = runSnippet(
+  const waiting = runCommand(
     'import { waitForMessage } from "yapparatus/agent"; console.log((await waitForMessage()).prompt);',
   );
   await page.goto("/");
-  await page.locator(".ask-action").click();
+  await page.locator(".chat-action").click();
   await expect(page.locator(".presence")).toHaveText("Agent connected");
   // The header asks first; Escape keeps the chat.
   await page.getByRole("button", { name: "Clear chat" }).click();
@@ -430,7 +430,7 @@ test("clearing the chat deletes it, starts numbering again, and refuses a late r
   for (const module of replyFiles) expect(existsSync(path.join(root, module))).toBe(false);
   expect(readFileSync(path.join(root, ".yapparatus/content/chat.jsonl"), "utf8")).toBe("");
   // A reply to a message from before the chat was cleared has nothing to answer.
-  const stale = await runSnippet(
+  const stale = await runCommand(
     'import { sendReply } from "yapparatus/agent"; await sendReply();',
     "Too late.",
   );
@@ -444,15 +444,15 @@ test("clearing the chat deletes it, starts numbering again, and refuses a late r
   expect(after.messages.map((m) => m.seq)).toEqual([1]);
 });
 
-test("whole targets: ask about a table, link a section, deep-link a diagram part", async ({
+test("whole targets: comment on a table, link a section, deep-link a diagram element", async ({
   page,
   context,
 }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/");
-  await page.getByRole("button", { name: "Ask about Table 1.1" }).click();
-  await expect(page.locator(".context-items > div")).toHaveCount(1);
-  await expect(page.locator(".context-items")).toContainText("Table 1.1");
+  await page.getByRole("button", { name: "Comment on Table 1.1" }).click();
+  await expect(page.locator(".references > div")).toHaveCount(1);
+  await expect(page.locator(".references")).toContainText("Table 1.1");
   await page.getByRole("button", { name: /^Copy link to Section 1\.1$/ }).click();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/\/first-page#[a-z-]+$/);
@@ -473,8 +473,8 @@ test("whole targets: ask about a table, link a section, deep-link a diagram part
   await expect(page.locator("#fixture-flow--fixture-edge")).toBeInViewport();
 
   // The page title stands for the whole page.
-  await page.getByRole("button", { name: "Ask about Chapter 1" }).click();
-  await expect(page.locator(".context-items")).toContainText("Chapter 1 · First page");
+  await page.getByRole("button", { name: "Comment on Chapter 1" }).click();
+  await expect(page.locator(".references")).toContainText("Chapter 1 · First page");
 
   // A word inside a paragraph becomes a text fragment on its section's address.
   await page.goto("/");
@@ -492,11 +492,11 @@ test("whole targets: ask about a table, link a section, deep-link a diagram part
     });
   await page
     .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Ask", exact: true })
+    .getByRole("button", { name: "Comment", exact: true })
     .click();
   const word = (
     await page.evaluate(
-      () => JSON.parse(sessionStorage.getItem("yapparatus:context") ?? "[]") as ContextItem[],
+      () => JSON.parse(sessionStorage.getItem("yapparatus:references") ?? "[]") as Reference[],
     )
   ).at(-1);
   expect(word?.address).toMatch(/^\/first-page#[a-z-]+:~:text=paragraph$/);
@@ -512,11 +512,11 @@ test("whole targets: ask about a table, link a section, deep-link a diagram part
   });
   await page
     .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Ask", exact: true })
+    .getByRole("button", { name: "Comment", exact: true })
     .click();
   const row = (
     await page.evaluate(
-      () => JSON.parse(sessionStorage.getItem("yapparatus:context") ?? "[]") as ContextItem[],
+      () => JSON.parse(sessionStorage.getItem("yapparatus:references") ?? "[]") as Reference[],
     )
   ).at(-1);
   const rowLine =
@@ -536,11 +536,11 @@ test("whole targets: ask about a table, link a section, deep-link a diagram part
   });
   await page
     .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Ask", exact: true })
+    .getByRole("button", { name: "Comment", exact: true })
     .click();
   const code = (
     await page.evaluate(
-      () => JSON.parse(sessionStorage.getItem("yapparatus:context") ?? "[]") as ContextItem[],
+      () => JSON.parse(sessionStorage.getItem("yapparatus:references") ?? "[]") as Reference[],
     )
   ).at(-1);
   const longerLine =
@@ -557,7 +557,7 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
 }) => {
   // The agent waits; no browser has the page open.
   await answerAll(request);
-  const waiting = runSnippet(
+  const waiting = runCommand(
     'import { waitForMessage } from "yapparatus/agent"; console.log((await waitForMessage()).prompt);',
   );
   await expect
@@ -581,7 +581,7 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
   expect(told.stdout).toMatch(/^- \/second-page$/m);
   // checkDocument() waits for the checks of an edit it has not seen yet.
   writeFileSync(file, `${original.trimEnd()}\n\nSee [elsewhere](nowhere-else).\n`);
-  const checked = await runSnippet(
+  const checked = await runCommand(
     'import { checkDocument } from "yapparatus/agent"; console.log((await checkDocument()).prompt);',
   );
   expect(checked.stderr).toBe("");
@@ -620,7 +620,10 @@ test("diagnostics: a removed page takes its errors with it", async ({ request })
   await expect.poll(reported).toEqual([]);
 });
 
-test("the header lists diagnostics, and Ask attaches where one is", async ({ page, request }) => {
+test("the header lists diagnostics, and Comment attaches where one is", async ({
+  page,
+  request,
+}) => {
   await report(request, [
     {
       origin: "chart",
@@ -631,12 +634,12 @@ test("the header lists diagnostics, and Ask attaches where one is", async ({ pag
   ]);
   await page.goto("/second-page");
   await page.getByRole("button", { name: "1 error" }).click();
-  await page.getByRole("button", { name: "Ask about CHART_FAILED" }).click();
+  await page.getByRole("button", { name: "Comment on CHART_FAILED" }).click();
   await expect(page).toHaveURL(/\/first-page/);
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
     "Please fix this error: CHART_FAILED: A test chart fails.",
   );
-  await expect(page.locator(".context-items")).toContainText("Chapter 1 · First page");
+  await expect(page.locator(".references")).toContainText("Chapter 1 · First page");
   // The page changes, the open tab renders the new revision, and the finding is gone.
   changePage();
   await expect(page.getByRole("button", { name: "1 error" })).toHaveCount(0);
@@ -649,7 +652,7 @@ test("sending a message scrolls the chat to it, even when scrolled up", async ({
   for (let i = 0; i < 12; i++)
     await readerMessage(request, `Filler message ${i}\n\nwith a second paragraph.`);
   await page.goto("/");
-  await page.locator(".ask-action").click();
+  await page.locator(".chat-action").click();
   const thread = page.locator(".messages");
   const gap = () =>
     thread.evaluate((t) => Math.round(t.scrollHeight - t.scrollTop - t.clientHeight));

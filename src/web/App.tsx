@@ -17,10 +17,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { flashPart } from "../diagram/part.tsx";
-import { partSeparator, splitAddress, textFragment } from "../document.ts";
+import { flashElement } from "../diagram/element.tsx";
+import { elementSeparator, splitAddress, textFragment } from "../document.ts";
 import { parseFileAddress } from "../files.ts";
-import type { ContextItem, ReportedDiagnostic } from "../protocol.ts";
+import type { Reference, ReportedDiagnostic } from "../protocol.ts";
 import { useLive } from "./api.ts";
 import { type ThemeChoice, themeSwitchable, useThemeChoice } from "./appearance.ts";
 import { Chat } from "./Chat.tsx";
@@ -36,7 +36,6 @@ import {
   fileHref,
   hashMode,
   href,
-  interceptLinks,
   navigate,
   parseAddress,
   prefetchLinks,
@@ -47,10 +46,10 @@ import {
 import { Sidebar } from "./Sidebar.tsx";
 import {
   codeAddress,
-  contextFromDiagram,
-  contextFromTarget,
-  contextsFromRange,
-  fileContextsFromRange,
+  fileReferencesFromRange,
+  referenceFromDiagram,
+  referenceFromTarget,
+  referencesFromRange,
   selectedCode,
   useSelectionMenu,
 } from "./selection.ts";
@@ -114,8 +113,8 @@ export function App() {
   const [pagesRevision, setPagesRevision] = useState(0);
   useEffect(() => onPagesChanged(() => setPagesRevision((revision) => revision + 1)), []);
   const [open, setOpen] = useStored("yapparatus:open", false);
-  const [context, setContext] = useStored<ContextItem[]>("yapparatus:context", []);
-  const [question, setQuestion] = useStored("yapparatus:draft", "");
+  const [references, setReferences] = useStored<Reference[]>("yapparatus:references", []);
+  const [draft, setDraft] = useStored("yapparatus:draft", "");
   const [full, setFull] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [layout, setLayout] = useState<Layout>("wide");
@@ -125,16 +124,14 @@ export function App() {
   const appRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const selection = useSelectionMenu(true);
-  const [pendingShow, setPendingShow] = useState<ContextItem>();
+  const [pendingShow, setPendingShow] = useState<Reference>();
   const chatOpen = live && open;
 
   useLayoutEffect(() => canonicalize(), []);
   useEffect(() => {
-    document.addEventListener("click", interceptLinks);
     document.addEventListener("pointerover", prefetchLinks);
     document.addEventListener("focusin", prefetchLinks);
     return () => {
-      document.removeEventListener("click", interceptLinks);
       document.removeEventListener("pointerover", prefetchLinks);
       document.removeEventListener("focusin", prefetchLinks);
     };
@@ -150,7 +147,7 @@ export function App() {
     else {
       scrollToFragment(route.fragment, false);
       // Arriving at an address shows where it points. Diagrams render after their fonts
-      // load, so their parts may appear a moment later. The file view shows its own lines.
+      // load, so their elements may appear a moment later. The file view shows its own lines.
       if (route.fragment && !route.file)
         whenPresent(
           () => document.getElementById(route.fragment),
@@ -194,23 +191,23 @@ export function App() {
     return () => observer.disconnect();
   }, [chatOpen, full]);
 
-  const addContext = useCallback(
-    (items: ContextItem[]) => {
-      setContext((current) => [
+  const addReferences = useCallback(
+    (items: Reference[]) => {
+      setReferences((current) => [
         ...current,
         ...items.filter((item) => !current.some((c) => JSON.stringify(c) === JSON.stringify(item))),
       ]);
       setOpen(true);
     },
-    [setContext, setOpen],
+    [setReferences, setOpen],
   );
 
-  /** Attach the place a diagnostic is about to the message box, and start the question. */
-  function askAbout(diagnostic: ReportedDiagnostic) {
+  /** Attach the place a diagnostic is about to the message box, and start the message. */
+  function commentOn(diagnostic: ReportedDiagnostic) {
     const target = pages.find((p) => p.source === diagnostic.source);
     if (!target) return;
     setOpen(true);
-    setQuestion(
+    setDraft(
       `Please fix this ${diagnostic.severity}: ${diagnostic.code}${
         diagnostic.line ? ` on line ${diagnostic.line}` : ""
       }: ${diagnostic.message}`,
@@ -227,14 +224,14 @@ export function App() {
         return block?.dataset.source === target.source ? element : undefined;
       },
       (element) => {
-        const item = contextFromTarget(element, target);
-        if (item) addContext([item]);
+        const item = referenceFromTarget(element, target);
+        if (item) addReferences([item]);
       },
     );
   }
 
-  /** Find the target of an earlier context item by its address, and show it. */
-  function showOnPage(item: ContextItem) {
+  /** Find the target of an earlier reference by its address, and show it. */
+  function showOnPage(item: Reference) {
     // A source file opens at the item's lines, which the file view highlights.
     const sourceFile = parseFileAddress(item.address);
     if (sourceFile) return navigate(fileHref(sourceFile));
@@ -255,23 +252,23 @@ export function App() {
       },
       () => {
         // The exact target is gone, usually because the agent rewrote it in answer. Its anchor,
-        // the section around selected text or the figure around a part, is a sure place to look.
+        // the section around selected text or the figure around an element, is a sure place to look.
         const { anchor } = splitAddress(item.address);
         const around =
           (anchor && document.getElementById(anchor)) ||
-          (anchor.includes(partSeparator) &&
-            document.getElementById(anchor.slice(0, anchor.indexOf(partSeparator))));
+          (anchor.includes(elementSeparator) &&
+            document.getElementById(anchor.slice(0, anchor.indexOf(elementSeparator))));
         if (!around) {
-          setNotice({ text: "This part disappeared or is ambiguous.", id: Date.now() });
+          setNotice({ text: "This target disappeared or is ambiguous.", id: Date.now() });
           return;
         }
         around.scrollIntoView({ block: "start", behavior: "smooth" });
         flash(around);
         setNotice({
           text:
-            item.kind === "text" || item.kind === "diagram-part"
-              ? `This ${item.kind === "text" ? "text" : "part"} changed since you asked. Showing where it was.`
-              : "This changed since you asked. Showing it as it is now.",
+            item.kind === "text" || item.kind === "diagram-element"
+              ? `This ${item.kind === "text" ? "text" : "element"} changed since you commented. Showing where it was.`
+              : "This changed since you commented. Showing it as it is now.",
           id: Date.now(),
         });
       },
@@ -285,7 +282,7 @@ export function App() {
     showOnPage(pendingShow);
   }, [page, pendingShow]);
 
-  // Stable, so typing a question does not re-render the page through this context.
+  // Stable, so typing a message does not re-render the page through this context.
   const handlers = useMemo<TargetHandlers>(
     () => ({
       link: (element) => {
@@ -295,14 +292,14 @@ export function App() {
       },
       ...(live
         ? {
-            ask: (element: Element) => {
-              const item = page && contextFromTarget(element, page);
-              if (item) addContext([item]);
+            comment: (element: Element) => {
+              const item = page && referenceFromTarget(element, page);
+              if (item) addReferences([item]);
             },
           }
         : {}),
     }),
-    [page, addContext],
+    [page, addReferences],
   );
 
   const wide = layout === "wide";
@@ -364,15 +361,15 @@ export function App() {
           )}
           <div {...stylex.props(s.headerEnd)}>
             {themeSwitchable && <ThemeButton />}
-            {live && <DiagnosticsMenu diagnostics={diagnostics} onAsk={askAbout} />}
+            {live && <DiagnosticsMenu diagnostics={diagnostics} onComment={commentOn} />}
             {live && (
               <Button
-                className="ask-action"
+                className="chat-action"
                 variant={open ? "default" : "primary"}
                 aria-pressed={open}
                 onClick={() => setOpen(!open)}
               >
-                <Icon name="ask" /> Ask
+                <Icon name="comment" /> Chat
               </Button>
             )}
           </div>
@@ -398,8 +395,8 @@ export function App() {
             onClick={
               live
                 ? (event) => {
-                    const item = page && contextFromDiagram(event.target, page);
-                    if (item) addContext([item]);
+                    const item = page && referenceFromDiagram(event.target, page);
+                    if (item) addReferences([item]);
                   }
                 : undefined
             }
@@ -407,10 +404,10 @@ export function App() {
               live
                 ? (event) => {
                     if (event.key !== "Enter" && event.key !== " ") return;
-                    const item = page && contextFromDiagram(event.target, page);
+                    const item = page && referenceFromDiagram(event.target, page);
                     if (!item) return;
                     event.preventDefault();
-                    addContext([item]);
+                    addReferences([item]);
                   }
                 : undefined
             }
@@ -419,7 +416,7 @@ export function App() {
               <FileView
                 file={file}
                 fragment={route.fragment}
-                {...(live ? { onAsk: addContext } : {})}
+                {...(live ? { onComment: addReferences } : {})}
               />
             ) : (
               <PageContent page={page} handlers={handlers} revision={pagesRevision} />
@@ -443,23 +440,23 @@ export function App() {
               onClick={() => {
                 const range = selection.menu?.range;
                 if (range) {
-                  const text = page ? contextsFromRange(range, page) : [];
-                  addContext([...text, ...fileContextsFromRange(range)]);
+                  const text = page ? referencesFromRange(range, page) : [];
+                  addReferences([...text, ...fileReferencesFromRange(range)]);
                 }
                 window.getSelection()?.removeAllRanges();
                 selection.dismiss();
               }}
             >
-              <Icon name="ask" size={14} /> Ask
+              <Icon name="comment" size={14} /> Comment
             </Button>
           )}
           <CopyPassageLink
             link={() => {
               const range = selection.menu?.range;
-              const item = range && page && contextsFromRange(range, page)[0];
+              const item = range && page && referencesFromRange(range, page)[0];
               if (!item || !page) {
                 // Selected code links to its lines in the file, and to its words when it leaves
-                // out part of them, which browsers highlight. The single file links the lines.
+                // out some of them, which browsers highlight. The single file links the lines.
                 const [code] = range ? selectedCode(range) : [];
                 const address = code && codeAddress(hashMode ? { ...code, words: "" } : code);
                 return address && new URL(addressHref(address), location.href).href;
@@ -478,10 +475,10 @@ export function App() {
       {chatOpen && (
         <Chat
           chat={chat}
-          context={context}
-          setContext={setContext}
-          question={question}
-          setQuestion={setQuestion}
+          references={references}
+          setReferences={setReferences}
+          draft={draft}
+          setDraft={setDraft}
           full={full}
           setFull={setFull}
           onClose={() => setOpen(false)}
@@ -607,20 +604,20 @@ function Notice({ text, onDismiss }: { text: string; onDismiss: () => void }) {
 }
 
 /**
- * The elements on the page that an earlier context item points at, found by its address: the
- * id it names, and the part or the selected words in it. Text and code have no id of their own,
+ * The elements on the page that an earlier reference points at, found by its address: the
+ * id it names, and the element or the selected words in it. Text and code have no id of their own,
  * so they are the blocks of the item's page that hold the words or code; among several, those
  * at the item's lines, where they are while the page has not changed since.
  */
-function findTarget(item: ContextItem): Element[] {
+function findTarget(item: Reference): Element[] {
   const { anchor, text } = splitAddress(item.address);
   if (item.kind === "page")
     return [...document.querySelectorAll("main article [data-target=page]")];
-  if (item.kind === "diagram-part") {
-    const at = anchor.indexOf(partSeparator);
+  if (item.kind === "diagram-element") {
+    const at = anchor.indexOf(elementSeparator);
     const figure = document.getElementById(anchor.slice(0, at));
-    const part = anchor.slice(at + partSeparator.length);
-    return figure ? [...figure.querySelectorAll(`[data-element-id="${CSS.escape(part)}"]`)] : [];
+    const id = anchor.slice(at + elementSeparator.length);
+    return figure ? [...figure.querySelectorAll(`[data-element-id="${CSS.escape(id)}"]`)] : [];
   }
   if (item.kind !== "text" && item.kind !== "code") {
     const element = anchor ? document.getElementById(anchor) : null;
@@ -673,7 +670,7 @@ function whenPresent<T extends Element>(
 
 /** Briefly mark a target the reader just arrived at. */
 function flash(element: Element) {
-  if (element instanceof SVGElement) return flashPart(element);
+  if (element instanceof SVGElement) return flashElement(element);
   const classes = stylex.props(s.highlight).className?.split(" ") ?? [];
   element.classList.add(...classes);
   window.setTimeout(() => element.classList.remove(...classes), 1800);
@@ -683,7 +680,7 @@ function flash(element: Element) {
 const reading = { reply: false, idPrefix: "" };
 
 /**
- * The page itself. Memoized on stable inputs: typing a question or selecting text changes
+ * The page itself. Memoized on stable inputs: typing a message or selecting text changes
  * the app's state, and must not re-render the page and recompile every diagram on it.
  */
 const PageContent = memo(function PageContent({

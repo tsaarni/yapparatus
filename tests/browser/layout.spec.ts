@@ -106,7 +106,7 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
   await page.keyboard.press("Escape");
 
   // The chat takes space from the page, and the page adapts.
-  await page.locator(".masthead").getByRole("button", { name: "Ask", exact: true }).click();
+  await page.locator(".masthead").getByRole("button", { name: "Chat", exact: true }).click();
   await page.locator(".chat").evaluate((element) => {
     (element as HTMLElement).style.width = "600px";
   });
@@ -211,7 +211,7 @@ test("the reading column, not the window, sets the reading type", async ({ page 
   await page.goto("/");
   const title = page.locator("article h1");
   await expect(title).toHaveCSS("font-size", "32px");
-  await page.locator(".masthead").getByRole("button", { name: "Ask", exact: true }).click();
+  await page.locator(".masthead").getByRole("button", { name: "Chat", exact: true }).click();
   await page.locator(".chat").evaluate((element) => {
     (element as HTMLElement).style.width = "700px";
   });
@@ -234,26 +234,26 @@ test("diagram categories: colors, a legend, and highlighting from the legend or 
   const figure = page.locator("figure#migration");
   const legend = figure.getByRole("list", { name: "Legend" });
   await expect(legend.getByRole("button")).toHaveText(["New", "To be removed"]);
-  const part = (id: string) => figure.locator(`[data-element-id="${id}"]`);
+  const element = (id: string) => figure.locator(`[data-element-id="${id}"]`);
   const ink = (id: string) =>
-    part(id).evaluate((element) => getComputedStyle(element).getPropertyValue("--ink"));
-  // Parts in one category share a color; parts without one stay neutral.
+    element(id).evaluate((element) => getComputedStyle(element).getPropertyValue("--ink"));
+  // Elements in one category share a color; elements without one stay neutral.
   expect(await ink("orders")).toBe(await ink("payments"));
   expect(await ink("orders")).not.toBe(await ink("batch-job"));
   expect(await ink("database")).not.toBe(await ink("orders"));
 
-  // Pointing at a legend entry highlights its parts and fades the others.
+  // Pointing at a legend entry highlights its elements and fades the others.
   await legend.getByRole("button", { name: "To be removed" }).hover();
-  await expect(part("batch-job")).toHaveAttribute("data-state", "focus");
-  await expect(part("orders")).toHaveAttribute("data-state", "dim");
+  await expect(element("batch-job")).toHaveAttribute("data-state", "focus");
+  await expect(element("orders")).toHaveAttribute("data-state", "dim");
   await page.mouse.move(0, 0);
-  await expect(part("orders")).not.toHaveAttribute("data-state");
+  await expect(element("orders")).not.toHaveAttribute("data-state");
 
   // A step focuses a whole category by its id.
   await figure.getByRole("button", { name: "Start steps" }).click();
-  await expect(part("orders")).toHaveAttribute("data-state", "focus");
-  await expect(part("payments")).toHaveAttribute("data-state", "focus");
-  await expect(part("batch-job")).toHaveAttribute("data-state", "dim");
+  await expect(element("orders")).toHaveAttribute("data-state", "focus");
+  await expect(element("payments")).toHaveAttribute("data-state", "focus");
+  await expect(element("batch-job")).toHaveAttribute("data-state", "dim");
 });
 
 test("tabs follow their label, and columns line up side by side", async ({ page }) => {

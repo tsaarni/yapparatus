@@ -75,18 +75,18 @@ export function validate(
   enclosures: CompiledEnclosure[],
   report: Report,
 ) {
-  // The accent marks the one part that matters most; on two parts it marks neither.
+  // The accent marks the one element that matters most; on two elements it marks neither.
   const accented = [...nodes, ...edges, ...enclosures]
-    .filter((part) => part.role === "accent" && !("passive" in part && part.passive))
-    .map((part) => part.id);
+    .filter((element) => element.role === "accent" && !("passive" in element && element.passive))
+    .map((element) => element.id);
   if (accented.length > 1)
     report(
       "ACCENT_OVERUSED",
-      `${accented.join(", ")} all use the accent. Keep it on the one part that matters most.`,
+      `${accented.join(", ")} all use the accent. Keep it on the one element that matters most.`,
       accented,
     );
 
-  // A start or end label is painted outside the dot, so it takes part in every check.
+  // A start or end label is painted outside the dot, so every check includes it.
   const rects = (n: CompiledNode) => (n.labelRect ? [n.rect, n.labelRect] : [n.rect]);
   const overlapOf = (a: CompiledNode, b: Rect) =>
     rects(a)
@@ -98,7 +98,7 @@ export function validate(
     for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i] as CompiledNode;
       const b = nodes[j] as CompiledNode;
-      // Step-only parts may share a place; the steps decide whether they appear together.
+      // Step-only elements may share a place; the steps decide whether they appear together.
       if (a.passive || b.passive || (a.stepOnly && b.stepOnly)) continue;
       // Of members, only marks of one text can collide: two highlights over the same letters.
       const marks = a.shape === "mark" && b.shape === "mark" && a.parent === b.parent;

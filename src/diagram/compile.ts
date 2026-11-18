@@ -116,12 +116,12 @@ export function compile(
 }
 
 /**
- * The legend, in color order, and the parts of each category. A category's id stands for its
- * parts in steps, unless a part or container has that id.
+ * The legend, in color order, and the elements of each category. A category's id stands for its
+ * elements in steps, unless an element or container has that id.
  */
 function legendOf(
   scene: DiagramBuilder,
-  parts: Array<{ id: string; category?: number }>,
+  elements: Array<{ id: string; category?: number }>,
   groups: Record<string, string[]>,
   report: Report,
 ): { legend: LegendEntry[]; categoryGroups: Record<string, string[]> } {
@@ -129,10 +129,10 @@ function legendOf(
     name,
     id: slug(name),
     slot: i + 1,
-    parts: parts.filter((p) => p.category === i + 1).map((p) => p.id),
+    elements: elements.filter((p) => p.category === i + 1).map((p) => p.id),
   }));
   const taken = new Set([
-    ...parts.map((p) => p.id),
+    ...elements.map((p) => p.id),
     ...scene.stacks.map((s) => s.id),
     ...Object.keys(groups),
   ]);
@@ -141,15 +141,15 @@ function legendOf(
     if (taken.has(entry.id))
       report(
         "DUPLICATE_ID",
-        `The category "${entry.name}" has the id "${entry.id}", which a part already has, so steps cannot focus the category. Rename the category or the part.`,
+        `The category "${entry.name}" has the id "${entry.id}", which an element already has, so steps cannot focus the category. Rename the category or the element.`,
         [entry.id],
       );
-    else categoryGroups[entry.id] = entry.parts;
+    else categoryGroups[entry.id] = entry.elements;
   }
   if (scene.categories.length > maxCategories)
     report(
       "TOO_MANY_CATEGORIES",
-      `This figure has ${scene.categories.length} categories; ${maxCategories} can be told apart by color. Parts in ${scene.categories
+      `This figure has ${scene.categories.length} categories; ${maxCategories} can be told apart by color. Elements in ${scene.categories
         .slice(maxCategories)
         .map((c) => `"${c}"`)
         .join(", ")} are drawn without a color. Merge categories, or split the figure.`,

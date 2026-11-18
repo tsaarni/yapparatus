@@ -16,8 +16,8 @@
       "types": "./lib/vite.d.ts",
       "default": "./lib/vite.js"
     },
-    "./styles.css": "./src/reader/styles.css",
-    "./theme.stylex": "./src/reader/theme.stylex.ts"
+    "./styles.css": "./src/web/styles.css",
+    "./theme.stylex": "./src/web/theme.stylex.ts"
   },
   "scripts": {
     "dev": "pnpm build:lib && node lib/cli.js dev",

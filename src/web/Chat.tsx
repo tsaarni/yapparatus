@@ -15,16 +15,16 @@ import {
   useRef,
   useState,
 } from "react";
-import { partSeparator, quoteOf, splitAddress } from "../document.ts";
+import { elementSeparator, quoteOf, splitAddress } from "../document.ts";
 import { linesLabel, parseFileAddress } from "../files.ts";
 import { createLogger } from "../logger.ts";
 import type {
   AgentMessage,
   AgentState,
   Chat as ChatRead,
-  ContextItem,
   Message,
   ReaderMessage,
+  Reference,
 } from "../protocol.ts";
 import { commands, reportDiagnostics } from "./api.ts";
 import { type AppIconName, AppIcon as Icon } from "./icons.tsx";
@@ -87,9 +87,9 @@ class ReplyBoundary extends Component<
   }
 }
 
-/** How a context item reads in the chat: an icon and its name. */
-export function describeItem(item: ContextItem) {
-  const icon: Record<ContextItem["kind"], AppIconName> = {
+/** How a reference reads in the chat: an icon and its name. */
+export function describeReference(item: Reference) {
+  const icon: Record<Reference["kind"], AppIconName> = {
     page: "page",
     text: "quote",
     section: "hash",
@@ -97,7 +97,7 @@ export function describeItem(item: ContextItem) {
     table: "table",
     listing: "code",
     code: "code",
-    "diagram-part": "diagram",
+    "diagram-element": "diagram",
     file: "file",
     lines: "code",
   };
@@ -116,12 +116,12 @@ export function describeItem(item: ContextItem) {
   const { page: id, anchor } = splitAddress(item.address);
   const page = pages.find((p) => p.id === id);
   // Labels and numbers are the reader's view of the address, computed now, never stored.
-  const [owner = "", part] = anchor.split(partSeparator);
+  const [owner = "", element] = anchor.split(elementSeparator);
   const label = owner ? findTarget(owner, page)?.label : undefined;
   const heading = page?.outline?.headings.find((h) => h.id === anchor)?.text;
   const caption = page?.outline?.numbered.find((n) => n.id === owner)?.caption;
-  const joined = (...parts: Array<string | undefined>) =>
-    [...new Set(parts.filter(Boolean))].join(" · ");
+  const joined = (...values: Array<string | undefined>) =>
+    [...new Set(values.filter(Boolean))].join(" · ");
   const name =
     item.kind === "text"
       ? `“${quoteOf(item.address) ?? ""}”`
@@ -132,8 +132,8 @@ export function describeItem(item: ContextItem) {
           )
         : item.kind === "section"
           ? joined(label, heading)
-          : item.kind === "diagram-part"
-            ? joined(label, part)
+          : item.kind === "diagram-element"
+            ? joined(label, element)
             : item.kind === "code"
               ? joined("Code", label)
               : joined(label, caption);
@@ -200,25 +200,25 @@ function Reply({ message }: { message: AgentMessage }) {
   );
 }
 
-function ContextList({
+function ReferenceList({
   items,
   onShowOnPage,
 }: {
-  items: ContextItem[];
-  onShowOnPage: (item: ContextItem) => void;
+  items: Reference[];
+  onShowOnPage: (item: Reference) => void;
 }) {
   return (
-    <ul {...stylex.props(s.contexts)}>
+    <ul {...stylex.props(s.references)}>
       {items.map((item) => {
-        const { icon, name } = describeItem(item);
+        const { icon, name } = describeReference(item);
         return (
           <li key={JSON.stringify(item)}>
-            <details {...stylex.props(s.context)}>
-              <summary {...stylex.props(s.contextSummary, ui.focus)}>
-                <span {...stylex.props(s.contextIcon)}>
+            <details {...stylex.props(s.reference)}>
+              <summary {...stylex.props(s.referenceSummary, ui.focus)}>
+                <span {...stylex.props(s.referenceIcon)}>
                   <Icon name={icon} size={14} />
                 </span>
-                <span {...stylex.props(s.contextQuote)}>{name}</span>
+                <span {...stylex.props(s.referenceQuote)}>{name}</span>
                 <Button
                   variant="icon"
                   size="small"
@@ -297,7 +297,7 @@ function TurnHeader({
 }
 
 /**
- * The messages, in log order. Memoized, so typing a question does not render them again: at a
+ * The messages, in log order. Memoized, so typing a message does not render them again: at a
  * few hundred messages that took most of each keystroke.
  */
 const MessageList = memo(function MessageList({
@@ -305,7 +305,7 @@ const MessageList = memo(function MessageList({
   onShowOnPage,
 }: {
   messages: Message[];
-  onShowOnPage: (item: ContextItem) => void;
+  onShowOnPage: (item: Reference) => void;
 }) {
   const bySeq = new Map(messages.map((message) => [message.seq, message]));
   return messages.map((message) =>
@@ -315,7 +315,7 @@ const MessageList = memo(function MessageList({
       <AgentView
         key={message.seq}
         message={message}
-        asked={bySeq.get(message.inReplyTo)?.createdAt}
+        sent={bySeq.get(message.inReplyTo)?.createdAt}
       />
     ),
   );
@@ -336,15 +336,15 @@ const ReaderView = memo(function ReaderView({
   onShowOnPage,
 }: {
   message: ReaderMessage;
-  onShowOnPage: (item: ContextItem) => void;
+  onShowOnPage: (item: Reference) => void;
 }) {
   return (
     <article {...styled("reader-message", s.turn)} data-seq={message.seq}>
       <TurnHeader author="You" message={message} />
       <div {...stylex.props(s.readerBubble)}>
         <p {...stylex.props(s.messageText)}>{message.text}</p>
-        {message.context.length > 0 && (
-          <ContextList items={message.context} onShowOnPage={onShowOnPage} />
+        {message.references.length > 0 && (
+          <ReferenceList items={message.references} onShowOnPage={onShowOnPage} />
         )}
       </div>
     </article>
@@ -353,19 +353,19 @@ const ReaderView = memo(function ReaderView({
 
 const AgentView = memo(function AgentView({
   message,
-  asked,
+  sent,
 }: {
   message: AgentMessage;
-  asked: string | undefined;
+  sent: string | undefined;
 }) {
   // From the message it answers to the reply, as the counter showed while it worked. When
   // the server saw the agent read it, the tooltip tells waiting from working.
   const at = (iso: string) => new Date(iso).getTime();
   const replied = at(message.createdAt);
-  const took = asked ? lasted(replied - at(asked)) : undefined;
+  const took = sent ? lasted(replied - at(sent)) : undefined;
   const split =
-    asked && message.readAt
-      ? `Waited ${lasted(at(message.readAt) - at(asked))} for an agent, which worked ${lasted(replied - at(message.readAt))}`
+    sent && message.readAt
+      ? `Waited ${lasted(at(message.readAt) - at(sent))} for an agent, which worked ${lasted(replied - at(message.readAt))}`
       : "From the message it answers to the reply";
   return (
     <article {...styled("agent-message", s.turn)} data-seq={message.seq}>
@@ -522,20 +522,20 @@ function ConfirmClear({ onClear, onCancel }: { onClear: () => void; onCancel: ()
 export interface ChatProps {
   chat: ChatRead;
   /** What the next message is about: the pills above the message box. */
-  context: ContextItem[];
-  setContext: (update: (current: ContextItem[]) => ContextItem[]) => void;
+  references: Reference[];
+  setReferences: (update: (current: Reference[]) => Reference[]) => void;
   full: boolean;
   setFull: (full: boolean) => void;
   onClose: () => void;
-  onShowOnPage: (item: ContextItem) => void;
+  onShowOnPage: (item: Reference) => void;
   onError: (message: string) => void;
-  question: string;
-  setQuestion: (question: string) => void;
+  draft: string;
+  setDraft: (draft: string) => void;
   panelRef: Ref<HTMLElement>;
 }
 
 export function Chat(props: ChatProps) {
-  const { chat, context, setContext, onError, question, setQuestion } = props;
+  const { chat, references, setReferences, onError, draft, setDraft } = props;
   const [sending, setSending] = useState(false);
   const [clearing, setClearing] = useState(false);
   const thread = useRef<HTMLDivElement>(null);
@@ -551,17 +551,17 @@ export function Chat(props: ChatProps) {
   useLayoutEffect(() => {
     showOnPage.current = props.onShowOnPage;
   });
-  const stableShowOnPage = useCallback((item: ContextItem) => showOnPage.current(item), []);
+  const stableShowOnPage = useCallback((item: Reference) => showOnPage.current(item), []);
 
   async function submit() {
-    if (sending || !question.trim()) return;
+    if (sending || !draft.trim()) return;
     setSending(true);
     try {
-      await commands.send({ text: question, context });
+      await commands.send({ text: draft, references });
       // Sending shows the newest message, wherever the reader had scrolled.
       scrollToBottom();
-      setQuestion("");
-      setContext(() => []);
+      setDraft("");
+      setReferences(() => []);
     } catch (cause) {
       onError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -589,7 +589,7 @@ export function Chat(props: ChatProps) {
         ) : (
           <>
             <div {...stylex.props(s.headerText)}>
-              <h2 {...stylex.props(s.title)}>Ask about this document</h2>
+              <h2 {...stylex.props(s.title)}>Chat</h2>
               <p {...styled("presence", s.subtitle)} data-agent={chat.agent}>
                 <span {...stylex.props(s.presence, chat.agent === "waiting" && s.presenceOn)} />
                 {presence[chat.agent]}
@@ -623,12 +623,12 @@ export function Chat(props: ChatProps) {
         <div {...stylex.props(s.column, props.full && s.columnFull)}>
           {count === 0 && (
             <div {...stylex.props(s.empty)}>
-              <p {...stylex.props(s.emptyTitle)}>Ask anything about this document.</p>
+              <p {...stylex.props(s.emptyTitle)}>Comment on anything in this document.</p>
               <ul {...stylex.props(s.tips)}>
-                <li>Select text and choose Ask to quote it.</li>
-                <li>Hover a heading, figure, table, or code block and choose Ask about this.</li>
+                <li>Select text and choose Comment to quote it.</li>
+                <li>Hover a heading, figure, table, or code block and choose Comment.</li>
                 <li>Click a box or arrow in a diagram to point at it.</li>
-                <li>Ask for changes too. The agent can edit the pages.</li>
+                <li>Request changes too. The agent can edit the pages.</li>
               </ul>
             </div>
           )}
@@ -661,18 +661,20 @@ export function Chat(props: ChatProps) {
         <div {...stylex.props(s.column, props.full && s.columnFull)}>
           {chat.agent === "away" && <Connect start={chat.prompt} />}
           <div {...stylex.props(s.box)}>
-            {context.length > 0 && (
-              <div {...styled("context-items", s.chips)}>
-                {context.map((item, index) => (
+            {references.length > 0 && (
+              <div {...styled("references", s.chips)}>
+                {references.map((item, index) => (
                   <div key={JSON.stringify(item)} {...stylex.props(s.chip)}>
-                    <Icon name={describeItem(item).icon} size={13} />
+                    <Icon name={describeReference(item).icon} size={13} />
                     <span {...stylex.props(s.chipText)} title={decodeURIComponent(item.address)}>
-                      {describeItem(item).name}
+                      {describeReference(item).name}
                     </span>
                     <button
                       type="button"
-                      aria-label={`Remove context ${index + 1}`}
-                      onClick={() => setContext((current) => current.filter((_, i) => i !== index))}
+                      aria-label={`Remove reference ${index + 1}`}
+                      onClick={() =>
+                        setReferences((current) => current.filter((_, i) => i !== index))
+                      }
                       {...stylex.props(s.chipRemove, ui.focus)}
                     >
                       <Icon name="close" size={12} />
@@ -682,10 +684,10 @@ export function Chat(props: ChatProps) {
               </div>
             )}
             <textarea
-              id="question"
+              id="draft"
               aria-label="Message"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 // Enter sends and Shift+Enter starts a new line. Enter that confirms an input
                 // method's composition, as when typing Japanese, does neither.
@@ -695,9 +697,9 @@ export function Chat(props: ChatProps) {
                 }
               }}
               placeholder={
-                context.length
-                  ? "Ask about the selected parts…"
-                  : "Ask a question or request a change…"
+                references.length
+                  ? "Comment on the selection…"
+                  : "Write a message or request a change…"
               }
               rows={3}
               {...stylex.props(s.textarea)}
@@ -708,7 +710,7 @@ export function Chat(props: ChatProps) {
                 type="submit"
                 variant="primary"
                 size="small"
-                disabled={sending || !question.trim()}
+                disabled={sending || !draft.trim()}
                 title="Send (Enter; Shift+Enter for a new line)"
                 aria-keyshortcuts="Enter"
               >
@@ -879,7 +881,7 @@ const s = stylex.create({
     lineHeight: lineHeight.normal,
     whiteSpace: "pre-wrap",
   },
-  contexts: {
+  references: {
     display: "grid",
     gridTemplateColumns: "minmax(0, 1fr)",
     gap: space.xs,
@@ -888,12 +890,12 @@ const s = stylex.create({
     padding: 0,
     listStyle: "none",
   },
-  context: {
+  reference: {
     minWidth: 0,
     borderRadius: radius.md,
     backgroundColor: theme.surface,
   },
-  contextSummary: {
+  referenceSummary: {
     display: "flex",
     alignItems: "center",
     gap: space.sm,
@@ -906,10 +908,10 @@ const s = stylex.create({
     fontSize: fontSize.xs,
     "::-webkit-details-marker": { display: "none" },
   },
-  contextIcon: {
+  referenceIcon: {
     display: "inline-flex",
   },
-  contextQuote: {
+  referenceQuote: {
     flexGrow: 1,
     minWidth: 0,
     overflow: "hidden",

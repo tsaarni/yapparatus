@@ -1,0 +1,200 @@
+# Documents and addresses
+
+This page describes what a document is on disk and how everything in it is named, from pages to words in a file, and the references that the reader attaches to a message. <Ref to="documents-project" /> shows a project with two documents.
+
+<Figure id="documents-project" caption="A project with two document directories, after a dev session and both builds of content/.">
+
+<FileTree>
+
+- my-document/
+  - **content/** a document directory
+    - document.json
+    - overview.mdx
+  - tutorial/ a second document directory
+    - document.json
+    - …
+  - .yapparatus/
+    - server.json the address of the running server
+    - content/
+      - chat.jsonl the chat log of content/
+      - chat/ the replies, one MDX file each
+  - dist/
+    - content/ the website build of content/
+  - dist-single/
+    - content/
+      - index.html the single-file build of content/
+
+</FileTree>
+
+</Figure>
+
+## Projects and document directories
+
+A project is the directory where the server runs, made from [the starter](/-/files/yapparatus/starter/README.md). A document directory holds a `document.json` and the pages of one document, such as `content/` in the starter or `docs/design/` in this repository.
+
+The server shows one document at a time, named by its path in the project, as in `yap dev docs/design`. A document's pages are every MDX file under its directory, so the server refuses to start when another document directory is inside it or contains it.
+
+The chat and the builds of a document are stored under its path, such as `.yapparatus/docs/design/`, so each document in a project has its own.
+
+The project has one `.yapparatus/server.json`, where the running server writes its address for the agent library; see [starting](server#starting).
+
+## document.json
+
+`document.json` holds the settings of one document: its title, page list, theme, icons, numbering, and external directories. [The authoring guide](/-/files/yapparatus/starter/docs/guide.md#L44-L53) lists the fields.
+
+`"pages"` is the only required field. It lists the page files in reading order. The server compares it with the MDX files on disk and reports each difference and each invalid field as a `PAGE_LIST` diagnostic. It reads the file again when it changes, so a fix needs no restart. See [the document module](page-compiler#the-document-module).
+
+## Pages
+
+A page's file name gives its address: `guide/setup.mdx` is the page `/guide/setup`. A page name uses lowercase letters, digits, and hyphens, in segments separated by `/`.
+
+A page has one `#` heading, at the top, which is its title.
+
+## Addresses
+
+An address names something that the reader can open, link to, or attach to a message. Links, Copy link, references, and prompts use the same forms, which <Ref to="documents-forms" /> lists.
+
+<Table id="documents-forms" caption="The address forms.">
+
+| Form | Names |
+|---|---|
+| `/<page>` | A page |
+| `/<page>#<id>` | A section, figure, table, or listing |
+| `/<page>#<figure>--<element>` | An element of a diagram |
+| `/<page>#<figure>--<step>` | A step of a diagram |
+| `/<page>#<id>:~:text=…` | Words inside the item with that id |
+| `/-/files/<directory>/<path>` | An external file |
+| `/-/files/<directory>/<path>#<lines>` | Lines of the file |
+| `/-/files/<directory>/<path>#<lines>:~:text=…` | Words in those lines |
+
+</Table>
+
+<Ref to="documents-address-segments" /> takes two real addresses of this document apart: [an element](/overview#overview-system--agent) and [words in a line of a file](/-/files/yapparatus/src/protocol.ts#L65:~:text=address).
+
+<Diagram id="documents-address-segments" caption="The segments of an element address and of a file address." description="Two addresses in monospace text, each segment marked and named by a note" draw={(d) => {
+  const element = d.text("/overview#overview-system--agent", {
+    mono: true,
+    id: "element-address",
+    marks: { page: "/overview", figure: "#overview-system", element: "--agent" },
+  })
+  const file = d.text("/-/files/yapparatus/src/protocol.ts#L65:~:text=address", {
+    mono: true,
+    id: "file-address",
+    marks: {
+      prefix: "/-/files",
+      directory: "yapparatus",
+      path: "src/protocol.ts",
+      lines: "#L65",
+      words: ":~:text=address",
+    },
+  })
+  const page = d.note("Page")
+  const figure = d.note("Figure id")
+  const elementId = d.note("Element id")
+  const prefix = d.note("Files prefix")
+  const directory = d.note("Directory name")
+  const path = d.note("Path")
+  const lines = d.note("Lines")
+  const words = d.note("Words")
+  const top = d.row([page, figure, elementId], { gap: 48 })
+  const bottom = d.row([prefix, directory, path, lines, words], { gap: 24 })
+  d.column([top, element, file, bottom], { gap: 48 })
+  d.arrow(page, element.element("page"))
+  d.arrow(figure, element.element("figure"))
+  d.arrow(elementId, element.element("element"))
+  d.arrow(prefix, file.element("prefix"))
+  d.arrow(directory, file.element("directory"))
+  d.arrow(path, file.element("path"))
+  d.arrow(lines, file.element("lines"))
+  d.arrow(words, file.element("words"))
+}} />
+
+Everything that is not a page is under `/-/`, such as external files and the REST API. A page name starts with a letter or a digit, so the two never collide.
+
+Ids come from headings, such as `text-fragments` from "Text fragments", and from `id` attributes. A heading id is unique on its page, and a figure, table, or listing id in the whole document, so a reference to it works from any page. Text without an id, such as a table row, is named by its words inside the nearest id.
+
+A diagram element cannot be selected as text, so it has an id, joined to the figure's id with `--`. An element id is unique only in its figure. A step with an `id` is named the same way.
+
+**[Direction](directions):** a chart mark, such as a dot, a line, or a range, is named after `--` by its data values, as in `/charts#throughput-chart--Build=After`. See [charts](charts#color).
+
+## Text fragments
+
+A text fragment is the part of an address after `:~:` that names words. Its format comes from the [URL Fragment Text Directives](https://wicg.github.io/scroll-to-text-fragment/) specification, which browsers follow. Up to eight selected words are written in full, as in `:~:text=coding%20agent`. A longer selection is written as its first four and last four words.
+
+A browser that opens such an address goes to the first place on the page where the words occur. The web app's [Show on page](web-app#show-on-page) searches only the blocks of the item.
+
+**[Direction](directions):** when the selected words occur more than once on a page, the fragment also holds the words just before and after them, as in `:~:text=The-,chat,-is%20a%20log`, so that the address names one place.
+
+## Lines
+
+Lines of an external file are written as on GitHub: `#L40` for one line and `#L40-L72` for a range, counted from 1. When an address has words too, the lines come first: the lines say where to look, and the words say which part of those lines the reader meant.
+
+**[Direction](directions):** a list of lines, such as `#L54-L68,L80`, with a list in the reference.
+
+## External files
+
+An external directory is a directory that `document.json` names under `"files"`, with a path relative to `document.json`, such as `"files": { "app": "../app" }`. The name is the `<directory>` of a file address, so the address does not depend on where the directory is on disk. This document names its own repository `yapparatus`.
+
+A link to an external file opens the [file view](web-app#file-view), an [excerpt](page-compiler#code-and-excerpts) shows some of its lines in a page, and a [chart](charts#data-sources) can read its data. The server [reads files](server#external-files) only from the named directories.
+
+A file also has a path relative to the project, such as `../../contour/internal/dag/builder.go`, which the server computes from the address and `document.json`. References and prompts use this path, so that the agent can open the file as written.
+
+## References
+
+A reference is one address that the reader attached to a message, with the file and lines it came from. A message has a list of references. The reader adds them as [commenting on the page](web-app#commenting-on-the-page) describes. <Ref to="documents-reference" /> shows a reference.
+
+<Listing id="documents-reference" caption="A reference, in src/protocol.ts.">
+<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface Reference {" />
+</Listing>
+
+`kind` says what the reader attached, and `address` names it. `source` is the page file or external file, relative to the project, and `startLine` and `endLine` are the lines in it. The page compiler records which lines every block came from (see [source marks](page-compiler#outline-and-source-marks)), and the web app copies them into the reference. If the file has changed since, the address and its words tell the agent where to look. <Ref to="documents-kinds" /> lists the kinds.
+
+<Table id="documents-kinds" caption="The kinds of reference.">
+
+| Kind | What the reader attached | Lines |
+|---|---|---|
+| `page` | A page | The `#` heading |
+| `section` | A section | The section |
+| `figure`, `table`, `listing` | A numbered block | The block |
+| `code` | A code block | The code |
+| `text` | Words in one block | The block, or the selected lines of code |
+| `diagram-element` | An element, with the open step | The figure |
+| `file` | An external file | The file |
+| `lines` | Lines of an external file | The lines |
+
+</Table>
+
+The server checks every reference before it stores the message. A page reference must point at a page of the document. A `file` or `lines` reference must point at the file and lines that its address names.
+
+The prompt names each reference by its kind, file, lines, and address, followed by the selected words; see [prompts](agent-library#prompts). It never uses the numbers that the web app shows, such as "Figure 3.1", because they change when a figure is added.
+
+## Addresses in builds
+
+A [build](page-compiler#builds) keeps the same addresses. The website build writes an HTML file for every page and external file, so any static host can serve them.
+
+The single HTML file has no server, so the address goes after `#`: `/server#agent-state` becomes `#/server#agent-state`. A website build opened from disk uses this form too. A browser does not look for a text fragment after a `#`, so in the single file Copy link leaves out the words.
+
+**[Direction](directions):** the single file writes words with `~text=`, as in `#/rest-api#chat~text=log`. Browsers ignore it, and the web app finds the words itself, as Show on page does.
+
+## Where the code is
+
+<Table id="documents-code" caption="The files that implement documents and addresses.">
+
+| File | What it holds |
+|---|---|
+| [`src/document.ts`](/-/files/yapparatus/src/document.ts) | Page list, links, text fragments |
+| [`src/document-directory.ts`](/-/files/yapparatus/src/document-directory.ts) | Document directory check |
+| [`src/files.ts`](/-/files/yapparatus/src/files.ts) | File addresses and lines |
+| [`src/source-files.ts`](/-/files/yapparatus/src/source-files.ts) | Reading external files |
+| [`src/protocol.ts`](/-/files/yapparatus/src/protocol.ts) | The reference |
+| [`src/web/selection.ts`](/-/files/yapparatus/src/web/selection.ts) | References from a selection |
+| [`src/server/chat.ts`](/-/files/yapparatus/src/server/chat.ts) | Reference check |
+
+</Table>
+
+## Sources
+
+- [URL Fragment Text Directives](https://wicg.github.io/scroll-to-text-fragment/)
+- [W3C Web Annotation Data Model](https://www.w3.org/TR/annotation-model/)
+- [Hypothesis](https://web.hypothes.is/help/overview-of-the-hypothesis-system/)
+- [Figma comments](https://help.figma.com/hc/en-us/articles/360041068574-Add-comments-to-files)

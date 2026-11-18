@@ -73,7 +73,7 @@ export class Router {
     return this;
   }
 
-  /** Connect middleware. Only the local reader may call the API. */
+  /** Connect middleware. Only the local web app may call the API. */
   middleware() {
     return (req: IncomingMessage, res: ServerResponse) => {
       const started = Date.now();

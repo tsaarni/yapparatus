@@ -1,4 +1,4 @@
-/** Document model shared by the Vite plugin (Node) and the reader (browser). */
+/** Document model shared by the Vite plugin (Node) and the web app (browser). */
 
 import { type FileAddress, linesLabel, parseFileAddress } from "./files.ts";
 import type { DiagnosticCode } from "./protocol.ts";
@@ -135,7 +135,7 @@ export function numberingOf(settings: DocumentSettings): NumberingSettings {
 
 /** What a page contains, extracted at compile time and exported as `outline`. */
 export interface PageOutline {
-  /** SHA-256 of the page source. */
+  /** SHA-256 of the page source and the files the page reads, from `pageRevision`. */
   revision: string;
   /** Text of the page's single `#` heading. */
   title: string;
@@ -154,8 +154,8 @@ export interface PageOutline {
 
 /* ---------- Addresses ---------- */
 
-/** Separates a figure id from a part inside it in DOM ids and addresses: `system-map--api`. */
-export const partSeparator = "--";
+/** Separates a figure id from an element inside it in DOM ids and addresses: `system-map--api`. */
+export const elementSeparator = "--";
 
 /**
  * The text fragment for selected words, which browsers scroll to and highlight:
@@ -168,7 +168,7 @@ export function textFragment(words: string): string {
   return `:~:text=${encode(list.slice(0, 4).join(" "))},${encode(list.slice(-4).join(" "))}`;
 }
 
-/** An address's parts: "/page#anchor:~:text=start,end" → page, anchor, and the words. */
+/** An address split up: "/page#anchor:~:text=start,end" → page, anchor, and the words. */
 export function splitAddress(address: string): {
   page: string;
   anchor: string;
@@ -226,9 +226,9 @@ export function resolveLink(raw: string, from: string | undefined, ids: string[]
 
 function normalize(path: string) {
   const out: string[] = [];
-  for (const part of path.split("/")) {
-    if (part === "..") out.pop();
-    else if (part && part !== ".") out.push(part);
+  for (const segment of path.split("/")) {
+    if (segment === "..") out.pop();
+    else if (segment && segment !== ".") out.push(segment);
   }
   return out.join("/");
 }
@@ -280,7 +280,7 @@ export function checkLinks(
   const anchorExists = (page: string, fragment: string) => {
     if (!fragment || fragment.startsWith(":~:")) return true;
     const anchors = byId.get(page)?.anchors ?? [];
-    const [base = ""] = fragment.split(partSeparator);
+    const [base = ""] = fragment.split(elementSeparator);
     return anchors.includes(fragment) || anchors.includes(base);
   };
   for (const page of pages) {
@@ -328,8 +328,8 @@ export function checkLinks(
         });
     }
     for (const { to: written, line } of page.outline.refs) {
-      // A diagram part or step is checked by its figure; the diagram checks the rest.
-      const [to = ""] = written.split(partSeparator);
+      // A diagram element or step is checked by its figure; the diagram checks the rest.
+      const [to = ""] = written.split(elementSeparator);
       const [slug = "", fragment = ""] = to.slice(1).split("#");
       const exists = to.startsWith("/")
         ? ids.includes(slug) && anchorExists(slug, fragment)

@@ -17,7 +17,7 @@ import {
   slug,
 } from "./scene.ts";
 
-/** Parts a fragment or a whole sequence holds, for steps that focus it. */
+/** Elements a fragment or a whole sequence holds, for steps that focus it. */
 type Members = Array<Element | Edge | Frame>;
 
 export interface SequenceMessage {
@@ -31,7 +31,7 @@ export interface SequenceMessage {
   /** Default: derived from the label, such as `get-item`. */
   id?: string;
   role?: Role;
-  /** See `category` on shapes: a color shared with the parts of the same category. */
+  /** See `category` on shapes: a color shared with the elements of the same category. */
   category?: string;
 }
 

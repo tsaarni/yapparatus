@@ -19,8 +19,8 @@ const users = d.record([
 ], { title: "users", header: "column\ttype\tkey", mono: true })
 const teams = d.record(["id\tuuid\tPK", "name\ttext"], { title: "teams", header: "column\ttype\tkey", mono: true, category: "New" })
 d.row([orders, users, teams], { gap: 80, align: "start" })
-d.arrow(orders.part("user-id"), users.part("id"))
-d.arrow(users.part("team-id"), teams.part("id"))
+d.arrow(orders.element("user-id"), users.element("id"))
+d.arrow(users.element("team-id"), teams.element("id"))
 ```
 
 - One string per row. Tabs separate the columns, and line up across the record and its `header`.
@@ -41,7 +41,7 @@ const tcp = d.record([
 const flags = d.note("1  CWR and ECE signal congestion")
 const options = d.note("Up to 40 bytes")
 d.place(d.row([flags, options], { gap: 40 }), { below: tcp, gap: 40 })
-d.arrow(options, tcp.part("options-variable-length"))
+d.arrow(options, tcp.element("options-variable-length"))
 ```
 
 - `columns` is the row width in bits; `[label, span]` is a field and its width.
@@ -68,9 +68,9 @@ const ant = d.record(["key: \"ant\"", "next"], { title: "entry", mono: true })
 const cat = d.record(["key: \"cat\"", "next"], { title: "entry", mono: true, category: "Collision" })
 const bee = d.record(["key: \"bee\"", "next"], { title: "entry", mono: true })
 d.place(d.row([ant, cat, bee], { gap: 40, align: "start" }), { below: buckets, gap: 56 })
-d.arrow(buckets.part("2"), ant)
-d.arrow(buckets.part("6"), bee)
-d.arrow(ant.part("next"), cat.part("key-cat"))
+d.arrow(buckets.element("2"), ant)
+d.arrow(buckets.element("6"), bee)
+d.arrow(ant.element("next"), cat.element("key-cat"))
 ```
 
 - An array is a record with one row of `columns` cells. A slot points from its bottom.
@@ -93,8 +93,8 @@ const routing = d.note("Routes to a\nvirtual host")
 const secret = d.note("Never logged")
 d.place(routing, { rightOf: req, gap: 64, align: "start" })
 d.place(secret, { below: routing, gap: 24 })
-d.arrow(routing, req.part("host"))
-d.arrow(secret, req.part("auth"))
+d.arrow(routing, req.element("host"))
+d.arrow(secret, req.element("auth"))
 ```
 
 - A mark is a substring that occurs once, or whole lines: `{ lines: "3" }`, `{ lines: "2-4" }`, counted from 1.
@@ -126,13 +126,13 @@ A header names the columns of a table; a ruler numbers positions. Neither is a c
 
 ### Members
 
-A record's cells and a text's marks are members. A member is a part like any other: edges attach to it, steps focus it, and it takes `role` and `category`.
+A record's cells and a text's marks are members. A member is an element like any other: edges attach to it, steps focus it, and it takes `role` and `category`.
 
-- `shape.part(id)` returns a member by its own id. A wrong id is reported with the valid ones, and the shape stands in.
+- `shape.element(id)` returns a member by its own id. A wrong id is reported with the valid ones, and the shape stands in.
 - A member's id is its parent's, a dot, and its own: `users.team-id`, `req.path`. Its own id comes from its label (a cell's first tab column), from a mark's name, or from `id`.
 - An edge leaves a cell from the middle of a side on the record's outline: the side that a line from the cell's center toward the other end crosses first. A wide field takes its bottom for a note below it, even one off to the side.
 - `<Step focus="users">` focuses the record and its cells; `<Step focus="users.team-id">` focuses one cell and fades the rest.
 
 ### Diagnostics
 
-`CELL_SPAN`, `MARK_UNMATCHED`, `RULER_CROWDED`, and `UNKNOWN_PART`; see [the table](diagrams.md#diagnostics).
+`CELL_SPAN`, `MARK_UNMATCHED`, `RULER_CROWDED`, and `UNKNOWN_ELEMENT`; see [the table](diagrams.md#diagnostics).

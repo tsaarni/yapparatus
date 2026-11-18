@@ -9,11 +9,11 @@ import { files as builtFiles } from "virtual:yapparatus/files";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { type FileAddress, fileAddress, parseFileAddress, parseLines } from "../files.ts";
-import type { ContextItem, SourceFileView } from "../protocol.ts";
+import type { Reference, SourceFileView } from "../protocol.ts";
 import { onFileChanged, readFile } from "./api.ts";
 import { CodeBlock, SourceFileContext } from "./prose.tsx";
 import { fileHref, href } from "./router.ts";
-import { fileContext } from "./selection.ts";
+import { fileReference } from "./selection.ts";
 import {
   TargetActions,
   TargetContext,
@@ -40,12 +40,12 @@ async function load(file: FileAddress): Promise<SourceFileView> {
 export function FileView({
   file,
   fragment,
-  onAsk,
+  onComment,
 }: {
   file: FileAddress;
   fragment: string;
-  /** Add context to the question. Absent outside live mode. */
-  onAsk?: (items: ContextItem[]) => void;
+  /** Add references to the message. Absent outside live mode. */
+  onComment?: (items: Reference[]) => void;
 }) {
   const address = fileAddress(file);
   const [view, setView] = useState<SourceFileView | { error: string }>();
@@ -81,17 +81,17 @@ export function FileView({
   const handlers = useMemo<TargetHandlers>(
     () => ({
       link: () => new URL(fileHref(file), location.href).href,
-      ...(onAsk
+      ...(onComment
         ? {
-            ask: () => {
+            comment: () => {
               const region = document.querySelector<HTMLElement>("main article [data-file]");
-              const item = region && fileContext(region);
-              if (item) onAsk([item]);
+              const item = region && fileReference(region);
+              if (item) onComment([item]);
             },
           }
         : {}),
     }),
-    [file, onAsk],
+    [file, onComment],
   );
   const name = file.path.split("/").at(-1) ?? file.path;
 

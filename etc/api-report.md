@@ -70,30 +70,14 @@ export interface CompiledDiagramProps extends Omit<DiagramProps, "draw"> {
   drawing: CompiledDiagram;
 }
 
-export interface ContextItem {
-  kind: TargetKind;
-  /**
-   * "/page", "/page#id", "/page#figure--part", or for selected words the figure, table, listing,
-   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
-   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
-   */
-  address: string;
-  /** The page's or source file's file, relative to the project folder. */
-  source: string;
-  startLine: number;
-  endLine: number;
-  /** The diagram step the reader had open, with its text: "Step 2 of 5 (miss): …". */
-  step?: string;
-}
-
 export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
 
 export interface Diagnostic {
   code: DiagnosticCode;
   message: string;
-  /** The parts it is about, which also identify it. */
+  /** The elements it is about, which also identify it. */
   ids: string[];
-  /** What it is about when no part is, such as a step's id. */
+  /** What it is about when no element is, such as a step's id. */
   subject?: string;
 }
 
@@ -108,7 +92,7 @@ export class DiagramBuilder {
   readonly owner = new Map<Element, Stack | Placement>();
   readonly sizeGroups: Array<{ members: Node[]; width: boolean; height: boolean }> = [];
   /**
-   * Parts a step focuses together with a container, beyond what it encloses or stacks:
+   * Elements a step focuses together with a container, beyond what it encloses or stacks:
    * a sequence's messages and notes, a fragment's messages.
    */
   readonly groups = new Map<Element | Frame, Array<Element | Edge | Frame>>();
@@ -170,7 +154,7 @@ export class DiagramBuilder {
   }
   /**
    * Cells on a grid under an optional title: a type, a table, a packet header, a register,
-   * an array. Each cell is a member: `rec.part("id")`.
+   * an array. Each cell is a member: `rec.element("id")`.
    */
   record(cells: Cell[], options: RecordOptions = {}): Node {
     const { title = "", ...rest } = options;
@@ -186,7 +170,7 @@ export class DiagramBuilder {
   /**
    * A member's id is its parent's, then its own, such as `users.team-id`. Its own comes from
    * the first tab-separated column of its label, and is unique in the parent. The parent's
-   * part is joined in later, when the parent's id is final.
+   * element is joined in later, when the parent's id is final.
    */
   private member(parent: Node, label: string, options: MemberOptions, place: Place) {
     const { id, pin, ...rest } = options;
@@ -353,7 +337,7 @@ export interface DiagramProps {
   id?: string;
   caption?: string;
   description?: string;
-  /** Hide each part until the first step that focuses it. Needs `<Step>` children. */
+  /** Hide each element until the first step that focuses it. Needs `<Step>` children. */
   build?: boolean;
   /** `<Step>` elements: an explanation of the figure, in order. */
   children?: ReactNode;
@@ -398,7 +382,7 @@ export interface EdgeOptions {
   loop?: Side;
   role?: Role;
   /**
-   * What sets this part apart, in a few words, such as "New" or "To be removed". Parts with
+   * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
@@ -418,7 +402,7 @@ export interface EncloseOptions {
   padding?: number;
   role?: Role;
   /**
-   * What sets this part apart, in a few words, such as "New" or "To be removed". Parts with
+   * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
@@ -501,7 +485,7 @@ export interface NodeOptions {
   sub?: string;
   role?: Role;
   /**
-   * What sets this part apart, in a few words, such as "New" or "To be removed". Parts with
+   * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
@@ -529,7 +513,7 @@ export interface NumberingSettings {
 }
 
 export interface PageOutline {
-  /** SHA-256 of the page source. */
+  /** SHA-256 of the page source and the files the page reads, from `pageRevision`. */
   revision: string;
   /** Text of the page's single `#` heading. */
   title: string;
@@ -564,10 +548,26 @@ export type PlotFunction = (Plot: PlotLibrary, rows: Row[]) => ChartSpec;
 
 export const Ref: ({ to, children }: RefProps) => Element;
 
+export interface Reference {
+  kind: TargetKind;
+  /**
+   * "/page", "/page#id", "/page#figure--element", or for selected words the figure, table, listing,
+   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
+   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
+   */
+  address: string;
+  /** The page's or source file's file, relative to the project folder. */
+  source: string;
+  startLine: number;
+  endLine: number;
+  /** The diagram step the reader had open, with its text: "Step 2 of 5 (miss): …". */
+  step?: string;
+}
+
 export interface RefProps {
   /**
    * A figure, table, or listing id, a heading id on this page, or an address on any page:
-   * "/page" or "/page#id". `figure--part` points at a diagram part or step; it opens that step.
+   * "/page" or "/page#id". `figure--element` points at a diagram element or step; it opens that step.
    */
   to: string;
   /** Link text. Default: "Figure 3.1", "Section 3.2", "Chapter 3", or the caption, heading, or title. */
@@ -612,7 +612,7 @@ export interface SequenceMessage {
   /** Default: derived from the label, such as `get-item`. */
   id?: string;
   role?: Role;
-  /** See `category` on shapes: a color shared with the parts of the same category. */
+  /** See `category` on shapes: a color shared with the elements of the same category. */
   category?: string;
 }
 
@@ -650,12 +650,12 @@ export const Step: { (_props: StepProps): null; diagramStep: boolean; };
 
 export interface StepProps {
   /**
-   * An address for the step: `/page#figure--id`. Unique among the figure's parts and steps.
+   * An address for the step: `/page#figure--id`. Unique among the figure's elements and steps.
    * Plain text: the page compiler checks it.
    */
   id?: string;
   /**
-   * Ids of the parts this step is about, separated by spaces. A container (an enclosure,
+   * Ids of the elements this step is about, separated by spaces. A container (an enclosure,
    * row, column, sequence, or fragment) stands for everything in it. Plain text: the page
    * compiler checks it.
    */
@@ -674,7 +674,7 @@ export type TargetKind =
   | "table"
   | "listing"
   | "code"
-  | "diagram-part"
+  | "diagram-element"
   | "file"
   | "lines";
 
@@ -711,28 +711,12 @@ export interface Chat {
   diagnostics?: ReportedDiagnostic[];
   /**
    * The same read written for an agent. Without the agent header, the text a person gives an
-   * agent to connect; with it, the messages and diagnostics, ending with the snippet to run next.
+   * agent to connect; with it, the messages and diagnostics, ending with the command to run next.
    */
   prompt: string;
 }
 
 export const checkDocument: () => Promise<DocumentDiagnostics>;
-
-export interface ContextItem {
-  kind: TargetKind;
-  /**
-   * "/page", "/page#id", "/page#figure--part", or for selected words the figure, table, listing,
-   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
-   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
-   */
-  address: string;
-  /** The page's or source file's file, relative to the project folder. */
-  source: string;
-  startLine: number;
-  endLine: number;
-  /** The diagram step the reader had open, with its text: "Step 2 of 5 (miss): …". */
-  step?: string;
-}
 
 export interface Diagnostic {
   origin: DiagnosticOrigin;
@@ -745,12 +729,12 @@ export interface Diagnostic {
   /** A figure id, or a reply's message number, inside that source. */
   target?: string;
   /**
-   * What the diagnostic is about, such as a link's target or a diagram's parts. With the code,
+   * What the diagnostic is about, such as a link's target or a diagram's elements. With the code,
    * source, and target it identifies the diagnostic, so its message may change wording.
    * Without it, the message identifies it.
    */
   subject?: string;
-  /** Diagram part ids involved. */
+  /** Diagram element ids involved. */
   elements?: string[];
 }
 
@@ -766,8 +750,24 @@ export interface ReaderMessage {
   seq: number;
   author: "reader";
   text: string;
-  context: ContextItem[];
+  references: Reference[];
   createdAt: string;
+}
+
+export interface Reference {
+  kind: TargetKind;
+  /**
+   * "/page", "/page#id", "/page#figure--element", or for selected words the figure, table, listing,
+   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
+   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
+   */
+  address: string;
+  /** The page's or source file's file, relative to the project folder. */
+  source: string;
+  startLine: number;
+  endLine: number;
+  /** The diagram step the reader had open, with its text: "Step 2 of 5 (miss): …". */
+  step?: string;
 }
 
 export interface ReportedDiagnostic extends Diagnostic {

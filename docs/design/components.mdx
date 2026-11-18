@@ -1,65 +1,52 @@
 # Components
 
-This page lists everything a page or a chat reply can contain and shows an example of each item. For each item, it says where its code is, whether it is numbered, what the reader can link to or ask about, and what the compiler checks. How authors write each component is in the authoring reference, [`starter/docs/components.md`](/-/files/yapparatus/starter/docs/components.md).
+This page describes how the web app renders the built-in components, with a live example of each. How authors write them is in [the authoring reference](/-/files/yapparatus/starter/docs/components.md).
 
-## List of components
+## Overview
 
-<Ref to="component-inventory" /> lists the components. "Ask" means the item has Ask buttons, and "Link" means it also has a Link button. Every item can also be asked about by selecting its text.
+Pages and replies use the built-in components without imports, because [the registry](/-/files/yapparatus/src/web/registry.ts) passes them to every page. <Ref to="components-inventory" /> lists them with the counter that numbers them and the buttons they show. <Ref to="components-file-tree" /> shows where their code is.
 
-<Table id="component-inventory" caption="Everything a page can contain, and how it is numbered and checked.">
+<Table id="components-inventory" caption="The built-in components.">
 
-| Component | Written as | Numbered | Buttons | Checks | Code |
-|---|---|---|---|---|---|
-| Page title | `#` | Chapter | Link, Ask | One per page | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
-| Section | `##`, `###` | Section | Link, Ask | `HEADING_DEPTH`, `DUPLICATE_ID` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
-| Prose | Markdown | No | None | `BROKEN_LINK` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
-| Markdown table | GFM table | No | None | None | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
-| Code block | Fenced block | No | Ask | `CODE_LANGUAGE` | [`prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
-| Code marks | `[!code ++]` comment | No | None | None | [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
-| Alert | `> [!NOTE]` | No | None | `ALERT_TYPE` | [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
-| `Figure` | Tag | Figure | Link, Ask | `FIGURE_NESTED`, `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Table` | Tag around a table | Table | Link, Ask | `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Listing` | Tag around code | Listing | Link, Ask | `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Excerpt` | Tag with `from` | No | Ask | `EXCERPT_TEXT`, `EXCERPT_INVALID`, `BROKEN_LINK` | [`code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts), [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Diagram`, `Step` | Tag with `draw` | Figure | Link, Ask, per part | Diagram codes | `src/diagram/`, [`diagram-plugin.ts`](/-/files/yapparatus/src/diagram-plugin.ts) |
-| `Chart` | Tag with `plot`, around a block of CSV, or with `from` naming a table or file | Figure | Link, Ask | `CHART_PLOT`, `CHART_DATA`, and chart codes | `src/chart/`, [`chart-plugin.ts`](/-/files/yapparatus/src/chart-plugin.ts) |
-| `Ref` | Tag | No | None | `BROKEN_REF` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Icon` | Tag | No | None | Unknown names | [`icons.tsx`](/-/files/yapparatus/src/reader/icons.tsx) |
-| `FileTree` | Tag around a list | No | None | `FILE_TREE_INVALID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Tabs`, `Panel` | Tag around panels | No | None | `PANEL_CONTENT`, `PANEL_LABEL`, `PANEL_NESTED` | [`alternatives.tsx`](/-/files/yapparatus/src/reader/alternatives.tsx), [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
-| `Columns`, `Panel` | Tag around panels | In a `Listing` or `Figure` | None | `PANEL_CONTENT`, `PANEL_LABEL`, `PANEL_NESTED`, `TOO_MANY_COLUMNS` | [`alternatives.tsx`](/-/files/yapparatus/src/reader/alternatives.tsx), [`markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
+| Component | Numbered | Buttons |
+|---|---|---|
+| Page title `#` | Chapter | Comment |
+| Sections `##`, `###` | Section | Link, Comment |
+| Markdown text and tables | No | None |
+| Alerts | No | None |
+| Code blocks | No | Comment |
+| `Figure` | Figure | Link, Comment |
+| `Table`, `Listing` | Table, Listing | Link, Comment |
+| `Excerpt` | No | Comment |
+| `Diagram`, `Step` | Figure | Link, Comment, each element |
+| `Chart` | Figure | Link, Comment |
+| `Ref` | No | None |
+| `Icon` | No | None |
+| `FileTree` | No | None |
+| `Tabs`, `Columns`, `Panel` | No | None |
 
 </Table>
 
-1. **Every component also works in chat replies,** without imports and with the same line length as the page. In a reply, nothing is numbered and there are no Link or Ask buttons, because a reply is not part of the document.
-2. **A failed check is reported by its code.** Each code in the Checks column is an error in the registry, except some diagram and chart codes, which are warnings. The server reports each problem with its file and line. It refuses a reply that contains an error. See [diagnostics](diagnostics#codes-and-severity).
-3. **A selection gives more precise context than the buttons.** A selection in a list item or a table row points at that line. See [asking about the page](reader-app#asking-about-the-page).
+The Link button copies the item's address and needs an `id`. The Comment button exists only in dev mode; see [commenting on the page](web-app#commenting-on-the-page). In a [reply](page-compiler#replies), nothing is numbered and no buttons are shown.
+
+The [page compiler](page-compiler#markdown-conventions) does all parsing: it highlights code, reads excerpts, file trees, and panels, compiles diagrams, and checks chart data. The components only render the result.
 
 ## Text and Markdown
 
-Headings, paragraphs, lists, links, emphasis, inline code, images, quotations, rules, and tables are ordinary Markdown. [`src/reader/prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) gives each one its style.
+Headings, paragraphs, lists, links, quotations, and tables are ordinary Markdown with their own styles. Headings show their [numbers](web-app#numbering-and-references), and the first paragraph after the title is set larger. A link to another site opens in a new tab. A quotation without an alert marker stays a quotation:
 
-- **Headings** use `##` and `###` only. Both levels are numbered and listed in the contents. A deeper level is an error (`HEADING_DEPTH`).
-- **Links** are checked. A link to a page or anchor that does not exist is an error.
-- **Tables** align text to the left and numbers to the right. Numbers use tabular figures, which all have the same width. Each header is aligned like its column. With this alignment, the reader can compare values down a column. Long cells keep a readable width. Wrap a table in `Table` to give it a number and a caption.
-
-> A quotation without a marker is an ordinary quotation, like this one.
+> A quotation looks like this.
 
 ## Alerts
 
-> [!NOTE]
-> A note adds something the reader may want to know.
+The page compiler turns a quotation that starts with a marker such as `[!TIP]` into an alert. The web app draws it with an icon, a title, and the kind's color.
 
-> [!WARNING]
-> A warning is for a step that can lose data or break something.
-
-An alert is a blockquote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, or `[!CAUTION]`. The compiler removes the marker and passes the kind to the reader app, which draws the icon, the title, and the color. Any other marker is an error. The syntax is the same as on GitHub, which agents already know. Replies need no extra component. An alert is one or two sentences.
+> [!TIP]
+> A tip suggests a better way to do something.
 
 ## Code
 
-Shiki, the highlighter, highlights a fenced code block at build time with the theme colors. The lines of the block do not wrap. The block names a language that Shiki knows, or `text`. Shiki loads a language when a block first uses it.
-
-Code marks show what changed in a block:
+Code blocks, excerpts, and the file view share one component. Its bar shows the language, or for an excerpt a link to the file, and a Copy button. Marked lines get a background and a sign in the gutter. Copy leaves out removed lines, so it copies the code after the change:
 
 ```ts
 const retry = {
@@ -69,162 +56,193 @@ const retry = {
 };
 ```
 
-The marks are comments at the end of a line. The compiler removes them before highlighting. They show what changed without a second copy of the code. The Copy button copies the code after the change.
+An excerpt shows the line numbers of its file outside the text, so a selection or a copy takes only the code. With `wrap`, a long line breaks under its own text. A `Table` or `Listing` shows its title above its content, as <Ref to="components-excerpt" /> does.
 
-**The compiler does not check line length.** Code written for a document should stay within 100 columns, so it fits the breakout track without scrolling. Code copied from a source keeps its formatting, so the reader can compare it with the original.
-
-**Highlighted code has one form.** The compiler turns every code block, excerpt, and whole file into a `HighlightedCode` object, and one reader component, `CodeBlock`, draws it. The object lists each token style once and gives each line as pairs of a style number and a text. Code as a hast tree, the highlighter's own output, takes about 19 times the size of its source; as pairs, it takes under twice the size. A page's code carries the object as a JSON string, which the browser parses faster than code that builds the same object.
-
-<Listing id="highlighted-code" caption="Highlighted code, as code blocks, excerpts, and the file view carry it.">
-<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface HighlightedCode {" />
+<Listing id="components-excerpt" caption="The registry of built-in components, as an excerpt with one marked line.">
+<Excerpt from="/-/files/yapparatus/src/web/registry.ts" start="export const components =" mark="Excerpt" />
 </Listing>
 
-`Excerpt` shows lines of an external file in the same kind of block, with the file's line numbers and a link to the file. See [external files](rendering#external-files). `Listing` gives a block a number and a caption, as in <Ref to="listing-example" />. This listing shows the current content of this repository's [registry](/-/files/yapparatus/src/reader/registry.ts).
+## Figures
 
-<Listing id="listing-example" caption="The registry: the components pages and replies use without imports.">
-<Excerpt from="/-/files/yapparatus/src/reader/registry.ts" start="export const components =" mark="Excerpt" />
-</Listing>
+A figure has a frame, a scroll area, and a caption below that starts with its label, such as "Figure 11.1", and ends with its buttons. Diagrams and charts use the same frame. A figure wider than the page scrolls sideways, also with the keyboard. Its accessible name is its `description`, or else its caption. A diagram, chart, or file tree inside a `Figure` draws no frame of its own. <Ref to="components-figure" /> frames three icons.
 
-## Figures, diagrams, and charts
-
-`Figure` puts a frame around any content, usually an image, and adds a number and a caption below it. A figure is at least as wide as the text. The content is centered, and the caption has the same line length as the text. <Ref to="figure-example" /> frames three icons.
-
-<Figure id="figure-example" caption="A figure that frames icons." description="Three icons in a row: a database, a gateway, and a battery">
+<Figure id="components-figure" caption="A figure that frames three icons." description="Three icons in a row: a database, a gateway, and a battery">
   <Icon name="lucide:database" size={32} label="Database" /> <Icon name="local:gateway" size={32} label="Gateway" /> <Icon name="energy-icons:battery-bolt-20" size={32} label="Battery" />
 </Figure>
 
-`Diagram` draws a figure from a short program and numbers it like a `Figure`. Every part has an address that the reader can link to and ask about. `Step` children explain the figure in order. <Ref to="diagram-example" /> has two steps. [Diagrams](diagrams) describes the compiler.
+## Diagram
 
-<Diagram id="diagram-example" caption="A diagram with two steps." draw={(d) => {
-  const page = d.box("Page")
-  const reader = d.actor("Reader")
-  d.row([reader, page])
-  d.arrow(reader, page, "reads")
+The web app draws the [compiled diagram](diagram-compiler#the-compiled-diagram) as SVG, with the same shapes as the [picture](diagram-compiler#pictures). Under the drawing are the legend, the step controls, and in dev mode the diagnostics. While a diagram has errors, the web app shows its last good drawing faded above them.
+
+Every element has an address, `figure--element`. In dev mode, a click on an element adds it to the message box.
+
+### Steps
+
+A step focuses some elements, fades the others, and shows a short text under the caption. <Ref to="components-steps" /> has three steps, adds its elements step by step, and has a note that only the second step shows.
+
+<Diagram id="components-steps" caption="A cached read, with three steps." build draw={(d) => {
+  const client = d.box("Client")
+  const api = d.box("API", { role: "accent" })
+  const cache = d.cylinder("Cache")
+  const db = d.cylinder("Database")
+  d.equalSize([client, api, cache, db])
+  d.row([client, api, cache])
+  d.place(db, { below: cache })
+  d.arrow(client, api, "request")
+  d.arrow(api, cache, "lookup")
+  d.arrow(cache, db, { id: "miss", label: "miss" })
+  const hit = d.note("Most reads stop here", { id: "hit-note", stepOnly: true })
+  d.place(hit, { below: api, gap: 48 })
 }}>
-  <Step focus="reader">The reader opens the document.</Step>
-  <Step focus="page reader->page">The reader reads the page.</Step>
+  <Step focus="client api client->api">The client sends a request to the API.</Step>
+  <Step id="lookup" focus="cache api->cache hit-note">The API first looks in the cache.</Step>
+  <Step focus="database miss">On a miss, the cache reads the database.</Step>
 </Diagram>
 
-`Chart` draws data with Observable Plot and numbers it like a `Figure`. Its data is a `Table` on the page, a block of CSV inside it, or a file. <Ref to="chart-example" /> draws a few rows written in the page. [Charts](charts) describes how it works.
+A focused element has a heavier line. With `build`, an element stays hidden until the first step that focuses it. A step-only element, such as the note, appears only in its steps. Focusing a container or a category focuses its elements. The layout is the same in every step.
 
-<Chart id="chart-example" caption="Lines of code in the largest components." plot={(Plot, rows) => ({
-  marks: [Plot.barY(rows, { x: "Component", y: "Lines" }), Plot.ruleY([0])],
+### Interaction
+
+The step controls are previous and next buttons, a counter such as "Step 2 of 3", and Show all, which closes the step. The arrow keys also step, and Escape closes the step. A click on an element, in any mode, opens the next step that focuses it.
+
+An address can open a step: [/components#components-steps--lookup](/components#components-steps--lookup) opens the step `lookup`, and an element's address opens the first step that focuses it. In a figure that scrolls sideways, opening a step scrolls the focused elements into view.
+
+### Roles and categories
+
+An element's color comes from its role or its category, which the [diagram compiler](diagram-compiler#roles-and-categories) assigns. <Ref to="components-roles" /> shows every role and two categories.
+
+<Diagram id="components-roles" caption="Roles and categories as the web app draws them." description="A small system with the accent, warning, muted, and external roles, and the categories New and To be removed" draw={(d) => {
+  const client = d.actor("Browser", { role: "external" })
+  const api = d.box("API", { role: "accent" })
+  const cache = d.cylinder("Cache", { category: "New" })
+  const search = d.box("Search", { category: "New" })
+  const batch = d.box("Batch job", { category: "To be removed", role: "warning" })
+  const logs = d.cylinder("Logs", { role: "muted" })
+  d.equalSize([api, search, batch])
+  d.row([client, api, cache], { gap: 104 })
+  d.place(search, { below: api, gap: 64 })
+  d.place(batch, { below: cache, gap: 64 })
+  d.place(logs, { below: client, gap: 64 })
+  d.arrow(client, api, "request")
+  d.arrow(api, cache, "lookup")
+  d.arrow(api, search, "query")
+  d.arrow(batch, cache, { label: "refills", dashed: true })
+  d.arrow(client, logs, { label: "logs", role: "muted" })
+}}>
+  <Step focus="api">`accent` draws the element in the accent color with a heavier outline.</Step>
+  <Step focus="batch-job">`warning` draws it in the warning color with a badge.</Step>
+  <Step focus="browser logs">`external` draws a dashed outline. `muted` draws a thin line and a muted label.</Step>
+  <Step focus="new to-be-removed">A category replaces the color and keeps the role's weight, badge, and dashes. The legend names each category.</Step>
+</Diagram>
+
+A role sets the line color, fill, label color, and line weight that every kind of element reads, so a role looks the same on a box, an arrow, and an enclosure. A category sets only the colors, from the theme's four category colors. Focus and pointing add line weight, so weight shows state and color shows meaning.
+
+Pointing at a legend entry highlights its category's elements as a step does. In dev mode, an element that a warning names gets a dotted outline.
+
+### Accessibility and print
+
+To assistive technology, a diagram with clickable elements is a group of them, and another diagram is an image. Each element's accessible name is its label. A screen reader reads each step's text when the step opens. Fading and scrolling follow the reader's reduced motion setting.
+
+Print shows the plain figure without step-only elements, and prints the text of every step as a numbered list under the caption.
+
+## Chart
+
+The web app loads Observable Plot with the first chart on a page and calls the author's `plot` with the checked rows and the chart's width. Only the browser draws a chart, so it reports a chart's problems to the server; see [charts](charts). <Ref to="components-chart" /> shows the line counts of four files of the web app.
+
+<Chart id="components-chart" caption="Lines of code in four files of the web app." plot={(Plot, rows) => ({
+  marks: [Plot.barY(rows, { x: "Module", y: "Lines" }), Plot.ruleY([0])],
 })}>
 
 ```csv
-Component,Lines
-Diagram,1409
-Chat,1050
-App,962
-Prose,754
+Module,Lines
+Chat.tsx,1099
+App.tsx,1007
+prose.tsx,885
+components.tsx,495
 ```
 
 </Chart>
 
 ## References and icons
 
-`Ref` links to a numbered item or a section and shows its current number. For example, <Ref to="alerts" /> describes alerts. A `Ref` to an id that does not exist is an error.
+A `Ref` shows the current label of its target, such as <Ref to="components-inventory" />, from the targets that [numbering](web-app#numbering-and-references) collects. An unresolved `Ref` shows its text in the style for missing targets.
 
-`Icon` shows an icon from an installed collection or from `icons/`, such as <Icon name="lucide:folder" label="Folder" />. The name is a literal string. The compiler turns it into an import of that one icon. An unknown name is an error.
+The page compiler turns each `Icon` into an import of its one SVG file; see [icons](page-compiler#icons). Without `label`, an icon is hidden from assistive technology: <Icon name="lucide:folder" label="Folder" />.
 
 ## File trees
 
-`FileTree` shows a directory layout. <Ref to="file-tree-source" /> shows the source of a tree beside the tree it draws. This tree shows where the components are.
+The page compiler reads the Markdown list inside a `FileTree` into entries. The web app shows them as nested lists with a folder or file icon, the name, and the comment, as <Ref to="components-file-tree" /> does.
 
-<Listing id="file-tree-source" caption="A file tree is written as a Markdown list.">
-
-<Columns>
-<Panel label="Source">
-
-```mdx
+<Figure id="components-file-tree" caption="Where the built-in components are.">
 <FileTree>
 
 - src/
-  - markdown-plugin.ts reads alerts and file trees
-  - reader/
-    - **components.tsx** draws figures, tables, and file trees
-    - prose.tsx
-  - …
+  - web/
+    - prose.tsx Markdown elements, alerts, code
+    - **components.tsx** figures, tables, listings, excerpts, file trees
+    - alternatives.tsx tabs and columns
+    - icons.tsx
+    - registry.ts
+  - diagram/
+    - Diagram.tsx
+    - …
+  - chart/
+    - Chart.tsx
 
 </FileTree>
-```
-
-</Panel>
-<Panel label="Result">
-
-<FileTree>
-
-- src/
-  - markdown-plugin.ts reads alerts and file trees
-  - reader/
-    - **components.tsx** draws figures, tables, and file trees
-    - prose.tsx
-  - …
-
-</FileTree>
-
-</Panel>
-</Columns>
-
-</Listing>
-
-The compiler reads the list into entries and passes them to the component. The source remains a readable list. A `FileTree` without a list is an error. A tree can be placed in a `Figure` to give it a number, as in [the code](architecture#where-the-code-is). The tree then draws no frame of its own. Only the figure's frame is shown.
+</Figure>
 
 ## Tabs and columns
 
-`Tabs` and `Columns` both hold labelled `Panel`s. Tabs show one panel at a time. The reader picks the panel that applies, such as the form in which a document is read. Columns show every panel side by side, so that the reader can compare them, such as an old and a new design. <Ref to="file-tree-source" /> uses columns to show a source beside its result.
+The page compiler passes the labels of the panels to their container, and each `Panel` renders as a tab panel or a column depending on its container.
+
+`Tabs` follows the WAI-ARIA tabs pattern for the keyboard. The browser stores the reader's recent choices, and every tab set shows the most recent one it has, so a choice changes every set with that label, on every page and on the next visit. Find in page reveals a hidden panel in that set only. Print shows every panel.
 
 <Tabs>
-<Panel label="Live">
+<Panel label="Dev mode">
 
 ```sh
-pnpm dev content        # the reader and the chat, on a local server
+pnpm dev content
 ```
 
 </Panel>
 <Panel label="Website">
 
 ```sh
-pnpm build content      # dist/content/: a static site
-```
-
-</Panel>
-<Panel label="Single file">
-
-```sh
-pnpm build:single content  # dist-single/content/index.html: one offline file
+pnpm build content
 ```
 
 </Panel>
 </Tabs>
 
-1. **Both containers take the same panels.** An author changes tabs into columns by renaming the outer tag. A reader cannot compare hidden panels, so content to compare belongs in columns.
-2. **A tab choice applies to every tab set with the same label.** Choosing a tab selects the tab with the same label in every set, on every page. The browser keeps the choice for the next visit. The reader app matches sets by their labels and uses no group key, so authors have no key to choose or forget. Unrelated sets with the same labels also change together. This is another reason to put a before and an after in columns.
-3. **Find in page and print reach hidden panels.** Each hidden panel has `hidden="until-found"`. Find in page reveals the panel and selects its tab in that set only, without changing the reader's choice. Print shows every panel under its label. The tabs follow the WAI-ARIA tabs pattern: the arrow keys, Home, and End move between tabs.
-4. **A container is numbered by the figure or listing around it.** Columns alone are not numbered. Code side by side goes in a `Listing`, and drawings side by side go in a `Figure`. The container then takes the full width. A diagram or chart inside a figure is part of it and draws no frame. The compiler reports an `id` or `caption` on it as `FIGURE_NESTED`.
-5. **Columns end at the same height.** The last block of each column fills the column's height, so code blocks side by side end together. Up to three columns fit. On a narrow page they stack.
-6. **The compiler reads the panels.** It passes their labels to the container, so the container does not inspect its children. It reports these problems:
-   - Content outside a panel, or fewer than two panels: `PANEL_CONTENT`.
-   - A missing or repeated label: `PANEL_LABEL`.
-   - A panel outside a container, or a container inside a panel: `PANEL_NESTED`.
-   - More than three columns: `TOO_MANY_COLUMNS`.
+`Columns` shows the panels side by side, and stacks them on a narrow page. The last block of each column fills its height, so code side by side ends at the same line.
 
 ## Custom components
 
-A document can import its own React components from `.tsx` files. These components work in that document's pages and use the exported theme. The color samples in [styling](styling#color) are a custom component of this document. Custom components are not available in chat replies, because a reply has no imports. A custom component cannot hold a `Diagram`, because the page compiler compiles only the diagrams written in a page or a reply. See [styling](styling).
+A document can import its own React components from `.tsx` files next to its pages. It styles itself with StyleX and the tokens from `yapparatus/theme.stylex`, as [the color swatch](/-/files/yapparatus/docs/design/swatch.tsx) in [color](styling#color) does. Replies have no imports, so they cannot use custom components. A `Diagram` inside a custom component fails, because the page compiler compiles only diagrams written in a page or a reply.
 
 ## Adding a component
 
-Add a new built-in component in all of these places, in one change:
+A new built-in component is added in one change, in these places:
 
-1. [`src/reader/registry.ts`](/-/files/yapparatus/src/reader/registry.ts), so pages and replies can use it without an import.
-2. `pageComponents` in [`src/document.ts`](/-/files/yapparatus/src/document.ts), so the reply check accepts it.
-3. The component list in [`src/server/prompt.ts`](/-/files/yapparatus/src/server/prompt.ts), which the agent reads.
+1. [The registry](/-/files/yapparatus/src/web/registry.ts), so pages and replies can use it without an import.
+2. [The list of page components](/-/files/yapparatus/src/document.ts#L65-L80) that the reply check accepts.
+3. The component list in [the start prompt](/-/files/yapparatus/src/server/prompt.ts).
 4. The authoring guide and [`starter/docs/components.md`](/-/files/yapparatus/starter/docs/components.md).
-5. This page: a row in <Ref to="component-inventory" /> and an example.
+5. This page: a row in <Ref to="components-inventory" />, a section, and a live example.
 
-**Structured content is written as Markdown.** For a component such as `FileTree`, the author writes Markdown, and the compiler turns it into props. Agents write Markdown reliably, and the compiler can check it.
+A component that takes structured content gets a stage of the page compiler that reads it from Markdown, as `FileTree` has, because agents write Markdown reliably and the compiler can check it. A component that declares itself wide may use the breakout track; see [page layout](web-app#page-layout).
+
+## Design decisions
+
+Authors give an element a role or a category, and the theme picks the color. A color chosen by the author would break in the light theme, in print, and with forced colors.
+
+A step changes only emphasis and visibility, because elements that moved between steps would make the reader lose track of them.
+
+Tab sets are linked by their labels, so authors have no group key to choose or forget. Unrelated sets with the same labels then change together, which is one reason content to compare goes in columns.
 
 ## Sources
 
-Tables: [Material data tables](https://material.io/components/data-tables), [Matthew Ström](https://matthewstrom.com/writing/tables). Tabs: [WAI-ARIA tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/), [Nielsen Norman Group](https://www.nngroup.com/articles/tabs-used-right/), and the linked tabs of [MkDocs Material](https://squidfunk.github.io/mkdocs-material/reference/content-tabs/).
+- Tabs: [WAI-ARIA tabs pattern](https://www.w3.org/WAI/ARIA/apg/patterns/tabs/), [Nielsen Norman Group](https://www.nngroup.com/articles/tabs-used-right/), the linked tabs of [MkDocs Material](https://squidfunk.github.io/mkdocs-material/reference/content-tabs/).
+- Tables: [Material data tables](https://material.io/components/data-tables), [Matthew Ström](https://matthewstrom.com/writing/tables).
+- Steps and words next to the drawing: Richard E. Mayer, *Multimedia Learning*.

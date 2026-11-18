@@ -13,20 +13,20 @@ import {
   useId,
   useState,
 } from "react";
-import { partSeparator } from "../document.ts";
-import { FigureFrame } from "../reader/components.tsx";
-import { AppIcon } from "../reader/icons.tsx";
-import { useScopedId } from "../reader/prose.tsx";
-import { useRoute } from "../reader/router.ts";
-import { fontSize, lineHeight, sizes, space, theme, when } from "../reader/theme.stylex.ts";
-import { Button, styled } from "../reader/ui.tsx";
+import { elementSeparator } from "../document.ts";
+import { FigureFrame } from "../web/components.tsx";
+import { AppIcon } from "../web/icons.tsx";
+import { useScopedId } from "../web/prose.tsx";
+import { useRoute } from "../web/router.ts";
+import { fontSize, lineHeight, sizes, space, theme, when } from "../web/theme.stylex.ts";
+import { Button, styled } from "../web/ui.tsx";
 import {
   type CompiledDiagram,
+  type ElementState,
+  elementState,
   expand,
-  type PartState,
-  partState,
   type StepView,
-  stepOnlyParts,
+  stepOnlyElements,
 } from "./compiled.ts";
 import { Diagnostics } from "./Diagnostics.tsx";
 import { DiagramView } from "./DiagramView.tsx";
@@ -47,7 +47,7 @@ export interface DiagramProps {
   id?: string;
   caption?: string;
   description?: string;
-  /** Hide each part until the first step that focuses it. Needs `<Step>` children. */
+  /** Hide each element until the first step that focuses it. Needs `<Step>` children. */
   build?: boolean;
   /** `<Step>` elements: an explanation of the figure, in order. */
   children?: ReactNode;
@@ -63,12 +63,12 @@ export interface CompiledDiagramProps extends Omit<DiagramProps, "draw"> {
 
 export interface StepProps {
   /**
-   * An address for the step: `/page#figure--id`. Unique among the figure's parts and steps.
+   * An address for the step: `/page#figure--id`. Unique among the figure's elements and steps.
    * Plain text: the page compiler checks it.
    */
   id?: string;
   /**
-   * Ids of the parts this step is about, separated by spaces. A container (an enclosure,
+   * Ids of the elements this step is about, separated by spaces. A container (an enclosure,
    * row, column, sequence, or fragment) stands for everything in it. Plain text: the page
    * compiler checks it.
    */
@@ -88,8 +88,8 @@ interface StepItem {
   id?: string;
   /** The ids as written. */
   focus: string[];
-  /** The focused parts, with containers expanded to their contents. */
-  parts: Set<string>;
+  /** The focused elements, with containers expanded to their contents. */
+  elements: Set<string>;
   content: ReactNode;
 }
 
@@ -120,24 +120,25 @@ export function Diagram({
 
   const steps = collectSteps(children).map((step) => ({
     ...step,
-    parts: expand(step.focus, shown.groups),
+    elements: expand(step.focus, shown.groups),
   }));
-  const stepsOf = (part: string) => steps.flatMap((step, i) => (step.parts.has(part) ? [i] : []));
+  const stepsOf = (element: string) =>
+    steps.flatMap((step, i) => (step.elements.has(element) ? [i] : []));
   const [active, setActive] = useState<number | undefined>(undefined);
-  // Parts a legend entry highlights while the reader points at it or focuses it.
+  // Elements a legend entry highlights while the reader points at it or focuses it.
   const [preview, setPreview] = useState<string[]>();
   const view: StepView = {
-    steps: steps.map((step) => step.parts),
+    steps: steps.map((step) => step.elements),
     active,
     build: build ?? false,
-    stepOnly: stepOnlyParts(shown),
+    stepOnly: stepOnlyElements(shown),
     ...(preview ? { preview } : {}),
   };
-  const stateOf = (part: string): PartState => partState(part, view);
+  const stateOf = (element: string): ElementState => elementState(element, view);
 
-  // A link to a step, or to a part, opens that step, or the first step about the part.
+  // A link to a step, or to an element, opens that step, or the first step about the element.
   const route = useRoute();
-  const prefix = `${figure}${partSeparator}`;
+  const prefix = `${figure}${elementSeparator}`;
   const fragment =
     figure && route.fragment.startsWith(prefix) ? route.fragment.slice(prefix.length) : "";
   const byId = steps.findIndex((step) => step.id === fragment);
@@ -149,7 +150,7 @@ export function Diagram({
     if (byId >= 0 && figure) document.getElementById(figure)?.scrollIntoView({ block: "center" });
   }, [route, linked, byId, figure]);
 
-  // In a figure that scrolls sideways, bring the focused parts into view.
+  // In a figure that scrolls sideways, bring the focused elements into view.
   useEffect(() => {
     if (active !== undefined) revealFocused(marker);
   }, [active, marker]);
@@ -157,13 +158,13 @@ export function Diagram({
   const diagnostics = drawing.diagnostics;
 
   const label = caption ?? "Diagram";
-  const partOf = (target: EventTarget) =>
+  const elementOf = (target: EventTarget) =>
     target instanceof Element
       ? target.closest<SVGElement>("[data-element-id]")?.dataset.elementId
       : undefined;
-  // Clicking a part again moves on to the next step about it, so a reader can follow its arc.
-  const openPart = (part: string | undefined) => {
-    const about = part === undefined ? [] : stepsOf(part);
+  // Clicking an element again moves on to the next step about it, so a reader can follow its arc.
+  const openElement = (element: string | undefined) => {
+    const about = element === undefined ? [] : stepsOf(element);
     const next = about.find((i) => active === undefined || i > active) ?? about[0];
     if (next !== undefined) setActive(next);
   };
@@ -174,7 +175,8 @@ export function Diagram({
     if (event.key === "Escape" && active !== undefined) go(undefined);
     else if (event.key === "ArrowRight") go(active === undefined ? 0 : active + 1);
     else if (event.key === "ArrowLeft" && active !== undefined) go(active - 1);
-    else if (event.key === "Enter" || event.key === " ") return openPart(partOf(event.target));
+    else if (event.key === "Enter" || event.key === " ")
+      return openElement(elementOf(event.target));
     else return;
     event.preventDefault();
   };
@@ -188,9 +190,9 @@ export function Diagram({
         marker={marker}
         figure={figure}
         stateOf={stateOf}
-        stepped={(part) => stepsOf(part).length > 0}
+        stepped={(element) => stepsOf(element).length > 0}
         {...(steps.length
-          ? { onClick: (event: MouseEvent) => openPart(partOf(event.target)), onKeyDown }
+          ? { onClick: (event: MouseEvent) => openElement(elementOf(event.target)), onKeyDown }
           : {})}
       />
       {shown.legend.length > 0 && <Legend legend={shown.legend} preview={setPreview} />}
@@ -221,7 +223,7 @@ Diagram.breakout = true;
 
 /* ---------- steps ---------- */
 
-function collectSteps(children: ReactNode): Omit<StepItem, "parts">[] {
+function collectSteps(children: ReactNode): Omit<StepItem, "elements">[] {
   return Children.toArray(children).flatMap((child) => {
     if (!isValidElement<StepProps>(child)) return [];
     if (!(child.type as { diagramStep?: boolean }).diagramStep) return [];
@@ -235,7 +237,7 @@ function collectSteps(children: ReactNode): Omit<StepItem, "parts">[] {
   });
 }
 
-/** Scroll a sideways-scrolling figure so its focused parts are visible. */
+/** Scroll a sideways-scrolling figure so its focused elements are visible. */
 function revealFocused(marker: string) {
   const svg = document.querySelector(`svg[data-diagram="${CSS.escape(marker)}"]`);
   const scroller = svg?.closest<HTMLElement>(".figure-scroll");
@@ -268,7 +270,7 @@ function StepControls({
   return (
     <div
       {...styled("diagram-steps", styles.steps)}
-      // Questions about the figure record the step the reader had open.
+      // Comments on the figure record the step the reader had open.
       {...(active === undefined
         ? {}
         : {

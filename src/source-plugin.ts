@@ -31,7 +31,7 @@ function codeMeta(code: Element): string {
 
 /**
  * Tag top-level blocks, list items, and table rows with their file and lines, and give each
- * line of a code block its line in the file. The reader sends these back with a question.
+ * line of a code block its line in the file. The reader sends these back with a message.
  */
 export function sourceContext(getRoot: () => string) {
   return () => (tree: Root, file: { path: string }) => {

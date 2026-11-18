@@ -13,7 +13,7 @@ import {
   splitAddress,
   textFragment,
 } from "../src/document.ts";
-import { acceptContext } from "../src/server/chat.ts";
+import { acceptReferences } from "../src/server/chat.ts";
 import { diagnosticKey } from "../src/server/diagnostics.ts";
 import { messagesPrompt } from "../src/server/prompt.ts";
 import { SourceFiles } from "../src/source-files.ts";
@@ -22,7 +22,7 @@ const page =
   "# Page\n\n## First\n\nOriginal paragraph.\n\n```md\n## not a heading\n```\n\n## Second\n\nMore.\n";
 
 function withWorkspace(run: (root: string) => void) {
-  const root = mkdtempSync(path.join(os.tmpdir(), "yapparatus-context-"));
+  const root = mkdtempSync(path.join(os.tmpdir(), "yapparatus-references-"));
   try {
     mkdirSync(path.join(root, "content"));
     writeFileSync(path.join(root, "content/page.mdx"), page);
@@ -40,9 +40,9 @@ const paragraph = {
   endLine: 5,
 };
 
-test("context is kept as sent, with the lines the reader saw", () => {
+test("references are kept as sent, with the lines the reader saw", () => {
   withWorkspace((root) => {
-    const [item] = acceptContext(root, "content", new SourceFiles(() => root, "content"), [
+    const [item] = acceptReferences(root, "content", new SourceFiles(() => root, "content"), [
       { ...paragraph, snapshot: "dropped" },
     ]);
     assert.ok(item);
@@ -57,13 +57,13 @@ test("context is kept as sent, with the lines the reader saw", () => {
   });
 });
 
-test("the prompt names each item by kind, lines, address, and words", () => {
+test("the prompt names each reference by kind, lines, address, and words", () => {
   const message = {
     seq: 4,
     author: "reader" as const,
     text: "Why?",
     createdAt: "",
-    context: [
+    references: [
       { ...paragraph, kind: "text" as const, address: "/page#first:~:text=Original%20paragraph" },
       {
         ...paragraph,
@@ -75,7 +75,7 @@ test("the prompt names each item by kind, lines, address, and words", () => {
       { ...paragraph, kind: "page" as const, address: "/page" },
       {
         ...paragraph,
-        kind: "diagram-part" as const,
+        kind: "diagram-element" as const,
         address: "/page#flow--api",
         step: "Step 2 of 3 (api): calls",
       },
@@ -87,7 +87,7 @@ test("the prompt names each item by kind, lines, address, and words", () => {
   assert.match(text, /- page, content\/page\.mdx, \/page\n/);
   assert.match(
     text,
-    /- diagram part, content\/page\.mdx:5, \/page#flow--api, open at Step 2 of 3 \(api\): calls/,
+    /- diagram element, content\/page\.mdx:5, \/page#flow--api, open at Step 2 of 3 \(api\): calls/,
   );
 });
 
@@ -95,7 +95,7 @@ test("rejects unknown kinds and files outside the document", () => {
   withWorkspace((root) => {
     assert.throws(
       () =>
-        acceptContext(root, "content", new SourceFiles(() => root, "content"), [
+        acceptReferences(root, "content", new SourceFiles(() => root, "content"), [
           { ...paragraph, kind: "x" },
         ]),
       /Invalid/,
@@ -104,7 +104,7 @@ test("rejects unknown kinds and files outside the document", () => {
     symlinkSync(path.join(root, "outside.mdx"), path.join(root, "content/escape.mdx"));
     assert.throws(
       () =>
-        acceptContext(root, "content", new SourceFiles(() => root, "content"), [
+        acceptReferences(root, "content", new SourceFiles(() => root, "content"), [
           { ...paragraph, source: "content/escape.mdx" },
         ]),
       /document page/,

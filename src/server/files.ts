@@ -1,5 +1,5 @@
 /**
- * Source files for the reader's file view: GET /-/api/files/{directory}/{path} answers with the
+ * Source files for the web app's file view: GET /-/api/files/{directory}/{path} answers with the
  * file highlighted. The server watches each file it served, so an open view can reload it.
  */
 import path from "node:path";

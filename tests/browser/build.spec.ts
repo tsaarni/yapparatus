@@ -77,7 +77,7 @@ test("static reading retains navigation without the chat or its records", async 
   await page.evaluate(() => document.fonts.load('17px "Inter Variable"'));
   expect(await page.evaluate(() => document.fonts.check('17px "Inter Variable"'))).toBe(true);
   await expect(page.getByRole("heading", { name: "First page" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Ask", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Chat", exact: true })).toHaveCount(0);
   await expect(page.getByRole("toolbar", { name: "Selection actions" })).toHaveCount(0);
   await expect(page.locator("figure").first()).toBeVisible();
   await expectCompiledDiagram(page);
@@ -90,6 +90,8 @@ test("static reading retains navigation without the chat or its records", async 
     await expect(page.getByRole("img", { name: label, exact: true })).toBeVisible();
   }
   await expect(page.getByRole("img", { name: "Redis", exact: true })).toHaveCSS("width", "28px");
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Second page" })).toBeVisible();
   for (const entry of readdirSync(path.join(root, "dist/content/-/assets"))) {
     const output = readFileSync(path.join(root, "dist/content/-/assets", entry), "utf8");
     expect(output).not.toContain(privateSentinel);
@@ -115,34 +117,34 @@ test("static reading retains navigation without the chat or its records", async 
   expect(apiRequests).toEqual([]);
 });
 
-test("diagram steps: controls, build reveal, groups, step-only parts, and links", async ({
+test("diagram steps: controls, build reveal, groups, step-only elements, and links", async ({
   page,
 }) => {
   await page.goto("http://127.0.0.1:4174/second-page");
   const figure = page.locator("figure#step-flow");
-  const part = (id: string) => figure.locator(`[data-element-id="${id}"]`);
-  // Without a step, the whole figure shows except step-only parts.
+  const element = (id: string) => figure.locator(`[data-element-id="${id}"]`);
+  // Without a step, the whole figure shows except step-only elements.
   await expect(figure.getByText("3 steps")).toBeVisible();
-  await expect(part("go")).toHaveAttribute("role", "button");
-  await expect(part("finish")).toHaveCSS("opacity", "1");
-  await expect(part("hint")).toHaveCSS("opacity", "0");
+  await expect(element("go")).toHaveAttribute("role", "button");
+  await expect(element("finish")).toHaveCSS("opacity", "1");
+  await expect(element("hint")).toHaveCSS("opacity", "0");
   await figure.getByRole("button", { name: "Start steps" }).click();
   await expect(figure.getByText("Everything begins here.")).toBeVisible();
-  await expect(part("hint")).toHaveCSS("opacity", "1");
-  await expect(part("finish")).toHaveCSS("opacity", "0");
+  await expect(element("hint")).toHaveCSS("opacity", "1");
+  await expect(element("finish")).toHaveCSS("opacity", "0");
   await figure.getByRole("button", { name: "Next step" }).click();
-  await expect(part("hint")).toHaveCSS("opacity", "0");
-  await expect(part("start")).toHaveCSS("opacity", "0.35");
+  await expect(element("hint")).toHaveCSS("opacity", "0");
+  await expect(element("start")).toHaveCSS("opacity", "0.35");
   // A container focuses everything in it.
   await figure.getByRole("button", { name: "Next step" }).click();
-  await expect(part("start")).toHaveAttribute("data-state", "focus");
-  await expect(part("finish")).toHaveAttribute("data-state", "focus");
-  // Clicking a part opens the next step about it, wrapping around.
-  await part("start").click();
+  await expect(element("start")).toHaveAttribute("data-state", "focus");
+  await expect(element("finish")).toHaveAttribute("data-state", "focus");
+  // Clicking an element opens the next step about it, wrapping around.
+  await element("start").click();
   await expect(figure.getByText("Step 1 of 3")).toBeVisible();
   await figure.getByRole("button", { name: "Show all" }).click();
   await expect(figure.getByText("3 steps")).toBeVisible();
-  // Steps and parts have addresses.
+  // Steps and elements have addresses.
   await page.goto("http://127.0.0.1:4174/second-page#step-flow--end");
   await expect(figure.getByText("Then it moves on.")).toBeVisible();
   await page.goto("http://127.0.0.1:4174/second-page#step-flow--hint");

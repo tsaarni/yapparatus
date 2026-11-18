@@ -1,6 +1,6 @@
 /**
- * The picture writer draws a compiled figure as a standalone SVG: every shape the reader draws,
- * step-only parts left out, and the id overlay.
+ * The picture writer draws a compiled figure as a standalone SVG: every shape the web app draws,
+ * step-only elements left out, and the id overlay.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -22,9 +22,9 @@ function draw(figure: Figure, options: PictureOptions = {}) {
   return pictureOf(drawing, options, { measure, outline });
 }
 
-/** The ids of the parts a picture draws. */
-function parts(svg: string): string[] {
-  return [...svg.matchAll(/<g data-part="([^"]+)" data-shape="[^"]+">/g)].map((m) =>
+/** The ids of the elements a picture draws. */
+function elements(svg: string): string[] {
+  return [...svg.matchAll(/<g data-element-id="([^"]+)" data-shape="[^"]+">/g)].map((m) =>
     (m[1] as string).replace(/&gt;/g, ">"),
   );
 }
@@ -140,13 +140,13 @@ const flow: Figure = {
   build: true,
 };
 
-test("every part is drawn plainly, and step-only parts are left out", () => {
+test("every element is drawn plainly, and step-only elements are left out", () => {
   const { svg } = draw(flow);
-  assert.deepEqual(parts(svg).sort(), ["a", "a->b", "b", "b->c", "c"]);
+  assert.deepEqual(elements(svg).sort(), ["a", "a->b", "b", "b->c", "c"]);
   assert.doesNotMatch(svg, /opacity=/);
 });
 
-test("the id overlay labels each part and outlines the parts diagnostics name", () => {
+test("the id overlay labels each element and outlines the elements diagnostics name", () => {
   const overlap: Figure = {
     draw: (d) => {
       const a = d.box("A");
@@ -160,12 +160,12 @@ test("the id overlay labels each part and outlines the parts diagnostics name", 
   assert.doesNotMatch(plain, /data-layer="ids"/);
   const { svg } = draw(overlap, { ids: true });
   const layer = /<g data-layer="ids">(.*?)<\/g>/s.exec(svg)?.[1] ?? "";
-  // One label per part, in the error color: each id's text is drawn.
+  // One label per element, in the error color: each id's text is drawn.
   assert.equal([...layer.matchAll(new RegExp(`fill="${lightColors.error}"`, "g"))].length, 2);
   assert.match(svg, new RegExp(`stroke="${lightColors.warning}"[^>]*stroke-dasharray="2 3"`));
 });
 
-test("text is drawn as outlines from the reader's font files", () => {
+test("text is drawn as outlines from the web app's font files", () => {
   const { measure: fontWidth } = fontMeasure();
   const figure: Figure = { draw: (d) => void d.box("Outline"), steps: [], build: false };
   const drawing = compileFigure(figure, fontWidth);

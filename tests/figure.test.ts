@@ -39,12 +39,12 @@ test("a draw program that throws is DRAW_FAILED", () => {
   assert.deepEqual(out.diagnostics, [{ code: "DRAW_FAILED", message: "boom", ids: [] }]);
 });
 
-test("a step that focuses a missing part names the parts there are", () => {
+test("a step that focuses a missing element names the elements there are", () => {
   const out = compileFigure({ draw: pair, steps: [{ focus: ["a", "c"] }], build: false }, measure);
   assert.deepEqual(out.diagnostics, [
     {
-      code: "UNKNOWN_PART",
-      message: 'Step 1 focuses "c", which is not a part of this diagram. Parts: a, b, a->b.',
+      code: "UNKNOWN_ELEMENT",
+      message: 'Step 1 focuses "c", which is not an element of this diagram. Elements: a, b, a->b.',
       ids: [],
       subject: "c",
     },
@@ -53,7 +53,7 @@ test("a step that focuses a missing part names the parts there are", () => {
   assert.equal(out.ok, true);
 });
 
-test("a step id may not repeat a part id or another step id", () => {
+test("a step id may not repeat an element id or another step id", () => {
   const out = compileFigure(
     {
       draw: pair,
@@ -75,7 +75,7 @@ test("a step id may not repeat a part id or another step id", () => {
   );
 });
 
-test("step-only parts: unused ones and those a step shows on top of each other", () => {
+test("step-only elements: unused ones and those a step shows on top of each other", () => {
   const draw = (d: DiagramBuilder) => {
     const box = d.box("Counter");
     const one = d.note("count = 1", { stepOnly: true, id: "one" });

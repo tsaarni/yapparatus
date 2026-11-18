@@ -266,12 +266,12 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
   assert.ok(frame.title.x >= frame.tab.rect.x + frame.tab.rect.width);
 });
 
-test("record cells are parts; an edge from a row leaves the record's side", () => {
+test("record cells are elements; an edge from a row leaves the record's side", () => {
   const d = new DiagramBuilder();
   const rec = d.record(["seq", "author", "text"], { title: "Message", id: "message" });
   const choice = d.decision("Same page?", { id: "choice" });
   d.row([rec, choice], { gap: 80 });
-  const link = d.arrow(rec.part("text"), choice, { id: "link" });
+  const link = d.arrow(rec.element("text"), choice, { id: "link" });
   const out = compile(d, measure);
   const r = out.nodes.find((n) => n.id === "message")?.rect;
   const cell = out.nodes.find((n) => n.id === "message.text");
@@ -336,7 +336,7 @@ test("member ids follow their record's id, even when it is derived and repeated"
   const a = d.record(["key", "next"], { title: "entry" });
   const b = d.record(["key", "next"], { title: "entry" });
   d.row([a, b]);
-  const link = d.arrow(a.part("next"), b.part("key"));
+  const link = d.arrow(a.element("next"), b.element("key"));
   const untitled = d.record(["x"]);
   d.place(untitled, { below: a });
   const out = compile(d, measure);
@@ -360,9 +360,9 @@ test("member ids follow their record's id, even when it is derived and repeated"
 test("a missing member is reported, and its parent stands in", () => {
   const d = new DiagramBuilder();
   const rec = d.record(["id"], { id: "users" });
-  assert.equal(rec.part("email"), rec);
+  assert.equal(rec.element("email"), rec);
   const out = compile(d, measure);
-  const missing = out.diagnostics.find((x) => x.code === "UNKNOWN_PART");
+  const missing = out.diagnostics.find((x) => x.code === "UNKNOWN_ELEMENT");
   assert.match(missing?.message ?? "", /no member "email"\. Members: id\./);
 });
 
@@ -382,7 +382,7 @@ test("a header row lines up with the cells' tab columns", () => {
   assert.ok(cell.rect.y > (rec.divider ?? 0) + 20, "the header is between title and cells");
 });
 
-test("text marks are parts over their substring; unmatched marks are reported", () => {
+test("text marks are elements over their substring; unmatched marks are reported", () => {
   const d = new DiagramBuilder();
   const t = d.text("GET /users/42 HTTP/1.1\nHost: example.com\nAccept: */*", {
     id: "req",
@@ -402,7 +402,7 @@ test("text marks are parts over their substring; unmatched marks are reported", 
   const width = (s: string) => measure(s, { family: "", size: 0, weight: 0 });
   const path = node("req.path");
   const text = node("req")?.rect;
-  assert.ok(path && text && t.part("path") !== t);
+  assert.ok(path && text && t.element("path") !== t);
   assert.equal(path.rect.x, text.x + width("GET "));
   assert.equal(path.lines[0]?.text, "/users/42");
   const unmatched = out.diagnostics.filter((x) => x.code === "MARK_UNMATCHED");
@@ -532,7 +532,7 @@ test("containers list their members for steps: enclosures, stacks, sequences, fr
   assert.deepEqual(out.groups.outside, ["c"]);
 });
 
-test("step-only parts may share a place without overlap warnings", () => {
+test("step-only elements may share a place without overlap warnings", () => {
   const d = new DiagramBuilder();
   const box = d.box("Counter");
   const one = d.note("count = 1", { stepOnly: true });
@@ -572,7 +572,7 @@ test("categories: colors in order of first use, a legend, and a group for steps"
   assert.equal(node("database")?.category, undefined);
   assert.equal(node("database")?.role, "default");
   assert.deepEqual(
-    out.legend.map((e) => [e.name, e.id, e.slot, e.parts]),
+    out.legend.map((e) => [e.name, e.id, e.slot, e.elements]),
     [
       ["New", "new", 1, ["orders", "orders->database"]],
       ["To be removed", "to-be-removed", 2, ["batch-job"]],
@@ -591,7 +591,7 @@ test("categories: a fifth is reported and drawn without a color", () => {
   assert.equal(out.nodes.find((n) => n.id === "e")?.category, undefined);
 });
 
-test("categories: an id a part already has cannot name a category for steps", () => {
+test("categories: an id an element already has cannot name a category for steps", () => {
   const d = new DiagramBuilder();
   d.box("Cache", { category: "Cache" });
   const out = compile(d, measure);
@@ -599,7 +599,7 @@ test("categories: an id a part already has cannot name a category for steps", ()
   assert.equal(out.groups.cache, undefined);
 });
 
-test("start and end labels sit beside the dot without moving it, and take part in checks", () => {
+test("start and end labels sit beside the dot without moving it, and are checked", () => {
   const d = new DiagramBuilder();
   const start = d.start("Clicked");
   const step = d.box("Step");
@@ -673,7 +673,7 @@ test("an edge leaves a wide cell through the side its line crosses first", () =>
   const note = d.note("Up to 40 bytes", { id: "note" });
   // Far to the right, but below: the line from the cell's center leaves through its bottom.
   d.place(note, { below: rec, gap: 40, align: "end" });
-  d.arrow(note, rec.part("options"));
+  d.arrow(note, rec.element("options"));
   const out = compile(d, measure);
   const cell = out.nodes.find((n) => n.id === "tcp.options")?.rect;
   // The head's first point is its tip, where the edge meets the cell.

@@ -315,8 +315,8 @@ export const layer = stylex.defineConsts({
 });
 
 /**
- * Diagram stroke weights: dividers and quiet parts, ordinary parts, the accent, and the extra
- * weight of a part a step focuses or the reader points at.
+ * Diagram stroke weights: dividers and quiet elements, ordinary elements, the accent, and the extra
+ * weight of an element a step focuses or the reader points at.
  */
 export const stroke = stylex.defineConsts({
   hairline: "1px",

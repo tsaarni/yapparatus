@@ -1,16 +1,16 @@
 /**
- * What every drawn part shares: its state in a step, its role and category colors, its text
+ * What every drawn element shares: its state in a step, its role and category colors, its text
  * lines, and its address as a link and a button.
  */
 import * as stylex from "@stylexjs/stylex";
-import { partSeparator } from "../document.ts";
-import { dash, duration, stroke, theme, when } from "../reader/theme.stylex.ts";
-import type { PartState, TextLine } from "./compiled.ts";
+import { elementSeparator } from "../document.ts";
+import { dash, duration, stroke, theme, when } from "../web/theme.stylex.ts";
+import type { ElementState, TextLine } from "./compiled.ts";
 import type { Role } from "./scene.ts";
 
 /**
- * Diagram parts are targets: a namespaced DOM id (`figure--part`) makes them linkable.
- * Parts are buttons while editing (to ask about them) and when a step explains them.
+ * Diagram elements are targets: a namespaced DOM id (`figure--element`) makes them linkable.
+ * Elements are buttons while editing (to comment on them) and when a step explains them.
  */
 export function interactive(
   id: string,
@@ -19,9 +19,9 @@ export function interactive(
   button: boolean,
 ) {
   return {
-    ...(figure ? { id: `${figure}${partSeparator}${id}` } : {}),
+    ...(figure ? { id: `${figure}${elementSeparator}${id}` } : {}),
     "data-element-id": id,
-    "data-target": "diagram-part",
+    "data-target": "diagram-element",
     "data-title": label,
     "aria-label": label,
     ...(button ? { role: "button", tabIndex: 0 } : {}),
@@ -30,28 +30,28 @@ export function interactive(
 
 export type Target = ReturnType<typeof interactive>;
 
-/** Focused parts are drawn heavier; others fade; parts not yet built are hidden. */
-export function stateStyle(state: PartState): stylex.StyleXStyles | null {
+/** Focused elements are drawn heavier; others fade; elements not yet built are hidden. */
+export function stateStyle(state: ElementState): stylex.StyleXStyles | null {
   return state === "focus"
-    ? (partStyles.focused as stylex.StyleXStyles)
+    ? (elementStyles.focused as stylex.StyleXStyles)
     : state === "dim"
-      ? partStyles.dimmed
+      ? elementStyles.dimmed
       : state === "hidden"
-        ? partStyles.hidden
+        ? elementStyles.hidden
         : state === "absent"
-          ? partStyles.absent
+          ? elementStyles.absent
           : null;
 }
 
-/** Briefly mark a part the reader arrived at: heavier, with the focus ring around it. */
-export function flashPart(element: SVGElement) {
-  const classes = stylex.props(partStyles.arrived).className?.split(" ") ?? [];
+/** Briefly mark an element the reader arrived at: heavier, with the focus ring around it. */
+export function flashElement(element: SVGElement) {
+  const classes = stylex.props(elementStyles.arrived).className?.split(" ") ?? [];
   element.classList.add(...classes);
   window.setTimeout(() => element.classList.remove(...classes), 1800);
 }
 
-/** Hidden parts leave the tab order. The state is also an attribute, for scrolling into view. */
-export function targetFor(target: Target | undefined, state: PartState) {
+/** Hidden elements leave the tab order. The state is also an attribute, for scrolling into view. */
+export function targetFor(target: Target | undefined, state: ElementState) {
   const marked = state ? { "data-state": state } : {};
   if (!target) return marked;
   return state === "hidden" || state === "absent"
@@ -68,11 +68,11 @@ export function Line({ line, halo = false }: { line: TextLine; halo?: boolean })
       fontSize={line.size}
       fontWeight={line.weight}
       {...stylex.props(
-        partStyles.text,
-        line.mono ? partStyles.mono : partStyles.sans,
-        line.align === "start" && partStyles.start,
-        line.muted && partStyles.muted,
-        halo && partStyles.halo,
+        elementStyles.text,
+        line.mono ? elementStyles.mono : elementStyles.sans,
+        line.align === "start" && elementStyles.start,
+        line.muted && elementStyles.muted,
+        halo && elementStyles.halo,
       )}
     >
       {line.text}
@@ -86,19 +86,19 @@ export function Lines({ lines }: { lines: TextLine[] }) {
 }
 
 /**
- * A part's role, the same for shapes, edges, and enclosures: its ink, fill, label color, and
+ * An element's role, the same for shapes, edges, and enclosures: its ink, fill, label color, and
  * stroke weight, as custom properties that the shape and line styles read.
  */
 export function roleStyle(role: Role): stylex.StyleXStyles {
   switch (role) {
     case "accent":
-      return partStyles.roleAccent as stylex.StyleXStyles;
+      return elementStyles.roleAccent as stylex.StyleXStyles;
     case "warning":
-      return partStyles.roleWarning as stylex.StyleXStyles;
+      return elementStyles.roleWarning as stylex.StyleXStyles;
     case "muted":
-      return partStyles.roleMuted as stylex.StyleXStyles;
+      return elementStyles.roleMuted as stylex.StyleXStyles;
     default:
-      return partStyles.roleDefault as stylex.StyleXStyles;
+      return elementStyles.roleDefault as stylex.StyleXStyles;
   }
 }
 
@@ -106,22 +106,22 @@ export function roleStyle(role: Role): stylex.StyleXStyles {
 export function categoryStyle(slot: number | undefined): stylex.StyleXStyles | null {
   switch (slot) {
     case 1:
-      return partStyles.category1 as stylex.StyleXStyles;
+      return elementStyles.category1 as stylex.StyleXStyles;
     case 2:
-      return partStyles.category2 as stylex.StyleXStyles;
+      return elementStyles.category2 as stylex.StyleXStyles;
     case 3:
-      return partStyles.category3 as stylex.StyleXStyles;
+      return elementStyles.category3 as stylex.StyleXStyles;
     case 4:
-      return partStyles.category4 as stylex.StyleXStyles;
+      return elementStyles.category4 as stylex.StyleXStyles;
     default:
       return null;
   }
 }
 
-export const partStyles = stylex.create({
+export const elementStyles = stylex.create({
   /**
-   * Parts that can be pointed at. Hover draws the part heavier, keeping its color; keyboard
-   * focus draws the reader's focus ring, as everywhere else in the app.
+   * Elements that can be pointed at. Hover draws the element heavier, keeping its color; keyboard
+   * focus draws the focus ring, as everywhere else in the web app.
    */
   target: {
     cursor: { default: "inherit", ":is([role=button])": "pointer" },
@@ -135,11 +135,11 @@ export const partStyles = stylex.create({
     transitionProperty: "opacity",
     transitionDuration: duration.slow,
   },
-  /** A part a step is about: heavier, in its own color, while the others fade. */
+  /** An element a step is about: heavier, in its own color, while the others fade. */
   focused: {
     "--boost": stroke.boost,
   },
-  /** A part the reader just arrived at, by a link or Show on page. */
+  /** An element the reader just arrived at, by a link or Show on page. */
   arrived: {
     "--boost": stroke.boost,
     outlineStyle: "solid",
@@ -152,12 +152,12 @@ export const partStyles = stylex.create({
     opacity: { default: 0, [when.print]: 1 },
     pointerEvents: "none",
   },
-  /** Step-only parts outside their steps: gone on screen and in print. */
+  /** Step-only elements outside their steps: gone on screen and in print. */
   absent: {
     opacity: 0,
     pointerEvents: "none",
   },
-  // Roles. Every kind of part reads the same properties, so a role means the same everywhere.
+  // Roles. Every kind of element reads the same properties, so a role means the same everywhere.
   roleDefault: {
     "--ink": theme.borderControl,
     "--fill": theme.surfaceRaised,

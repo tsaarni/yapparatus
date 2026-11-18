@@ -18,7 +18,7 @@ import { checkLinks, type PageOutline, quoteOf, resolveLink } from "../src/docum
 import { checkFiles, fileAddress, fileSource, parseFileAddress, parseLines } from "../src/files.ts";
 import { contentIssues } from "../src/markdown-plugin.ts";
 import type { HighlightedCode } from "../src/protocol.ts";
-import { acceptContext } from "../src/server/chat.ts";
+import { acceptReferences } from "../src/server/chat.ts";
 import { messagesPrompt, startPrompt } from "../src/server/prompt.ts";
 import { SourceFiles } from "../src/source-files.ts";
 import { sourceContext } from "../src/source-plugin.ts";
@@ -35,7 +35,7 @@ const main = [
 /** The page component, reduced to its code: these tests look at the compiled lines. */
 const Excerpt = ({ children }: { children?: ReactNode }) => children ?? null;
 
-/** The code blocks of a compiled page, as the reader receives them. */
+/** The code blocks of a compiled page, as the web app receives them. */
 async function codeBlocks(js: string) {
   const blocks: HighlightedCode[] = [];
   const pre = ({ "data-code": code }: { "data-code": string }) => {
@@ -180,7 +180,7 @@ test("links to files and lines are checked against the file", () =>
     assert.match(problems[2]?.message ?? "", /not a file address/);
   }));
 
-test("lines of a source file are context", () =>
+test("lines of a source file are references", () =>
   withProject((root, files) => {
     const item = {
       kind: "lines",
@@ -189,19 +189,19 @@ test("lines of a source file are context", () =>
       startLine: 2,
       endLine: 3,
     };
-    const [accepted] = acceptContext(root, "content", files, [item]);
+    const [accepted] = acceptReferences(root, "content", files, [item]);
     assert.deepEqual(accepted, item);
     // The address, the source, and the lines must agree.
     assert.throws(
-      () => acceptContext(root, "content", files, [{ ...item, source: "secret.txt" }]),
+      () => acceptReferences(root, "content", files, [{ ...item, source: "secret.txt" }]),
       /file the document shows/,
     );
     assert.throws(
-      () => acceptContext(root, "content", files, [{ ...item, startLine: 1 }]),
+      () => acceptReferences(root, "content", files, [{ ...item, startLine: 1 }]),
       /Invalid/,
     );
     assert.throws(
-      () => acceptContext(root, "content", files, [{ ...item, kind: "file" }]),
+      () => acceptReferences(root, "content", files, [{ ...item, kind: "file" }]),
       /Invalid/,
     );
   }));
@@ -365,7 +365,7 @@ test("an excerpt's block takes a brace on its own line and preprocessor lines in
   );
 });
 
-test("two folders with the same paths stay apart, in context and in the agent's prompt", () => {
+test("two folders with the same paths stay apart, in references and in the agent's prompt", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "yapparatus-two-"));
   try {
     mkdirSync(path.join(root, "guide"));
@@ -392,21 +392,21 @@ test("two folders with the same paths stay apart, in context and in the agent's 
         endLine: 2,
       };
     };
-    const context = acceptContext(root, "guide", files, [item("app"), item("lib")]);
+    const references = acceptReferences(root, "guide", files, [item("app"), item("lib")]);
     assert.deepEqual(
-      context.map((c) => c.source),
+      references.map((c) => c.source),
       ["app/src/main.ts", "lib/src/main.ts"],
     );
     // An item cannot claim one folder's address with the other folder's file.
     assert.throws(
-      () => acceptContext(root, "guide", files, [{ ...item("app"), source: "lib/src/main.ts" }]),
+      () => acceptReferences(root, "guide", files, [{ ...item("app"), source: "lib/src/main.ts" }]),
       /file the document shows/,
     );
     const message = {
       seq: 1,
       author: "reader" as const,
       text: "How do these differ?",
-      context,
+      references,
       createdAt: new Date().toISOString(),
     };
     const prompt = messagesPrompt([message], "Diagnostics: none", "guide.md");

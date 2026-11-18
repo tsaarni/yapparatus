@@ -1,6 +1,6 @@
 /**
- * The chat's log: reader messages with the context they carry, and agent replies, checked
- * before they are stored. Reads of the chat, with waiting and prompts, are in `agent.ts`.
+ * The chat's log: reader messages with the references they carry, and agent replies, checked
+ * before they are stored. Reads of the chat, with waiting and prompts, are in `chat-resource.ts`.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -22,11 +22,11 @@ import { contentIssues } from "../markdown-plugin.ts";
 import { compiled } from "../outline-plugin.ts";
 import {
   type AgentMessage,
-  type ContextItem,
   type Diagnostic,
   diagnosticCodes,
   type Message,
   type ReaderMessage,
+  type Reference,
   type TargetKind,
 } from "../protocol.ts";
 import type { SourceFiles } from "../source-files.ts";
@@ -42,28 +42,29 @@ const kinds: TargetKind[] = [
   "table",
   "listing",
   "code",
-  "diagram-part",
+  "diagram-element",
   "file",
   "lines",
 ];
 
 function optionalText(value: unknown, max: number): string | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== "string" || value.length > max) throw new HttpError(400, "Invalid context.");
+  if (typeof value !== "string" || value.length > max)
+    throw new HttpError(400, "Invalid reference.");
   return value;
 }
 
 /**
- * Check the browser's context items and keep them as sent: the file must be a document page,
+ * Check the browser's references and keep them as sent: the file must be a document page,
  * or a source file the document shows. The lines are those the reader saw.
  */
-export function acceptContext(
+export function acceptReferences(
   root: string,
   content: string,
   files: SourceFiles,
   input: unknown,
-): ContextItem[] {
-  if (!Array.isArray(input) || input.length > 30) throw new HttpError(400, "Invalid context.");
+): Reference[] {
+  if (!Array.isArray(input) || input.length > 30) throw new HttpError(400, "Invalid reference.");
   return input.map((item: unknown) => {
     if (
       !isRecord(item) ||
@@ -74,15 +75,15 @@ export function acceptContext(
       !Number.isInteger(item.startLine) ||
       !Number.isInteger(item.endLine)
     )
-      throw new HttpError(400, "Invalid context.");
-    if (item.kind === "file" || item.kind === "lines") return acceptFileItem(files, item);
+      throw new HttpError(400, "Invalid reference.");
+    if (item.kind === "file" || item.kind === "lines") return acceptFileReference(files, item);
     const sourceRoot = realpathSync(path.join(root, content));
     const filename = realpathSync(path.resolve(root, item.source));
     if (!filename.startsWith(`${sourceRoot}${path.sep}`) || !filename.endsWith(".mdx"))
-      throw new HttpError(400, "Context must refer to a document page.");
+      throw new HttpError(400, "A reference must refer to a document page.");
     const startLine = Number(item.startLine);
     const endLine = Number(item.endLine);
-    if (startLine < 1 || endLine < startLine) throw new HttpError(400, "Invalid context.");
+    if (startLine < 1 || endLine < startLine) throw new HttpError(400, "Invalid reference.");
     const step = optionalText(item.step, 600);
     return {
       kind: item.kind as TargetKind,
@@ -97,19 +98,19 @@ export function acceptContext(
 
 /**
  * A source file or lines in it. The address names the file and lines; `source` and the line
- * fields must agree with it, so the item says one thing however it is read.
+ * fields must agree with it, so the reference says one thing however it is read.
  */
-function acceptFileItem(files: SourceFiles, item: Record<string, unknown>): ContextItem {
+function acceptFileReference(files: SourceFiles, item: Record<string, unknown>): Reference {
   const address = parseFileAddress(item.address as string);
   const kind = item.kind as "file" | "lines";
   if (!address || (kind === "lines") !== !!address.lines)
-    throw new HttpError(400, "Invalid context.");
+    throw new HttpError(400, "Invalid reference.");
   const file = files.read({ folder: address.folder, path: address.path });
   if ("error" in file || file.source !== item.source)
-    throw new HttpError(400, "Context must refer to a file the document shows.");
+    throw new HttpError(400, "A reference must refer to a file the document shows.");
   const lines = address.lines ?? { start: 1, end: file.lines.length };
   if (item.startLine !== lines.start || item.endLine !== lines.end || lines.end > file.lines.length)
-    throw new HttpError(400, "Invalid context.");
+    throw new HttpError(400, "Invalid reference.");
   return {
     kind,
     address: item.address as string,
@@ -123,7 +124,7 @@ export interface ChatOptions {
   root: string;
   server: ViteDevServer;
   content: string;
-  /** The document's chat state directory, from the project folder: `.yapparatus/<directory>`, with `/` between parts. */
+  /** The document's chat state directory, from the project folder: `.yapparatus/<directory>`, with `/` between segments. */
   state: string;
   /** The source files the document shows. */
   files: SourceFiles;
@@ -215,11 +216,11 @@ export class ChatStore {
       seq: this.next(),
       author: "reader",
       text: input.text.trim(),
-      context: acceptContext(root, content, files, input.context ?? []),
+      references: acceptReferences(root, content, files, input.references ?? []),
       createdAt: new Date().toISOString(),
     };
     this.append(message);
-    log.info(`reader #${message.seq}, ${message.context.length} context items`);
+    log.info(`reader #${message.seq}, ${message.references.length} references`);
     this.options.changed();
     return message;
   }

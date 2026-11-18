@@ -1,82 +1,139 @@
 # Diagnostics
 
-Diagnostics are the errors and warnings in a document. Examples are a page that does not compile, a broken link, a diagram whose boxes overlap, and a page or reply that fails to render. The agent uses diagnostics more than the reader does, because the agent edits the pages and can fix the problems. This page describes where diagnostics come from, how they are identified, and who sees them.
+A diagnostic is one error or warning in a document, such as a broken link or two boxes that overlap in a diagram. This page follows a diagnostic from the check that finds it, through the server, to the agent and the reader.
 
-## Where diagnostics come from
+## Overview
 
-<Ref to="diagnostic-flow" /> shows the two sources of diagnostics and the two places they are shown.
+The server finds problems in the source files, and the web app reports those that appear only when a page runs. Both go into one diagnostic store in the server. <Ref to="diagnostics-flow" /> follows one edit to the error that ends the agent's next wait.
 
-<Diagram id="diagnostic-flow" caption="Where diagnostics come from and where they go." draw={(d) => {
-  const server = d.box("Server checks", { id: "server-checks", sub: "compile, diagrams, links" })
-  const browser = d.box("Browser checks", { id: "browser-checks", sub: "charts, render, runtime" })
-  d.equalSize([server, browser])
-  const sources = d.column([server, browser], { gap: 40 })
-  const store = d.cylinder("Diagnostic store", { id: "diagnostic-store", sub: "by page revision" })
-  d.place(store, { rightOf: sources, gap: 120 })
-  const prompt = d.box("Agent prompt", { id: "agent-prompt", sub: "new errors end a wait", role: "accent" })
-  const list = d.box("Header list", { id: "header-list", sub: "when there are any" })
-  d.equalSize([prompt, list])
-  const outputs = d.column([prompt, list], { gap: 40 })
-  d.place(outputs, { rightOf: store, gap: 120 })
-  d.arrow(server.right, store.left, { id: "checks", route: { viaX: d.lerp(server.right, store.left, 0.5) } })
-  d.arrow(browser.right, store.left, { id: "reports", route: { viaX: d.lerp(browser.right, store.left, 0.5) }, label: { text: "POST", segment: 2 } })
-  d.arrow(store.right, prompt.left, { id: "to-agent", route: { viaX: d.lerp(store.right, prompt.left, 0.5) } })
-  d.arrow(store.right, list.left, { id: "to-list", route: { viaX: d.lerp(store.right, list.left, 0.5) } })
+<Diagram id="diagnostics-flow" caption="An edit gives a page a new revision. The server checks it at once, and the web app reports a chart error later." draw={(d) => {
+  const agent = d.actor("Agent")
+  const store = d.cylinder("Diagnostic store")
+  const compiler = d.box("Page compiler")
+  const web = d.box("Web app")
+  d.equalSize([store, compiler, web])
+  d.sequence([agent, store, compiler, web], [
+    { from: agent, to: compiler, label: "save page", async: true, id: "save" },
+    { from: compiler, to: store, label: "compile and link checks", async: true, id: "server-checks" },
+    { from: agent, to: store, label: "checkDocument", id: "check" },
+    { from: store, to: agent, label: "diagnostics, unchecked pages", reply: true, id: "check-result" },
+    { from: agent, to: store, label: "waitForMessage", id: "wait" },
+    { from: compiler, to: web, label: "new revision", async: true, id: "update" },
+    { from: web, to: store, label: "report: CHART_FAILED", async: true, id: "report" },
+    { from: store, to: agent, label: "new error, after 2 s", reply: true, id: "new-error" },
+  ], { gap: 120 })
 }}>
-  <Step focus="server-checks checks diagnostic-store">The server checks every page, with its diagrams, whenever a file changes.</Step>
-  <Step focus="browser-checks reports diagnostic-store">The browser reports what it finds while it renders a page: charts, render errors, and runtime errors.</Step>
-  <Step focus="to-agent agent-prompt">New errors end the agent's wait and appear in its prompt.</Step>
-  <Step focus="to-list header-list">The reader sees a count in the header and each diagnostic in place.</Step>
+  <Step focus="save server-checks">The agent saves a page. The server compiles it and checks the links.</Step>
+  <Step focus="check check-result">`checkDocument` returns every diagnostic and lists the page as unchecked by a browser.</Step>
+  <Step focus="update report">The reader opens the page, and the web app reports a chart that fails to draw.</Step>
+  <Step focus="new-error wait">The error lasts 2 s and is new to the agent, so it ends the agent's wait.</Step>
 </Diagram>
 
-1. **The server checks everything that it can find from the source files.** Whenever a file changes, the server compiles every page and checks links, references, and `document.json`. Compiling also checks the Markdown conventions: code block languages, heading depth, alert kinds, file trees, tabs and columns, and figures inside figures. None of these checks need a browser.
-2. **Compiling a page compiles its diagrams.** The page compiler runs each `draw`, measures the text with the reader's font files, and checks the layout and the steps. A diagram's diagnostics are therefore compile diagnostics of its page, found on every save, whether or not a browser has the page open. Each one names the figure as its target, the parts, and the figure's lines. See [where a diagram is compiled](diagrams#where-a-diagram-is-compiled).
-3. **The browser checks what can be found only when a page runs.** These checks cover chart marks, render errors, runtime errors, and replies that fail to show. A chart is drawn by Observable Plot in the browser at the width of the page, so its checks need a browser. [What the browser reports](#what-the-browser-reports) describes how its diagnostics reach the server.
-4. **A reply is checked like a page before it is stored.** Its problems are diagnostics with the codes pages use, such as `BROKEN_LINK`, `COMPILE_FAILED`, or a diagram's `UNKNOWN_PART`, plus `UNKNOWN_COMPONENT` and `REPLY_EMPTY`, which only a reply can have. Errors keep the reply out, and warnings do not. The errors are not stored: they come back to the agent in the refusal. See [replying](chat#replying).
-5. **[Direction](directions):** an open tab also renders, off screen, the pages that it does not show, so that one tab checks the charts and render errors of the whole document. Browsers slow down background tabs, so this needs testing first.
+The store is in [`src/server/diagnostics.ts`](/-/files/yapparatus/src/server/diagnostics.ts). The requests that read and report diagnostics are in [the REST API](/rest-api#diagnostics).
 
-### What the browser reports
+## Origins
 
-A page's revision is a hash of its text and of every file it reads: the files of its excerpts and its charts' data. The compiler writes the revision into the page, and the server computes it from the files on disk. A change to any of these files gives the page a new revision.
+Every diagnostic records which check found it as its [origin](/-/files/yapparatus/src/protocol.ts#L140-L152).
 
-1. **A diagnostic belongs to the revision of the page that the browser rendered.** The browser sends it with `POST /-/api/diagnostics` and `{ source, revision, diagnostics }`. See [report diagnostics](api#report-diagnostics). A revision never changes, so the diagnostics reported for it stay true.
-2. **A report only adds diagnostics.** The browser does not report that a problem is fixed. A fix changes the page, the page gets a new revision, and the diagnostics of the old revision stop counting. The current diagnostics are the server's checks and the diagnostics reported for each page's current revision.
-3. **A page reports every revision it renders, even without diagnostics.** That report marks the revision as checked. A chart without diagnostics sends nothing.
-4. **A page that no browser has rendered since it changed is unchecked.** Its charts, render errors, and runtime errors are not known for its current revision. Its diagrams are, because the server checks them. The server lists the page with the diagnostics of the revision that a browser rendered last. An empty list therefore means that the checked pages have no problems. The agent can also tell an old error that is not confirmed from one that is gone. The server keeps the diagnostics of the last three revisions of each page.
-5. **Runtime errors belong to the revision of the page on screen.** On a file view, they are only logged.
-6. **A reply never changes,** so its diagnostics have no revision and count for as long as the reply is in the chat.
-7. **Diagnostics from several tabs add up.** A chart's tick labels can overlap at one width and not at another. The warning counts, because some readers see the overlap.
-8. **The revision does not cover components.** A change to a component, built in or in the document's own `.tsx` files, updates the page without a new revision. A diagnostic that a component caused therefore stays after the component is fixed, until the page changes or the server restarts.
+After every change, the server checks `document.json` and its page list (origin `pages`), compiles every page (origin `compile`), and checks links and references across pages (origin `link`). Compiling a page also checks its [Markdown conventions](/page-compiler#markdown-conventions), its charts' data, and its [diagrams](/diagram-compiler#checks).
+
+The web app checks what exists only when a page runs: [the marks of a chart](/charts#checks-on-the-marks) (origin `chart`), a page that throws while it renders (origin `render`), an error outside rendering (origin `runtime`), and a reply that cannot be shown (origin `reply`). It reports them to the server.
+
+The server also [checks each reply](/server#reply-checks), and returns its errors to the agent without storing them.
+
+**[Direction](directions):** an open tab also renders the pages it does not show, off screen, so one tab checks the whole document. Browsers slow down background tabs, so this needs testing first.
 
 ## Codes and severity
 
-<Ref to="diagnostic-codes" /> shows the start of the registry of codes.
+Every code is in one registry in `src/protocol.ts`, with its severity and meaning. <Ref to="diagnostics-registry" /> shows its start.
 
-<Listing id="diagnostic-codes" caption="The registry: each code with its severity and what it means.">
+<Listing id="diagnostics-registry" caption="The start of the registry: each code with its severity and meaning.">
 <Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export const diagnosticCodes = {" end="DUPLICATE_ID:" mark="severity" />
 </Listing>
 
-1. **Every code is in one registry, with its severity.** `diagnosticCodes` in `protocol.ts` maps each code to its severity and one line on what it means. `DiagnosticCode` is the union of its codes. A check passes a code, and the registry supplies its severity. One code therefore cannot be an error in one checker and a warning in another.
-2. **A code names what is wrong, in the words of the authoring guide.** The registry stores the severity, so a code has no `_ERROR` suffix. Each problem has one code, and every checker uses the same code for the same problem. A duplicate is `DUPLICATE_ID` whether two pages, a heading and a figure, or a step and a part share the id.
-3. **The severity follows one rule.** A code is an `error` when the result is not what the author wrote: a reference to nothing, a duplicate, an invalid form, or something that threw. It is a `warning` when the page renders as written but reads badly: overlap, overflow, or too much. The rule guides the choice of severity for each code in the registry. The registry stores each severity as a fixed value.
-4. **The server adds the severity to reports.** The browser sends codes without severity. The server refuses a report whose code is not in the registry. It adds each code's severity when it lists diagnostics, in the updates that it sends to the browser, and in the agent's text. A browser that runs old code therefore cannot contradict the registry.
-5. **The registry has no classes of codes.** A layered taxonomy would use a fixed list of problem words, classes such as "failure, mistake, flaw", and a severity derived from the class. That would make codes less descriptive and would need exceptions. The registry uses a code for three things: as identity, as a label in the header list and the agent's prompt, and for its severity. Nothing would read a class.
+A check passes a code and never a severity, so a code has the same severity everywhere. Each problem has one code: any two things that share an id are `DUPLICATE_ID`.
 
-## How diagnostics are identified
+A code is an `error` when the result is not what the author wrote: a reference to nothing, a duplicate, an invalid form, or something that threw. It is a `warning` when the page renders as written but reads badly: overlap, overflow, or too much of something.
 
-<Ref to="diagnostic-type" /> shows the fields of a diagnostic.
+The web app sends codes without a severity, and the server adds it from the registry.
 
-<Listing id="diagnostic-type" caption="A diagnostic. The code, file, target, and subject identify it.">
+<Ref to="diagnostics-groups" /> counts the codes in the registry by group, and <Ref to="diagnostics-groups-chart" /> draws the same rows. Half of the codes belong to diagrams, and all warnings but one are about how a diagram reads.
+
+<Table id="diagnostics-groups" caption="Codes in the registry, by group and severity.">
+
+| Group | Severity | Codes |
+|---|---|---:|
+| Links, ids, and pages | error | 5 |
+| Replies | error | 2 |
+| Markdown conventions | error | 11 |
+| Charts | error | 6 |
+| Charts | warning | 1 |
+| Diagrams | error | 14 |
+| Diagrams | warning | 14 |
+| Found in the browser | error | 3 |
+
+</Table>
+
+<Chart id="diagnostics-groups-chart" caption="The 56 codes by registry group: 41 errors and 15 warnings." from="#diagnostics-groups" plot={(Plot, rows) => ({
+  marks: [
+    Plot.barX(rows, { y: "Group", x: "Codes", fill: "Severity", sort: { y: "-x" } }),
+    Plot.ruleX([0]),
+  ],
+  y: { label: null },
+})} />
+
+## Identity
+
+A diagnostic is identified by its code, file, target, and subject, as <Ref to="diagnostics-type" /> marks.
+
+<Listing id="diagnostics-type" caption="A diagnostic. The marked fields identify it.">
 <Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface Diagnostic {" mark={["code: DiagnosticCode", "source?: string", "target?: string", "subject?: string"]} />
 </Listing>
 
-**A diagnostic is identified by its code, file, target, and subject.** The subject is what the diagnostic is about, such as a link's target or a diagram's parts. With this identity, a diagnostic whose message is reworded is still the same diagnostic. Two broken links on one page are two separate diagnostics. When a diagnostic has no subject, its message identifies it.
+The target is a figure id on a page, or a message number in a reply. The subject is what the diagnostic is about, such as a link's target, or else its message. So a diagnostic whose line moves stays the same, and two broken links on one page stay two. The store uses it to drop duplicate reports and to remember which errors the agent has been given.
 
-## Who sees diagnostics
+## Revisions and reports
 
-1. **The agent checks the document after editing and before replying.** `checkDocument()` reads [`GET /-/api/diagnostics`](api#read-the-diagnostics), which waits until the checks of recent edits are done. The file watcher reports an edit a moment after the file is saved. The read therefore compares the save times of the pages with the start of the last check, and runs the checks again when a page is newer. It returns every diagnostic and the unchecked pages, with text for the agent. The errors it returns count as given to the agent. It claims no agent, so it runs beside an open wait.
-2. **The agent learns about later errors without asking.** Some errors, such as a chart that fails, appear only when a browser opens a changed page, after the agent replied. The server remembers which errors it gave the agent, by [their identity](#how-diagnostics-are-identified). An error that has existed for 2 s and that the agent has not been given ends the agent's wait, as a reader message does. The prompt then lists all diagnostics with the new errors marked. See [waiting for messages](chat#waiting-for-messages).
-3. **Errors in the document do not hold back a reply.** The server checks only the reply's own MDX, components, and links. The agent checks the document's errors. See [replying](chat#replying).
-4. **The agent reads one line per diagnostic, the same everywhere.** A prompt, a diagnostics read, and a refused reply all write `- error CODE file:lines, /page#figure, parts a, b: message`. The server fills in a figure's lines from the page as it is now. The address is the one the agent links in its reply. A reply being checked has no file yet, so its problems name only the line.
-5. **Short-lived errors and warnings never end the agent's wait.** An error that disappears within 2 s, such as one caused by a file that was saved half-written, never wakes the agent. Warnings do not end a wait, so the agent spends no turn on them.
-6. **The reader sees diagnostics in the page and in a list.** A page that fails shows its error. A diagram or chart shows its diagnostics under the figure. When there are errors or warnings, the header shows how many there are. Each item in the list opens the place it is about. **Ask** attaches that place to the message box. A diagnostic therefore reaches the chat only when the reader asks about it.
+The web app's findings belong to a [revision](/page-compiler#revisions) of a page: a hash of the page's text and of every file it reads.
+
+The web app sends one report for every revision it renders: an empty list when the page renders, `RENDER_FAILED` when it throws, and what its charts found.
+
+A report only adds diagnostics. A fix changes the revision, and the old revision's findings stop counting. The store's list holds the server's checks, the findings for each page's current revision, and those for replies still in the chat. Reports from several tabs add up, because a chart can overlap at one width only.
+
+A page is unchecked when no web app has rendered its current revision. Its diagrams are known, because the server checks them, and its charts and render errors are not. The store lists it with what the last rendered revision found, so the agent can tell an unconfirmed error from one that is gone.
+
+A change to a component's code does not change a revision, so a finding the component caused stays until the page changes or the server restarts.
+
+## What the agent sees
+
+The agent reads diagnostics in the prompt of a wait, in the result of `checkDocument`, and in the refusal of a reply, one line per diagnostic. <Ref to="diagnostics-line" /> marks the parts of one line.
+
+<Diagram id="diagnostics-line" caption="One diagnostic as the agent reads it." draw={(d) => {
+  d.text("- new error DEGENERATE_EDGE docs/cache.mdx:40-62, /cache#flow, elements api->api: api->api starts and ends at the same point.", {
+    mono: true,
+    id: "line",
+    marks: {
+      severity: { text: "new error", category: "Severity" },
+      code: { text: "DEGENERATE_EDGE", category: "Code" },
+      file: { text: "docs/cache.mdx:40-62", category: "Place" },
+      address: { text: "/cache#flow", category: "Place" },
+      elements: { text: "elements api->api", category: "Place" },
+    },
+  })
+}} />
+
+`new` marks an error the agent has not been given. The agent links the address in its reply. New errors come first, and the unchecked pages follow.
+
+[`checkDocument`](/agent-library#checkdocument) first checks again any file saved after the last check started, because the file watcher reports an edit a moment late. It then waits a few seconds at most, so an open web app can report. The errors it returns count as given.
+
+[`waitForMessage`](/agent-library#waitformessage) returns reader messages and new errors. An error ends a wait when it has lasted 2 s and has not been given. Warnings never end a wait. An error that is fixed and comes back is new again.
+
+## What the reader sees
+
+In dev mode, the web app shows diagnostics under each diagram and chart, in place of a page that throws, and in a menu in the header, which lists them by page. **Comment** in the menu starts a message about the diagnostic. A diagnostic reaches the chat only this way. A build shows none. See [diagnostics display](/web-app#diagnostics-display).
+
+## Design decisions
+
+**Reports are tied to a revision and only add.** A report that replaced earlier findings would need the web app to know when a problem is fixed, and reports from several tabs would overwrite each other. With revisions, a report never has to be taken back.
+
+**An error must last 2 s before it ends the agent's wait.** Otherwise the agent would spend a turn on each error that exists only while a file is half-written or an edit across two files is in progress.

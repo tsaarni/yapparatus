@@ -46,11 +46,11 @@ const documentModule = "virtual:yapparatus/document";
 const filesModule = "virtual:yapparatus/files";
 const fileModule = "virtual:yapparatus/file:";
 
-/** The reader app's entry, as the page names it. From `src/` and from `dist/` alike. */
+/** The web app's entry, as the page names it. From `src/` and from `dist/` alike. */
 const appEntry = `${appPrefix}/main.tsx`;
-const readerEntry = fileURLToPath(new URL("../src/reader/main.tsx", import.meta.url));
+const appSource = fileURLToPath(new URL("../src/web/main.tsx", import.meta.url));
 
-/** Packages that pages and the reader must share: one React, one StyleX. */
+/** Packages that pages and the web app must share: one React, one StyleX. */
 const sharedRuntime = /^(react|react-dom|@stylexjs\/stylex)(\/|$)/;
 const sharedEntries = [
   "react",
@@ -74,7 +74,7 @@ const virtualOf = (id: string) =>
 /** Is yapparatus a dependency of the project at `root`, rather than the project itself? */
 const installedIn = (root: string) => existsSync(path.join(root, "node_modules", "yapparatus"));
 
-/** The one HTML page every address serves; the reader app routes inside it. */
+/** The one HTML page every address serves; the web app routes inside it. */
 function indexHtml(theme: ThemeSetting): string {
   const scheme = theme === "auto" ? "light dark" : theme;
   return `<!doctype html>
@@ -150,7 +150,7 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
     [...excerptFiles.values()].some((read) => read.has(file));
   /**
    * A page's outline, compiled by the same pipeline as the page. A page that does not compile
-   * has an empty outline, so the reader lists it and shows its error when it is opened.
+   * has an empty outline, so the web app lists it and shows its error when it is opened.
    */
   const outlineOf = async (
     id: string,
@@ -172,7 +172,7 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
       return empty;
     }
   };
-  /** The first paint, before the reader app runs, uses the document's color scheme. */
+  /** The first paint, before the web app runs, uses the document's color scheme. */
   const page = () => {
     let theme: ThemeSetting = "dark";
     try {
@@ -186,12 +186,12 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
   return [
     {
       // Compiled pages and custom components import React and StyleX. A project depends only on
-      // yapparatus, so these resolve from here, to the same copies the reader uses.
+      // yapparatus, so these resolve from here, to the same copies the web app uses.
       name: "yapparatus:runtime",
       enforce: "pre",
       resolveId(id, importer, options) {
-        if (!sharedRuntime.test(id) || importer === readerEntry) return;
-        return this.resolve(id, readerEntry, { ...options, skipSelf: true });
+        if (!sharedRuntime.test(id) || importer === appSource) return;
+        return this.resolve(id, appSource, { ...options, skipSelf: true });
       },
     },
     {
@@ -201,10 +201,10 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
         // Nor is the chat's storage: the server compiles each reply as a temporary file before
         // accepting it, and Vite reloads the page when a file it compiled is removed.
         server: { watch: { ignored: ["**/dist/**", "**/dist-single/**", "**/.yapparatus/**"] } },
-        // The reader is source, compiled with the document's pages and styles.
+        // The web app is source, compiled with the document's pages and styles.
         optimizeDeps: {
           // Scanned at startup, so the first page load does not discover and reload.
-          entries: [readerEntry],
+          entries: [appSource],
           exclude: ["yapparatus"],
           // An installed yapparatus's dependencies are pre-bundled through it, since the project
           // may not depend on them.
@@ -226,7 +226,7 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
         },
       }),
       resolveId(id) {
-        if (id === appEntry) return readerEntry;
+        if (id === appEntry) return appSource;
         if (id === indexFile()) return id;
         return id === documentModule ||
           id === filesModule ||
@@ -386,7 +386,7 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
         base = config.base;
         Object.assign(iconCollections, FileSystemHMRIconLoader(path.join(root, "icons"), "local"));
       },
-      // The document module holds every outline. It is not part of a page's hot update, which
+      // The document module holds every outline. It is outside a page's hot update, which
       // it accepts, but a reload must compile it again with the new outline.
       hotUpdate({ file }) {
         if (this.environment.name !== "client" || !feedsOutline(file)) return;
@@ -398,7 +398,7 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
         devServer = server;
         installApi(server, content, sourceFiles);
         // After Vite's own middlewares: every page address, and every source file's, is the
-        // reader app. Other paths with an extension are missing assets.
+        // web app. Other paths with an extension are missing assets.
         return () =>
           server.middlewares.use(async (req, res, next) => {
             const url = (req.url ?? "/").split(/[?#]/)[0] ?? "/";

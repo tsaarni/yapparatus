@@ -2,11 +2,11 @@ import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
 import { agentHeader, type DocumentDiagnostics, type ReplyRefusal } from "../../src/protocol.ts";
-import { root, runSnippet } from "./workspace.ts";
+import { root, runCommand } from "./workspace.ts";
 
 /** The document's diagnostics once recent edits are checked, as the agent reads them. */
 async function checkDocument(): Promise<DocumentDiagnostics> {
-  const checked = await runSnippet(
+  const checked = await runCommand(
     'import { checkDocument } from "yapparatus/agent"; console.log(JSON.stringify(await checkDocument()));',
   );
   expect(checked.stderr).toBe("");
@@ -14,7 +14,7 @@ async function checkDocument(): Promise<DocumentDiagnostics> {
 }
 
 // The diagram reference's unit test compiles every form with a fake text measure. The page
-// compiler measures with the reader's font files, and the browser draws what it compiled.
+// compiler measures with the web app's font files, and the browser draws what it compiled.
 test("every diagram form compiles without diagnostics and draws in the browser", async ({
   page,
 }) => {
@@ -57,13 +57,13 @@ test("the server checks a diagram on a page no browser has open", async ({ page 
     expect(found.map((d) => [d.code, d.severity, d.subject]).sort()).toEqual([
       ["FONT_FALLBACK", "warning", "→"],
       ["NODE_OVERLAP", "warning", "alpha,gamma"],
-      ["UNKNOWN_PART", "error", "delta"],
+      ["UNKNOWN_ELEMENT", "error", "delta"],
     ]);
     expect(prompt).toContain(
-      `- error UNKNOWN_PART content/second-page.mdx:${start}-${end}, /second-page#broken-flow: Step 1 focuses "delta"`,
+      `- error UNKNOWN_ELEMENT content/second-page.mdx:${start}-${end}, /second-page#broken-flow: Step 1 focuses "delta"`,
     );
     expect(prompt).toContain(
-      `- warning NODE_OVERLAP content/second-page.mdx:${start}-${end}, /second-page#broken-flow, parts alpha, gamma:`,
+      `- warning NODE_OVERLAP content/second-page.mdx:${start}-${end}, /second-page#broken-flow, elements alpha, gamma:`,
     );
 
     // A draw program uses only its own values; an outside name is named, at its line.
@@ -82,7 +82,7 @@ test("the server checks a diagram on a page no browser has open", async ({ page 
     writeFileSync(file, `${original.trimEnd()}\n\n${broken}`);
     await page.goto("/second-page#broken-flow");
     const list = page.getByRole("list", { name: "Diagram diagnostics" });
-    await expect(list).toContainText("UNKNOWN_PART");
+    await expect(list).toContainText("UNKNOWN_ELEMENT");
     await expect(list).toContainText("NODE_OVERLAP");
     await expect(page.locator("figure#broken-flow svg [data-element-id='alpha']")).toBeVisible();
   } finally {
@@ -96,7 +96,7 @@ test("a reply with a broken diagram is refused; one with only warnings is not", 
   request,
 }) => {
   const created = await request.post("/-/api/chat", {
-    data: { author: "reader", text: "Draw it.", context: [] },
+    data: { author: "reader", text: "Draw it.", references: [] },
   });
   expect(created.status()).toBe(201);
   // A reply answers the message an agent read, so read it as one, as the agent library does.
@@ -119,7 +119,7 @@ test("a reply with a broken diagram is refused; one with only warnings is not", 
   const { error, diagnostics } = (await refused.json()) as ReplyRefusal;
   expect(diagnostics.map((d) => d.code).sort()).toEqual(["PLACEMENT_CYCLE", "STEP_NOT_TEXT"]);
   expect(error).toMatch(/^- error STEP_NOT_TEXT line 7: Step 1 has focus=\{…\}/m);
-  expect(error).toMatch(/^- error PLACEMENT_CYCLE line 3, parts alpha: /m);
+  expect(error).toMatch(/^- error PLACEMENT_CYCLE line 3, elements alpha: /m);
 
   // An overlap is a warning: the reply is stored.
   const sent = await send(`A drawing:

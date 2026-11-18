@@ -19,7 +19,7 @@ import Link from "~icons/lucide/link";
 import Expand from "~icons/lucide/maximize-2";
 import Menu from "~icons/lucide/menu";
 import Important from "~icons/lucide/message-square-exclamation-point";
-import Ask from "~icons/lucide/message-square-text";
+import Comment from "~icons/lucide/message-square-text";
 import Collapse from "~icons/lucide/minimize-2";
 import System from "~icons/lucide/monitor";
 import Dark from "~icons/lucide/moon";
@@ -75,13 +75,13 @@ export function Icon({ icon: Svg, name, size = 20, label, color = "inherit" }: I
 }
 
 const appIcons = {
-  ask: Ask,
   caution: Caution,
   check: Check,
   clear: Clear,
   code: Code,
   close: Close,
   collapse: Collapse,
+  comment: Comment,
   copy: Copy,
   dark: Dark,
   diagram: Diagram,

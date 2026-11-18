@@ -1,6 +1,6 @@
 # Writing Yapparatus documents
 
-A Yapparatus document is a directory of MDX pages that a reader reads in the browser and can ask questions about. You write content; the components handle layout, numbering, and drawing.
+A Yapparatus document is a directory of MDX pages that a reader reads in the browser and comments on in a chat with you. You write content; the components handle layout, numbering, and drawing.
 
 ## Start a document
 
@@ -14,7 +14,7 @@ npx giget gh:tsaarni/yapparatus/starter my-document && cd my-document && pnpm in
 
 2. Write `document.json` and the pages in the document directory: `content/` for the first document, or a new directory such as `tutorial/` when `content/` already holds one. Name the documented repository under `"files"`.
 3. End your turn: tell the user to run `pnpm dev <directory>`, such as `pnpm dev content`, in the project directory, open the address it prints, and paste the prompt the document's chat shows back to you.
-4. The prompt connects you to the chat. It lists diagnostics, including diagrams, which are checked when a page compiles, and charts, which are checked only once the browser shows them. Fix them, then answer the reader's questions there.
+4. The prompt connects you to the chat. It lists diagnostics, including diagrams, which are checked when a page compiles, and charts, which are checked only once the browser shows them. Fix them, then reply to the reader's messages there.
 
 A minimal document for a repository `myapp` next to the project `my-document`:
 
@@ -38,7 +38,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 ## Pages
 
 - A page's file name is its address: `key-ideas.mdx` → `/key-ideas`. Use lowercase letters, digits, and hyphens. A page in a subdirectory is listed as `"guide/setup.mdx"`.
-- Name a page for what it covers, so a first-time reader understands the contents entry: `architecture` and "Architecture", rather than `parts` and "Parts". Keep the file name and the title close.
+- Name a page for what it covers, so a first-time reader understands the contents entry: `architecture` and "Architecture", rather than `pieces` and "Pieces". Keep the file name and the title close.
 - `document.json` lists every page file once, in reading order: `"pages": ["overview.mdx", "guide/setup.mdx"]`. The address drops the extension: `/guide/setup`. A page missing from the list, or listed without a file, is an error. Required: `"pages"`. Optional:
 
 | Field | Value | Default |
@@ -84,13 +84,13 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 
 ## Links and ids
 
-- One address form: `/page#id`. Ids are headings' slugs, numbered blocks' `id`s, and diagram parts as `figure--part`.
+- One address form: `/page#id`. Ids are headings' slugs, numbered blocks' `id`s, and diagram elements as `figure--element`.
 - A heading's id is its text, lowercased with hyphens: `## Install the CLI` → `install-the-cli`. A repeated heading gets `-1`, `-2`. Headings take no custom id; keep heading text stable or update links.
 - Link pages by address or file name: `[setup](setup)`, `[setup](setup.mdx#install)`. External links are ordinary Markdown and are not checked.
 - Write a GitHub issue or pull request as a link, keeping the reference as its text: `[#1234](https://github.com/owner/repo/issues/1234)`, `[owner/other#56](https://github.com/owner/other/issues/56)`. Neither form becomes a link by itself.
-- `<Ref to="…" />` takes a figure, table, or listing id, a heading id on this page, or an address: `/setup` for a page, `/setup#install` for anything on it. Add `--part` for a diagram part or step: `request-flow--lookup`.
+- `<Ref to="…" />` takes a figure, table, or listing id, a heading id on this page, or an address: `/setup` for a page, `/setup#install` for anything on it. Add `--element` for a diagram element or step: `request-flow--lookup`.
 - Give an explicit `id` to every figure, table, and listing. Ids are addresses: renaming one breaks links.
-- Diagram parts get ids from their labels. Set `id` on a part when prose, a link, or a `Ref` points at it, or when the derived id is long or unclear; see [the diagram reference](diagrams.md#ids).
+- Diagram elements get ids from their labels. Set `id` on an element when prose, a link, or a `Ref` points at it, or when the derived id is long or unclear; see [the diagram reference](diagrams.md#ids).
 - A heading id is unique on its page, and a figure, table, or listing id in the whole document; do not use `--` in your own ids.
 - Renaming a page file, a heading, or an id changes its address. Update `document.json` and every link in the same edit; the diagnostics list the links you missed.
 
@@ -99,17 +99,17 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 - External directories are the way to include files from outside the project, such as the repository the document is about. `document.json` names each one, relative to `document.json`: `"files": { "app": "../app" }`. Their names use lowercase letters, digits, and hyphens. Pages can show any text file from them, not only code.
 - Files under `.git`, binary files, files over 1 MB, and symlinks leading out of the directory are not shown.
 - A file's address is `/-/files/<directory>/<path>`, and lines are `#L40` or `#L40-L72`. Link to code with an ordinary link: `[the handler](/-/files/app/src/server.ts#L40-L72)`. The address opens the file view, which shows the whole file.
-- When the text is about part of a file, such as a function, type, or block, link to its lines: `[handle](/-/files/app/src/server.ts#L40-L72)`, not the bare file. Read the file to find the lines. Link a whole file only when the text is about the whole file.
+- When the text is about some lines of a file, such as a function, type, or block, link to its lines: `[handle](/-/files/app/src/server.ts#L40-L72)`, not the bare file. Read the file to find the lines. Link a whole file only when the text is about the whole file.
 - Show code from the project with `<Excerpt from="/-/files/app/src/server.ts" start="export function handle(" />`, never by copying it into a fenced block. `start` quotes the first line, and the excerpt runs to the end of the block that line opens, or to the line with `end="…"`. Highlight lines with `mark="text"` or `mark={["text", "text"]}`. Long lines scroll; add `wrap` when their words matter, as in Markdown. Excerpts find their lines by text, so they follow the code when lines are added above it. See [Excerpt](components.md#excerpt).
 - Keep excerpts short, about 5 to 30 lines, and explain them in the text. Link to the file for the rest.
-- A reader can ask about lines of a file. The prompt names the file relative to the project directory, so you can open it.
+- A reader can comment on lines of a file. The prompt names the file relative to the project directory, so you can open it.
 
 ## Diagrams
 
 - Draw a figure whenever structure, flow, or change over time is easier to see than to read: components and how they connect, a request path, messages between participants, a data layout, or numbers to compare. Write the prose around it, and refer to it with `Ref`.
 - Draw with `<Diagram>`, never with hand-written SVG. Read [the diagram reference](diagrams.md) before drawing, and the page for the form you draw: [structures](diagram-structures.md) for tables, headers, and marked text, [sequences](diagram-sequences.md) for messages over time. Start from the closest example.
 - Use `d.sequence` for interactions over time.
-- Add `<Step>` children when the figure is best explained in order. Each step is one or two sentences. Focus containers instead of listing their parts, and use `stepOnly` notes for words that belong on the drawing. See [steps](diagrams.md#steps).
+- Add `<Step>` children when the figure is best explained in order. Each step is one or two sentences. Focus containers instead of listing their elements, and use `stepOnly` notes for words that belong on the drawing. See [steps](diagrams.md#steps).
 - The page compiler runs `draw` and checks the figure, so three rules hold. `draw` uses only `d` and the values it defines itself, not the page's imports or constants. Write `<Diagram>` in a page or a reply, not inside a `.tsx` component. Write a step's `id` and `focus` as plain text, such as `focus="client api"`, not `focus={…}`.
 - Keep text-heavy drawings under about 960 units wide. Stack rows into columns rather than letting a figure scroll.
 
@@ -125,7 +125,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 
 A reply to a reader is MDX shown in the chat. Every built-in component works in it without imports, at the same width as the page.
 
-- A reply is not part of the document: nothing in it is numbered, and it has no Link or Ask buttons. Point at document content with links and addresses: `<Ref to="/setup#install" />`.
+- A reply is outside the document: nothing in it is numbered, and it has no Link or Comment buttons. Point at document content with links and addresses: `<Ref to="/setup#install" />`.
 - Custom components do not work in replies, because a reply has no imports.
 - The server checks a reply like a page, and refuses it with file and line until it compiles, its links resolve, and its diagrams have no errors.
 - Reply after every change to the pages, and say what changed, so the reader knows where to look.
@@ -140,7 +140,7 @@ Put a `.tsx` file next to the pages and import it: `import { Swatch } from "./sw
 
 ## Checking your work
 
-Fix every diagnostic. Broken links, `Ref`s, and anchors, duplicate ids, compile errors, and every diagram and chart diagnostic are reported one per line, with the file and lines, the page address, and for a diagram the parts involved: `- error BROKEN_LINK content/intro.mdx:12, /intro: …` or `- warning LABEL_OVERLAP content/cache.mdx:40-62, /cache#flow, parts api, db: …`. Each code is an `error`, which you must fix, or a `warning`, which reads badly but renders.
+Fix every diagnostic. Broken links, `Ref`s, and anchors, duplicate ids, compile errors, and every diagram and chart diagnostic are reported one per line, with the file and lines, the page address, and for a diagram the elements involved: `- error BROKEN_LINK content/intro.mdx:12, /intro: …` or `- warning LABEL_OVERLAP content/cache.mdx:40-62, /cache#flow, elements api, db: …`. Each code is an `error`, which you must fix, or a `warning`, which reads badly but renders.
 
 - After editing, read them from the running dev server, from the project directory. It waits until your edits are checked; `Diagnostics: none` means none:
 
@@ -150,7 +150,7 @@ node --input-type=module-typescript -e 'import { checkDocument } from "yapparatu
 
 - In the chat, read them after editing and fix them before you reply. Errors found later, when a browser opens a changed page, end your wait for messages.
 - Diagrams are checked when their page compiles, so their diagnostics are listed at once. Charts, render errors, and runtime errors are checked only when a browser shows the page. The diagnostics list the pages no browser has shown since they changed, with what was found before the change. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.
-- Diagnostics do not tell you that a diagram is hard to read. After you write or change a diagram and its diagnostics are clean, look at it once. This saves its picture as the reader sees it in the PNG file that you name. Open the file as an image, and delete it afterwards. `savePicture("/cache#flow", "/tmp/flow.png", { ids: true })` labels each part with its id.
+- Diagnostics do not tell you that a diagram is hard to read. After you write or change a diagram and its diagnostics are clean, look at it once. This saves its picture as the reader sees it in the PNG file that you name. Open the file as an image, and delete it afterwards. `savePicture("/cache#flow", "/tmp/flow.png", { ids: true })` labels each element with its id.
 
 ```sh
 node --input-type=module-typescript -e 'import { savePicture } from "yapparatus/agent"; await savePicture("/page#figure", "/tmp/figure.png");'

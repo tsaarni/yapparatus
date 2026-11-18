@@ -11,11 +11,10 @@
 import { type DocumentPage, pages } from "virtual:yapparatus/document";
 import { useSyncExternalStore } from "react";
 import { resolveLink, splitAddress } from "../document.ts";
-import { type FileAddress, fileAddress, filesPrefix, parseFileAddress } from "../files.ts";
+import { type FileAddress, fileAddress, parseFileAddress } from "../files.ts";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 export const hashMode = __YAPPARATUS_HASH_ROUTES__ || location.protocol === "file:";
-const changed = "yapparatus:navigate";
 
 export interface Route {
   /** The page, or undefined when the address names no page. */
@@ -44,20 +43,28 @@ export function fileHref(file: FileAddress): string {
   return addressHref(fileAddress(file));
 }
 
-function parse(): { slug: string; fragment: string } {
+/** The page slug and fragment a URL names, as this build routes it. */
+function parse(url: URL): { slug: string; fragment: string } {
   if (hashMode) {
-    const [slug = "", ...rest] = location.hash.replace(/^#\/?/, "").split("#");
+    const [slug = "", ...rest] = url.hash.replace(/^#\/?/, "").split("#");
     return { slug, fragment: decodeURIComponent(rest.join("#")) };
   }
-  const slug = decodeURIComponent(location.pathname)
+  const slug = decodeURIComponent(url.pathname)
     .slice(base.length)
     .replace(/(^|\/)index\.html$/, "")
     .replace(/^\/+|\/+$/g, "");
-  return { slug, fragment: decodeURIComponent(location.hash.slice(1)) };
+  return { slug, fragment: decodeURIComponent(url.hash.slice(1)) };
 }
 
-let cache: { key: string; route: Route } | undefined;
-let restore: number | undefined;
+/** Does the app show this URL: a page, a source file, or the start of the document? */
+function routed(url: URL): boolean {
+  if (url.origin !== location.origin) return false;
+  if (hashMode)
+    return url.pathname === location.pathname && (!url.hash || url.hash.startsWith("#/"));
+  if (url.pathname !== base && !url.pathname.startsWith(`${base}/`)) return false;
+  const { slug } = parse(url);
+  return !slug || pageAt(slug) !== undefined || parseFileAddress(`/${slug}`) !== undefined;
+}
 
 /** The page the address names, if it names one. */
 function pageAt(slug: string): DocumentPage | undefined {
@@ -65,61 +72,83 @@ function pageAt(slug: string): DocumentPage | undefined {
   return slug ? pages.find((p) => p.id === slug) : pages[0];
 }
 
-/** Can the page be shown now: its code has loaded, or failed to, which shows the error? */
-const ready = (page: DocumentPage) => page.module !== undefined || page.error !== undefined;
-
-/**
- * The route on screen. A new page is shown once its code has loaded, so the old page stays
- * until then, and the new one renders with its content. The latest address wins.
- */
-function snapshot(): Route {
-  const key = `${location.pathname}${location.hash}`;
-  if (cache?.key === key) return cache.route;
-  const { slug, fragment } = parse();
+function routeAt(url: URL, restore?: number): Route {
+  const { slug, fragment } = parse(url);
   const file = parseFileAddress(`/${slug}`);
-  const page = pageAt(slug);
-  if (cache && page && !ready(page)) return cache.route;
-  const route: Route = {
-    page,
+  return {
+    page: pageAt(slug),
     ...(file ? { file } : {}),
     fragment,
     ...(restore !== undefined ? { restore } : {}),
   };
-  restore = undefined;
-  cache = { key, route };
-  return route;
 }
 
+/** Can the page be shown now: its code has loaded, or failed to, which shows the error? */
+const ready = (page: DocumentPage) => page.module !== undefined || page.error !== undefined;
+
+let route = routeAt(new URL(location.href));
+const listeners = new Set<() => void>();
+
 function subscribe(notify: () => void) {
-  // The address changed. A page whose code is not loaded yet is shown when it has loaded,
-  // if the address still names it then.
-  const update = () => {
-    const page = pageAt(parse().slug);
-    if (page && !ready(page)) page.load().then(notify, notify);
-    else notify();
-  };
-  const pop = (event: PopStateEvent) => {
-    const scroll = (event.state as { scroll?: unknown } | null)?.scroll;
-    restore = typeof scroll === "number" ? scroll : undefined;
-    update();
-  };
-  window.addEventListener("popstate", pop);
-  window.addEventListener("hashchange", update);
-  window.addEventListener(changed, update);
-  return () => {
-    window.removeEventListener("popstate", pop);
-    window.removeEventListener("hashchange", update);
-    window.removeEventListener(changed, update);
-  };
+  listeners.add(notify);
+  return () => listeners.delete(notify);
+}
+
+/** The scroll position saved in a history entry's state. */
+function savedScroll(state: unknown): number | undefined {
+  const scroll = (state as { scroll?: unknown } | undefined)?.scroll;
+  return typeof scroll === "number" ? scroll : undefined;
+}
+
+/**
+ * Every navigation to an address the app shows, by a link, `navigate`, Back, or Forward,
+ * stays in the app. A new page is shown once its code has loaded, so the old page stays
+ * until then, and the new one renders with its content. The latest navigation wins.
+ *
+ * The page scrolls in its own element, and the browser resets and restores only the window's
+ * scroll position. The web app therefore scrolls the page itself, after the route changes.
+ */
+function intercept(event: NavigateEvent) {
+  if (!event.canIntercept || event.downloadRequest !== null || event.formData) return;
+  if (event.navigationType === "reload") return;
+  const url = new URL(event.destination.url);
+  if (!routed(url)) return;
+  const options = { scroll: "manual", focusReset: "manual" } as const;
+  if (event.navigationType !== "traverse" && url.href === location.href) {
+    // The same address again: scroll to its anchor, in the same history entry.
+    event.intercept({ ...options, handler: async () => scrollToFragment(route.fragment) });
+    return;
+  }
+  // Remember the position for Back and Forward to the entry the reader leaves.
+  navigation.updateCurrentEntry({ state: { scroll: scrollRoot().scrollTop } });
+  const restore =
+    event.navigationType === "traverse" ? savedScroll(event.destination.getState()) : undefined;
+  event.intercept({
+    ...options,
+    async handler() {
+      const page = pageAt(parse(url).slug);
+      if (page && !ready(page)) await page.load().catch(() => undefined);
+      if (event.signal.aborted) return;
+      route = routeAt(url, restore);
+      for (const notify of listeners) notify();
+    },
+  });
+}
+
+// Without the Navigation API, links load each page from the server.
+const navigationApi = "navigation" in window;
+if (navigationApi) {
+  navigation.addEventListener("navigate", intercept);
+  import.meta.hot?.dispose(() => navigation.removeEventListener("navigate", intercept));
 }
 
 export function useRoute(): Route {
-  return useSyncExternalStore(subscribe, snapshot);
+  return useSyncExternalStore(subscribe, () => route);
 }
 
 /** The page on screen, for code outside React. */
 export function currentPage(): DocumentPage | undefined {
-  return snapshot().page;
+  return route.page;
 }
 
 /**
@@ -130,18 +159,16 @@ export function scrollRoot(): HTMLElement {
   return document.querySelector<HTMLElement>("[data-scroll-root]") ?? document.documentElement;
 }
 
-/** Go to an address produced by `href`. Remembers the scroll position for Back. */
+/** Go to an address produced by `href`. */
 export function navigate(to: string, { replace = false } = {}) {
-  restore = undefined;
-  history.replaceState({ ...(history.state as object), scroll: scrollRoot().scrollTop }, "");
-  if (replace) history.replaceState({}, "", to);
-  else history.pushState({}, "", to);
-  window.dispatchEvent(new Event(changed));
+  if (navigationApi) navigation.navigate(to, { history: replace ? "replace" : "push" });
+  else if (replace) location.replace(to);
+  else location.assign(to);
 }
 
 /**
  * The stable address of a target, independent of how the app routes: "/page#anchor".
- * Context items, prompts, and Show on page use it; `href` turns it into a link.
+ * References, prompts, and Show on page use it; `href` turns it into a link.
  */
 export function addressOf(page: DocumentPage, fragment?: string): string {
   return `/${page.id}${fragment ? `#${fragment}` : ""}`;
@@ -158,9 +185,9 @@ export function parseAddress(address: string): {
 
 /** The canonical address for the current location, such as "/" → "/first-page". */
 export function canonicalize() {
-  const { slug, fragment } = parse();
+  const { slug, fragment } = parse(new URL(location.href));
   const first = pages[0];
-  if (!slug && first) history.replaceState(history.state, "", href(first, fragment));
+  if (!slug && first) history.replaceState(null, "", href(first, fragment));
 }
 
 /**
@@ -181,41 +208,6 @@ export function resolveHref(raw: string | undefined, from: DocumentPage | undefi
   return page ? href(page, resolved.fragment) : raw;
 }
 
-/** The address an internal link goes to, as `navigate` takes it, or undefined for any other link. */
-function internalTarget(anchor: HTMLAnchorElement): string | undefined {
-  if (anchor.target && anchor.target !== "_self") return;
-  if (anchor.hasAttribute("download")) return;
-  const url = new URL(anchor.href);
-  if (url.origin !== location.origin && location.protocol !== "file:") return;
-  const raw = anchor.getAttribute("href") ?? "";
-  if (hashMode ? !raw.startsWith("#/") : !url.pathname.startsWith(`${base}/`)) return;
-  if (!hashMode) {
-    const slug = url.pathname.slice(base.length).replace(/^\/+|\/+$/g, "");
-    const known =
-      pages.some((p) => p.id === slug) || url.pathname.startsWith(`${base}${filesPrefix}/`);
-    if (slug && !known) return;
-  }
-  return hashMode ? raw : `${url.pathname}${url.hash}`;
-}
-
-/** Handle clicks on internal links without reloading the app. */
-export function interceptLinks(event: MouseEvent) {
-  if (event.defaultPrevented || event.button !== 0) return;
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  const anchor = (event.target as Element | null)?.closest?.("a[href]");
-  if (!(anchor instanceof HTMLAnchorElement)) return;
-  const target = internalTarget(anchor);
-  if (!target) return;
-  if (target === (hashMode ? location.hash : `${location.pathname}${location.hash}`)) {
-    // The same address again: scroll to its anchor without a new history entry.
-    event.preventDefault();
-    scrollToFragment(parse().fragment);
-    return;
-  }
-  event.preventDefault();
-  navigate(target);
-}
-
 /**
  * Start loading the page a link goes to when the pointer or focus reaches the link, so the
  * page is usually ready when the link is followed.
@@ -223,19 +215,15 @@ export function interceptLinks(event: MouseEvent) {
 export function prefetchLinks(event: Event) {
   const anchor = (event.target as Element | null)?.closest?.("a[href]");
   if (!(anchor instanceof HTMLAnchorElement)) return;
-  const target = internalTarget(anchor);
-  if (!target) return;
-  const slug = (hashMode ? target.slice(1) : target.slice(base.length))
-    .split("#")[0]
-    ?.replace(/^\/+|\/+$/g, "");
-  const page = slug ? pages.find((p) => p.id === slug) : pages[0];
+  const url = new URL(anchor.href);
+  const page = routed(url) ? pageAt(parse(url).slug) : undefined;
   page?.load().catch(() => undefined);
 }
 
 /** Scroll to an anchor, or to the top when there is none. */
 export function scrollToFragment(fragment: string, smooth = true) {
   const target = fragment ? document.getElementById(fragment) : undefined;
-  // Diagram parts are SVG and ignore scroll margins; center them instead.
+  // Diagram elements are SVG and ignore scroll margins; center them instead.
   const block = target instanceof SVGElement ? "center" : "start";
   if (target) target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block });
   else if (!fragment) scrollRoot().scrollTo({ top: 0 });

@@ -1,11 +1,11 @@
 /**
- * The agent's side of the chat. An agent calls these from short snippets run with Node:
+ * The agent's side of the chat. An agent calls these from short commands run with Node:
  *
  *   node --input-type=module-typescript -e 'import { waitForMessage } from "yapparatus/agent";
  *     console.log((await waitForMessage()).prompt);'
  *
  * The library only transports. Every prompt and error comes from the server, which also
- * writes the next snippet to run; the library writes only transport errors.
+ * writes the next command to run; the library writes only transport errors.
  */
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -26,11 +26,11 @@ export type {
   AgentMessage,
   AgentState,
   Chat,
-  ContextItem,
   Diagnostic,
   DocumentDiagnostics,
   Message,
   ReaderMessage,
+  Reference,
   ReportedDiagnostic,
   UncheckedPage,
 } from "./protocol.ts";
@@ -41,7 +41,7 @@ const log = createLogger("agent");
 const requestWait = 25;
 
 /**
- * An error whose message is meant for the agent: what went wrong and the snippet to run next.
+ * An error whose message is meant for the agent: what went wrong and the command to run next.
  * A refused reply also carries the diagnostics behind it.
  */
 export class YapparatusError extends Error {
@@ -53,8 +53,8 @@ export class YapparatusError extends Error {
   }
 }
 
-// A snippet that does not catch an error ends with the server's text alone, not Node's frames
-// around it. Other errors keep their stack. Errors the snippet catches are not affected.
+// A command that does not catch an error ends with the server's text alone, not Node's frames
+// around it. Other errors keep their stack. Errors the command catches are not affected.
 process.on("uncaughtException", (error) => {
   process.stderr.write(
     `${error instanceof YapparatusError ? error.message : (error.stack ?? String(error))}\n`,
@@ -64,7 +64,7 @@ process.on("uncaughtException", (error) => {
 
 /**
  * The running server, from `.yapparatus/server.json` in this folder or the nearest above: its
- * address, the document it serves, and the project folder.
+ * address.
  */
 function findServer(): ServerFile {
   for (let dir = process.cwd(); ; dir = path.dirname(dir)) {
@@ -114,7 +114,7 @@ const reconnectFor = 30_000;
 /**
  * Wait until there is something for the agent: reader messages not answered yet, or errors in
  * the document that the agent has not been given. Resolves with them and the prompt to read,
- * which ends with the next snippet. The server remembers what it gave the agent, so calling
+ * which ends with the next command. The server remembers what it gave the agent, so calling
  * it again without replying gives the same messages.
  */
 export async function waitForMessage(): Promise<Chat> {
@@ -185,8 +185,8 @@ export async function checkDocument(): Promise<DocumentDiagnostics> {
 /**
  * Save a diagram's picture as the reader sees it in the light theme, as a PNG file to open as
  * an image. The address is the figure's, `/page#figure`. The file is where the picture is
- * written; the caller chooses it and removes it. `ids` labels each part with its id and
- * outlines the parts that diagnostics name.
+ * written; the caller chooses it and removes it. `ids` labels each element with its id and
+ * outlines the elements that diagnostics name.
  */
 export async function savePicture(
   address: string,

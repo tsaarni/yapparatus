@@ -1,0 +1,207 @@
+# Server
+
+The server is the dev server: Vite with the `yapparatus()` plugin, serving one document. This page describes what the server stores and computes. The requests and their bodies are in [the REST API](rest-api).
+
+## Overview
+
+<Ref to="server-modules" /> shows the modules that answer requests, the two clients that send them, and the directories the server reads and writes.
+
+<Diagram id="server-modules" caption="The modules of the server, its two clients, and the directories it reads and writes." description="The router passes requests to the chat handler, the diagnostic store, the picture handler, and the file handler. The chat log writes .yapparatus, the page compiler reads the document directory, and the file handler reads the external directories." draw={(d) => {
+  const web = d.box("Web app", { id: "web-app", role: "external" })
+  const library = d.box("Agent library", { id: "agent-library", role: "external" })
+  d.equalSize([web, library])
+
+  const router = d.box("Router", { id: "router", sub: "api.ts, http.ts", role: "accent" })
+  const resource = d.box("Chat handler", { id: "chat-handler", sub: "chat-resource.ts" })
+  const store = d.box("Diagnostic store", { id: "diagnostic-store", sub: "diagnostics.ts" })
+  const figures = d.box("Pictures", { id: "pictures", sub: "figures.ts" })
+  const files = d.box("External files", { id: "files", sub: "files.ts" })
+  const prompt = d.box("Prompts", { id: "prompts", sub: "prompt.ts" })
+  const log = d.box("Chat log", { id: "chat-log", sub: "chat.ts" })
+  const compiler = d.box("Page compiler", { id: "page-compiler", sub: "vite.ts and plugins" })
+  d.equalSize([router, prompt, resource, store, figures, files, log, compiler])
+
+  const modules = d.row([resource, store, figures, files], { gap: 48 })
+  d.place(router, { at: d.lerp(store.top, figures.top, 0.5).offset(0, -72), anchor: "bottom" })
+  const clients = d.row([web, library], { gap: 160 })
+  d.place(clients, { above: router, gap: 88 })
+  d.place(log, { below: resource, gap: 72 })
+  d.place(prompt, { leftOf: log, gap: 48 })
+  d.place(compiler, { at: d.lerp(store.bottom, figures.bottom, 0.5).offset(0, 72), anchor: "top" })
+
+  const state = d.cylinder(".yapparatus/", { id: "state-dir", sub: "chat, server.json", mono: true })
+  const docs = d.cylinder("Document directory", { id: "document-dir", sub: "pages" })
+  const external = d.cylinder("External directories", { id: "external-dirs" })
+  d.equalSize([state, docs, external])
+  d.place(state, { below: log, gap: 88 })
+  d.place(docs, { below: compiler, gap: 88 })
+  d.place(external, { at: d.xy(files.bottom, docs.top), anchor: "top" })
+
+  d.enclose([router, modules, prompt, log, compiler], { id: "server", title: "Server", titleAt: "bottomLeft" })
+
+  d.arrow(web, router, { id: "web-http", ends: "<->", label: "HTTP, updates" })
+  d.arrow(library, router, { id: "agent-http", label: "HTTP" })
+  d.arrow(router, resource, { id: "to-chat" })
+  d.arrow(router, store, { id: "to-diagnostics" })
+  d.arrow(router, figures, { id: "to-pictures" })
+  d.arrow(router, files, { id: "to-files" })
+  d.arrow(resource, store, { id: "new-errors" })
+  d.arrow(resource, log, { id: "to-log" })
+  d.arrow(resource.port("left", 0.5), prompt.top, { id: "writes-prompt" })
+  d.arrow(log, state, { id: "appends", label: "appends" })
+  d.arrow(log, compiler, { id: "checks-replies", label: "replies" })
+  d.arrow(store, compiler.port("top", 0.3), { id: "compiles" })
+  d.arrow(figures, compiler.port("top", 0.7), { id: "draws" })
+  d.arrow(compiler, docs, { id: "reads-pages", label: "reads" })
+  d.arrow(files, external, { id: "reads-files", label: "reads" })
+}}>
+  <Step focus="web-app agent-library web-http agent-http router">Both clients send requests to the router under `/-/api`. The web app also receives [updates](#updates).</Step>
+  <Step focus="chat-handler to-chat chat-log to-log appends state-dir">The chat handler answers reads of the chat, and the [chat log](#chat-log) stores the messages.</Step>
+  <Step focus="new-errors writes-prompt prompts">For an agent's read, the chat handler adds the new errors and writes the prompt.</Step>
+  <Step focus="checks-replies page-compiler">The chat log [compiles each reply](#reply-checks) before it stores it.</Step>
+  <Step focus="diagnostic-store to-diagnostics compiles reads-pages document-dir">The [diagnostic store](#diagnostic-store) compiles every page after each file change.</Step>
+  <Step focus="pictures to-pictures draws files to-files reads-files external-dirs">The other two handlers draw [pictures](#pictures) and read [external files](#external-files).</Step>
+</Diagram>
+
+[One function](/-/files/yapparatus/src/server/api.ts#L22-L127) creates the modules and connects them. When a module changes, this function sends an update to the web app and tells the chat handler, which answers the waiting agent reads.
+
+## Starting
+
+The [`yap` command](/-/files/yapparatus/src/cli.ts) takes a subcommand and a document directory, as in `yap dev docs/design`. The other subcommands are `preview` and [`build`](page-compiler#builds).
+
+The current directory is the project and Vite's root, and a project's `vite.config.ts` can add Vite options and plugins. The plugin stops with an error when the document directory is outside the project, has no `document.json`, or lies inside or around another document directory.
+
+The server listens on `127.0.0.1` only. When it starts, it writes its address to `.yapparatus/server.json` in the project, as `{"url":"http://127.0.0.1:5173"}`. The agent library reads this file to find the server. A closing server removes the file only if it still holds that server's address.
+
+## Chat log
+
+The chat of a document is a log in `.yapparatus/<directory>/chat.jsonl`, with one JSON object per line. `<directory>` is the path of the document directory. The [chat log module](/-/files/yapparatus/src/server/chat.ts#L142-L340) keeps the log in memory and appends each new message as one line. It never rewrites a line. <Ref to="server-chat-record" /> shows a reader message and the reply to it.
+
+<Diagram id="server-chat-record" caption="A reader message with one reference, and the reply to it, as two lines of chat.jsonl." description="Three records: a reader message with seq 12, its reference, and an agent message with seq 13 whose inReplyTo is 12." draw={(d) => {
+  const reader = d.record([
+    "seq\t12",
+    "author\t\"reader\"",
+    "text\t\"Why does a read wait?\"",
+    ["references\t[ 1 reference ]", { id: "references" }],
+    "createdAt\t\"2026-11-18T14:02:00.000Z\"",
+  ], { title: "chat.jsonl, line 12", id: "reader", mono: true })
+  const reply = d.record([
+    "seq\t13",
+    "author\t\"agent\"",
+    ["inReplyTo\t12", { id: "in-reply-to", role: "accent" }],
+    "readAt\t\"2026-11-18T14:02:00.410Z\"",
+    "module\t\"/.yapparatus/docs/design/chat/0b6e….mdx\"",
+    "createdAt\t\"2026-11-18T14:02:41.177Z\"",
+  ], { title: "chat.jsonl, line 13", id: "reply", mono: true })
+  const item = d.record([
+    "kind\t\"section\"",
+    "address\t\"/rest-api#read-the-chat\"",
+    "source\t\"docs/design/rest-api.mdx\"",
+    "startLine\t88",
+    "endLine\t140",
+  ], { title: "reference", id: "reference", mono: true })
+  d.row([reader, reply], { gap: 96, align: "start" })
+  d.place(item, { below: reader, gap: 56, align: "start" })
+  d.arrow(reply.element("in-reply-to"), reader.element("seq"), { id: "replies-to", label: "replies to" })
+  d.arrow(reader.element("references").left, item.left, { id: "holds", route: { viaX: reader.left.offset(-28, 0) } })
+}} />
+
+`seq` is the message's place in the log, starting at 1. A reply names in `inReplyTo` the newest reader message it answers, and the earlier unanswered reader messages count as answered too. `repliedTo` is the highest `inReplyTo` in the log. The reader messages after it are unanswered.
+
+`createdAt` is when the server stored the message. `readAt` on a reply is when the server first gave the answered message to an agent. The server keeps that time in memory only, so a reply after a restart has no `readAt`.
+
+A reader message holds its text and its [references](documents#references). A reply holds the path of its MDX file, `.yapparatus/<directory>/chat/<uuid>.mdx`, which the web app imports to show it. The name is random, so a new reply never reuses the address of a deleted one. Clearing the chat deletes the reply files and empties `chat.jsonl`, and numbering starts again at 1.
+
+## Agent state
+
+The server sees an agent only while one of its requests is open. It computes the agent state from these requests and two time limits. <Ref to="server-agent-state" /> shows the states and what moves between them.
+
+<Diagram id="server-agent-state" caption="The agent state as the server computes it." description="State machine with the states away, waiting, and working, and the agent requests and time limits that move between them" draw={(d) => {
+  const start = d.start()
+  const away = d.box("away", { mono: true, role: "muted" })
+  const waiting = d.box("waiting", { mono: true, role: "accent" })
+  const working = d.box("working", { mono: true })
+  d.equalSize([away, waiting, working])
+  d.row([away, waiting, working], { gap: 260 })
+  d.place(start, { leftOf: away, gap: 56 })
+  d.arrow(start, away)
+  d.arrow(away, waiting, { id: "connect", label: "read opens,\nor reply accepted", bend: 36 })
+  d.arrow(waiting, away, { id: "stop", label: "read closed unanswered,\nor 10 s without a read", bend: 36 })
+  d.arrow(waiting, waiting, { id: "idle", label: "empty read;\nthe next read follows", loop: "top" })
+  d.arrow(waiting, working, { id: "deliver", label: "read returns\nmessages or errors", bend: 36 })
+  d.arrow(working, waiting, { id: "answer", label: "read opens,\nor reply accepted", bend: 36 })
+  d.arrow(working.bottom, away.bottom, {
+    id: "give-up",
+    route: { viaY: waiting.bottom.offset(0, 120) },
+    label: { text: "nothing unanswered, 10 min, or chat cleared", segment: 1, side: "below" },
+  })
+}}>
+  <Step focus="away connect waiting idle">An empty read ends after at most 25 s, and the library opens the next one at once, so the agent stays waiting.</Step>
+  <Step focus="deliver working answer">A read that returns something starts the agent's work. The agent opens no read while it works.</Step>
+  <Step focus="stop give-up away">A read that closes before its answer means the agent's process ended.</Step>
+</Diagram>
+
+The server computes the state when it is asked, in this order:
+
+1. If a read of the current agent is open, or its last empty read or reply ended less than 10 s ago, the state is `waiting`.
+2. Otherwise, if the agent was given a reader message less than 10 minutes ago and no reply has answered it, the state is `working`.
+3. Otherwise the state is `away`.
+
+A timer runs out with each time limit, so the web app learns that the agent went away without a new request. <Ref to="server-agent-labels" /> lists the labels that the [chat panel](web-app#chat-panel) shows.
+
+<Table id="server-agent-labels" caption="The agent states and their labels in the web app.">
+
+| State | Meaning | Label in the web app |
+|---|---|---|
+| `waiting` | A read is open, or one ended a moment ago | Agent connected |
+| `working` | The agent read messages it has not replied to | Agent working, not connected |
+| `away` | Neither | Agent not connected |
+
+</Table>
+
+`working` is an estimate, and the 10 minute limit bounds how long a wrong estimate is shown.
+
+## What the agent has to do
+
+A read of the chat with the `Yapparatus-Agent` header is an agent's read. It returns what the agent has to do instead of the whole chat: every reader message after `repliedTo`, the new errors when the read asks for diagnostics, and a [prompt](agent-library#prompts) for both that ends with the command to run next. An error is new when it has lasted 2 s and the agent has not been given it, as [diagnostics](diagnostics#what-the-agent-sees) describes.
+
+The server remembers in memory what the reads returned. The newest reader message is the one that the next reply answers, and the errors count as given, so a later read does not return them. Messages that the agent read and did not answer come back on the next read.
+
+Each agent read carries a random agent id in the header, and the newest id becomes the current agent. The reads of earlier ids end with `409`, so a wait command left running by an old agent session cannot take messages meant for a new one.
+
+A read with `wait` stays open while it would return nothing. When the chat or the diagnostics change, the server computes each open read again and answers those that now have something.
+
+## Reply checks
+
+A reply is an agent's `POST` with MDX. The server refuses it with `409` when no agent read has returned a reader message since the chat was last cleared. Otherwise [it checks the reply](/-/files/yapparatus/src/server/chat.ts#L306-L339) and stores it:
+
+1. An empty reply is refused with `REPLY_EMPTY`.
+2. The MDX is written to a temporary file in the chat directory and compiled through Vite with the [page compiler](page-compiler#replies). A failure is `COMPILE_FAILED`.
+3. The server collects the errors: every error the page compiler found, components that are not built in (`UNKNOWN_COMPONENT`), and links that do not resolve. Warnings do not refuse a reply.
+4. With errors, the server deletes the temporary file and answers `422` with the errors. Without errors, it renames the file to a random name and appends the message to the log.
+
+Errors in the pages do not hold back a reply. Reader messages sent while the agent wrote the reply stay unanswered.
+
+## Diagnostic store
+
+The [diagnostic store](/-/files/yapparatus/src/server/diagnostics.ts#L72-L515) holds the diagnostics of the document. After each file change, it compiles every page and checks the links and `document.json`. It also keeps what browsers report for each page and each reply. How diagnostics are found, when an error becomes new for the agent, and how a read waits for recent checks are described in [diagnostics](diagnostics).
+
+## External files
+
+The file handler answers reads of external files for the [file view](web-app#file-view). The server reads a file only from a directory that `"files"` in `document.json` names, and only when the file's real path stays inside that directory. It refuses files under `.git`, files over 1 MB, and files that contain a NUL byte. The server watches each file it has served. When the file changes, the server sends its address as an update, and an open file view reads it again.
+
+## Pictures
+
+The picture handler draws a diagram as a PNG for the agent, without a browser. If the page file changed since its last compile, the handler compiles it first, so the picture matches the file on disk. [The diagram compiler](diagram-compiler#pictures) describes how it draws.
+
+## Updates
+
+The server sends changes to the web app on Vite's hot-update connection. It collects changes for 50 ms and then sends the latest data of each event, so a burst of edits produces one update. The chat and the diagnostics are one event each, and each changed external file is its own event. The server ignores changes to files under `.yapparatus/`, so storing a reply does not count as a change to the document. The events and their data are listed in [the REST API](rest-api#updates).
+
+## Security
+
+The server trusts local processes, which can already read and write the project, and uses no token. It guards against web pages in the reader's browser and DNS rebinding. It listens on `127.0.0.1`, so other machines cannot reach it. The router answers `403` to a request whose `Origin` header is not `http://` followed by the request's `Host`. The web app sends its own origin, and the agent library sends no `Origin` header. Vite checks the `Host` header against its allowed hosts before the router sees the request, which blocks DNS rebinding.
+
+## Logging
+
+The server, the web app, and the agent library share [one logger](/-/files/yapparatus/src/logger.ts). The environment variable `YAPPARATUS_LOG` sets the level everywhere: `debug`, `info`, `warn` (the default), `error`, or `silent`. The server passes its level to the web app. In Node every line goes to stderr, because the agent reads the agent library's stdout as its prompt.

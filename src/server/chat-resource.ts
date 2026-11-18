@@ -141,7 +141,7 @@ export class ChatResource {
   /**
    * One read of the chat. Without an agent: every message, every diagnostic if included, and
    * the start prompt. For an agent: the reader messages not answered yet, the errors it has
-   * not been given, and the prompt for them, which ends with the next snippet. What a
+   * not been given, and the prompt for them, which ends with the next command. What a
    * non-empty read gives the agent is remembered.
    */
   private read(query: Query, agent?: string): Chat {
@@ -166,7 +166,7 @@ export class ChatResource {
     };
   }
 
-  /** The prompt for reader messages and new errors, ending with the next snippet. */
+  /** The prompt for reader messages and new errors, ending with the next command. */
   private prompt(readers: ReturnType<ChatStore["readers"]>, fresh: Diagnostic[]): string {
     const { diagnostics } = this.options;
     const isNew = new Set(fresh.map(diagnosticKey));

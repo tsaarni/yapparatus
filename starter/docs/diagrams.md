@@ -30,7 +30,7 @@ The page compiler runs `draw` when it compiles the page, and the browser only dr
 
 ## Pick a form
 
-Draw a figure when it shows parts, a path, or an order faster than text; a rule stays a sentence. Find what the reader needs to see, and copy its example.
+Draw a figure when it shows structure, a path, or an order faster than text; a rule stays a sentence. Find what the reader needs to see, and copy its example.
 
 | To show | Example |
 |---|---|
@@ -39,7 +39,7 @@ Draw a figure when it shows parts, a path, or an order faster than text; a rule 
 | States and transitions | [A state machine](#a-state-machine) |
 | Messages over time | [Sequences](diagram-sequences.md) |
 | Tables, types, protocol headers, registers, arrays | [Structures](diagram-structures.md) |
-| Which part of a text or code matters | [Marked text](diagram-structures.md#marked-text) |
+| Which span of a text or code matters | [Marked text](diagram-structures.md#marked-text) |
 | A layout or a size | Boxes with a fixed `width` and `height`, placed with gaps that match the thing drawn |
 
 ### Components
@@ -113,15 +113,15 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 | `d.text(label, options?)` | Text without an outline; with `marks`, see [Marked text](diagram-structures.md#marked-text) |
 
 - **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
-- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The label takes part in the overlap checks, so put it on a side no edge leaves from. Without a label, the id is `start-1`, `end-2`, and so on. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
-- **Text:** `d.text` is for a remark that belongs to no part, such as a heading over a group. A label for a part belongs to the part.
+- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is `start-1`, `end-2`, and so on. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
+- **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element.
 
 Options:
 
 - `id`: see [Ids](#ids).
 - `sub`: a second, smaller line.
-- `role`: what the part is for. `accent` is the one part that matters most (one per figure, drawn heavier), `warning` is a failure or a risk (it gets a badge), `muted` steps a part back, and `external` is outside the system (dashed).
-- `category`: what sets the part apart, in a few words, such as `"New"` or `"To be removed"`. See [Categories](#categories).
+- `role`: what the element is for. `accent` is the one element that matters most (one per figure, drawn heavier), `warning` is a failure or a risk (it gets a badge), `muted` steps an element back, and `external` is outside the system (dashed).
+- `category`: what sets the element apart, in a few words, such as `"New"` or `"To be removed"`. See [Categories](#categories).
 
 `role` and `category` also work on arrows, enclosures, and sequence messages. There is no option for a color: the theme picks it.
 - `width`: a fixed width; the text wraps.
@@ -132,7 +132,7 @@ Options:
 
 ## Ids
 
-Every part has an id. Steps, links, and the reader's questions use it.
+Every element has an id. Steps, links, and the reader's comments use it.
 
 - A shape's id comes from its label: `"Auth service"` → `auth-service`. A labelled start or end too: `d.start("Request received")` → `request-received`.
 - An edge's id joins the ids of its ends: `client->api`. With a box labelled "Get an answer", the edge from `ask` is `ask->get-an-answer`.
@@ -142,11 +142,11 @@ Every part has an id. Steps, links, and the reader's questions use it.
 
 Set `id` when:
 
-- prose, a link, or a `Ref` points at the part, so editing its label does not change its address;
+- prose, a link, or a `Ref` points at the element, so editing its label does not change its address;
 - the derived id is long or unclear;
 - two edges join the same shapes.
 
-A link to a part is `/page#figure--part`, such as `/guide#request-flow--miss`. Steps may use derived ids, because they sit inside the figure and are checked with it.
+A link to an element is `/page#figure--element`, such as `/guide#request-flow--miss`. Steps may use derived ids, because they sit inside the figure and are checked with it.
 
 ## Layout
 
@@ -239,7 +239,7 @@ A label is a string or `{ text, segment, at, side, gap }`:
 
 ## Categories
 
-A category shows which parts belong together, or how they differ. Give parts the same `category` and they share a color; a legend under the figure names each color.
+A category shows which elements belong together, or how they differ. Give elements the same `category` and they share a color; a legend under the figure names each color.
 
 ```js
 const orders = d.box("Orders API", { category: "New" })
@@ -253,15 +253,15 @@ d.arrow(payments, db)
 d.arrow(batch, db, { dashed: true })
 ```
 
-- **Colors follow the order of first use.** The first category gets the first color, and so on. Parts without a category stay neutral.
+- **Colors follow the order of first use.** The first category gets the first color, and so on. Elements without a category stay neutral.
 - **At most four categories per figure.** More cannot be told apart reliably, especially with color blindness. A fifth is reported and drawn without a color.
 - **Name the difference, not the color.** The legend shows the words, so write what the reader should understand: "Runs in the browser", not "Blue".
-- **A category also has an id** for steps, derived like a label: `<Step focus="new">` focuses every part in "New". Pointing at a legend entry highlights its parts too.
-- A category changes a part's color only. An `accent` part in a category keeps its heavier outline, and a `warning` part keeps its badge.
+- **A category also has an id** for steps, derived like a label: `<Step focus="new">` focuses every element in "New". Pointing at a legend entry highlights its elements too.
+- A category changes an element's color only. An `accent` element in a category keeps its heavier outline, and a `warning` element keeps its badge.
 
 ## Steps
 
-Steps tell the story of a figure in order. Each `<Step>` names the parts it is about and says one or two sentences. Step text is MDX, so it can link to the section that explains more. Steps never move anything; they only change what is highlighted, faded, or shown.
+Steps tell the story of a figure in order. Each `<Step>` names the elements it is about and says one or two sentences. Step text is MDX, so it can link to the section that explains more. Steps never move anything; they only change what is highlighted, faded, or shown.
 
 ```mdx
 <Diagram id="cached-read" caption="A cached read." build draw={(d) => {
@@ -280,45 +280,45 @@ Steps tell the story of a figure in order. Each `<Step>` names the parts it is a
   <Step focus="client api client->api">The client sends a request to the API.</Step>
   <Step id="lookup" focus="cache api->cache most-reads-stop-here">The API first looks in the cache.</Step>
   <Step focus="database miss">On a miss, the cache reads the database.</Step>
-  <Step focus="row-1">Together, the three parts serve every read.</Step>
+  <Step focus="row-1">Together, the three serve every read.</Step>
 </Diagram>
 ```
 
 | Feature | Meaning |
 |---|---|
-| `focus` | Part ids, separated by spaces. Focused parts are highlighted; the others fade |
+| `focus` | Element ids, separated by spaces. Focused elements are highlighted; the others fade |
 | Containers | Focusing an enclosure, row, column, sequence, or sequence fragment focuses everything in it |
-| Categories | Focusing a category's id focuses every part in it |
-| `build` | Each part stays hidden until the first step that focuses it |
-| `stepOnly` | A shape or edge option: the part shows only in steps that focus it. Use it for callouts next to a part, or for versions of a label that change from step to step |
-| `id` | A step's address: `/page#cached-read--lookup`. Unique among the figure's parts and steps |
+| Categories | Focusing a category's id focuses every element in it |
+| `build` | Each element stays hidden until the first step that focuses it |
+| `stepOnly` | A shape or edge option: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
+| `id` | A step's address: `/page#cached-read--lookup`. Unique among the figure's elements and steps |
 
 To tell a story:
 
-Steps help when the reader must follow an order: a request through components, a pipeline, a protocol, or a state machine. Give a figure steps when the text would otherwise say "first … then … finally" about it. A figure with four parts or fewer, or one that shows a structure without an order, needs none.
+Steps help when the reader must follow an order: a request through components, a pipeline, a protocol, or a state machine. Give a figure steps when the text would otherwise say "first … then … finally" about it. A figure with four elements or fewer, or one that shows a structure without an order, needs none.
 
-- Start with a step that focuses the main parts, so the reader sees the whole cast.
-- Revisit a part in a later step when the story comes back to it.
+- Start with a step that focuses the main elements, so the reader sees the whole cast.
+- Revisit an element in a later step when the story comes back to it.
 - Put short remarks on the drawing with `stepOnly` notes. The eye then stays on the figure.
-- Show a change with two `stepOnly` parts in the same place, focused in different steps.
+- Show a change with two `stepOnly` elements in the same place, focused in different steps.
 - Say in each step what the drawing cannot: the reason or the consequence. Do not repeat the caption.
 - Link from a step to the section that explains more.
 - Steps and a numbered prose list that walk the same path repeat each other. Keep the walk in the steps, and keep rules and details in the prose after the figure.
-- With `build`, a part that no step focuses is shown, faded, from the first step. Focus every part that should appear in order.
+- With `build`, an element that no step focuses is shown, faded, from the first step. Focus every element that should appear in order.
 
-The reader steps with the buttons under the caption, the arrow keys, and Esc. Clicking a part opens the next step about it. A link to a step or part opens it. `<Ref to="cached-read--lookup">the lookup</Ref>` links to a step from the prose. When the reader asks about the figure, the question includes the open step. Print shows the whole figure, without step-only parts, and lists the steps.
+The reader steps with the buttons under the caption, the arrow keys, and Esc. Clicking an element opens the next step about it. A link to a step or element opens it. `<Ref to="cached-read--lookup">the lookup</Ref>` links to a step from the prose. When the reader comments on the figure, the message includes the open step. Print shows the whole figure, without step-only elements, and lists the steps.
 
 Use steps when the order matters. A simple figure needs none.
 
 ## Diagnostics
 
-The page compiler finds diagnostics when it compiles the page, so they are listed without a browser. In development, they also appear under the figure, as dashed outlines on the parts, and in the header's list. New errors are sent to the agent at once. If a compile fails, the last valid drawing stays on screen, dimmed.
+The page compiler finds diagnostics when it compiles the page, so they are listed without a browser. In development, they also appear under the figure, as dashed outlines on the elements, and in the header's list. New errors are sent to the agent at once. If a compile fails, the last valid drawing stays on screen, dimmed.
 
 | Code | Severity | Fix |
 |---|---|---|
 | `PLACEMENT_CYCLE` | error | Placements depend on each other. Place one of them independently |
 | `CONFLICTING_PLACEMENT` | error | A shape is in a row and also placed. Keep one |
-| `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or a part has the same id as a category, so steps cannot focus the category. Rename one |
+| `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
 | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT` | error | Check the `place()` options |
 | `DRAW_FAILED` | error | The `draw` function threw, at the line given, or it uses a name it does not define |
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
@@ -329,18 +329,18 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `BEND_WITH_ROUTE` | error | An edge has both `bend` and `route`. Keep one |
 | `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
-| `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only parts overlap only if one step shows both |
+| `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
 | `TEXT_OVERFLOW` | warning | Increase `width` or `height` |
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a row or column, or `place()` it |
-| `UNKNOWN_PART` | error | A step focuses an id that does not exist, or `part()` names a member that does not. The message lists the valid ids |
+| `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `element()` names a member that does not. The message lists the valid ids |
 | `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |
 | `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |
-| `STEP_ONLY_UNUSED` | warning | A `stepOnly` part that no step focuses is never shown |
+| `STEP_ONLY_UNUSED` | warning | A `stepOnly` element that no step focuses is never shown |
 | `DIAGRAM_SCROLLS` | warning | Wider than 1280 units. Stack it more vertically |
-| `FONT_FALLBACK` | warning | The text has characters the reader's fonts lack, such as "→", so its width is estimated. Use characters the fonts have, such as `->` |
-| `ACCENT_OVERUSED` | warning | Keep `role: "accent"` on one part; give the others the default role |
+| `FONT_FALLBACK` | warning | The text has characters the web app's fonts lack, such as "→", so its width is estimated. Use characters the fonts have, such as `->` |
+| `ACCENT_OVERUSED` | warning | Keep `role: "accent"` on one element; give the others the default role |
 | `TOO_MANY_CATEGORIES` | warning | Merge categories, or split the figure. Four is the most |
 
 ## Size
@@ -348,7 +348,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 - Figures are at least as wide as the text column (560 px). They grow to the right to fit the drawing, up to about 960 units at natural size.
 - On small screens, drawings shrink to 75 % of their natural size, then scroll sideways.
 - Keep text-heavy diagrams under about 960 units.
-- Text is measured with the reader's font files, so the checks match what the browser draws.
+- Text is measured with the web app's font files, so the checks match what the browser draws.
 
 ## Checklist
 
@@ -357,6 +357,6 @@ Before you finish a figure:
 - The document check lists no diagnostics for it.
 - The caption says what the figure shows in one or two sentences, and the text refers to it with `<Ref>` before or where it appears.
 - A figure that is hard to describe from its labels alone has a `description`.
-- At most one part has `role: "accent"`, and it is the part the text is about.
+- At most one element has `role: "accent"`, and it is the element the text is about.
 - Labels are short: two or three words, with details in `sub` or in the text.
-- Each step's `focus` names parts that exist; `UNKNOWN_PART` lists the valid ids.
+- Each step's `focus` names elements that exist; `UNKNOWN_ELEMENT` lists the valid ids.

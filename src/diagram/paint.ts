@@ -2,15 +2,15 @@
  * How a drawing is painted in the light theme, as plain values for code outside the browser:
  * the picture writer, which draws a figure as a standalone SVG.
  *
- * The values are read when this module loads, from the reader's own files: the theme file and
- * the role styles in `part.tsx`. StyleX's functions throw outside its compiler, so the theme
+ * The values are read when this module loads, from the web app's own files: the theme file and
+ * the role styles in `element.tsx`. StyleX's functions throw outside its compiler, so the theme
  * file is loaded with a stub in which they return their input.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import type { theme } from "../reader/theme.stylex.ts";
+import type { theme } from "../web/theme.stylex.ts";
 import type { Role } from "./scene.ts";
 
 // The same path from src/diagram/ and from the compiled lib/diagram/.
@@ -30,7 +30,7 @@ export async function loadThemes(): Promise<{
   stroke: Record<string, string>;
   dash: Record<string, string>;
 }> {
-  const text = readFileSync(source("reader/theme.stylex.ts"), "utf8").replace(
+  const text = readFileSync(source("web/theme.stylex.ts"), "utf8").replace(
     'import * as stylex from "@stylexjs/stylex";',
     "const stylex = { defineVars: (v: any) => v, defineConsts: (v: any) => v, createTheme: (_: unknown, v: any) => v };",
   );
@@ -45,14 +45,14 @@ export async function loadThemes(): Promise<{
 }
 
 const themes = await loadThemes();
-const part = readFileSync(source("diagram/part.tsx"), "utf8");
+const elementSource = readFileSync(source("diagram/element.tsx"), "utf8");
 
-/** The style object `name: { … }` in `part.tsx`, as its text. */
+/** The style object `name: { … }` in `element.tsx`, as its text. */
 function style(name: string): string {
   const found =
-    new RegExp(`^  ${name}: \\{(.*)\\},$`, "m").exec(part)?.[1] ??
-    new RegExp(`^  ${name}: \\{\\n([\\s\\S]*?)\\n  \\},$`, "m").exec(part)?.[1];
-  if (found === undefined) throw new Error(`part.tsx has no style ${name}.`);
+    new RegExp(`^  ${name}: \\{(.*)\\},$`, "m").exec(elementSource)?.[1] ??
+    new RegExp(`^  ${name}: \\{\\n([\\s\\S]*?)\\n  \\},$`, "m").exec(elementSource)?.[1];
+  if (found === undefined) throw new Error(`element.tsx has no style ${name}.`);
   return found;
 }
 
@@ -62,7 +62,7 @@ function token(name: string, property: string, scale: "theme" | "stroke"): strin
   const found =
     new RegExp(`"${property}": ${scale}\\.(\\w+)`).exec(text)?.[1] ??
     new RegExp(`"${property}": "(transparent)"`).exec(text)?.[1];
-  if (!found) throw new Error(`part.tsx's ${name} does not set ${property} to a token.`);
+  if (!found) throw new Error(`element.tsx's ${name} does not set ${property} to a token.`);
   return found;
 }
 
@@ -100,7 +100,7 @@ const rolePaint = (name: string): RolePaint => ({
   weight: token(name, "--weight", "stroke") as keyof typeof stroke,
 });
 
-/** The role table. An external part paints as a default part and is dashed. */
+/** The role table. An external element paints as a default element and is dashed. */
 export const roles: Record<Exclude<Role, "external">, RolePaint> = {
   default: rolePaint("roleDefault"),
   accent: rolePaint("roleAccent"),

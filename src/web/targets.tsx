@@ -1,10 +1,10 @@
 /**
- * Targets: everything a reader can link to or ask about.
+ * Targets: everything a reader can link to or comment on.
  *
  * A target is an element with `data-target` (its kind), `data-label` ("Table 6.3"),
  * `data-title` (caption or heading), and, when it can be linked, a real `id`. Sections,
- * figures, tables, listings, code blocks, and diagram parts all follow this contract, so
- * linking, asking, and locating work the same way for each.
+ * figures, tables, listings, code blocks, and diagram elements all follow this contract, so
+ * linking, commenting, and locating work the same way for each.
  */
 import * as stylex from "@stylexjs/stylex";
 import { createContext, type ReactNode, useContext } from "react";
@@ -14,8 +14,8 @@ import { duration, layer, radius, space, theme, when } from "./theme.stylex.ts";
 import { Button, styled, useCopy } from "./ui.tsx";
 
 export interface TargetHandlers {
-  /** Add the target containing this element to the question. Absent outside live mode. */
-  ask?: (element: Element) => void;
+  /** Add the target containing this element to the message. Absent outside live mode. */
+  comment?: (element: Element) => void;
   /** The full URL of the target containing this element, for copying. */
   link: (element: Element) => string | undefined;
 }
@@ -32,7 +32,7 @@ export function targetProps(kind: TargetKind, label?: string, title?: string) {
 }
 
 /**
- * Link and Ask buttons for the enclosing target. They appear on hover or keyboard focus,
+ * Link and Comment buttons for the enclosing target. They appear on hover or keyboard focus,
  * so the page stays quiet while reading.
  */
 export function TargetActions({
@@ -50,7 +50,7 @@ export function TargetActions({
 }) {
   const handlers = useContext(TargetContext);
   const [copied, copy] = useCopy();
-  if (!handlers || (!linkable && !handlers.ask)) return children ?? null;
+  if (!handlers || (!linkable && !handlers.comment)) return children ?? null;
   return (
     <span {...styled("target-actions", s.bar, placement === "corner" ? s.corner : s.inline)}>
       {children}
@@ -83,15 +83,15 @@ export function TargetActions({
           />
         </Button>
       )}
-      {handlers.ask && (
+      {handlers.comment && (
         <Button
           variant="icon"
           size="small"
-          aria-label={`Ask about ${name}`}
-          title="Ask about this"
-          onClick={(event) => handlers.ask?.(event.currentTarget)}
+          aria-label={`Comment on ${name}`}
+          title="Comment"
+          onClick={(event) => handlers.comment?.(event.currentTarget)}
         >
-          <Icon name="ask" size={14} />
+          <Icon name="comment" size={14} />
         </Button>
       )}
     </span>

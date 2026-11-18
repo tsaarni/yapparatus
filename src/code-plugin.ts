@@ -1,6 +1,6 @@
 /**
  * Code highlighting for pages, excerpts, and the file view, so code looks the same wherever it
- * appears. Each becomes `HighlightedCode`, which the reader draws. `<Excerpt from="/-/files/…"
+ * appears. Each becomes `HighlightedCode`, which the web app draws. `<Excerpt from="/-/files/…"
  * start="…" />` finds its lines in the file by their text at compile time and becomes a
  * highlighted code block that keeps the file's line numbers.
  */
@@ -28,7 +28,7 @@ import { codeMarks, contentIssues } from "./markdown-plugin.ts";
 import type { CodeMark, DiagnosticCode, HighlightedCode, SourceFileView } from "./protocol.ts";
 import type { SourceFile, SourceFiles } from "./source-files.ts";
 
-/** Code colors come from CSS variables, so they follow the reader theme. */
+/** Code colors come from CSS variables, so they follow the theme. */
 const codeTheme = createCssVariablesTheme({ name: "yapparatus", variablePrefix: "--shiki-" });
 
 /** Shiki's font style bits for underline and strikethrough. */

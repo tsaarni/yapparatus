@@ -1,0 +1,67 @@
+# Terminology
+
+This page explains the words that have a specific meaning in this document. Each term links to the page that describes it.
+
+## People and programs
+
+<Table id="terms-people" caption="The people and programs involved.">
+
+| Term | Meaning |
+|---|---|
+| Reader | The person who reads a document in the browser and comments on it in messages to the agent. |
+| Author | Whoever writes the pages of a document. This is usually the agent, and sometimes a person. |
+| [Agent](agent-library) | The reader's AI coding agent, such as Claude Code, running in a terminal. It writes and revises the pages and replies to the reader's messages. Yapparatus does not include an agent. |
+| [Web app](web-app) | The program that runs in the browser. It shows the pages and the chat. |
+| [Server](server) | The program that the reader starts with `pnpm dev`. It compiles the pages, serves them to the web app, and passes messages between the web app and the agent. |
+| [Agent library](agent-library) | The functions that the agent calls to receive the reader's messages and to send replies. |
+
+</Table>
+
+## Documents
+
+<Table id="terms-documents" caption="What a document is made of.">
+
+| Term | Meaning |
+|---|---|
+| [Document](documents) | A set of pages about one topic, with a list that gives their order. |
+| [Project](documents#projects-and-document-directories) | The directory in which the reader runs the server. It can hold several documents. |
+| [Document directory](documents#projects-and-document-directories) | The directory that holds the files of one document. |
+| [Address](documents#addresses) | The name of anything in a document that can be opened, linked to, or commented on. `/setup#install` is the address of the section "Install" on the page "Setup". |
+| [External file](documents#external-files) | A file from outside the project that a document shows, such as a source file of the software that the document describes. |
+| [Excerpt](page-compiler#code-and-excerpts) | Some lines of an external file, shown inside a page. |
+| [File view](web-app#file-view) | The screen of the web app that shows one whole external file. |
+| [Page compiler](page-compiler) | The part of the server that turns a page file into code that the web app can show. |
+| [Build](page-compiler#builds) | A copy of a document made for sharing: a static website or a single HTML file. A build has no chat. |
+
+</Table>
+
+## Diagrams and charts
+
+<Table id="terms-diagrams" caption="Terms for figures.">
+
+| Term | Meaning |
+|---|---|
+| Figure | Anything with a figure number and a caption: an image, a diagram, or a chart. |
+| [Diagram](components#diagram) | A figure made of shapes and arrows. The author describes it in a few lines of code, and the [diagram compiler](diagram-compiler) draws it. |
+| [Element](diagram-compiler#ids) | One shape, arrow, or cell in a diagram. The reader can click an element to comment on it. |
+| [Step](components#steps) | One stage of an explanation that a diagram shows in order. Each step highlights some elements and shows a sentence about them. |
+| [Picture](diagram-compiler#pictures) | An image file of a diagram that the server makes for the agent, so that the agent can see what it drew. |
+| [Chart](charts) | A figure that shows numbers, such as a line chart or a bar chart. |
+
+</Table>
+
+## Chat and diagnostics
+
+<Table id="terms-chat" caption="Terms for the chat between the reader and the agent.">
+
+| Term | Meaning |
+|---|---|
+| [Chat](server#chat-log) | The messages between the reader and the agent, shown in a panel beside the page. |
+| [Comment](web-app#commenting-on-the-page) | A message from the reader about something on the page, such as a question, a correction, or a request to change it. |
+| [Reply](agent-library#sendreply) | A message from the agent to the reader. |
+| [Reference](documents#references) | What a comment refers to: selected text, a section, a figure, an element of a diagram, or lines of a file. |
+| [Prompt](agent-library#prompts) | The text that the server writes for the agent. It holds the reader's messages, their references, and instructions for the next step. |
+| [Agent state](server#agent-state) | Whether an agent is connected to the chat and whether it is working on a reply. The chat panel shows it. |
+| [Diagnostic](diagnostics) | An error or a warning that the system found in a document, such as a broken link or two shapes that overlap in a diagram. |
+
+</Table>

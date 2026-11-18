@@ -2,7 +2,7 @@
  * Source files a document shows: their addresses, and where they are on disk. A document names
  * folders in `document.json` under `"files"`, such as `{ "contour": "../contour" }`, and its
  * pages point into them with `/-/files/contour/internal/dag/builder.go#L40-L72`. Shared by the
- * compiler, the dev server, and the reader.
+ * compiler, the dev server, and the web app.
  */
 import { appPrefix } from "./protocol.ts";
 
@@ -77,10 +77,10 @@ export function fileSource(
   const folder = folders[file.folder];
   if (folder === undefined) return;
   const out: string[] = [];
-  for (const part of `${content}/${folder}/${file.path}`.split("/")) {
-    if (!part || part === ".") continue;
-    if (part === ".." && out.length && out.at(-1) !== "..") out.pop();
-    else out.push(part);
+  for (const segment of `${content}/${folder}/${file.path}`.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === ".." && out.length && out.at(-1) !== "..") out.pop();
+    else out.push(segment);
   }
   return out.join("/");
 }

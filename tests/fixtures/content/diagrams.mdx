@@ -52,8 +52,8 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   ], { title: "users", header: "column\ttype\tkey", mono: true })
   const teams = d.record(["id\tuuid\tPK", "name\ttext"], { title: "teams", header: "column\ttype\tkey", mono: true, category: "New" })
   d.row([orders, users, teams], { gap: 80, align: "start" })
-  d.arrow(orders.part("user-id"), users.part("id"))
-  d.arrow(users.part("team-id"), teams.part("id"))
+  d.arrow(orders.element("user-id"), users.element("id"))
+  d.arrow(users.element("team-id"), teams.element("id"))
 }} />
 
 <Diagram id="tcp-header" caption="A protocol header with a ruler and a pinned field." draw={(d) => {
@@ -66,7 +66,7 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   const flags = d.note("1  CWR and ECE signal congestion")
   const options = d.note("Up to 40 bytes")
   d.place(d.row([flags, options], { gap: 40 }), { below: tcp, gap: 40 })
-  d.arrow(options, tcp.part("options-variable-length"))
+  d.arrow(options, tcp.element("options-variable-length"))
 }} />
 
 <Diagram id="hash-table" caption="An array of buckets and a linked list." draw={(d) => {
@@ -75,14 +75,14 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   const cat = d.record(["key: \"cat\"", "next"], { title: "entry", mono: true, category: "Collision" })
   const bee = d.record(["key: \"bee\"", "next"], { title: "entry", mono: true })
   d.place(d.row([ant, cat, bee], { gap: 40, align: "start" }), { below: buckets, gap: 56 })
-  d.arrow(buckets.part("2"), ant)
-  d.arrow(buckets.part("6"), bee)
-  d.arrow(ant.part("next"), cat.part("key-cat"))
+  d.arrow(buckets.element("2"), ant)
+  d.arrow(buckets.element("6"), bee)
+  d.arrow(ant.element("next"), cat.element("key-cat"))
 }} />
 
 ## Marked text
 
-<Diagram id="marked-request" caption="A request with marked parts." draw={(d) => {
+<Diagram id="marked-request" caption="A request with marked spans." draw={(d) => {
   const req = d.text("GET /users/42?fields=name HTTP/1.1\nHost: api.example.com\nAuthorization: Bearer eyJhbGciOi…", {
     mono: true,
     id: "req",
@@ -96,8 +96,8 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   const secret = d.note("Never logged")
   d.place(routing, { rightOf: req, gap: 64, align: "start" })
   d.place(secret, { below: routing, gap: 24 })
-  d.arrow(routing, req.part("host"))
-  d.arrow(secret, req.part("auth"))
+  d.arrow(routing, req.element("host"))
+  d.arrow(secret, req.element("auth"))
 }}>
   <Step focus="req.host">The host picks the site.</Step>
 </Diagram>

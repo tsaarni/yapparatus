@@ -174,7 +174,7 @@ To number a tree, wrap it in a `Figure`. The tree then draws no frame of its own
 <Ref to="system-map">the system map</Ref>
 ```
 
-`to` is a figure, table, or listing id, a heading id on this page, or an address on any page: `/setup` or `/setup#install`. `figure--part` points at a diagram part or step. The default link text is the generated name, such as "Table 2.4", "Section 3.2", or "Chapter 3"; without numbering, the caption, heading, or page title. Refer to every numbered item before or where it appears. In a reply, use addresses for headings.
+`to` is a figure, table, or listing id, a heading id on this page, or an address on any page: `/setup` or `/setup#install`. `figure--element` points at a diagram element or step. The default link text is the generated name, such as "Table 2.4", "Section 3.2", or "Chapter 3"; without numbering, the caption, heading, or page title. Refer to every numbered item before or where it appears. In a reply, use addresses for headings.
 
 ## Custom components
 

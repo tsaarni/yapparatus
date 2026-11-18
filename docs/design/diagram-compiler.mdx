@@ -1,0 +1,477 @@
+# Diagram compiler
+
+This page describes how the diagram compiler turns a draw program into a compiled diagram, and how the server draws a picture from it. How the web app shows a compiled diagram is on [the components page](components#diagram). How authors write diagrams is in [the diagram reference](/-/files/yapparatus/starter/docs/diagrams.md).
+
+## Overview
+
+The page compiler finds each `<Diagram>` on a page and [hands its draw program to the diagram compiler](page-compiler#diagrams), together with the ids and focus lists of its steps. The diagram compiler runs in the server. It records what the draw program creates, measures the text, sizes and places every element, routes the edges, checks the result, and returns a compiled diagram: plain data with every coordinate in it. <Ref to="dc-stages" /> shows the stages.
+
+<Diagram id="dc-stages" caption="The stages of the diagram compiler, with the module of each and what it adds." draw={(d) => {
+  const stages = [
+    d.box("Record", { sub: "figure.ts, scene.ts", id: "record" }),
+    d.box("Settle ids", { sub: "validate.ts", id: "ids" }),
+    d.box("Measure", { sub: "text.ts", id: "measure" }),
+    d.box("Size and place", { sub: "layout.ts, records.ts", id: "layout" }),
+    d.box("Route", { sub: "edges.ts", id: "route" }),
+    d.box("Check", { sub: "validate.ts", id: "check" }),
+    d.box("Finish", { sub: "compile.ts", id: "finish" }),
+    d.box("Check steps", { sub: "figure.ts", id: "steps" }),
+  ]
+  const adds = [
+    "elements and how each is placed",
+    "a unique id for every element",
+    "text lines and their widths",
+    "a rectangle for every element",
+    "points, arrowheads, label boxes",
+    "overlaps and crossings",
+    "legend, view box, rounding",
+    "unknown ids, width",
+  ]
+  d.equalSize(stages)
+  d.column(stages, { gap: 28 })
+  stages.forEach((stage, i) => {
+    const note = d.text(adds[i], { id: `adds-${stage.id}` })
+    d.place(note, { rightOf: stage, gap: 32 })
+  })
+  for (let i = 0; i < stages.length - 1; i++) d.arrow(stages[i], stages[i + 1])
+  const out = d.box("Compiled diagram", { role: "accent", id: "compiled" })
+  d.place(out, { below: stages[7], gap: 48 })
+  d.arrow(stages[7], out)
+  const page = d.box("Page", { sub: "in the page module", id: "page" })
+  const picture = d.box("Picture", { sub: "PNG for the agent", id: "picture" })
+  d.place(page, { below: out, gap: 56, align: "end" })
+  d.place(picture, { rightOf: page, gap: 64 })
+  d.arrow(out, page)
+  d.arrow(out, picture)
+}}>
+  <Step focus="record adds-record">The draw program runs. Each call records an element or says where an element goes. Nothing has a position yet. See [the scene](#the-scene).</Step>
+  <Step focus="ids adds-ids">Every element gets its final id. See [ids](#ids).</Step>
+  <Step focus="measure adds-measure layout adds-layout">Sizes need measured text, and positions need the positions they depend on. See [text measurement](#text-measurement) and [layout](#layout).</Step>
+  <Step focus="route adds-route">Each edge attaches to its ends and gets its arrowheads and labels. See [edges](#edges).</Step>
+  <Step focus="check adds-check">The checks compare the exact geometry and report what collides. They move nothing. See [checks](#checks).</Step>
+  <Step focus="finish adds-finish steps adds-steps">The compiler adds the legend and the view box and rounds the numbers. Then the steps are checked against the final ids.</Step>
+  <Step focus="compiled page picture">The page carries the compiled diagram, and the server draws a picture from the same data. See [the compiled diagram](#the-compiled-diagram) and [pictures](#pictures).</Step>
+</Diagram>
+
+[The compiler](/-/files/yapparatus/src/diagram/compile.ts#L24-L116) measures, sizes, and places on demand: it computes a value the first time a later stage asks for it, and keeps it. The order in <Ref to="dc-stages" /> is the order in which results become final.
+
+A stage reports each problem it finds and continues with a usable value, so one compile reports all problems at once. Only a placement cycle or an exception stops the compile, and the result then has no geometry. A diagram with any error is marked as failed, and the server draws no picture of it.
+
+### A running example
+
+The sections below follow one small diagram through the stages. <Ref to="dc-example-source" /> is its draw program: three elements in a row and below it, and two edges between them. <Ref to="dc-example" /> is the result, drawn with the `debug` prop, which shows each element's rectangle and id, each label's box, and each point of an edge.
+
+<Listing id="dc-example-source" caption="The draw program of the running example: three elements and two edges.">
+
+```ts
+(d) => {
+  const client = d.box("Client")
+  const api = d.box("API")
+  const db = d.cylinder("Database")
+  d.row([client, api])
+  d.place(db, { below: api })
+  d.arrow(client, api, "request")
+  d.arrow(api, db, "query")
+}
+```
+
+</Listing>
+
+<Diagram id="dc-example" caption="The running example, with the debug layer that shows rectangles, ids, label boxes, and edge points." debug draw={(d) => {
+  const client = d.box("Client")
+  const api = d.box("API")
+  const db = d.cylinder("Database")
+  d.row([client, api])
+  d.place(db, { below: api })
+  d.arrow(client, api, "request")
+  d.arrow(api, db, "query")
+}} />
+
+<Ref to="dc-example-stages" /> shows what the compiler knows about the example after each stage. The numbers are the ones the compiler computes with the web app's fonts.
+
+<Diagram id="dc-example-stages" caption="The running example after measuring, sizing, placing, and routing. Units are CSS pixels at natural size." draw={(d) => {
+  // Measure: each label's measured box, drawn as a frame around the text.
+  const words = [["Client", 38.02], ["API", 22.27], ["Database", 61.79]]
+  const texts = words.map(([w]) => d.text(w, { id: `text-${w.toLowerCase()}` }))
+  d.row(texts, { gap: 40, id: "measured" })
+  words.forEach(([, width], i) => {
+    const c = texts[i].center
+    d.frame(c.offset(-width / 2, -9.32), c.offset(width / 2, 9.32))
+  })
+  const widths = d.text("38.0, 22.3, and 61.8 wide; 18.6 high", { id: "measured-note" })
+  d.place(widths, { below: texts[1], gap: 28 })
+  const measure = d.enclose([texts[0], texts[1], texts[2], widths], { title: "Measure", id: "measure" })
+
+  // Size: each element around its text, at least the minimum size.
+  const sized = [d.box("Client", { id: "s-client" }), d.box("API", { id: "s-api" }), d.cylinder("Database", { id: "s-db" })]
+  const sizedRow = d.row(sized, { gap: 24, id: "sized", align: "start" })
+  const sizes = d.text("104 × 46, 104 × 46, 104 × 55.2", { id: "sized-note" })
+  d.place(sizes, { below: sized[1], gap: 28 })
+  d.enclose([...sized, sizes], { title: "Size", id: "size" })
+
+  // Place: the row places client and api; place() puts the database below api.
+  const pc = d.box("Client", { id: "p-client" })
+  const pa = d.box("API", { id: "p-api" })
+  const pd = d.cylinder("Database", { id: "p-db" })
+  const placedRow = d.row([pc, pa], { id: "placed" })
+  d.place(pd, { below: pa })
+  d.line(pc.right, pa.left, { ends: "<->", label: "88", id: "row-gap", role: "muted" })
+  d.line(pa.bottom, pd.top, { ends: "<->", label: "64", id: "place-gap", role: "muted" })
+  const origin = d.text("Client at (0, 0)", { id: "origin" })
+  d.place(origin, { below: pc, gap: 16 })
+  const place = d.enclose([pc, pa, pd, origin], { title: "Place", id: "place" })
+
+  // Route: the edges attach to the outlines and get their labels.
+  const rc = d.box("Client", { id: "r-client" })
+  const ra = d.box("API", { id: "r-api" })
+  const rd = d.cylinder("Database", { id: "r-db" })
+  const routedRow = d.row([rc, ra], { id: "routed" })
+  d.place(rd, { below: ra })
+  d.arrow(rc, ra, { label: "request", id: "r-request" })
+  d.arrow(ra, rd, { label: "query", id: "r-query" })
+  d.enclose([rc, ra, rd], { title: "Route", id: "route" })
+
+  // The four panels: Measure at the origin, the others beside and below it.
+  d.place(sizedRow, { at: measure.topRight.offset(60, 34), anchor: "topLeft" })
+  d.place(placedRow, { at: measure.bottomLeft.offset(20, 74), anchor: "topLeft" })
+  d.place(routedRow, { at: place.topRight.offset(60, 34), anchor: "topLeft" })
+}} />
+
+## The scene
+
+The draw program receives an object `d` whose functions record elements and arrangements, which together are the scene. A function that creates an element returns an object that stands for it, and the program passes it to later calls, such as a row or an edge. <Ref to="dc-scene" /> shows the scene of the running example.
+
+<Diagram id="dc-scene" caption="The scene that the running example records: each element and what sets its position." draw={(d) => {
+  d.record([
+    "client\tbox\tin row-1",
+    "api\tbox\tin row-1",
+    ["database\tcylinder\tbelow api", { id: "db-place" }],
+    "row-1\trow\tnothing: the origin",
+    "client->api\tedge\tfrom client to api",
+    "api->database\tedge\tfrom api to database",
+  ], { title: "Scene", header: "id\tkind\tposition", mono: true, id: "scene" })
+}} />
+
+An element in the scene has no coordinates. A point on it, such as `api.bottom`, or a point computed from others, such as `api.bottom.offset(0, 20)`, is a description that the layout evaluates once the positions it names are known. The order of the statements therefore does not matter.
+
+Each element gets its position from exactly one source: the row or column it is in, or the `place()` call that places it. A second source is `CONFLICTING_PLACEMENT`, and the first one stays in force. Before layout, the compiler looks for elements with no source. The first one goes to the origin, and every other one is reported as `UNPLACED`. In the running example, only the row has no source, so it is at the origin.
+
+Rows and columns can be placed like any element, so they nest.
+
+## Ids
+
+Every element has an id. The page uses it as the element's address, `/page#figure--element`, and steps, diagnostics, and references refer to elements by it. An author may set `id`. Without one, the compiler derives an id, as <Ref to="dc-ids" /> lists.
+
+<Table id="dc-ids" caption="Derived ids.">
+
+| Element | Derived id | Example |
+|---|---|---|
+| A shape with a label | The label as a slug: lowercase, with hyphens for everything else | `"Auth service"` → `auth-service` |
+| A row or column | The direction and its count among rows and columns | `row-1`, `column-2` |
+| An enclosure | Its title as a slug, or `boundary` and its count | `backend`, `boundary-1` |
+| An edge | The ids of its two ends, joined by `->` | `client->api` |
+| A cell or a mark | The parent's id, a dot, and its own name as a slug | `users.team-id` |
+| A category | Its name as a slug | `to-be-removed` |
+
+</Table>
+
+[The id check](/-/files/yapparatus/src/diagram/validate.ts#L30-L50) makes the ids final before layout. A repeated explicit id is `DUPLICATE_ID`, and a repeated derived id gets `-2`, `-3`, in the order of creation. Cells, marks, and edges are settled last, because their ids are built from the final ids of their parents and ends.
+
+A derived id changes when its label changes. The link check verifies only the figure part of an address, so [the diagram reference](/-/files/yapparatus/starter/docs/diagrams.md#L133-L150) asks for an explicit id on any element that something outside points at.
+
+## Text measurement
+
+[Text measurement](/-/files/yapparatus/src/diagram/text.ts#L76-L162) splits each label into lines, and wraps them at word boundaries when the shape has a fixed `width`. Every line in the compiled diagram carries its font size and weight, and the web app and the picture draw it with exactly those values.
+
+The widths come from [the font measure](/-/files/yapparatus/src/font-measure.ts#L57-L71), which reads the font files and `@font-face` rules that the web app loads. For each character, it picks the face that a browser picks, and it shapes the text with fontkit. A browser test checks that its widths are within 0.5 pixels of the browser's own. A character that no face has gets a width of one em and is reported as `FONT_FALLBACK`, because a browser draws it in a system font of unknown width.
+
+## Layout
+
+[The layout](/-/files/yapparatus/src/diagram/layout.ts#L33-L326) answers three questions about any element: its size, its position, and its rectangle, which combines the two. Sizes are computed from the inside out, and positions from the outside in.
+
+### Sizes
+
+A shape's size is its measured text plus the shape's padding, and at least a minimum size. A fixed `width` or `height` replaces it, and shapes in a size group, such as `equalSize`, take the largest size in the group. A row is as wide as its children and the gaps between them, and as tall as its tallest child; a column is the same on the other axis. An enclosure surrounds its members with padding and a band for its title.
+
+In the running example, "Client" measures 38.0 by 18.6. With the padding, the box would be 70 by 40.6, so the minimum size of 104 by 46 applies. The cylinder adds 7.3 units of cap above and below its text and is 55.2 units tall.
+
+### Positions
+
+A position is the top-left corner of an element's rectangle. A child of a row or column sits after the children before it, one gap apart. An element placed with `place()` sits at the gap from the rectangle of the element it names, or puts its anchor on the point it names.
+
+<Ref to="dc-resolve" /> shows the values that the layout computes to place the database in the running example. Each is computed once, the first time it is needed.
+
+<Diagram id="dc-resolve" caption="The values the layout computes to place the database in the running example. Each arrow points at a value that is needed first." draw={(d) => {
+  const value = (label, id) => d.box(label, { id })
+  const db = value("Database position", "pos-db")
+  const dbSize = value("Database size", "size-db")
+  const apiRect = value("API rectangle", "rect-api")
+  const apiPos = value("API position", "pos-api")
+  const apiSize = value("API size", "size-api")
+  const row = value("Row position", "pos-row")
+  const offsets = value("Offsets in the row", "offsets")
+  const clientSize = value("Client size", "size-client")
+  d.equalSize([db, dbSize, apiRect, apiPos, apiSize, row, offsets, clientSize])
+  d.row([dbSize, db, apiRect], { gap: 48, id: "level-1" })
+  d.place(d.row([apiPos, apiSize], { gap: 48, id: "level-2" }), { below: apiRect, gap: 56, align: "end" })
+  d.place(d.row([row, offsets], { gap: 48, id: "level-3" }), { below: apiPos, gap: 56, align: "end" })
+  d.place(clientSize, { below: offsets, gap: 56 })
+  d.arrow(db, dbSize)
+  d.arrow(db, apiRect)
+  d.arrow(apiRect, apiPos)
+  d.arrow(apiRect, apiSize)
+  d.arrow(apiPos, row)
+  d.arrow(apiPos, offsets)
+  d.arrow(offsets, clientSize)
+  d.arrow(offsets, apiSize)
+  const origin = d.text("placed by nothing: the origin", { id: "origin-note" })
+  d.place(origin, { below: row, gap: 20 })
+}} />
+
+The layout keeps the chain of values in progress. When it needs a value that is already in the chain, the placements depend on each other, and the compiler stops with `PLACEMENT_CYCLE` and the chain, such as `position(api) → position(cache) → position(api)`.
+
+### Three rectangles of a shape
+
+The compiler uses three rectangles for each shape, as <Ref to="dc-boxes" /> shows. The **layout bounds** are the position and size, and placement uses them. The **outline** is the shape as drawn, such as the rhombus of a diamond, and edges attach to it. The **ink bounds** cover everything painted. They differ from the layout bounds only for a start or end with a label beside its dot. The label lies outside the layout bounds, so it does not move the dot off the axis of its column. Enclosures, the overlap checks, and the view box use the ink bounds.
+
+<Diagram id="dc-boxes" caption="The layout bounds and outline of a decision, and the layout and ink bounds of a labelled start." draw={(d) => {
+  const check = d.box("Check", { id: "check" })
+  const valid = d.decision("Valid?", { id: "valid" })
+  const pair = d.row([check, valid], { gap: 72, id: "decision-row" })
+  d.frame(valid.topLeft, valid.bottomRight, { id: "valid-bounds" })
+  d.arrow(check.topRight, valid, { id: "to-outline" })
+  const decisionNote = d.text("The frame is the layout bounds.\nThe edge stops at the outline.", { id: "decision-note" })
+  d.place(decisionNote, { below: pair, gap: 24 })
+  const start = d.start("Request received", { id: "start" })
+  d.place(start, { rightOf: valid, gap: 72 })
+  d.frame(start.topLeft.offset(-3, -3), start.bottomRight.offset(3, 3), { id: "start-bounds" })
+  d.frame(start.topLeft.offset(-6, -24), start.bottomRight.offset(8 + 113.38 + 6, 8), { id: "start-ink", tab: "ink bounds" })
+  const startNote = d.text("The small frame is the layout bounds.\nRows and gaps use the dot alone.", { id: "start-note" })
+  d.place(startNote, { below: start, gap: 40, align: "start" })
+}} />
+
+## Edges
+
+[Routing](/-/files/yapparatus/src/diagram/edges.ts#L37-L298) turns each edge into a list of points, its arrowheads, and its label boxes. An edge that ends at an element attaches to the element's outline. An edge that ends at a point, such as `api.bottom`, ends exactly there.
+
+### Routes
+
+The author chooses the form of the route, and the compiler adds the corners that the form needs between the two ends. <Ref to="dc-routes" /> shows the forms: a straight line, one elbow, a channel at a given x or y, a list of points, a curve, and a loop.
+
+<Diagram id="dc-routes" caption="The route forms, a curve, and loops." draw={(d) => {
+  const panel = (title, at, draw) => {
+    const a = d.box("A", { width: 56, id: `${title}-a` })
+    const b = d.box("B", { width: 56, id: `${title}-b` })
+    d.place(a, { at, anchor: "topLeft" })
+    draw(a, b)
+    d.enclose([a, b], { title, id: title })
+  }
+  panel("straight", [0, 0], (a, b) => {
+    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
+    d.arrow(a, b, { id: "straight-edge" })
+  })
+  panel("hv", [240, 0], (a, b) => {
+    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
+    d.arrow(a, b, { id: "hv-edge", route: "hv" })
+  })
+  panel("viaY", [480, 0], (a, b) => {
+    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
+    d.arrow(a, b, { id: "viay-edge", route: { viaY: d.lerp(a.bottom, b.top) } })
+  })
+  panel("via", [0, 250], (a, b) => {
+    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
+    d.arrow(a, b, { id: "via-edge", route: { via: [a.right.offset(24, 0), b.top.offset(0, -24)] } })
+  })
+  panel("bend", [240, 250], (a, b) => {
+    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
+    d.arrow(a, b, { id: "bend-ab", bend: 20 })
+    d.arrow(b, a, { id: "bend-ba", bend: 20 })
+  })
+  panel("loop", [480, 250], (a, b) => {
+    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
+    d.arrow(a, a, { id: "self-a" })
+    d.arrow(b, b, { id: "self-b", loop: "left" })
+  })
+}} />
+
+A straight edge attaches where the line from the element's center toward the other end leaves the outline. An edge with corners attaches at the middle of the side that faces its first or last straight piece, so it leaves the element at a right angle. An edge whose ends coincide is `DEGENERATE_EDGE`.
+
+In the running example, `client->api` is straight. Both elements are at the same height, so the line between their centers leaves Client at its right side, at (104, 23), and meets API at its left side, at (192, 23).
+
+### Labels
+
+[A label](/-/files/yapparatus/src/diagram/edges.ts#L223-L295) stays horizontal and sits on one straight piece of the finished route: by default the longest, at its middle, above a horizontal piece and to the right of a vertical one. A label on a single straight edge must fit between the two ends, or the compiler reports `LABEL_CROWDED`. Labels on other routes are covered by [the overlap checks](#checks).
+
+In the running example, "request" sits above the middle of its edge, centered at x = 148, and "query" sits to the right of the vertical edge.
+
+### Arrowheads
+
+A head points along the last straight piece, with its tip on the end point. The line is shortened into the head, so the stroke does not show past the tip. In the running example, the line of `client->api` ends at x = 186.5, and the tip of its head is at x = 192.
+
+## Records and marked text
+
+The cells of a record and the marks of a text are elements of their own, so edges, steps, and links treat them like any other element. Their rectangles come from their parent's rectangle. <Ref to="dc-record" /> shows a record; the forms for authors are in [the structures reference](/-/files/yapparatus/starter/docs/diagram-structures.md).
+
+<Diagram id="dc-record" caption="A record on a grid of eight columns: cells of several spans, an inner cell with a pin, and an edge that enters a cell on the outline." draw={(d) => {
+  const rec = d.record([
+    ["Kind", 8],
+    ["Ver", 2], ["Flags", { span: 4, pin: 1 }], ["Len", 2],
+    ["Payload", 16],
+  ], { title: "frame", columns: 8, id: "frame" })
+  const pin = d.note("1  An inner cell: no free side", { id: "pin-note" })
+  const outline = d.note("A cell on the outline", { id: "outline-note" })
+  d.place(d.column([pin, outline], { gap: 24, align: "start" }), { rightOf: rec, gap: 64, align: "start" })
+  d.arrow(outline, rec.element("payload"))
+}} />
+
+[The grid](/-/files/yapparatus/src/diagram/records.ts#L54-L156) lays out a record's cells row by row on equal columns, as wide as the widest text needs. A cell can span several columns, and a cell that starts a row and spans a multiple of the row covers several rows, as Payload does. A cell that does not fit in its row is `CELL_SPAN`.
+
+An edge at a cell [attaches at the middle of a side on the record's outline](/-/files/yapparatus/src/diagram/records.ts#L337-L360), so that it crosses no other cell. A cell with no such side, such as Flags, cannot take an edge without crossing its neighbors, so a pin gives it a numbered badge that a note can refer to.
+
+[A mark](/-/files/yapparatus/src/diagram/records.ts#L224-L278) highlights words or lines of a text. The compiler finds the marked words in the measured lines and computes their rectangle from the measured widths. Words that do not occur exactly once on one line are `MARK_UNMATCHED`.
+
+## Sequences
+
+[A sequence diagram](/-/files/yapparatus/src/diagram/sequence.ts#L79-L362) is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A call opens an activation bar on its receiver, and the reply closes it. Lifelines and bars are drawn, but the checks and the steps leave them out.
+
+## Roles and categories
+
+The compiler gives every element a role and at most one category. The web app and the picture turn them into colors and strokes, as [the components page](components#roles-and-categories) shows.
+
+An element keeps the role the author gave it, or the default role, and an enclosure without a role is `muted`. More than one element with the `accent` role is `ACCENT_OVERUSED`.
+
+[Categories are numbered](/-/files/yapparatus/src/diagram/compile.ts#L35-L38) 1 to 4 in the order the draw program first uses them, and each number has its own color. A fifth category is `TOO_MANY_CATEGORIES`, and its elements get no color. The legend lists the categories, and a step that focuses a category's id focuses all its elements.
+
+## Checks
+
+Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. What each code means and how an author fixes it is in [the diagram reference](/-/files/yapparatus/starter/docs/diagrams.md#L313-L345).
+
+<Table id="dc-check-origins" caption="The stage that finds each diagram diagnostic.">
+
+| Stage | Codes |
+|---|---|
+| Running the draw program | `DRAW_FAILED`, `STEP_NOT_TEXT`, `FONT_FALLBACK` |
+| Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT` |
+| Settle ids | `DUPLICATE_ID`, `UNPLACED` |
+| Measure, size, and place | `TEXT_OVERFLOW`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
+| Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED` |
+| Check | `NODE_OVERLAP`, `EDGE_NODE_INTERSECTION`, `LABEL_OVERLAP`, `ENCLOSURE_TITLE_CROSSED`, `ENCLOSURE_INTRUSION`, `ACCENT_OVERUSED` |
+| Finish | `TOO_MANY_CATEGORIES`, `DUPLICATE_ID`, `DIAGRAM_FAILED` |
+| Check steps | `UNKNOWN_ELEMENT`, `DUPLICATE_ID`, `STEP_ONLY_UNUSED`, `NODE_OVERLAP`, `BUILD_WITHOUT_STEPS`, `DIAGRAM_SCROLLS` |
+
+</Table>
+
+### Collisions
+
+[The collision checks](/-/files/yapparatus/src/diagram/validate.ts#L71-L230) run on the exact geometry, before rounding. Two rectangles overlap only when they share more than half a unit in both directions, and an edge hits a shape only when it passes more than one unit inside it. Shapes that touch, and an edge that ends on an outline, are therefore not reported. Edges also keep eight units away from enclosure titles.
+
+The checks report conflicts between elements that the reader sees as separate. They skip a cell or mark and its parent, an edge and its own ends, lifelines and activation bars, and pairs of step-only elements, which the step checks compare.
+
+### Steps and width
+
+[The step checks](/-/files/yapparatus/src/diagram/figure.ts#L83-L163) run on the finished diagram, so they see the final ids. Each id in a step's `focus` must name an element, a container, or a category, or it is `UNKNOWN_ELEMENT`. Every step-only element must appear in some step, and two that one step shows together must not overlap.
+
+[The width check](/-/files/yapparatus/src/diagram/figure.ts#L71-L81) reports `DIAGRAM_SCROLLS` for a diagram wider than a fixed limit: the widest figure area divided by the smallest scale the web app shrinks a diagram to. The limit does not depend on any window, so every author gets the same result.
+
+## The compiled diagram
+
+<Ref to="dc-compiled-type" /> shows the type of the compiled diagram. It holds what the web app and the picture need to draw, and nothing that only the compiler uses.
+
+<Listing id="dc-compiled-type" caption="The compiled diagram, in src/diagram/compiled.ts.">
+<Excerpt from="/-/files/yapparatus/src/diagram/compiled.ts" start="export interface CompiledDiagram {" />
+</Listing>
+
+Shapes, edges, enclosures, and frames hold their final geometry: rectangles, points, and text lines with their positions and fonts. `groups` lists, for each container and category, the elements that a step focuses with it. `ok` and `diagnostics` say whether the diagram can be drawn and what is wrong with it. <Ref to="dc-compiled-edge" /> shows one edge of the running example.
+
+<Diagram id="dc-compiled-edge" caption="The compiled edge api->database of the running example." draw={(d) => {
+  d.record([
+    "id\t\"api->database\"",
+    "role\t\"default\"",
+    "head\t\"filled\"",
+    "points\t(244, 46) (244, 104.5)",
+    "heads\t(244, 110) (240, 100) (244, 102.8) (248, 100)",
+    "labels\t\"query\" at (270.71, 78), box 41.42 × 18.56",
+    "ariaLabel\t\"query, from API to Database\"",
+  ], { title: "api->database", header: "field\tvalue", mono: true, id: "edge" })
+}} />
+
+Every reader downloads the compiled diagrams of a page with its JavaScript, so [the last stage](/-/files/yapparatus/src/diagram/compile.ts#L77-L112) keeps them small. It rounds every number to hundredths of a unit, once, after the checks. It also computes the view box: everything painted, with a margin, rounded outward to whole units.
+
+## Pictures
+
+A picture is a PNG of a diagram that the server draws for the agent. The agent asks for it with [`savePicture`](agent-library#savepicture), through [the figures resource](rest-api#read-a-picture), and [the server](server#pictures) draws it from the compiled diagram of the page as it is on disk. <Ref to="dc-picture" /> shows how.
+
+<Diagram id="dc-picture" caption="How the server draws a picture: an SVG from the compiled diagram, then a PNG by resvg." draw={(d) => {
+  const compiled = d.box("Compiled diagram", { id: "compiled" })
+  const svg = d.box("SVG writer", { sub: "picture.ts", id: "svg" })
+  const resvg = d.box("resvg", { sub: "2 pixels per unit", id: "resvg" })
+  const png = d.box("PNG", { role: "accent", id: "png" })
+  d.equalSize([compiled, svg, resvg, png])
+  d.row([compiled, svg, resvg, png], { gap: 56 })
+  d.arrow(compiled, svg)
+  d.arrow(svg, resvg)
+  d.arrow(resvg, png)
+  const paint = d.box("Light theme colors", { sub: "paint.ts", id: "paint" })
+  const glyphs = d.box("Glyph outlines", { sub: "font-measure.ts", id: "glyphs" })
+  d.place(d.row([paint, glyphs], { gap: 32, id: "inputs" }), { above: svg, gap: 56 })
+  d.arrow(paint, svg)
+  d.arrow(glyphs, svg)
+}} />
+
+[The SVG writer](/-/files/yapparatus/src/diagram/picture.ts#L98-L369) writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same [shape outlines](/-/files/yapparatus/src/diagram/shapes.ts), and adds a legend below. The picture shows the diagram with no step open. Its colors are those of the light theme, so every agent gets the same picture; [styling](styling) describes how the server reads them. Text is drawn as [glyph outlines](/-/files/yapparatus/src/font-measure.ts#L111-L143) from the web app's font files, so it is exactly as wide as the compiler measured it.
+
+With the `ids` option, the picture also writes each element's id beside it and outlines the elements that diagnostics name. [The server](/-/files/yapparatus/src/server/figures.ts#L26-L38) passes the SVG to resvg at two pixels per unit, so that small text stays legible to a model.
+
+## Where the code is
+
+<Figure id="dc-files" caption="The modules of the diagram compiler and the picture.">
+
+<FileTree>
+
+- src/
+  - diagram/
+    - **scene.ts** what a draw program calls, and the scene it records
+    - figure.ts runs the draw program, checks steps and width
+    - compile.ts runs the stages, makes the legend, finishes
+    - text.ts measures and wraps labels
+    - metrics.ts fonts, paddings, and shape sizes
+    - layout.ts sizes, positions, rectangles, and points
+    - records.ts record grids, cells, and marks
+    - geometry.ts rectangles, anchors, sides, and segment tests
+    - nodes.ts compiled shapes, enclosures, and frames
+    - edges.ts routes, curves, loops, arrowheads, labels
+    - sequence.ts sequence diagrams from the other elements
+    - validate.ts ids, placement, and collisions
+    - compiled.ts the compiled diagram and step state
+    - shapes.ts outlines as path data, for the web app and the picture
+    - element.tsx the colors of roles and categories, and what every drawn element shares
+    - paint.ts the light theme and role colors as plain values
+    - picture.ts the compiled diagram as a standalone SVG
+    - Diagram.tsx, DiagramView.tsx, NodeView.tsx, EdgeView.tsx, Legend.tsx, Diagnostics.tsx the web app's views; see [components](components#diagram)
+  - diagram-plugin.ts the page compiler's diagram stage
+  - font-measure.ts widths and glyph outlines from the font files
+  - server/
+    - figures.ts the figures resource and resvg
+
+</FileTree>
+
+</Figure>
+
+## Design decisions
+
+The author arranges the diagram, and the compiler measures it. Automatic graph layout, as in Graphviz or ELK, can rearrange the whole diagram when one edge is added. A language model states an arrangement well and computes coordinates poorly, so the author states rows, columns, and placements, and the compiler computes every number.
+
+The compiler reports problems and does not repair them. A silent repair, such as moving a shape to remove an overlap, hides the problem, changes what the author wrote, and can be undone by the next edit.
+
+A draw program is TypeScript. A text language such as Mermaid, D2, or PlantUML is shorter for simple graphs, but it has no loops, variables, or functions, and its errors are vague. An error in a draw program names the page line of the statement.
+
+Diagrams compile on the server, so their diagnostics are known as soon as the page compiles, and a build carries data instead of programs. The cost is that the server measures text from the font files.
+
+Pictures are drawn by resvg inside the server process. A headless browser would draw the web app's own SVG exactly, but it is a large dependency and takes seconds to start for one image.
+
+## Sources
+
+- [Pikchr user manual](https://pikchr.org/home/doc/trunk/doc/userman.md): named objects, relative placement, anchors, paths.
+- [CeTZ](https://github.com/cetz-package/cetz): composable drawing, groups, named anchors.
+- [Fletcher manual](https://github.com/fletcher-package/fletcher/blob/main/docs/manual.typ): nodes fitted to content, edge snapping, labels.
+- [Typst measure](https://typst.app/docs/reference/layout/measure/): shapes built around measured content.

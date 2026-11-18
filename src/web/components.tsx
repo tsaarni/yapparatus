@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { type HTMLAttributes, type ReactNode, useContext } from "react";
-import { partSeparator } from "../document.ts";
+import { elementSeparator } from "../document.ts";
 import { parseFileAddress } from "../files.ts";
 import { createLogger } from "../logger.ts";
 import type { FileTreeEntry } from "../markdown-plugin.ts";
@@ -73,7 +73,7 @@ export function FigureFrame({
   // figure draws the frame and the caption.
   if (inFigure)
     return (
-      <div {...styled(`figure-part ${props.className ?? ""}`, s.figurePart)}>
+      <div {...styled(`figure-nested ${props.className ?? ""}`, s.figureNested)}>
         {children}
         {footer}
       </div>
@@ -191,7 +191,7 @@ function Titled({
 export interface RefProps {
   /**
    * A figure, table, or listing id, a heading id on this page, or an address on any page:
-   * "/page" or "/page#id". `figure--part` points at a diagram part or step; it opens that step.
+   * "/page" or "/page#id". `figure--element` points at a diagram element or step; it opens that step.
    */
   to: string;
   /** Link text. Default: "Figure 3.1", "Section 3.2", "Chapter 3", or the caption, heading, or title. */
@@ -201,7 +201,7 @@ export interface RefProps {
 /** A cross-reference that stays correct when figures and sections are renumbered. */
 export function Ref({ to, children }: RefProps) {
   const page = usePage();
-  const [base = "", part] = to.split(partSeparator);
+  const [base = "", element] = to.split(elementSeparator);
   const target = findTarget(base, page);
   if (!target) {
     if (import.meta.env.DEV) log.warn(`Ref: nothing has the id "${to}".`);
@@ -209,7 +209,10 @@ export function Ref({ to, children }: RefProps) {
   }
   return (
     <a
-      href={href(target.page, part ? `${target.fragment}${partSeparator}${part}` : target.fragment)}
+      href={href(
+        target.page,
+        element ? `${target.fragment}${elementSeparator}${element}` : target.fragment,
+      )}
       {...stylex.props(s.ref, ui.focus)}
     >
       {children ?? target.label}
@@ -420,7 +423,7 @@ const s = stylex.create({
   figureWide: {
     width: "100%",
   },
-  figurePart: {
+  figureNested: {
     minWidth: 0,
     overflowX: "auto",
   },

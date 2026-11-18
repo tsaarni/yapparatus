@@ -86,7 +86,7 @@ plot={(Plot, rows) => ({
 
 Draw thousands of rows with a transform, such as `Plot.binX` or `Plot.windowY`, rather than one mark per row: each mark is an element on the page.
 
-A reader asks about a chart as a whole, like any figure.
+A reader comments on a chart as a whole, like any figure.
 
 ## Diagnostics
 

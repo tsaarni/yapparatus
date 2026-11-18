@@ -1,26 +1,26 @@
 /**
  * Everything the agent reads, written in one place: messages, idle output, errors, and the
- * exact snippet to run next. The library passes this text on unchanged.
+ * exact command to run next. The library passes this text on unchanged.
  */
 import { quoteOf, splitAddress } from "../document.ts";
 import {
-  type ContextItem,
   type Diagnostic,
   diagnosticCodes,
   type ReaderMessage,
+  type Reference,
   type ReportedDiagnostic,
   type UncheckedPage,
 } from "../protocol.ts";
 
 const run = "node --input-type=module-typescript -e";
 
-/** The snippet that waits for reader messages and new errors. */
-export function waitSnippet(): string {
+/** The command that waits for reader messages and new errors. */
+export function waitCommand(): string {
   return `${run} 'import { waitForMessage } from "yapparatus/agent"; console.log((await waitForMessage()).prompt);'`;
 }
 
-/** The snippet that sends MDX on stdin as the reply, then waits again. */
-export function replySnippet(): string {
+/** The command that sends MDX on stdin as the reply, then waits again. */
+export function replyCommand(): string {
   return [
     `${run} 'import { sendReply, waitForMessage } from "yapparatus/agent"; await sendReply(); console.log((await waitForMessage()).prompt);' <<'MDX'`,
     "<your reply>",
@@ -28,13 +28,13 @@ export function replySnippet(): string {
   ].join("\n");
 }
 
-/** The snippet that prints the document's diagnostics once the checks of recent edits are done. */
-export function checkSnippet(): string {
+/** The command that prints the document's diagnostics once the checks of recent edits are done. */
+export function checkCommand(): string {
   return `${run} 'import { checkDocument } from "yapparatus/agent"; console.log((await checkDocument()).prompt);'`;
 }
 
-/** The snippet that saves a figure's picture as a PNG file that the agent names. */
-export function pictureSnippet(): string {
+/** The command that saves a figure's picture as a PNG file that the agent names. */
+export function pictureCommand(): string {
   return `${run} 'import { savePicture } from "yapparatus/agent"; await savePicture("/page#figure", "/tmp/figure.png");'`;
 }
 
@@ -54,14 +54,14 @@ export const pictureErrors = {
   chart: (address: string) =>
     `${address} is a chart, and only diagrams have pictures. A browser checks a chart when it shows the page.`,
   notDrawn: (address: string) =>
-    `${address} could not be drawn. Check the document, fix the diagram's errors, and ask again:\n\n${checkSnippet()}`,
+    `${address} could not be drawn. Check the document, fix the diagram's errors, and ask again:\n\n${checkCommand()}`,
   notCompiled: (page: string, message: string) =>
-    `The page ${page} does not compile: ${message}\nCheck the document, fix it, and ask again:\n\n${checkSnippet()}`,
+    `The page ${page} does not compile: ${message}\nCheck the document, fix it, and ask again:\n\n${checkCommand()}`,
 };
 
 /**
  * One line per diagnostic, the same everywhere the agent reads one:
- * "- error CODE file:lines, /page#figure, parts a, b: message". A reply being checked has no
+ * "- error CODE file:lines, /page#figure, elements a, b: message". A reply being checked has no
  * file yet, so its problems name only the line.
  */
 function describeDiagnostic(d: Diagnostic | ReportedDiagnostic, fresh = false): string {
@@ -71,7 +71,7 @@ function describeDiagnostic(d: Diagnostic | ReportedDiagnostic, fresh = false): 
     d.source ? `${d.source}${lines}` : d.line ? `line ${d.line}` : "",
     address ?? "",
     d.origin === "reply" && d.target ? `reply #${d.target}` : "",
-    d.elements?.length ? `parts ${d.elements.join(", ")}` : "",
+    d.elements?.length ? `elements ${d.elements.join(", ")}` : "",
   ]
     .filter(Boolean)
     .join(", ");
@@ -119,7 +119,7 @@ export function diagnosticsSection(
     .join("\n");
 }
 
-const kindName: Record<ContextItem["kind"], string> = {
+const kindName: Record<Reference["kind"], string> = {
   page: "page",
   text: "text",
   section: "section",
@@ -127,16 +127,16 @@ const kindName: Record<ContextItem["kind"], string> = {
   table: "table",
   listing: "listing",
   code: "code",
-  "diagram-part": "diagram part",
+  "diagram-element": "diagram element",
   file: "file",
   lines: "file lines",
 };
 
 /**
- * One line per item: what, its lines in the source, its address, and the reader's words or step.
+ * One line per reference: what, its lines in the source, its address, and the reader's words or step.
  * A page or a whole file has no lines: the agent reads the file.
  */
-function describeContext(item: ContextItem): string {
+function describeReference(item: Reference): string {
   const { page, anchor } = splitAddress(item.address);
   const { source, startLine: start, endLine: end } = item;
   const lines =
@@ -171,16 +171,16 @@ export function messagesPrompt(
         "--- reader ---",
         message.text,
         "--- end reader ---",
-        message.context.length
-          ? `Context, at the lines the reader saw. If the file changed since, find each by its address and words:\n${message.context
-              .map(describeContext)
+        message.references.length
+          ? `References, at the lines the reader saw. If the file changed since, find each by its address and words:\n${message.references
+              .map(describeReference)
               .join("\n")}`
-          : "No context: a question about the document in general.",
+          : "No references: a message about the document in general.",
       ].join("\n"),
     ),
     diagnostics,
-    `Edit pages (${guide}) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\n${checkSnippet()}\n\nThen reply and wait:`,
-    replySnippet(),
+    `Edit pages (${guide}) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\n${checkCommand()}\n\nThen reply and wait:`,
+    replyCommand(),
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -194,15 +194,15 @@ export function errorsPrompt(diagnostics: string, canReply: boolean): string {
   return [
     "The document has new errors.",
     diagnostics,
-    `Fix them, then check the document again:\n\n${checkSnippet()}`,
+    `Fix them, then check the document again:\n\n${checkCommand()}`,
     canReply
-      ? `Tell the reader what you changed, and wait:\n\n${replySnippet()}`
-      : `Then wait:\n\n${waitSnippet()}`,
+      ? `Tell the reader what you changed, and wait:\n\n${replyCommand()}`
+      : `Then wait:\n\n${waitCommand()}`,
   ].join("\n\n");
 }
 
 export function idlePrompt(): string {
-  return `Nothing new. Wait again:\n\n${waitSnippet()}`;
+  return `Nothing new. Wait again:\n\n${waitCommand()}`;
 }
 
 /**
@@ -219,12 +219,12 @@ function foldersSection(folders: Record<string, string>): string {
 
 export function startPrompt(guide: string, folders: Record<string, string>, root: string): string {
   return [
-    `You are connected to a Yapparatus document. A reader asks about it in the browser, and you answer by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when the answer is a page edit: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses).`,
+    `You are connected to a Yapparatus document. In the browser, a reader comments on it and sends you messages. You act on each by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when you edit a page: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses).`,
     foldersSection(folders),
     `Run this from the project directory, ${root}, and follow what it prints. It waits until the reader writes, which may take hours: run it in the background if you are notified when commands finish, otherwise with the longest timeout your shell allows, and run it again if your shell stops it.`,
-    waitSnippet(),
-    `After editing pages, and before you reply, check the document and fix its errors and warnings:\n\n${checkSnippet()}`,
-    `Diagnostics catch overlaps and unknown parts, not a drawing that is hard to read. After you write or change a diagram and the check is clean, look at it once: this saves its picture as the reader sees it in the PNG file that you name, for you to open and then delete. Add { ids: true } as a third argument to label each part with its id.\n\n${pictureSnippet()}`,
+    waitCommand(),
+    `After editing pages, and before you reply, check the document and fix its errors and warnings:\n\n${checkCommand()}`,
+    `Diagnostics catch overlaps and unknown elements, not a drawing that is hard to read. After you write or change a diagram and the check is clean, look at it once: this saves its picture as the reader sees it in the PNG file that you name, for you to open and then delete. Add { ids: true } as a third argument to label each element with its id.\n\n${pictureCommand()}`,
   ]
     .filter(Boolean)
     .join("\n\n");
@@ -234,13 +234,13 @@ export function rejectedReply(errors: Diagnostic[]): string {
   return [
     "The reply was not sent:",
     errors.map((d) => describeDiagnostic(d)).join("\n"),
-    "Fix the MDX and run the snippet again.",
+    "Fix the MDX and run the command again.",
   ].join("\n\n");
 }
 
 /** A reply with no reader message to answer: none was given to the agent, or the chat was cleared. */
 export function nothingToAnswer(): string {
-  return `There is no reader message to answer. Wait for one:\n\n${waitSnippet()}`;
+  return `There is no reader message to answer. Wait for one:\n\n${waitCommand()}`;
 }
 
 export const takenOver = "Another agent took over the chat. Stop waiting.";

@@ -1,15 +1,15 @@
 /**
- * The legend under a figure: one entry per category, which highlights its parts.
+ * The legend under a figure: one entry per category, which highlights its elements.
  */
 import * as stylex from "@stylexjs/stylex";
-import { space } from "../reader/theme.stylex.ts";
-import { Button, styled } from "../reader/ui.tsx";
+import { space } from "../web/theme.stylex.ts";
+import { Button, styled } from "../web/ui.tsx";
 import type { LegendEntry } from "./compiled.ts";
-import { categoryStyle } from "./part.tsx";
+import { categoryStyle } from "./element.tsx";
 
 /**
  * The legend: one entry per category, with its color and its words. Pointing at an entry,
- * or focusing it, highlights the category's parts, so the reader can find them without
+ * or focusing it, highlights the category's elements, so the reader can find them without
  * telling colors apart.
  */
 export function Legend({
@@ -17,7 +17,7 @@ export function Legend({
   preview,
 }: {
   legend: LegendEntry[];
-  preview: (parts: string[] | undefined) => void;
+  preview: (elements: string[] | undefined) => void;
 }) {
   return (
     <ul aria-label="Legend" {...styled("diagram-legend", styles.legend)}>
@@ -26,10 +26,10 @@ export function Legend({
           <Button
             variant="ghost"
             size="small"
-            title="Highlight these parts"
-            onMouseEnter={() => preview(entry.parts)}
+            title="Highlight these elements"
+            onMouseEnter={() => preview(entry.elements)}
             onMouseLeave={() => preview(undefined)}
-            onFocus={() => preview(entry.parts)}
+            onFocus={() => preview(entry.elements)}
             onBlur={() => preview(undefined)}
           >
             <span {...stylex.props(categoryStyle(entry.slot), styles.swatch)} />

@@ -1,7 +1,7 @@
 /**
  * Agents copy the examples in the diagram reference, so every example must draw. Each
  * `js` block is a draw program; each `mdx` block is a `<Diagram>` whose draw program
- * compiles and whose steps focus parts it has.
+ * compiles and whose steps focus elements it has.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -20,19 +20,19 @@ test("the diagram reference has pages with examples", () => {
 
 for (const page of pages)
   examples(page).forEach(({ draw, focus }, i) => {
-    test(`${page}: example ${i + 1} draws, and its steps focus its parts`, () => {
+    test(`${page}: example ${i + 1} draws, and its steps focus its elements`, () => {
       assert.ok(draw.trim(), "an mdx example has a draw program");
       const d = new DiagramBuilder();
       new Function("d", draw)(d);
       const out = compile(d, measure);
       const errors = out.diagnostics.filter((x) => diagnosticCodes[x.code].severity === "error");
       assert.deepEqual(errors, []);
-      const parts = new Set([
+      const elements = new Set([
         ...[...out.nodes, ...out.edges, ...out.enclosures].map((p) => p.id),
         ...Object.keys(out.groups),
       ]);
       assert.deepEqual(
-        focus.filter((id) => !parts.has(id)),
+        focus.filter((id) => !elements.has(id)),
         [],
       );
     });

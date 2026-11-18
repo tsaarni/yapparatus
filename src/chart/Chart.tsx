@@ -2,10 +2,10 @@ import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Diagnostics } from "../diagram/Diagnostics.tsx";
 import { diagnosticCodes } from "../protocol.ts";
-import { FigureFrame } from "../reader/components.tsx";
-import { useChartReport } from "../reader/diagnostics.tsx";
-import { fontSize, radius, sizes, space, theme } from "../reader/theme.stylex.ts";
-import { Button, styled } from "../reader/ui.tsx";
+import { FigureFrame } from "../web/components.tsx";
+import { useChartReport } from "../web/diagnostics.tsx";
+import { fontSize, radius, sizes, space, theme } from "../web/theme.stylex.ts";
+import { Button, styled } from "../web/ui.tsx";
 import { type ChartData, rowObjects } from "./data.ts";
 import { useFontsReady } from "./fonts.ts";
 import {

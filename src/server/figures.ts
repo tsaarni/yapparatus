@@ -1,6 +1,6 @@
 /**
  * Pictures of diagrams: GET /-/api/figures/{page}/{figure} answers with a PNG of the figure as
- * the reader draws it in the light theme, or with its part ids, so that an agent can look at
+ * the web app draws it in the light theme, or with its element ids, so that an agent can look at
  * what it drew. The page compiler keeps each page's drawings; this resource draws one
  * as an SVG with text as outlines, and rasterizes it without a browser.
  */

@@ -1,5 +1,5 @@
 /**
- * Waiting for the reader's fonts in the browser. A chart measures its tick labels only after
+ * Waiting for the web app's fonts in the browser. A chart measures its tick labels only after
  * the fonts are ready.
  */
 import { useEffect, useState } from "react";

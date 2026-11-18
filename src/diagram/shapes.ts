@@ -1,5 +1,5 @@
 /**
- * The outlines of drawn shapes as SVG path data. The reader's views and the picture writer
+ * The outlines of drawn shapes as SVG path data. The web app's views and the picture writer
  * draw with the same functions, so a shape looks the same in both.
  */
 import type { Rect, Vec } from "./geometry.ts";
@@ -86,7 +86,7 @@ export function diamond(r: Rect): string {
   return `${x + w / 2},${y} ${x + w},${y + h / 2} ${x + w / 2},${y + h} ${x},${y + h / 2}`;
 }
 
-/** Where a warning badge sits: on the part's top-right corner. */
+/** Where a warning badge sits: on the element's top-right corner. */
 export function badgeCenter(r: Rect): Vec {
   return { x: r.x + r.width - 2, y: r.y + 2 };
 }

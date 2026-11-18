@@ -12,7 +12,7 @@ export const maxFileSize = 1_000_000;
 export interface SourceFile {
   /** Absolute real path. */
   file: string;
-  /** Path relative to the project folder, as context items and prompts name it. */
+  /** Path relative to the project folder, as references and prompts name it. */
   source: string;
   /** The file's lines, without the empty one after a final newline. */
   lines: string[];

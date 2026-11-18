@@ -35,8 +35,8 @@ export type {
 export type { DocumentSettings, NumberingSettings, PageOutline } from "./document.ts";
 export type {
   CodeMark,
-  ContextItem,
   HighlightedCode,
+  Reference,
   SourceFileView,
   TargetKind,
 } from "./protocol.ts";
@@ -49,6 +49,6 @@ export {
   Ref,
   type RefProps,
   Table,
-} from "./reader/components.tsx";
+} from "./web/components.tsx";
 
-export { Icon, type IconProps } from "./reader/icons.tsx";
+export { Icon, type IconProps } from "./web/icons.tsx";
