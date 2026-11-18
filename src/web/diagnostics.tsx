@@ -27,7 +27,7 @@ import {
   space,
   theme,
 } from "./theme.stylex.ts";
-import { Button, ui } from "./ui.tsx";
+import { Button, ui, useCopy } from "./ui.tsx";
 
 const log = createLogger("diagnostics");
 const live = import.meta.env.DEV;
@@ -148,7 +148,7 @@ const counted = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 
 /**
  * The header's indicator, shown only when the document has errors or warnings, and its list.
- * An item opens where it is; Comment attaches that place to the message box.
+ * An item's code and line open where it is. Its buttons copy it and attach it to the message box.
  */
 export function DiagnosticsMenu({
   diagnostics,
@@ -200,43 +200,24 @@ export function DiagnosticsMenu({
                   <h3 {...stylex.props(s.group)}>{label}</h3>
                   <ul {...stylex.props(s.items)}>
                     {items.map((diagnostic, i) => (
-                      // biome-ignore lint/suspicious/noArrayIndexKey: Diagnostics have no ids.
-                      <li key={i} {...stylex.props(s.row)}>
-                        <button
-                          type="button"
-                          disabled={!page}
-                          onClick={() => {
-                            if (page) navigate(href(page, diagnostic.target ?? ""));
+                      <Row
+                        // biome-ignore lint/suspicious/noArrayIndexKey: Diagnostics have no ids.
+                        key={i}
+                        diagnostic={diagnostic}
+                        {...(page && {
+                          onOpen: () => {
+                            navigate(href(page, diagnostic.target ?? ""));
                             setOpen(false);
-                          }}
-                          {...stylex.props(s.item, ui.focus)}
-                        >
-                          <span
-                            {...stylex.props(
-                              s.dot,
-                              diagnostic.severity === "error" ? s.dotError : s.dotWarning,
-                            )}
-                          />
-                          <span {...stylex.props(s.itemText)}>
-                            <code {...stylex.props(s.code)}>{diagnostic.code}</code>
-                            {diagnostic.line ? `Line ${diagnostic.line}: ` : ""}
-                            {diagnostic.message}
-                          </span>
-                        </button>
-                        {onComment && page && (
-                          <Button
-                            size="small"
-                            variant="ghost"
-                            aria-label={`Comment on ${diagnostic.code}`}
-                            onClick={() => {
+                          },
+                        })}
+                        {...(onComment &&
+                          page && {
+                            onComment: () => {
                               setOpen(false);
                               onComment(diagnostic);
-                            }}
-                          >
-                            <Icon name="comment" size={14} /> Comment
-                          </Button>
-                        )}
-                      </li>
+                            },
+                          })}
+                      />
                     ))}
                   </ul>
                 </section>
@@ -246,6 +227,73 @@ export function DiagnosticsMenu({
         </div>
       )}
     </div>
+  );
+}
+
+/** A diagnostic as text to paste elsewhere: its code, its file and line, and its message. */
+function asText(diagnostic: ReportedDiagnostic) {
+  const place = [diagnostic.source, diagnostic.line].filter(Boolean).join(":");
+  return `${diagnostic.code}${place ? ` ${place}` : ""}: ${diagnostic.message}`;
+}
+
+/**
+ * One diagnostic in the list. Its code and line open where it is. The message is plain text,
+ * so the reader can select it, and the buttons copy it or attach it to the message box.
+ */
+function Row({
+  diagnostic,
+  onOpen,
+  onComment,
+}: {
+  diagnostic: ReportedDiagnostic;
+  onOpen?: () => void;
+  onComment?: () => void;
+}) {
+  const [copied, copy] = useCopy();
+  const copyLabel =
+    copied === "copied"
+      ? `${diagnostic.code} copied`
+      : copied === "failed"
+        ? "The clipboard is not available"
+        : `Copy ${diagnostic.code}`;
+  return (
+    <li {...stylex.props(s.row)}>
+      <span {...stylex.props(s.dot, diagnostic.severity === "error" ? s.dotError : s.dotWarning)} />
+      <span {...stylex.props(s.itemText)}>
+        <button
+          type="button"
+          disabled={!onOpen}
+          onClick={onOpen}
+          {...stylex.props(s.place, ui.focus)}
+        >
+          <code {...stylex.props(s.code)}>{diagnostic.code}</code>
+          {diagnostic.line ? `Line ${diagnostic.line}` : ""}
+        </button>
+        {diagnostic.message}
+      </span>
+      <span {...stylex.props(s.actions)}>
+        <Button
+          variant="icon"
+          size="small"
+          aria-label={copyLabel}
+          title={copied === "idle" ? "Copy" : copyLabel}
+          onClick={() => void copy(asText(diagnostic))}
+        >
+          <Icon name={copied === "copied" ? "check" : "copy"} size={14} />
+        </Button>
+        {onComment && (
+          <Button
+            variant="icon"
+            size="small"
+            aria-label={`Comment on ${diagnostic.code}`}
+            title="Comment"
+            onClick={onComment}
+          >
+            <Icon name="comment" size={14} />
+          </Button>
+        )}
+      </span>
+    </li>
   );
 }
 
@@ -310,36 +358,41 @@ const s = stylex.create({
     textTransform: "uppercase",
   },
   items: { margin: 0, padding: 0, listStyle: "none" },
-  item: {
+  row: {
     display: "flex",
     alignItems: "baseline",
     gap: space.sm,
-    flexGrow: 1,
-    minWidth: 0,
     paddingBlock: space.sm,
-    paddingInline: space.lg,
-    borderWidth: 0,
-    textAlign: "left",
-    cursor: { default: "pointer", ":disabled": "default" },
+    paddingLeft: space.lg,
+    paddingRight: space.sm,
     backgroundColor: { default: "transparent", ":hover": theme.surfaceHover },
     color: theme.textBody,
     fontFamily: theme.sans,
     fontSize: fontSize.sm,
     lineHeight: lineHeight.normal,
   },
-  itemText: { minWidth: 0 },
+  // A path or an address has no spaces, so it breaks anywhere and stays out of the buttons.
+  itemText: { flexGrow: 1, minWidth: 0, overflowWrap: "anywhere", userSelect: "text" },
+  place: {
+    marginRight: space.sm,
+    padding: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
+    cursor: { default: "pointer", ":disabled": "default" },
+    color: { default: theme.textMuted, ":hover": theme.text },
+    fontFamily: theme.sans,
+    fontSize: fontSize.sm,
+    lineHeight: lineHeight.normal,
+    textAlign: "left",
+    textDecorationLine: { default: "none", ":hover": "underline" },
+  },
   code: {
     marginRight: space.sm,
-    color: theme.textMuted,
     fontFamily: theme.mono,
     fontSize: fontSize.xs,
   },
-  row: {
-    display: "flex",
-    alignItems: "baseline",
-    gap: space.xs,
-    paddingRight: space.sm,
-  },
+  // The buttons sit on the first line whatever its height, and never shrink.
+  actions: { display: "flex", flexShrink: 0, alignSelf: "start" },
   crash: {
     gridColumn: "content",
     padding: space.xl,
