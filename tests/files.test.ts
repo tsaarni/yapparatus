@@ -7,10 +7,17 @@ import { compile, run } from "@mdx-js/mdx";
 import { createElement, type ReactNode } from "react";
 import * as runtime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
-import { codeHighlighting, excerptRange, excerpts, languageOf } from "../src/code-plugin.ts";
+import {
+  codeHighlighting,
+  excerptRange,
+  excerpts,
+  fileView,
+  languageOf,
+} from "../src/code-plugin.ts";
 import { checkLinks, type PageOutline, quoteOf, resolveLink } from "../src/document.ts";
 import { checkFiles, fileAddress, fileSource, parseFileAddress, parseLines } from "../src/files.ts";
 import { contentIssues } from "../src/markdown-plugin.ts";
+import type { HighlightedCode } from "../src/protocol.ts";
 import { acceptContext } from "../src/server/chat.ts";
 import { messagesPrompt, startPrompt } from "../src/server/prompt.ts";
 import { SourceFiles } from "../src/source-files.ts";
@@ -27,6 +34,22 @@ const main = [
 
 /** The page component, reduced to its code: these tests look at the compiled lines. */
 const Excerpt = ({ children }: { children?: ReactNode }) => children ?? null;
+
+/** The code blocks of a compiled page, as the reader receives them. */
+async function codeBlocks(js: string) {
+  const blocks: HighlightedCode[] = [];
+  const pre = ({ "data-code": code }: { "data-code": string }) => {
+    blocks.push(JSON.parse(code));
+    return null;
+  };
+  const { default: Content } = await run(js, { ...runtime, baseUrl: import.meta.url });
+  renderToStaticMarkup(createElement(Content, { components: { Excerpt, pre } }));
+  return blocks;
+}
+
+/** The text of a highlighted line. */
+const textOf = (line: Array<number | string> | undefined) =>
+  (line ?? []).filter((run) => typeof run === "string").join("");
 
 /** A project with a document in content/ that shows the folder app/. */
 function withProject(run: (root: string, files: SourceFiles) => void | Promise<void>) {
@@ -208,16 +231,11 @@ test("each line of a page's code block carries its line in the page, without a n
         },
       ),
     );
-    const { default: Content } = await run(js, { ...runtime, baseUrl: import.meta.url });
-    const html = renderToStaticMarkup(createElement(Content));
+    const [code] = await codeBlocks(js);
     // The comment alone on line 6 is removed; the code lines keep their lines in the page.
-    const lines = [...html.matchAll(/data-source-line="(\d+)"/g)].map((m) => Number(m[1]));
-    assert.deepEqual(lines, [7, 8]);
-    assert.match(
-      html,
-      /data-mark="highlight" data-source-line="7"|data-source-line="7"[^>]*data-mark/,
-    );
-    assert.doesNotMatch(html, /data-line=/);
+    assert.deepEqual(code?.pageLines, [7, 8]);
+    assert.deepEqual(code?.marks, { 0: "highlight" });
+    assert.equal(code?.start, undefined);
   }));
 
 test("an excerpt shows its file's lines with their numbers, exactly as written", () =>
@@ -233,29 +251,26 @@ test("an excerpt shows its file's lines with their numbers, exactly as written",
           },
         ),
       );
-      const { default: Content } = await run(js, { ...runtime, baseUrl: import.meta.url });
-      return {
-        html: renderToStaticMarkup(createElement(Content, { components: { Excerpt } })),
-        issues: contentIssues.get(file) ?? [],
-      };
+      return { code: (await codeBlocks(js))[0], issues: contentIssues.get(file) ?? [] };
     };
-    const { html, issues } = await compileExcerpt(
+    const { code, issues } = await compileExcerpt(
       '<Excerpt from="/-/files/app/src/main.ts" start="const text" end="return" mark="return" />',
     );
     assert.deepEqual(issues, []);
-    assert.match(html, /data-language="ts"/);
-    assert.match(html, /data-line="2"/);
-    assert.match(html, /data-line="3" data-mark="highlight"/);
-    assert.doesNotMatch(html, /data-line="1"|data-line="4"/);
+    assert.equal(code?.language, "ts");
+    assert.equal(code?.start, 2);
+    assert.equal(code?.lines.length, 2);
+    assert.deepEqual(code?.marks, { 1: "highlight" });
     // The file's own text is shown as written, notation included.
-    assert.match(html, /\[!code highlight\]/);
+    assert.match(textOf(code?.lines[0]), /\[!code highlight\]$/);
     // Without end, the excerpt is the block its first line opens, closing brace included.
     const block = await compileExcerpt(
       '<Excerpt from="/-/files/app/src/main.ts" start="export function greet(" mark={["const", "return"]} />',
     );
     assert.deepEqual(block.issues, []);
-    assert.match(block.html, /data-line="1"[^>]*>[\s\S]*data-line="4"/);
-    assert.match(block.html, /data-line="2" data-mark="highlight"/);
+    assert.equal(block.code?.start, 1);
+    assert.equal(textOf(block.code?.lines.at(-1)), "}");
+    assert.deepEqual(block.code?.marks, { 1: "highlight", 2: "highlight" });
     const message = async (tag: string) => (await compileExcerpt(tag)).issues[0]?.message ?? "";
     assert.match(
       await message('<Excerpt from="/-/files/app/src/main.ts" start="text" />'),
@@ -282,6 +297,25 @@ test("an excerpt shows its file's lines with their numbers, exactly as written",
       await message('<Excerpt from="/-/files/app/src/main.ts" start="greet(" wrap="yes" />'),
       /a bare wrap/,
     );
+  }));
+
+test("the file view carries the whole file, numbered, with each token style once", () =>
+  withProject(async (_root, files) => {
+    const address = parseFileAddress("/-/files/app/src/main.ts");
+    assert.ok(address);
+    const source = files.read(address);
+    assert.ok(!("error" in source));
+    const view = await fileView(address, source);
+    assert.equal(view.address, "/-/files/app/src/main.ts");
+    assert.equal(view.code.language, "ts");
+    assert.equal(view.code.start, 1);
+    assert.deepEqual(view.code.lines.map(textOf), source.lines);
+    assert.equal(new Set(view.code.styles).size, view.code.styles.length);
+    for (const line of view.code.lines)
+      for (let i = 0; i < line.length; i += 2) {
+        assert.equal(typeof line[i], "number");
+        assert.ok(view.code.styles[line[i] as number] !== undefined);
+      }
   }));
 
 test("an excerpt's block follows indentation, and a closing line that opens again continues it", () => {

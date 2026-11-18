@@ -47,7 +47,28 @@ export interface ChartSpec {
   r?: PlotModule.ScaleOptions;
 }
 
+export type CodeMark = "highlight" | "add" | "remove";
+
 export type ColumnType = "number" | "date" | "text";
+
+export interface CompiledDiagram {
+  ok: boolean;
+  viewBox: Rect;
+  nodes: CompiledNode[];
+  edges: CompiledEdge[];
+  enclosures: CompiledEnclosure[];
+  frames: CompiledFrame[];
+  /** The categories, in color order. A legend under the drawing explains them. */
+  legend: LegendEntry[];
+  diagnostics: Diagnostic[];
+  /** What a step focuses along with each container: enclosures, rows, columns, sequences. */
+  groups: Record<string, string[]>;
+}
+
+export interface CompiledDiagramProps extends Omit<DiagramProps, "draw"> {
+  /** The compiled drawing, with its diagnostics. */
+  drawing: CompiledDiagram;
+}
 
 export interface ContextItem {
   kind: TargetKind;
@@ -76,7 +97,7 @@ export interface Diagnostic {
   subject?: string;
 }
 
-export const Diagram: { ({ draw, id, caption, description, build, children, debug }: DiagramProps): Element; breakout: boolean; };
+export const Diagram: { ({ drawing, id, caption, description, build, children, debug, }: CompiledDiagramProps): Element; breakout: boolean; };
 
 export class DiagramBuilder {
   readonly nodes: Node[] = [];
@@ -323,7 +344,10 @@ export class DiagramBuilder {
 }
 
 export interface DiagramProps {
-  /** Builds the scene: create elements, arrange them, connect them. */
+  /**
+   * Builds the scene: create elements, arrange them, connect them. It uses only `d` and the
+   * values it defines itself.
+   */
   draw: (d: DiagramBuilder) => void;
   /** Figure id for references and links. With a caption, the figure is numbered. */
   id?: string;
@@ -425,6 +449,21 @@ export interface FigureProps extends HTMLAttributes<HTMLElement> {
   /** The figure takes the whole width, as when it holds columns. The compiler sets it; authors never write it. */
   wide?: boolean;
   children: ReactNode;
+}
+
+export interface HighlightedCode {
+  /** The Shiki language, or "text". */
+  language: string;
+  /** Each token style once, as CSS: "color:var(--shiki-token-keyword)". */
+  styles: string[];
+  /** Each line's tokens, as pairs: the index of the token's style, then its text. */
+  lines: Array<Array<number | string>>;
+  /** Code from a file: the first line's number in the file. Its lines show their numbers. */
+  start?: number;
+  /** Code written on a page: each line's line in the page. */
+  pageLines?: number[];
+  /** Marked lines, by their index in `lines`. */
+  marks?: Record<number, CodeMark>;
 }
 
 export const Icon: ({ icon: Svg, name, size, label, color }: IconProps) => Element;
@@ -603,21 +642,22 @@ export interface SourceFileView {
   address: string;
   /** The file, relative to the project folder. */
   source: string;
-  /** The Shiki language, or "text". */
-  language: string;
-  lines: number;
-  /** The highlighted code: a `pre` element, as hast. */
-  code: Root;
+  /** The whole file, numbered from line 1. */
+  code: HighlightedCode;
 }
 
 export const Step: { (_props: StepProps): null; diagramStep: boolean; };
 
 export interface StepProps {
-  /** An address for the step: `/page#figure--id`. Unique among the figure's parts and steps. */
+  /**
+   * An address for the step: `/page#figure--id`. Unique among the figure's parts and steps.
+   * Plain text: the page compiler checks it.
+   */
   id?: string;
   /**
    * Ids of the parts this step is about, separated by spaces. A container (an enclosure,
-   * row, column, sequence, or fragment) stands for everything in it.
+   * row, column, sequence, or fragment) stands for everything in it. Plain text: the page
+   * compiler checks it.
    */
   focus?: string;
   /** One or two sentences. */
@@ -738,6 +778,8 @@ export interface ReportedDiagnostic extends Diagnostic {
   address?: string;
 }
 
+export const savePicture: (address: string, file: string, options?: { ids?: boolean; }) => Promise<void>;
+
 export const sendReply: () => Promise<void>;
 
 export interface UncheckedPage {
@@ -787,7 +829,7 @@ export const layer: { raised: number; header: number; chat: number; scrim: numbe
 
 export const letterSpacing: { tight: string; snug: string; caps: string; };
 
-export const lightTheme: Theme<VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 30 more ...; mono: string; }>, symbol>, symbol>;
+export const lightTheme: Theme<VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 29 more ...; mono: string; }>, symbol>, symbol>;
 
 export const lineHeight: { tight: string; snug: string; normal: string; relaxed: string; };
 
@@ -799,7 +841,7 @@ export const space: { xxs: string; xs: string; sm: string; md: string; lg: strin
 
 export const stroke: { hairline: string; line: string; strong: string; boost: string; };
 
-export const theme: VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 30 more ...; mono: string; }>, symbol>;
+export const theme: VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 29 more ...; mono: string; }>, symbol>;
 
 export const when: { narrow: string; smallScreen: string; noHover: string; forcedColors: string; print: string; };
 ```

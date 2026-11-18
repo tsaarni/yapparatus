@@ -4,22 +4,19 @@
 import * as stylex from "@stylexjs/stylex";
 import { stroke, theme } from "../reader/theme.stylex.ts";
 import { styled } from "../reader/ui.tsx";
-import type { CompiledNode } from "./compiled.ts";
+import type { CompiledNode, PartState } from "./compiled.ts";
 import { type Rect, union } from "./geometry.ts";
-import { cylinderCap, defaultMetrics } from "./metrics.ts";
+import { badge, corner, defaultMetrics } from "./metrics.ts";
 import {
-  badge,
   categoryStyle,
-  corner,
   Lines,
-  outline,
-  type PartState,
   partStyles,
   roleStyle,
   stateStyle,
   type Target,
   targetFor,
 } from "./part.tsx";
+import * as shape from "./shapes.ts";
 
 const m = defaultMetrics;
 
@@ -70,7 +67,7 @@ export function NodeView({
       {node.role === "warning" && !layered && <WarningBadge node={node} />}
       {flagged && !layered && (
         <rect
-          {...outline(node.labelRect ? (union([r, node.labelRect]) as Rect) : r, 4)}
+          {...shape.outline(node.labelRect ? (union([r, node.labelRect]) as Rect) : r, 4)}
           rx={8}
           {...stylex.props(partStyles.flag)}
         />
@@ -84,16 +81,11 @@ export function NodeView({
  * Amber and the accent can look alike, at a glance and with color blindness.
  */
 function WarningBadge({ node }: { node: CompiledNode }) {
-  const { x, y, width } = node.rect;
-  const cx = x + width - 2;
-  const cy = y + 2;
+  const c = shape.badgeCenter(node.rect);
   return (
     <g>
-      <circle cx={cx} cy={cy} r={badge.radius} {...stylex.props(styles.badge)} />
-      <path
-        d={`M${cx} ${cy - 3.5}V${cy + 0.5}M${cx} ${cy + 3.2}V${cy + 3.3}`}
-        {...stylex.props(styles.badgeMark)}
-      />
+      <circle cx={c.x} cy={c.y} r={badge.radius} {...stylex.props(styles.badge)} />
+      <path d={shape.badgeMark(c)} {...stylex.props(styles.badgeMark)} />
     </g>
   );
 }
@@ -186,11 +178,14 @@ export function RecordOutline({
         {...stylex.props(styles.outlineOnly, node.role === "external" && partStyles.dashed)}
       />
       {node.divider !== undefined && (
-        <path d={`M${x} ${node.divider}H${x + w}`} {...stylex.props(styles.rule)} />
+        <path d={shape.rule(node.rect, node.divider)} {...stylex.props(styles.rule)} />
       )}
-      <Rules node={node} />
+      {/* Hairlines under the ruler, beside the row offsets, and between cells. */}
+      {node.rules && <path d={shape.segments(node.rules)} {...stylex.props(styles.rule)} />}
       {node.role === "warning" && <WarningBadge node={node} />}
-      {flagged && <rect {...outline(node.rect, 4)} rx={8} {...stylex.props(partStyles.flag)} />}
+      {flagged && (
+        <rect {...shape.outline(node.rect, 4)} rx={8} {...stylex.props(partStyles.flag)} />
+      )}
     </g>
   );
 }
@@ -198,52 +193,39 @@ export function RecordOutline({
 function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
   const r = node.rect;
   const { x, y, width: w, height: h } = r;
-  const shape = stylex.props(styles.shape, node.role === "external" && partStyles.dashed);
+  const outlined = stylex.props(styles.shape, node.role === "external" && partStyles.dashed);
   switch (node.shape) {
     case "box":
-      return <rect x={x} y={y} width={w} height={h} rx={corner.shape} {...shape} />;
+      return <rect x={x} y={y} width={w} height={h} rx={corner.shape} {...outlined} />;
     case "cylinder": {
-      const ry = cylinderCap(w);
-      const rx = w / 2;
-      const top = y + ry;
-      const bottom = y + h - ry;
+      const { body, cap } = shape.cylinder(r);
       return (
         <>
-          <path
-            d={`M${x} ${top}A${rx} ${ry} 0 0 1 ${x + w} ${top}V${bottom}A${rx} ${ry} 0 0 1 ${x} ${bottom}Z`}
-            {...shape}
-          />
-          <ellipse cx={x + rx} cy={top} rx={rx} ry={ry} {...shape} />
+          <path d={body} {...outlined} />
+          <ellipse {...cap} {...outlined} />
         </>
       );
     }
     case "actor": {
-      const cx = x + w / 2;
+      const { head, body } = shape.actor(r);
       return (
         <g {...stylex.props(styles.figure)}>
-          <circle cx={cx} cy={y + 6.5} r={5.5} />
-          <path
-            d={`M${cx} ${y + 12}V${y + 22}M${cx - 8} ${y + 15.5}H${cx + 8}M${cx} ${y + 22}L${cx - 6.5} ${y + 30}M${cx} ${y + 22}L${cx + 6.5} ${y + 30}`}
-          />
+          <circle {...head} />
+          <path d={body} />
         </g>
       );
     }
     case "note": {
-      const f = 10;
+      const { body, fold } = shape.note(r);
       return (
         <>
-          <path d={`M${x} ${y}H${x + w - f}L${x + w} ${y + f}V${y + h}H${x}Z`} {...shape} />
-          <path d={`M${x + w - f} ${y}V${y + f}H${x + w}`} {...stylex.props(styles.fold)} />
+          <path d={body} {...outlined} />
+          <path d={fold} {...stylex.props(styles.fold)} />
         </>
       );
     }
     case "diamond":
-      return (
-        <polygon
-          points={`${x + w / 2},${y} ${x + w},${y + h / 2} ${x + w / 2},${y + h} ${x},${y + h / 2}`}
-          {...shape}
-        />
-      );
+      return <polygon points={shape.diamond(r)} {...outlined} />;
     case "dot":
       return <circle cx={x + w / 2} cy={y + h / 2} r={w / 2} {...stylex.props(styles.solid)} />;
     case "ring":
@@ -273,9 +255,9 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
         );
       return (
         <>
-          <rect x={x} y={y} width={w} height={h} rx={corner.shape} {...shape} />
+          <rect x={x} y={y} width={w} height={h} rx={corner.shape} {...outlined} />
           {node.divider !== undefined && (
-            <path d={`M${x} ${node.divider}H${x + w}`} {...stylex.props(styles.rule)} />
+            <path d={shape.rule(r, node.divider)} {...stylex.props(styles.rule)} />
           )}
         </>
       );
@@ -286,8 +268,11 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
       const filled = node.role !== "default" || node.category !== undefined;
       return (
         <g clipPath={node.parent ? `url(#${clip}-${node.parent})` : undefined}>
-          <rect {...outline(r, 0)} {...stylex.props(filled ? styles.cellFill : styles.hitArea)} />
-          <rect {...outline(r, -2)} {...stylex.props(styles.cellRing)} />
+          <rect
+            {...shape.outline(r, 0)}
+            {...stylex.props(filled ? styles.cellFill : styles.hitArea)}
+          />
+          <rect {...shape.outline(r, -2)} {...stylex.props(styles.cellRing)} />
         </g>
       );
     }
@@ -298,13 +283,6 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
     default:
       return <rect x={x} y={y} width={w} height={h} fill="transparent" />;
   }
-}
-
-/** Hairlines inside a record: under the ruler, beside the row offsets, between cells. */
-function Rules({ node }: { node: CompiledNode }) {
-  if (!node.rules) return null;
-  const d = node.rules.map(([a, b]) => `M${a.x} ${a.y}L${b.x} ${b.y}`).join("");
-  return <path d={d} {...stylex.props(styles.rule)} />;
 }
 
 const styles = stylex.create({

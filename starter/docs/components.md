@@ -202,5 +202,6 @@ export function CacheLabel() {
 - Use tokens for every value: `theme` for colors and fonts; `fontSize`, `fontWeight`, `lineHeight`, `letterSpacing`, `space`, `radius`, `sizes`, `layer`, and `duration` for scales; `when.narrow` for a narrow reading column. Do not use literal colors.
 - Use longhand properties (`borderWidth`, `backgroundColor`). StyleX silently drops shorthands that contain theme variables.
 - Do not import application internals; use `yapparatus` and `yapparatus/theme.stylex`.
+- Do not put a `<Diagram>` in a component. The page compiler compiles diagrams written in pages and replies only.
 
 Builds compile and embed these styles like the built-in ones.

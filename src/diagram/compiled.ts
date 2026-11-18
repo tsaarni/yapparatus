@@ -1,5 +1,7 @@
 /**
- * The compiled drawing: what the compiler produces and the renderer draws.
+ * The compiled drawing: what the compiler produces and the renderer draws. The page embeds it,
+ * so it is kept small: coordinates are rounded to hundredths, and a flag that is false or a
+ * value that is the default is left out.
  */
 import type { Rect, Vec } from "./geometry.ts";
 import type { Diagnostic, Role, Shape } from "./scene.ts";
@@ -26,14 +28,16 @@ export interface TextLine {
   y: number;
   size: number;
   weight: number;
-  mono: boolean;
-  muted: boolean;
-  align: "middle" | "start";
+  /** Set in the monospace font. */
+  mono?: true;
+  /** Drawn in the muted text color. */
+  muted?: true;
+  /** Starts at x. Without it, the line is centered on x. */
+  align?: "start";
 }
 
 export interface CompiledNode {
   id: string;
-  explicitId: boolean;
   shape: Shape;
   role: Role;
   /** The category color slot, when the part has a category. */
@@ -41,9 +45,10 @@ export interface CompiledNode {
   label: string;
   rect: Rect;
   lines: TextLine[];
-  passive: boolean;
+  /** Decoration only, such as a lifeline or an activation bar: never interactive. */
+  passive?: true;
   /** Shown only while a step focuses it. */
-  stepOnly: boolean;
+  stepOnly?: true;
   /** A decoration's edge: steps show and fade it with that edge. */
   follows?: string;
   /** Record: y of the line under the title. */
@@ -67,26 +72,25 @@ export interface CompiledFrame {
   dividers: Array<{ y: number; label?: TextLine }>;
 }
 
+/** An edge label: one line for each `\n`, centered in its rectangle. */
 export interface CompiledLabel {
-  text: string;
+  lines: TextLine[];
+  /** Covers every line; the overlap checks and the view box use it. */
   rect: Rect;
-  center: Vec;
-  size: number;
-  weight: number;
 }
 
 export interface CompiledEdge {
   id: string;
-  explicitId: boolean;
   role: Role;
   /** The category color slot, when the part has a category. */
   category?: number;
-  dashed: boolean;
+  dashed?: true;
   head: "filled" | "open";
   radius: number;
-  passive: boolean;
+  /** Decoration only, such as a lifeline or an activation bar: never interactive. */
+  passive?: true;
   /** Shown only while a step focuses it. */
-  stepOnly: boolean;
+  stepOnly?: true;
   points: Vec[];
   heads: Vec[][];
   labels: CompiledLabel[];
@@ -95,7 +99,6 @@ export interface CompiledEdge {
 
 export interface CompiledEnclosure {
   id: string;
-  explicitId: boolean;
   role: Role;
   /** The category color slot, when the part has a category. */
   category?: number;
@@ -117,4 +120,57 @@ export interface CompiledDiagram {
   diagnostics: Diagnostic[];
   /** What a step focuses along with each container: enclosures, rows, columns, sequences. */
   groups: Record<string, string[]>;
+}
+
+/** The parts named, with every container replaced by itself plus all it holds. */
+export function expand(ids: string[], groups: Record<string, string[]>): Set<string> {
+  const parts = new Set<string>();
+  const visit = (id: string) => {
+    if (parts.has(id)) return;
+    parts.add(id);
+    for (const member of groups[id] ?? []) visit(member);
+  };
+  for (const id of ids) visit(id);
+  return parts;
+}
+
+/** How a part looks in a step. "absent" is a step-only part outside its steps. */
+export type PartState = "focus" | "dim" | "hidden" | "absent" | undefined;
+
+/** What decides how each part looks: the steps, the open one, and a legend entry pointed at. */
+export interface StepView {
+  /** Each step's focused parts, with containers expanded to their contents. */
+  steps: Array<Set<string>>;
+  /** The open step, counted from 0. Undefined shows the whole figure. */
+  active: number | undefined;
+  /** Hide each part until the first step that focuses it. */
+  build: boolean;
+  /** Parts shown only while a step focuses them. */
+  stepOnly: Set<string>;
+  /** The parts of the legend entry the reader points at, which override the step. */
+  preview?: string[];
+}
+
+/** The parts shown only while a step focuses them. */
+export function stepOnlyParts(diagram: CompiledDiagram): Set<string> {
+  return new Set([
+    ...diagram.nodes.filter((n) => n.stepOnly).map((n) => n.id),
+    ...diagram.edges.filter((e) => e.stepOnly).map((e) => e.id),
+  ]);
+}
+
+/**
+ * Focused parts are drawn heavier, the others fade, and with `build` the parts that a later
+ * step focuses first are hidden. A step-only part is absent outside its steps.
+ */
+export function partState(part: string, view: StepView): PartState {
+  const { steps, active, build, stepOnly, preview } = view;
+  if (preview) return preview.includes(part) ? "focus" : stepOnly.has(part) ? "absent" : "dim";
+  const current = active === undefined ? undefined : steps[active];
+  if (current?.has(part)) return "focus";
+  if (stepOnly.has(part)) return "absent";
+  if (!current || active === undefined) return undefined;
+  const first = steps.findIndex((step) => step.has(part));
+  if (build && first >= 0 && first > active) return "hidden";
+  return "dim";
 }

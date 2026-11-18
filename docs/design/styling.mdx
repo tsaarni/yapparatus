@@ -27,6 +27,8 @@ This page describes the visual design rules of the reader app and the convention
     - NodeView.tsx shapes, record cells, marks, badges, and pins
     - EdgeView.tsx edges, enclosures, and frames
     - Legend.tsx the category legend under a figure
+    - shapes.ts outlines as path data, shared with the agent's pictures
+    - paint.ts reads the light theme's colors and diagram strokes for the agent's pictures
     - Diagnostics.tsx the list of a figure's diagnostics, also used by charts
 
 </FileTree>
@@ -103,6 +105,8 @@ The reader app shows feedback where the reader performed the action. It asks the
 ## Tokens
 
 1. **Values that change with the theme are variables, and scales are constants.** `theme` (created with `defineVars`) holds colors, shadows, and fonts. Each role is declared once with `role("name")`. This function takes the role's value from the dark set, from the light set for print, and from the increased-contrast set. StyleX cannot import values from plain modules into a `.stylex.ts` file, so the sets are defined in the theme file.
+
+   StyleX's compiler takes a value from another file only when that file is a `.stylex.ts` file, and then it gives a reference to a CSS variable, not the value. A plain module's value is a compile error in `defineVars` and in `create`. Node cannot import the theme file either, because StyleX's functions throw outside its compiler. The agent's pictures of diagrams are drawn in Node, so [`src/diagram/paint.ts`](/-/files/yapparatus/src/diagram/paint.ts) loads the theme file with a stub in which StyleX's functions return their input, and reads the role styles in `part.tsx` as text. It gives the light theme's colors, the role table, and the stroke and dash constants as plain values. The theme file and `part.tsx` stay the only places where a value is written. Values that are plain numbers outside a style, such as corner radii, are written once in `metrics.ts`, and the views and the picture import them.
 
    `fontSize`, `fontWeight`, `lineHeight`, `letterSpacing`, `space`, `radius`, `sizes`, `layer`, `duration`, and `when` are created with `defineConsts`. StyleX compiles them into the rules that use them, so they need no CSS variables.
 2. **Components use only tokens.** A style uses a token for every color, size, weight, line height, space, radius, shadow, layer, and duration. A component that needs a new value adds it to the scale in the theme file, with a comment on what it is for. The scale therefore stays the only list of values. A new color role needs a value in every set and a rule in [`tests/theme.test.ts`](/-/files/yapparatus/tests/theme.test.ts).

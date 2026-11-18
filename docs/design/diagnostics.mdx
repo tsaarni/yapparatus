@@ -7,8 +7,8 @@ Diagnostics are the errors and warnings in a document. Examples are a page that 
 <Ref to="diagnostic-flow" /> shows the two sources of diagnostics and the two places they are shown.
 
 <Diagram id="diagnostic-flow" caption="Where diagnostics come from and where they go." draw={(d) => {
-  const server = d.box("Server checks", { id: "server-checks", sub: "compile, links, page list" })
-  const browser = d.box("Browser checks", { id: "browser-checks", sub: "figures, render, runtime" })
+  const server = d.box("Server checks", { id: "server-checks", sub: "compile, diagrams, links" })
+  const browser = d.box("Browser checks", { id: "browser-checks", sub: "charts, render, runtime" })
   d.equalSize([server, browser])
   const sources = d.column([server, browser], { gap: 40 })
   const store = d.cylinder("Diagnostic store", { id: "diagnostic-store", sub: "by page revision" })
@@ -23,16 +23,17 @@ Diagnostics are the errors and warnings in a document. Examples are a page that 
   d.arrow(store.right, prompt.left, { id: "to-agent", route: { viaX: d.lerp(store.right, prompt.left, 0.5) } })
   d.arrow(store.right, list.left, { id: "to-list", route: { viaX: d.lerp(store.right, list.left, 0.5) } })
 }}>
-  <Step focus="server-checks checks diagnostic-store">The server checks every page whenever a file changes.</Step>
-  <Step focus="browser-checks reports diagnostic-store">The browser reports what it finds while it renders a page.</Step>
+  <Step focus="server-checks checks diagnostic-store">The server checks every page, with its diagrams, whenever a file changes.</Step>
+  <Step focus="browser-checks reports diagnostic-store">The browser reports what it finds while it renders a page: charts, render errors, and runtime errors.</Step>
   <Step focus="to-agent agent-prompt">New errors end the agent's wait and appear in its prompt.</Step>
   <Step focus="to-list header-list">The reader sees a count in the header and each diagnostic in place.</Step>
 </Diagram>
 
 1. **The server checks everything that it can find from the source files.** Whenever a file changes, the server compiles every page and checks links, references, and `document.json`. Compiling also checks the Markdown conventions: code block languages, heading depth, alert kinds, file trees, tabs and columns, and figures inside figures. None of these checks need a browser.
-2. **The browser checks what can be found only when a page runs.** These checks cover diagram layout, chart marks, render errors, runtime errors, and replies that fail to show. Text in diagrams and charts is measured with the page font, so these checks cannot run on the server. [What the browser reports](#what-the-browser-reports) describes how its diagnostics reach the server.
-3. **A reply is checked like a page before it is stored.** Its problems are diagnostics with the codes pages use, such as `BROKEN_LINK` or `COMPILE_FAILED`, plus `UNKNOWN_COMPONENT` and `REPLY_EMPTY`, which only a reply can have. They are not stored: they come back to the agent in the refusal. See [replying](chat#replying).
-4. **[Direction](directions):** an open tab also renders, off screen, the pages that it does not show, so that one tab checks the whole document. Browsers slow down background tabs, so this needs testing first.
+2. **Compiling a page compiles its diagrams.** The page compiler runs each `draw`, measures the text with the reader's font files, and checks the layout and the steps. A diagram's diagnostics are therefore compile diagnostics of its page, found on every save, whether or not a browser has the page open. Each one names the figure as its target, the parts, and the figure's lines. See [where a diagram is compiled](diagrams#where-a-diagram-is-compiled).
+3. **The browser checks what can be found only when a page runs.** These checks cover chart marks, render errors, runtime errors, and replies that fail to show. A chart is drawn by Observable Plot in the browser at the width of the page, so its checks need a browser. [What the browser reports](#what-the-browser-reports) describes how its diagnostics reach the server.
+4. **A reply is checked like a page before it is stored.** Its problems are diagnostics with the codes pages use, such as `BROKEN_LINK`, `COMPILE_FAILED`, or a diagram's `UNKNOWN_PART`, plus `UNKNOWN_COMPONENT` and `REPLY_EMPTY`, which only a reply can have. Errors keep the reply out, and warnings do not. The errors are not stored: they come back to the agent in the refusal. See [replying](chat#replying).
+5. **[Direction](directions):** an open tab also renders, off screen, the pages that it does not show, so that one tab checks the charts and render errors of the whole document. Browsers slow down background tabs, so this needs testing first.
 
 ### What the browser reports
 
@@ -40,11 +41,11 @@ A page's revision is a hash of its text and of every file it reads: the files of
 
 1. **A diagnostic belongs to the revision of the page that the browser rendered.** The browser sends it with `POST /-/api/diagnostics` and `{ source, revision, diagnostics }`. See [report diagnostics](api#report-diagnostics). A revision never changes, so the diagnostics reported for it stay true.
 2. **A report only adds diagnostics.** The browser does not report that a problem is fixed. A fix changes the page, the page gets a new revision, and the diagnostics of the old revision stop counting. The current diagnostics are the server's checks and the diagnostics reported for each page's current revision.
-3. **A page reports every revision it renders, even without diagnostics.** That report marks the revision as checked. A figure without diagnostics sends nothing.
-4. **A page that no browser has rendered since it changed is unchecked.** The server lists it with the diagnostics of the revision that a browser rendered last. An empty list therefore means that the checked pages have no problems. The agent can also tell an old error that is not confirmed from one that is gone. The server keeps the diagnostics of the last three revisions of each page.
+3. **A page reports every revision it renders, even without diagnostics.** That report marks the revision as checked. A chart without diagnostics sends nothing.
+4. **A page that no browser has rendered since it changed is unchecked.** Its charts, render errors, and runtime errors are not known for its current revision. Its diagrams are, because the server checks them. The server lists the page with the diagnostics of the revision that a browser rendered last. An empty list therefore means that the checked pages have no problems. The agent can also tell an old error that is not confirmed from one that is gone. The server keeps the diagnostics of the last three revisions of each page.
 5. **Runtime errors belong to the revision of the page on screen.** On a file view, they are only logged.
 6. **A reply never changes,** so its diagnostics have no revision and count for as long as the reply is in the chat.
-7. **Diagnostics from several tabs add up.** A chart's tick labels can overlap at one width and not at another. The warning counts, because some readers see the overlap. A diagram is checked against a fixed width, so every tab finds the same.
+7. **Diagnostics from several tabs add up.** A chart's tick labels can overlap at one width and not at another. The warning counts, because some readers see the overlap.
 8. **The revision does not cover components.** A change to a component, built in or in the document's own `.tsx` files, updates the page without a new revision. A diagnostic that a component caused therefore stays after the component is fixed, until the page changes or the server restarts.
 
 ## Codes and severity
@@ -73,8 +74,8 @@ A page's revision is a hash of its text and of every file it reads: the files of
 
 ## Who sees diagnostics
 
-1. **The agent checks the document after editing and before replying.** `checkDocument()` reads [`GET /-/api/diagnostics`](api#read-the-diagnostics), which waits until the checks of recent edits are done. It returns every diagnostic and the unchecked pages, with text for the agent. The errors it returns count as given to the agent. It claims no agent, so it runs beside an open wait.
-2. **The agent learns about later errors without asking.** Some errors appear only when a browser opens a changed page, after the agent replied. The server remembers which errors it gave the agent, by [their identity](#how-diagnostics-are-identified). An error that has existed for 2 s and that the agent has not been given ends the agent's wait, as a reader message does. The prompt then lists all diagnostics with the new errors marked. See [waiting for messages](chat#waiting-for-messages).
+1. **The agent checks the document after editing and before replying.** `checkDocument()` reads [`GET /-/api/diagnostics`](api#read-the-diagnostics), which waits until the checks of recent edits are done. The file watcher reports an edit a moment after the file is saved. The read therefore compares the save times of the pages with the start of the last check, and runs the checks again when a page is newer. It returns every diagnostic and the unchecked pages, with text for the agent. The errors it returns count as given to the agent. It claims no agent, so it runs beside an open wait.
+2. **The agent learns about later errors without asking.** Some errors, such as a chart that fails, appear only when a browser opens a changed page, after the agent replied. The server remembers which errors it gave the agent, by [their identity](#how-diagnostics-are-identified). An error that has existed for 2 s and that the agent has not been given ends the agent's wait, as a reader message does. The prompt then lists all diagnostics with the new errors marked. See [waiting for messages](chat#waiting-for-messages).
 3. **Errors in the document do not hold back a reply.** The server checks only the reply's own MDX, components, and links. The agent checks the document's errors. See [replying](chat#replying).
 4. **The agent reads one line per diagnostic, the same everywhere.** A prompt, a diagnostics read, and a refused reply all write `- error CODE file:lines, /page#figure, parts a, b: message`. The server fills in a figure's lines from the page as it is now. The address is the one the agent links in its reply. A reply being checked has no file yet, so its problems name only the line.
 5. **Short-lived errors and warnings never end the agent's wait.** An error that disappears within 2 s, such as one caused by a file that was saved half-written, never wakes the agent. Warnings do not end a wait, so the agent spends no turn on them.

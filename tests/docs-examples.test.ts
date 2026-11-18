@@ -4,25 +4,14 @@
  * compiles and whose steps focus parts it has.
  */
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync } from "node:fs";
 import { test } from "node:test";
 import { compile } from "../src/diagram/compile.ts";
 import type { Measure } from "../src/diagram/metrics.ts";
 import { DiagramBuilder } from "../src/diagram/scene.ts";
 import { diagnosticCodes } from "../src/protocol.ts";
+import { examples, examplePages as pages } from "./diagram-examples.ts";
 
 const measure: Measure = (text) => text.length * 7;
-const pages = readdirSync("starter/docs").filter((f) => /^diagram.*\.md$/.test(f));
-
-function examples(page: string) {
-  const text = readFileSync(`starter/docs/${page}`, "utf8");
-  return [...text.matchAll(/```(js|mdx)\n([\s\S]*?)```/g)].map(([, lang, code = ""]) => {
-    if (lang === "js") return { draw: code, focus: [] };
-    const draw = /draw=\{\(d\) => \{\n([\s\S]*?)\n\}\}/.exec(code)?.[1] ?? "";
-    const focus = [...code.matchAll(/focus="([^"]*)"/g)].flatMap(([, f = ""]) => f.split(/\s+/));
-    return { draw, focus };
-  });
-}
 
 test("the diagram reference has pages with examples", () => {
   assert.deepEqual(pages.sort(), ["diagram-sequences.md", "diagram-structures.md", "diagrams.md"]);

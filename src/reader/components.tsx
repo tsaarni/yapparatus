@@ -411,10 +411,7 @@ const s = stylex.create({
     borderStyle: "solid",
     borderColor: theme.border,
     backgroundColor: theme.surface,
-    // A faint drafting grid; labels and tabs paint their halo in the figure color.
-    backgroundImage: `radial-gradient(circle at 1px 1px, ${theme.figureGrid} 1px, transparent 0)`,
-    backgroundSize: "20px 20px",
-    backgroundPosition: "10px 10px",
+    // Labels and tabs paint their halo in the figure color.
     "--figure-bg": theme.surface,
     scrollMarginTop: `calc(${sizes.headerHeight} + ${space.xl})`,
     breakInside: "avoid",

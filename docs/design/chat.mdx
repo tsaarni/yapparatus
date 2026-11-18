@@ -108,11 +108,11 @@ MDX
 1. **`sendReply()` answers the reader messages that the last wait returned.** A message that arrives while the agent writes its reply stays unanswered. Several replies to the same message are allowed, for example when the agent asks the reader a question, or tells the reader what it fixed after new errors.
 2. **The reply is MDX on stdin.** The library sends it as the `mdx` of a JSON message. The agent passes it inline with a quoted heredoc (`<<'MDX'`, so that the shell expands nothing) or from a file with `< reply.mdx`. Empty stdin or a terminal on stdin is an error, so `sendReply()` never waits for input. MDX contains many backticks, and in a template literal `${` would silently become code. Stdin needs no escaping.
 3. **Snippets that the server writes put their code in `-e '…'` and use only double quotes,** because a single quote would end the shell argument.
-4. **The server checks a reply before accepting it.** It checks that the MDX compiles, that the components exist, and that the links resolve, with the same codes as pages. If a check fails, `sendReply()` rejects with one line per problem, such as `- error BROKEN_LINK line 7: …`, and the agent fixes the reply and sends it again. The browser reports errors that appear only when the reply is rendered, and these errors end the agent's next wait.
+4. **The server checks a reply before accepting it.** It checks that the MDX compiles, that the components exist, that the links resolve, and that the diagrams compile without errors, with the same codes as pages. A diagram's warnings do not keep a reply out. If a check fails, `sendReply()` rejects with one line per problem, such as `- error BROKEN_LINK line 7: …`, and the agent fixes the reply and sends it again. The browser reports errors that appear only when the reply is rendered, and these errors end the agent's next wait.
 5. **The agent checks the document before it replies.** The server does not hold a reply back for errors in the document. The prompt tells the agent to run `checkDocument()` after editing and to fix what it lists, so the reader does not read "done" on a broken page. Errors that only a browser finds later, when the reader opens a changed page, end the agent's next wait.
 6. **A refusal carries data as well as text.** The server answers `422` with `{ error, diagnostics }`: `error` is the text for the agent, and `diagnostics` are the problems in the reply. `sendReply()` rejects with a `YapparatusError` whose message is the text and whose `diagnostics` are the data, as `waitForMessage()` returns `prompt` beside `diagnostics`.
 7. **A reply with nothing to answer is refused.** That happens when no wait has returned a reader message, or when the reader cleared the chat after the last wait.
-8. **The agent replies even when the answer is a page edit,** so that the reader knows what changed. The reply says in a sentence what changed on each page and links to the change. The reader follows the link, and opening the page renders it, which checks its diagrams and charts. The agent needs no browser of its own.
+8. **The agent replies even when the answer is a page edit,** so that the reader knows what changed. The reply says in a sentence what changed on each page and links to the change. The reader follows the link, and opening the page renders it, which checks its charts and render errors. The server has checked its diagrams already. The agent needs no browser of its own.
 
 ## Checking the document
 
@@ -124,9 +124,24 @@ node --input-type=module-typescript -e 'import { checkDocument } from "yapparatu
 
 </Listing>
 
-1. **`checkDocument()` returns every diagnostic after the agent's edits.** It does not read the chat. Without this call, an agent learns whether an edit broke something only by trying to reply or by waiting for the reader. `GET /-/api/diagnostics` answers after up to 8 s, once the server's checks have run and an open browser has had time to report. It resolves with every diagnostic, the pages that no browser has checked since they changed (with what was found before), and the text to read. Only a browser checks diagrams and charts, and most agents have no browser. The text lists the unchecked pages, as a wait's prompt does, for the agent to link in its reply.
+1. **`checkDocument()` returns every diagnostic after the agent's edits.** It does not read the chat. Without this call, an agent learns whether an edit broke something only by trying to reply or by waiting for the reader. `GET /-/api/diagnostics` answers after up to 8 s, once the server's checks have run and an open browser has had time to report. It resolves with every diagnostic, the pages that no browser has checked since they changed (with what was found before), and the text to read. Only a browser checks charts, render errors, and runtime errors, and most agents have no browser. The text lists the unchecked pages, as a wait's prompt does, for the agent to link in its reply. Diagrams are checked when their page compiles, so their diagnostics are in the list without a browser.
 2. **The errors that `checkDocument()` returns count as given.** The next wait does not return them again. The call claims no agent, so it can run while a wait is open.
 3. **Every prompt that asks for a reply shows the `checkDocument()` snippet,** to run after editing and before replying, and so do the start prompt and a prompt about new errors.
+
+## Looking at a diagram
+
+<Listing id="picture-snippet" caption="A snippet that saves a diagram's picture in the file that the agent names.">
+
+```sh
+node --input-type=module-typescript -e 'import { savePicture } from "yapparatus/agent"; await savePicture("/page#figure", "/tmp/figure.png");'
+```
+
+</Listing>
+
+1. **`savePicture(address, file)` saves a diagram as the reader sees it, as a PNG file.** The address is the figure's `/page#figure`. The agent opens the file with its own way of reading images. Diagnostics catch rule violations, such as overlaps and unknown parts. A multimodal agent that sees the picture also catches what no rule covers, such as an arrangement that is valid but hard to read. Models read raster images, so the server draws a PNG. See [pictures for the agent](diagrams#pictures-for-the-agent).
+2. **The agent names the file.** It chooses a place that it cleans up itself, such as its temporary directory. The library keeps no pictures in the project, so nothing collects there.
+3. **The start prompt says when to look:** once after the agent writes or changes a diagram and the check is clean. Each look costs the agent a turn, so later prompts do not repeat it, and the picture shows the whole diagram and not its steps.
+4. **`savePicture(address, file, { ids: true })` labels each part with its id** and outlines the parts that diagnostics name, so the agent can connect what it sees to the ids in its draw program.
 
 ## The prompt
 
@@ -226,7 +241,7 @@ The chat is an append-only log of messages, so one resource serves it: `GET /-/a
 3. **The library is the package's `./agent` export,** and agents import it by package name. It is compiled to JavaScript with type declarations in `lib/`, because Node refuses to strip types from files inside `node_modules`.
 4. **Uncaught errors print only the server's text,** without Node's stack frames, and the process exits with code 1. Errors that a snippet catches are not affected. The agent needs the instructions for the fix, and a stack trace does not help.
 5. **Snippets use only erasable TypeScript.** Erasable TypeScript is TypeScript whose types can be removed without changing the code. Node removes the type annotations and runs the rest. It does not check types, and enums and parameter properties cause errors.
-6. **The library finds the server through `.yapparatus/server.json`** in the project directory or a directory above it. The newest dev server writes this file. When a server closes, it removes the file only if the file still belongs to that server. If the connection is refused, the library rejects with instructions for starting the server. A stale file left after a crash therefore gives the agent instructions for starting the server.
+6. **The library finds the server through `.yapparatus/server.json`** in the project directory or a directory above it. The file holds the server's address. The newest dev server writes this file. When a server closes, it removes the file only if the file still belongs to that server. If the connection is refused, the library rejects with instructions for starting the server. A stale file left after a crash therefore gives the agent instructions for starting the server.
 7. **The server uses no token.** Any local process can read `.yapparatus/server.json`, and local processes already have access to the workspace. The threats are web pages and DNS rebinding. The server therefore refuses other origins, accepts requests without an `Origin` header (from the library), and checks the `Host` header.
 
 ## Open questions

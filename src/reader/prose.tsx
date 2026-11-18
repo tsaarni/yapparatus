@@ -4,7 +4,6 @@ import {
   Children,
   type CSSProperties,
   createContext,
-  Fragment,
   type HTMLAttributes,
   type ImgHTMLAttributes,
   isValidElement,
@@ -12,10 +11,13 @@ import {
   type ReactNode,
   type ThHTMLAttributes,
   useContext,
+  useMemo,
   useRef,
 } from "react";
+import type { LineRange } from "../files.ts";
 import { type FileAddress, fileAddress, linesLabel } from "../files.ts";
-import type { AlertKind, CodeMark } from "../markdown-plugin.ts";
+import type { AlertKind } from "../markdown-plugin.ts";
+import type { HighlightedCode } from "../protocol.ts";
 import { AppIcon as Icon } from "./icons.tsx";
 import { clickLineNumber, pressLineNumber } from "./line-numbers.ts";
 import { numbering, numbersOf, usePage } from "./numbering.ts";
@@ -52,7 +54,6 @@ export function useScopedId(id: string | undefined) {
   const { idPrefix } = useContext(ReadingContext);
   return id ? `${idPrefix}${id}` : undefined;
 }
-const CodeContext = createContext(false);
 
 type Props = HTMLAttributes<HTMLElement>;
 
@@ -76,13 +77,10 @@ export interface Breakout {
   breakout?: boolean;
 }
 
-/** Whether a block's content may use the wide track. Looks through fragments, which plugins such as the code highlighter add. */
+/** Whether a block's content may use the wide track. */
 function isBreakout(children: ReactNode): boolean {
   const child = Children.toArray(children).find(isValidElement);
-  if (!child) return false;
-  if (child.type === Fragment)
-    return isBreakout((child.props as { children?: ReactNode }).children);
-  return !!(child.type as Breakout).breakout;
+  return !!(child?.type as Breakout | undefined)?.breakout;
 }
 
 /**
@@ -188,88 +186,111 @@ function Paragraph(props: Props & { "data-lead"?: string }) {
   return <p {...props} {...stylex.props(s.p, reply && s.replyText, lead && s.lead)} />;
 }
 
-function Pre({
-  style: _shikiStyle,
-  ...props
-}: HTMLAttributes<HTMLPreElement> & { "data-language"?: string }) {
+/**
+ * Highlighted code as a code block, with a bar that names its language or links to its file,
+ * and a Copy button. Lines in `selected` are highlighted for the reader.
+ */
+export function CodeBlock({
+  code,
+  selected,
+}: {
+  code: HighlightedCode;
+  selected?: LineRange | undefined;
+}) {
   const { reply } = useContext(ReadingContext);
   const inTarget = useContext(InTargetContext);
   const sourceFile = useContext(SourceFileContext);
-  const language = props["data-language"];
   const ref = useRef<HTMLPreElement>(null);
   const [copied, copy] = useCopy();
-  const languageName = language && language !== "text" ? (languageNames[language] ?? language) : "";
+  const lines = useMemo(
+    () => codeLines(code, selected, sourceFile?.wrap ?? false),
+    [code, selected, sourceFile?.wrap],
+  );
+  const language = code.language;
+  const languageName = language !== "text" ? (languageNames[language] ?? language) : "";
   // A bare code block is its own target; inside a Listing, the listing is. The file view's
   // code is the file, which its title stands for.
   const target = !inTarget && !reply && !sourceFile?.whole;
   const excerpt = sourceFile && !sourceFile.whole ? sourceFile.file : undefined;
   return (
-    <CodeContext.Provider value={true}>
-      <div
-        {...(target
-          ? targetProps("code", undefined, languageName ? `${languageName} code` : "Code")
-          : {})}
-        {...(sourceFile
-          ? {
-              "data-file": fileAddress({
-                folder: sourceFile.file.folder,
-                path: sourceFile.file.path,
-              }),
-            }
-          : {})}
-        {...stylex.props(
-          s.codeBlock,
-          reply && s.replyPre,
-          sourceFile?.whole && s.wholeFile,
-          ...(target ? targetHost : []),
-        )}
-        style={sourceFile ? ({ "--line-digits": sourceFile.digits } as CSSProperties) : undefined}
-        {...(sourceFile
-          ? {
-              onMouseDown: pressLineNumber,
-              onClick: (event: MouseEvent) => clickLineNumber(event, sourceFile),
-            }
-          : {})}
-      >
-        <div {...stylex.props(s.codeBar)}>
-          <span {...stylex.props(s.grow)}>
-            {excerpt ? (
-              <a
-                href={fileHref({ folder: excerpt.folder, path: excerpt.path })}
-                {...stylex.props(s.fileLink, ui.focus)}
-              >
-                {excerpt.folder}/{excerpt.path}
-                {excerpt.lines && (
-                  <span {...stylex.props(s.fileLines)}>:{linesLabel(excerpt.lines)}</span>
-                )}
-              </a>
-            ) : (
-              languageName
-            )}
-          </span>
-          {target && (
-            <TargetActions
-              name={`this ${languageName || "code"} block`}
-              placement="inline"
-              linkable={false}
-            />
+    <div
+      {...(target
+        ? targetProps("code", undefined, languageName ? `${languageName} code` : "Code")
+        : {})}
+      {...(sourceFile
+        ? {
+            "data-file": fileAddress({
+              folder: sourceFile.file.folder,
+              path: sourceFile.file.path,
+            }),
+          }
+        : {})}
+      {...stylex.props(
+        s.codeBlock,
+        reply && s.replyPre,
+        sourceFile?.whole && s.wholeFile,
+        ...(target ? targetHost : []),
+      )}
+      style={sourceFile ? ({ "--line-digits": sourceFile.digits } as CSSProperties) : undefined}
+      {...(sourceFile
+        ? {
+            onMouseDown: pressLineNumber,
+            onClick: (event: MouseEvent) => clickLineNumber(event, sourceFile),
+          }
+        : {})}
+    >
+      <div {...stylex.props(s.codeBar)}>
+        <span {...stylex.props(s.grow)}>
+          {excerpt ? (
+            <a
+              href={fileHref({ folder: excerpt.folder, path: excerpt.path })}
+              {...stylex.props(s.fileLink, ui.focus)}
+            >
+              {excerpt.folder}/{excerpt.path}
+              {excerpt.lines && (
+                <span {...stylex.props(s.fileLines)}>:{linesLabel(excerpt.lines)}</span>
+              )}
+            </a>
+          ) : (
+            languageName
           )}
-          <Button
-            variant="ghost"
-            size="small"
-            aria-label={copied === "failed" ? "The clipboard is not available" : "Copy code"}
-            title={copied === "failed" ? "The clipboard is not available" : undefined}
-            onClick={() => void copy(ref.current ? codeText(ref.current) : "")}
-          >
-            {copied === "copied" ? "Copied" : copied === "failed" ? "Not copied" : "Copy"}
-          </Button>
-        </div>
-        <pre ref={ref} {...props} {...stylex.props(s.pre, sourceFile?.wrap && s.wrapPre)} />
+        </span>
+        {target && (
+          <TargetActions
+            name={`this ${languageName || "code"} block`}
+            placement="inline"
+            linkable={false}
+          />
+        )}
+        <Button
+          variant="ghost"
+          size="small"
+          aria-label={copied === "failed" ? "The clipboard is not available" : "Copy code"}
+          title={copied === "failed" ? "The clipboard is not available" : undefined}
+          onClick={() => void copy(ref.current ? codeText(ref.current) : "")}
+        >
+          {copied === "copied" ? "Copied" : copied === "failed" ? "Not copied" : "Copy"}
+        </Button>
       </div>
-    </CodeContext.Provider>
+      <pre
+        ref={ref}
+        data-language={language}
+        // biome-ignore lint/a11y/noNoninteractiveTabindex: Code that scrolls must be keyboard scrollable.
+        tabIndex={0}
+        {...stylex.props(s.pre, sourceFile?.wrap && s.wrapPre)}
+      >
+        <code {...stylex.props(s.code)}>{lines}</code>
+      </pre>
+    </div>
   );
 }
+CodeBlock.breakout = true;
 
+/** A code block on a page: the compiler gives its highlighted code as JSON. */
+function Pre({ "data-code": json }: { "data-code": string }) {
+  const code = useMemo(() => JSON.parse(json) as HighlightedCode, [json]);
+  return <CodeBlock code={code} />;
+}
 Pre.breakout = true;
 
 /** The code as it reads after a change: removed lines are left out. */
@@ -282,36 +303,62 @@ function codeText(pre: HTMLPreElement) {
     .join("\n");
 }
 
+/** "color:var(--x);font-style:italic" → { color: "var(--x)", fontStyle: "italic" } */
+function styleObject(style: string): CSSProperties {
+  const out: Record<string, string> = {};
+  for (const declaration of style.split(";")) {
+    const colon = declaration.indexOf(":");
+    const name = declaration.slice(0, colon).trim();
+    if (colon < 0 || !name) continue;
+    out[name.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase())] = declaration
+      .slice(colon + 1)
+      .trim();
+  }
+  return out as CSSProperties;
+}
+
 /**
- * Spans are code lines and the highlighted tokens inside them; tokens pass through. Every line
- * has the same box, so tab stops line up across lines. A line marked with `[!code highlight]`,
- * `[!code ++]`, or `[!code --]` gets its mark's background and gutter. A line of a source file
- * shows its number in the file beside it; a line the reader picked in the file view is
- * highlighted.
+ * The lines of a code block, separated by newlines, each a span of its tokens. Every line has
+ * the same box, so tab stops line up across lines. A marked line gets its mark's background
+ * and gutter. A line of a source file shows its number in the file beside it; a line the
+ * reader picked in the file view is highlighted.
  */
-function Span(
-  props: HTMLAttributes<HTMLSpanElement> & {
-    "data-mark"?: CodeMark;
-    "data-line"?: number;
-    "data-selected"?: string;
-  },
-) {
-  const wrap = useContext(SourceFileContext)?.wrap ?? false;
-  if (!props.className?.split(" ").includes("line")) return <span {...props} />;
-  const mark = props["data-selected"] ? "highlight" : props["data-mark"];
-  const numbered = props["data-line"] !== undefined;
-  return (
-    <span
-      {...props}
-      {...styled(
-        "line",
-        s.line,
-        mark && s[mark],
-        numbered && s.numbered,
-        numbered && wrap && s.hanging,
-      )}
-    />
-  );
+function codeLines(code: HighlightedCode, selected: LineRange | undefined, wrap: boolean) {
+  const styles = code.styles.map((style) => (style ? styleObject(style) : undefined));
+  const numbered = code.start !== undefined;
+  return code.lines.flatMap((tokens, index) => {
+    const number = numbered ? (code.start as number) + index : undefined;
+    const picked =
+      number !== undefined && selected && number >= selected.start && number <= selected.end;
+    const mark = picked ? "highlight" : code.marks?.[index];
+    const runs: ReactNode[] = [];
+    for (let i = 0; i < tokens.length; i += 2)
+      runs.push(
+        <span key={i} style={styles[tokens[i] as number]}>
+          {tokens[i + 1]}
+        </span>,
+      );
+    const line = (
+      <span
+        // biome-ignore lint/suspicious/noArrayIndexKey: The lines are the code's, in order.
+        key={index}
+        data-line={number}
+        data-source-line={code.pageLines?.[index]}
+        data-mark={code.marks?.[index]}
+        data-selected={picked ? "true" : undefined}
+        {...styled(
+          "line",
+          s.line,
+          mark && s[mark],
+          numbered && s.numbered,
+          numbered && wrap && s.hanging,
+        )}
+      >
+        {runs}
+      </span>
+    );
+    return index ? ["\n", line] : [line];
+  });
 }
 
 const alertTitles: Record<AlertKind, string> = {
@@ -366,9 +413,9 @@ const languageNames: Record<string, string> = {
   sql: "SQL",
 };
 
+/** Inline code: code in a block is drawn by `CodeBlock`. */
 function Code(props: Props) {
-  const block = useContext(CodeContext);
-  return <code {...props} {...stylex.props(s.code, !block && s.inlineCode)} />;
+  return <code {...props} {...stylex.props(s.code, s.inlineCode)} />;
 }
 
 function Link({ href: raw, ...props }: AnchorHTMLAttributes<HTMLAnchorElement>) {
@@ -422,7 +469,6 @@ export const prose = {
   strong: (props: Props) => <strong {...props} {...stylex.props(s.strong)} />,
   li: (props: HTMLAttributes<HTMLLIElement>) => <li {...props} {...stylex.props(s.li)} />,
   blockquote: Blockquote,
-  span: Span,
   hr: (props: HTMLAttributes<HTMLHRElement>) => <hr {...props} {...stylex.props(s.hr)} />,
   table: DataTable,
   td: ({ children, ...props }: HTMLAttributes<HTMLTableCellElement>) => (

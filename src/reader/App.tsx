@@ -39,6 +39,7 @@ import {
   interceptLinks,
   navigate,
   parseAddress,
+  prefetchLinks,
   scrollRoot,
   scrollToFragment,
   useRoute,
@@ -98,7 +99,13 @@ function useStored<T>(key: string, initial: T) {
   return [value, setValue] as const;
 }
 
+/** Run `task` when the browser is idle; Safari has no idle callback. */
+const whenIdle = (task: () => void) =>
+  "requestIdleCallback" in window ? requestIdleCallback(task) : setTimeout(task, 500);
+
 export function App() {
+  // The router changes the route when the new page's code has loaded, so the route's page
+  // renders with its content at once.
   const route = useRoute();
   const page = route.page;
   const file = route.file;
@@ -124,7 +131,13 @@ export function App() {
   useLayoutEffect(() => canonicalize(), []);
   useEffect(() => {
     document.addEventListener("click", interceptLinks);
-    return () => document.removeEventListener("click", interceptLinks);
+    document.addEventListener("pointerover", prefetchLinks);
+    document.addEventListener("focusin", prefetchLinks);
+    return () => {
+      document.removeEventListener("click", interceptLinks);
+      document.removeEventListener("pointerover", prefetchLinks);
+      document.removeEventListener("focusin", prefetchLinks);
+    };
   }, []);
   useEffect(() => {
     document.title = [file?.path ?? page?.outline.title, documentTitle, settings.subtitle]
@@ -148,6 +161,11 @@ export function App() {
         );
     }
   }, [route]);
+  // While the reader reads, load the next page, so following the pager does not wait.
+  useEffect(() => {
+    const next = page && pages[pages.indexOf(page) + 1];
+    if (next) whenIdle(() => next.load().catch(() => undefined));
+  }, [page]);
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
@@ -197,7 +215,8 @@ export function App() {
         diagnostic.line ? ` on line ${diagnostic.line}` : ""
       }: ${diagnostic.message}`,
     );
-    const anchor = diagnostic.origin === "diagram" ? (diagnostic.target ?? "") : "";
+    // A figure's diagnostic names it; a reply's target is its message number.
+    const anchor = diagnostic.origin === "reply" ? "" : (diagnostic.target ?? "");
     if (target !== page) navigate(href(target, anchor));
     whenPresent(
       () => {
@@ -258,6 +277,7 @@ export function App() {
       },
     );
   }
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: Run once the page arrives.
   useEffect(() => {
     if (!pendingShow || !page) return;
@@ -402,10 +422,7 @@ export function App() {
                 {...(live ? { onAsk: addContext } : {})}
               />
             ) : (
-              <>
-                <PageContent page={page} handlers={handlers} revision={pagesRevision} />
-                <PageFooter page={page} />
-              </>
+              <PageContent page={page} handlers={handlers} revision={pagesRevision} />
             )}
           </article>
         </main>
@@ -678,15 +695,17 @@ const PageContent = memo(function PageContent({
   /** Changes when a page is updated in place, so the memoized content renders again. */
   revision: number;
 }) {
-  const Page = page?.default;
   return (
     <TargetContext.Provider value={handlers}>
       <PageContext.Provider value={page}>
         <ReadingContext.Provider value={reading}>
-          {page && Page ? (
-            <PageBoundary key={page.source} source={page.source} revision={page.outline?.revision}>
-              <Page components={components} />
-            </PageBoundary>
+          {page ? (
+            <>
+              <PageBoundary key={page.source} source={page.source} revision={page.outline.revision}>
+                <PageBody page={page} />
+              </PageBoundary>
+              <PageFooter page={page} />
+            </>
           ) : (
             <NotFound />
           )}
@@ -695,6 +714,16 @@ const PageContent = memo(function PageContent({
     </TargetContext.Provider>
   );
 });
+
+/**
+ * A page's content. The router shows a page once its code has loaded or failed to; a page
+ * whose code failed throws the error, for its boundary to show.
+ */
+function PageBody({ page }: { page: DocumentPage }) {
+  if (!page.module) throw page.error ?? new Error(`${page.source} has not loaded.`);
+  const { default: Page } = page.module;
+  return <Page components={components} />;
+}
 
 function NotFound() {
   return (

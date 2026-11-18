@@ -21,7 +21,7 @@ This page lists everything a page or a chat reply can contain and shows an examp
 | `Table` | Tag around a table | Table | Link, Ask | `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
 | `Listing` | Tag around code | Listing | Link, Ask | `DUPLICATE_ID` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
 | `Excerpt` | Tag with `from` | No | Ask | `EXCERPT_TEXT`, `EXCERPT_INVALID`, `BROKEN_LINK` | [`code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts), [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
-| `Diagram`, `Step` | Tag with `draw` | Figure | Link, Ask, per part | Diagram codes | `src/diagram/` |
+| `Diagram`, `Step` | Tag with `draw` | Figure | Link, Ask, per part | Diagram codes | `src/diagram/`, [`diagram-plugin.ts`](/-/files/yapparatus/src/diagram-plugin.ts) |
 | `Chart` | Tag with `plot`, around a block of CSV, or with `from` naming a table or file | Figure | Link, Ask | `CHART_PLOT`, `CHART_DATA`, and chart codes | `src/chart/`, [`chart-plugin.ts`](/-/files/yapparatus/src/chart-plugin.ts) |
 | `Ref` | Tag | No | None | `BROKEN_REF` | [`components.tsx`](/-/files/yapparatus/src/reader/components.tsx) |
 | `Icon` | Tag | No | None | Unknown names | [`icons.tsx`](/-/files/yapparatus/src/reader/icons.tsx) |
@@ -32,7 +32,7 @@ This page lists everything a page or a chat reply can contain and shows an examp
 </Table>
 
 1. **Every component also works in chat replies,** without imports and with the same line length as the page. In a reply, nothing is numbered and there are no Link or Ask buttons, because a reply is not part of the document.
-2. **A failed check is reported by its code.** Each code in the Checks column is an error in the registry, except some diagram and chart codes, which are warnings. The server reports each problem with its file and line. It refuses a reply that contains a problem. See [diagnostics](diagnostics#codes-and-severity).
+2. **A failed check is reported by its code.** Each code in the Checks column is an error in the registry, except some diagram and chart codes, which are warnings. The server reports each problem with its file and line. It refuses a reply that contains an error. See [diagnostics](diagnostics#codes-and-severity).
 3. **A selection gives more precise context than the buttons.** A selection in a list item or a table row points at that line. See [asking about the page](reader-app#asking-about-the-page).
 
 ## Text and Markdown
@@ -57,7 +57,7 @@ An alert is a blockquote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`
 
 ## Code
 
-Shiki, the highlighter, highlights a fenced code block at build time with the theme colors. The lines of the block do not wrap. The block names a language that Shiki knows, or `text`. Shiki loads common languages when the server starts and loads any other language when a page first uses it.
+Shiki, the highlighter, highlights a fenced code block at build time with the theme colors. The lines of the block do not wrap. The block names a language that Shiki knows, or `text`. Shiki loads a language when a block first uses it.
 
 Code marks show what changed in a block:
 
@@ -72,6 +72,12 @@ const retry = {
 The marks are comments at the end of a line. The compiler removes them before highlighting. They show what changed without a second copy of the code. The Copy button copies the code after the change.
 
 **The compiler does not check line length.** Code written for a document should stay within 100 columns, so it fits the breakout track without scrolling. Code copied from a source keeps its formatting, so the reader can compare it with the original.
+
+**Highlighted code has one form.** The compiler turns every code block, excerpt, and whole file into a `HighlightedCode` object, and one reader component, `CodeBlock`, draws it. The object lists each token style once and gives each line as pairs of a style number and a text. Code as a hast tree, the highlighter's own output, takes about 19 times the size of its source; as pairs, it takes under twice the size. A page's code carries the object as a JSON string, which the browser parses faster than code that builds the same object.
+
+<Listing id="highlighted-code" caption="Highlighted code, as code blocks, excerpts, and the file view carry it.">
+<Excerpt from="/-/files/yapparatus/src/protocol.ts" start="export interface HighlightedCode {" />
+</Listing>
 
 `Excerpt` shows lines of an external file in the same kind of block, with the file's line numbers and a link to the file. See [external files](rendering#external-files). `Listing` gives a block a number and a caption, as in <Ref to="listing-example" />. This listing shows the current content of this repository's [registry](/-/files/yapparatus/src/reader/registry.ts).
 
@@ -205,7 +211,7 @@ pnpm build:single content  # dist-single/content/index.html: one offline file
 
 ## Custom components
 
-A document can import its own React components from `.tsx` files. These components work in that document's pages and use the exported theme. The color samples in [styling](styling#color) are a custom component of this document. Custom components are not available in chat replies, because a reply has no imports. See [styling](styling).
+A document can import its own React components from `.tsx` files. These components work in that document's pages and use the exported theme. The color samples in [styling](styling#color) are a custom component of this document. Custom components are not available in chat replies, because a reply has no imports. A custom component cannot hold a `Diagram`, because the page compiler compiles only the diagrams written in a page or a reply. See [styling](styling).
 
 ## Adding a component
 

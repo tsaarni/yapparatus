@@ -1,20 +1,10 @@
 /**
- * Fonts in the browser: waiting for the diagram fonts to load, and measuring text with them.
- * Diagrams and charts measure text only after the fonts are ready.
+ * Waiting for the reader's fonts in the browser. A chart measures its tick labels only after
+ * the fonts are ready.
  */
 import { useEffect, useState } from "react";
-import { defaultMetrics, type Measure } from "./metrics.ts";
+import { defaultMetrics as m } from "../diagram/metrics.ts";
 
-let context: CanvasRenderingContext2D | null | undefined;
-
-export const canvasMeasure: Measure = (text, font) => {
-  context ??= document.createElement("canvas").getContext("2d");
-  if (!context) return text.length * font.size * 0.55;
-  context.font = `${font.weight} ${font.size}px ${font.family}`;
-  return context.measureText(text).width;
-};
-
-const m = defaultMetrics;
 const fontQueries = [
   ...[m.textWeight, m.edgeWeight, m.labelWeight].map((w) => `${w} ${m.labelSize}px ${m.sans}`),
   `${m.textWeight} ${m.smallSize}px ${m.mono}`,

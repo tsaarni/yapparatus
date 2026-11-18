@@ -7,26 +7,11 @@
 import { type DocumentPage, pages } from "virtual:yapparatus/document";
 import { files as builtFiles } from "virtual:yapparatus/files";
 import * as stylex from "@stylexjs/stylex";
-import type { ElementContent, Root } from "hast";
-import {
-  type CSSProperties,
-  createElement,
-  type ReactNode,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useState,
-} from "react";
-import {
-  type FileAddress,
-  fileAddress,
-  type LineRange,
-  parseFileAddress,
-  parseLines,
-} from "../files.ts";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { type FileAddress, fileAddress, parseFileAddress, parseLines } from "../files.ts";
 import type { ContextItem, SourceFileView } from "../protocol.ts";
 import { onFileChanged, readFile } from "./api.ts";
-import { prose, SourceFileContext } from "./prose.tsx";
+import { CodeBlock, SourceFileContext } from "./prose.tsx";
 import { fileHref, href } from "./router.ts";
 import { fileContext } from "./selection.ts";
 import {
@@ -108,10 +93,6 @@ export function FileView({
     }),
     [file, onAsk],
   );
-  const code = useMemo(
-    () => (view && !("error" in view) ? render(view.code, selected) : null),
-    [view, selected],
-  );
   const name = file.path.split("/").at(-1) ?? file.path;
 
   return (
@@ -135,9 +116,14 @@ export function FileView({
       {view && !("error" in view) && (
         <div {...stylex.props(s.code)}>
           <SourceFileContext.Provider
-            value={{ file, whole: true, digits: String(view.lines).length, wrap: false }}
+            value={{
+              file,
+              whole: true,
+              digits: String(view.code.lines.length).length,
+              wrap: false,
+            }}
           >
-            {code}
+            <CodeBlock code={view.code} selected={selected} />
           </SourceFileContext.Provider>
         </div>
       )}
@@ -189,57 +175,6 @@ function mentionsOf(file: FileAddress) {
       });
     }
   return found;
-}
-
-/* ---------- Highlighted code as React ---------- */
-
-/** The same components that show code on pages, so a file looks the same as an excerpt. */
-const renderers: Record<string, unknown> = { pre: prose.pre, code: prose.code, span: prose.span };
-
-/** "color:var(--x);font-style:italic" → { color: "var(--x)", fontStyle: "italic" } */
-function styleObject(style: string): CSSProperties {
-  const out: Record<string, string> = {};
-  for (const declaration of style.split(";")) {
-    const colon = declaration.indexOf(":");
-    const name = declaration.slice(0, colon).trim();
-    if (colon < 0 || !name) continue;
-    const key = name.startsWith("--")
-      ? name
-      : name.replace(/-([a-z])/g, (_m, c: string) => c.toUpperCase());
-    out[key] = declaration.slice(colon + 1).trim();
-  }
-  return out as CSSProperties;
-}
-
-/** Render Shiki's hast with React; lines in `selected` are marked for the reader. */
-function render(
-  node: Root | ElementContent,
-  selected: LineRange | undefined,
-  key?: number,
-): ReactNode {
-  if (node.type === "text") return node.value;
-  if (node.type === "root")
-    return node.children.map((child, i) => render(child as ElementContent, selected, i));
-  if (node.type !== "element") return null;
-  const {
-    class: classes,
-    className,
-    style,
-    tabindex,
-    ...rest
-  } = node.properties as Record<string, unknown>;
-  const props: Record<string, unknown> = { ...rest, key };
-  const names = classes ?? className;
-  if (names) props.className = Array.isArray(names) ? names.join(" ") : String(names);
-  if (typeof style === "string") props.style = styleObject(style);
-  if (tabindex !== undefined) props.tabIndex = Number(tabindex);
-  const line = Number(rest["data-line"]);
-  if (selected && line >= selected.start && line <= selected.end) props["data-selected"] = "true";
-  return createElement(
-    (renderers[node.tagName] ?? node.tagName) as string,
-    props,
-    ...node.children.map((child, i) => render(child, selected, i)),
-  );
 }
 
 const s = stylex.create({

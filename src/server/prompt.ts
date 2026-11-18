@@ -33,6 +33,32 @@ export function checkSnippet(): string {
   return `${run} 'import { checkDocument } from "yapparatus/agent"; console.log((await checkDocument()).prompt);'`;
 }
 
+/** The snippet that saves a figure's picture as a PNG file that the agent names. */
+export function pictureSnippet(): string {
+  return `${run} 'import { savePicture } from "yapparatus/agent"; await savePicture("/page#figure", "/tmp/figure.png");'`;
+}
+
+/** The answers of the picture resource when it cannot draw a picture. */
+export const pictureErrors = {
+  badPath: () =>
+    "Ask for a figure as /-/api/figures/<page>/<figure>, from its address /<page>#<figure>.",
+  badIds: () => "ids is true or false.",
+  noPage: (page: string) =>
+    `There is no page /${page} in the document. A figure's address is /<page>#<figure>, as in links.`,
+  noDiagram: (address: string, diagrams: string[]) =>
+    `${address} is not a diagram with an id. ${
+      diagrams.length
+        ? `The diagrams with an id on its page: ${diagrams.join(", ")}.`
+        : "Its page has no diagram with an id."
+    } Only a <Diagram> with an id has a picture.`,
+  chart: (address: string) =>
+    `${address} is a chart, and only diagrams have pictures. A browser checks a chart when it shows the page.`,
+  notDrawn: (address: string) =>
+    `${address} could not be drawn. Check the document, fix the diagram's errors, and ask again:\n\n${checkSnippet()}`,
+  notCompiled: (page: string, message: string) =>
+    `The page ${page} does not compile: ${message}\nCheck the document, fix it, and ask again:\n\n${checkSnippet()}`,
+};
+
 /**
  * One line per diagnostic, the same everywhere the agent reads one:
  * "- error CODE file:lines, /page#figure, parts a, b: message". A reply being checked has no
@@ -54,10 +80,11 @@ function describeDiagnostic(d: Diagnostic | ReportedDiagnostic, fresh = false): 
 }
 
 /**
- * The document's errors and warnings, new errors marked, and the pages whose diagram and
- * render checks are out of date because no browser has rendered them since they changed,
- * with what was found before the change. Only a browser checks them, and the agent may have
- * none: the reader's browser checks a page when the reader opens the reply's link to it.
+ * The document's errors and warnings, new errors marked, and the pages whose browser checks
+ * (charts, render and runtime errors) are out of date because no browser has rendered them
+ * since they changed, with what was found before the change. Only a browser checks them, and
+ * the agent may have none: the reader's browser checks a page when the reader opens the
+ * reply's link to it. Diagrams are checked when the page compiles.
  */
 export function diagnosticsSection(
   diagnostics: ReportedDiagnostic[],
@@ -73,7 +100,7 @@ export function diagnosticsSection(
           .join("\n")}`
       : "Diagnostics: none",
     unchecked.length
-      ? `Not checked since they changed: diagrams and charts on these pages. They are checked when the reader opens them, so link each change in your reply:\n${unchecked
+      ? `Not checked since they changed: charts, render errors, and runtime errors on these pages. A browser checks them when the reader opens a page, so link each change in your reply:\n${unchecked
           .map((page) =>
             [
               `- ${page.address}`,
@@ -197,6 +224,7 @@ export function startPrompt(guide: string, folders: Record<string, string>, root
     `Run this from the project directory, ${root}, and follow what it prints. It waits until the reader writes, which may take hours: run it in the background if you are notified when commands finish, otherwise with the longest timeout your shell allows, and run it again if your shell stops it.`,
     waitSnippet(),
     `After editing pages, and before you reply, check the document and fix its errors and warnings:\n\n${checkSnippet()}`,
+    `Diagnostics catch overlaps and unknown parts, not a drawing that is hard to read. After you write or change a diagram and the check is clean, look at it once: this saves its picture as the reader sees it in the PNG file that you name, for you to open and then delete. Add { ids: true } as a third argument to label each part with its id.\n\n${pictureSnippet()}`,
   ]
     .filter(Boolean)
     .join("\n\n");

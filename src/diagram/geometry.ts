@@ -173,3 +173,12 @@ export function distance(a: Vec, b: Vec): number {
 export function round(n: number): number {
   return Math.round(n * 100) / 100;
 }
+
+/** Every number in a value rounded to hundredths, the precision a compiled drawing keeps. */
+export function rounded<T>(value: T): T {
+  if (typeof value === "number") return round(value) as T;
+  if (Array.isArray(value)) return value.map(rounded) as T;
+  if (typeof value === "object" && value !== null)
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, rounded(v)])) as T;
+  return value;
+}

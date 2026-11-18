@@ -1,10 +1,10 @@
 # Server API
 
-The dev server has an HTTP API under `/-/api`. The reader app and the `yapparatus/agent` library use it to read and write the chat and the diagnostics, and to read external files. This page describes the API's rules, each request with its parameters and JSON bodies, example requests, and the updates that the server sends to the browser.
+The dev server has an HTTP API under `/-/api`. The reader app and the `yapparatus/agent` library use it to read and write the chat and the diagnostics, to read external files, and to draw diagrams as pictures. This page describes the API's rules, each request with its parameters and bodies, example requests, and the updates that the server sends to the browser.
 
 ## Principles
 
-1. **The API has three resources, named after what the document is made of:** `chat`, `diagnostics`, and `files`.
+1. **The API has four resources, named after what the document is made of:** `chat`, `diagnostics`, `files`, and `figures`.
 2. **Methods mean what HTTP says.** A `GET` changes nothing the reader sees. A `POST` adds to a collection. A `DELETE` empties one. The chat is the collection of its messages, so all three use `/chat`.
 3. **The browser and the agent use the same resources.** A request says what it needs with query parameters, so the same query returns the same result whoever sends it. A header says who asks, when the server needs to know.
 4. **A read may wait.** The `wait` parameter makes an ordinary read wait, so waiting needs no separate request.
@@ -25,12 +25,13 @@ The dev server has an HTTP API under `/-/api`. The reader app and the `yapparatu
 | [`GET /diagnostics`](#read-the-diagnostics) | Reads every diagnostic, once the checks of recent edits are done | `200` with the diagnostics |
 | [`POST /diagnostics`](#report-diagnostics) | Adds what a browser found in one revision of a page, or in a reply | `204` |
 | [`GET /files/{directory}/{path}`](#read-a-source-file) | Reads an external file, highlighted | `200` with the file |
+| [`GET /figures/{page}/{figure}`](#read-a-figures-picture) | Draws a diagram as a picture | `200` with a PNG image |
 
 </Table>
 
 These rules apply to every request:
 
-1. **Bodies are JSON objects.** A `POST` sends `Content-Type: application/json`, and its body must be a JSON object of at most 512,000 characters. Every response with a body has `Content-Type: application/json`.
+1. **Bodies are JSON objects, except pictures.** A `POST` sends `Content-Type: application/json`, and its body must be a JSON object of at most 512,000 characters. Every response with a body has `Content-Type: application/json`, except a figure's picture, which is an image and has `Content-Type: image/png`. An error is JSON on every resource.
 2. **Every response has `Cache-Control: no-store`,** because every read can change.
 3. **Only local callers may use the API.** The server listens on `127.0.0.1` and refuses a request whose `Origin` header names another host. A request without `Origin`, such as one from the `yapparatus/agent` library, is accepted. See [the library implementation](chat#library-implementation).
 4. **An error is a status code and `{ "error": "…" }`.** The text says what is wrong. For the agent, it also says what to run next. <Ref to="api-status-codes" /> lists the codes.
@@ -41,12 +42,12 @@ These rules apply to every request:
 |---|---|
 | `400` | A parameter or the body is invalid |
 | `403` | The `Origin` header names another host |
-| `404` | No route has this path, or the external file does not exist |
+| `404` | No route has this path, the external file does not exist, or the page has no diagram with this id |
 | `405` | The path exists and does not allow this method. The `Allow` header lists the methods. |
 | `409` | The agent was taken over, or a reply answers nothing |
 | `413` | The body is longer than 512,000 characters |
 | `415` | A `POST` body is not JSON |
-| `422` | A reply was refused. See [add a message](#add-a-message). |
+| `422` | A reply was refused, or a diagram could not be drawn. See [add a message](#add-a-message) and [read a figure's picture](#read-a-figures-picture). |
 | `503` | The server closed while a read was waiting. There is no body. |
 
 </Table>
@@ -293,8 +294,8 @@ GET /-/api/diagnostics HTTP/1.1
   // Every diagnostic in the document.
   "diagnostics": [
     {
-      // Who found it. The server: compile, link, pages. A browser: diagram, render,
-      // runtime, reply.
+      // Who found it. The server: compile (diagrams too), link, pages. A browser: chart,
+      // render, runtime, reply.
       "origin": "link",
       // What is wrong. The codes are listed in diagnostics, codes and severity.
       "code": "BROKEN_LINK",
@@ -317,7 +318,8 @@ GET /-/api/diagnostics HTTP/1.1
       "address": "/architecture#system-map"
     }
   ],
-  // The pages no browser has rendered since they changed.
+  // The pages no browser has rendered since they changed: their charts, render errors,
+  // and runtime errors are not checked.
   "unchecked": [
     {
       "source": "docs/design/chat.mdx",
@@ -349,16 +351,14 @@ Content-Type: application/json
   // At most 200 items. Empty: the revision was rendered and nothing was found.
   "diagnostics": [
     {
-      // diagram, render, runtime, or reply: the origins a browser finds.
-      "origin": "diagram",
+      // chart, render, runtime, or reply: the origins a browser finds.
+      "origin": "chart",
       // A known diagnostic code.
-      "code": "TEXT_OVERFLOW",
-      "message": "The text of chat-server does not fit its box.",
+      "code": "CHART_OVERLAP",
+      "message": "Tick labels on the x axis overlap.",
       // Optional: line, target, subject, and elements, as in a read of the diagnostics.
       // The server sets source and severity itself.
-      "line": 41,
-      "target": "system-map",
-      "elements": ["chat-server"]
+      "target": "throughput-chart"
     }
   ]
 }
@@ -386,17 +386,54 @@ GET /-/api/files/yapparatus/src/server/http.ts HTTP/1.1
   "address": "/-/files/yapparatus/src/server/http.ts",
   // The file, relative to the project directory.
   "source": "src/server/http.ts",
-  // The highlighter's language, or "text".
-  "language": "ts",
-  // The number of lines.
-  "lines": 130,
-  // The highlighted code: a `pre` element as a hast tree.
-  // Each line is a `span` with `data-line`.
-  "code": { "type": "root", "children": [{ "type": "element", "tagName": "pre", … }] }
+  // The whole file as highlighted code, numbered from line 1.
+  "code": {
+    "language": "ts",
+    // Each token style once.
+    "styles": ["color:var(--shiki-token-keyword)", "color:var(--shiki-foreground)", …],
+    // Each line's tokens: a style's index, then the token's text.
+    "lines": [[0, "import", 1, " { HttpError } ", 0, "from", …], …],
+    "start": 1
+  }
 }
 ```
 
+The code is a `HighlightedCode`, the form all highlighted code takes. See [code](components#code).
+
 An address with lines, such as `/-/api/files/yapparatus/src/agent.ts#L4-L9` sent as a path, returns `400`. A file that does not exist, or that the document may not show, returns `404`.
+
+## Figures
+
+### Read a figure's picture
+
+`GET /-/api/figures/{page}/{figure}` draws a diagram as a PNG image, as the reader shows it in the light theme. The path is the figure's address, `/{page}#{figure}`, with the figure id as the last segment. The agent looks at the picture to judge what diagnostics do not catch, such as an arrangement that is valid but hard to read. [Pictures for the agent](diagrams#pictures-for-the-agent) describes how the server draws it. <Ref to="figure-read-parameters" /> lists the parameters.
+
+<Table id="figure-read-parameters" caption="The parameters of GET /-/api/figures/{page}/{figure}.">
+
+| Parameter | Values | Effect |
+|---|---|---|
+| `ids` | `true` or `false` | With `true`, labels each part with its id and outlines the parts that diagnostics name |
+
+</Table>
+
+The picture shows the diagram before any step, with 2 pixels per drawing unit, so small text stays legible. A category legend is drawn under the drawing.
+
+```http
+GET /-/api/figures/chat/agent-loop?ids=true HTTP/1.1
+```
+
+```http
+HTTP/1.1 200 OK
+Content-Type: image/png
+Cache-Control: no-store
+```
+
+1. **The picture is of the page as it is on disk.** When the page's text differs from the text it was last compiled from, the server compiles the page again before it draws. An agent can therefore ask for a picture right after an edit, without waiting for the file watcher.
+2. **Only a diagram with an id has a picture.** A chart returns `404` and says that it is a chart. Another id returns `404` with the ids of the diagrams on the page. A page that does not exist also returns `404`.
+3. **A diagram that could not be drawn returns `422`,** and so does a page that does not compile. The `error` says to check the document and fix the errors first.
+4. **An `ids` that is not `true` or `false` returns `400`.**
+
+The `savePicture()` call of the `yapparatus/agent` library reads a picture and saves it in the file that the agent names. See [looking at a diagram](chat#looking-at-a-diagram).
 
 ## Updates
 

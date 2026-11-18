@@ -5,15 +5,14 @@ import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEvent, MouseEvent } from "react";
 import { diagnosticCodes } from "../protocol.ts";
 import { fontSize, space, theme } from "../reader/theme.stylex.ts";
-import type { CompiledDiagram } from "./compiled.ts";
+import type { CompiledDiagram, PartState } from "./compiled.ts";
 import { EdgeView, EnclosureView, FrameView } from "./EdgeView.tsx";
+import { minScale } from "./metrics.ts";
 import { CellWarning, NodeView, Pin, RecordOutline } from "./NodeView.tsx";
-import { interactive, outline, type PartState } from "./part.tsx";
+import { interactive } from "./part.tsx";
+import { outline } from "./shapes.ts";
 
 const dev = import.meta.env.DEV;
-
-/** Drawings shrink to this fraction of their natural size before the figure scrolls. */
-export const minScale = 0.75;
 
 export function DiagramView({
   diagram,
@@ -166,7 +165,10 @@ function DebugLayer({ diagram }: { diagram: CompiledDiagram }) {
         )),
       )}
       {diagram.edges.flatMap((e) =>
-        e.labels.map((l) => <rect key={`${e.id}-${l.text}`} {...outline(l.rect, 0)} fill="none" />),
+        e.labels.map((l, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: Labels are positional.
+          <rect key={`${e.id}-label-${i}`} {...outline(l.rect, 0)} fill="none" />
+        )),
       )}
     </g>
   );

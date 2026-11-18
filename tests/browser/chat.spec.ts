@@ -359,14 +359,13 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
   });
   expect(notJson.status()).toBe(415);
 
-  // A finding about a figure names its lines in the page as it is now, its address, and its parts.
+  // A finding about a figure names its lines in the page as it is now, and its address.
   await report(request, [
     {
-      origin: "diagram",
-      code: "LABEL_OVERLAP",
+      origin: "chart",
+      code: "CHART_OVERLAP",
       message: "A test overlap.",
       target: "fixture-flow",
-      elements: ["fixture-edge"],
     },
   ]);
   const lines = readFileSync(path.join(root, testPage), "utf8").split("\n");
@@ -375,7 +374,7 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
   expect(
     ((await (await request.get("/-/api/diagnostics")).json()) as DocumentDiagnostics).prompt,
   ).toContain(
-    `- warning LABEL_OVERLAP content/first-page.mdx:${start}-${end}, /first-page#fixture-flow, parts fixture-edge: A test overlap.`,
+    `- warning CHART_OVERLAP content/first-page.mdx:${start}-${end}, /first-page#fixture-flow: A test overlap.`,
   );
 
   // A changed page has a new revision: the old findings stop counting, and until a browser
@@ -624,18 +623,18 @@ test("diagnostics: a removed page takes its errors with it", async ({ request })
 test("the header lists diagnostics, and Ask attaches where one is", async ({ page, request }) => {
   await report(request, [
     {
-      origin: "diagram",
-      code: "UNKNOWN_PART",
-      message: "A test step focuses nothing.",
+      origin: "chart",
+      code: "CHART_FAILED",
+      message: "A test chart fails.",
       target: "test-figure",
     },
   ]);
   await page.goto("/second-page");
   await page.getByRole("button", { name: "1 error" }).click();
-  await page.getByRole("button", { name: "Ask about UNKNOWN_PART" }).click();
+  await page.getByRole("button", { name: "Ask about CHART_FAILED" }).click();
   await expect(page).toHaveURL(/\/first-page/);
   await expect(page.getByLabel("Message", { exact: true })).toHaveValue(
-    "Please fix this error: UNKNOWN_PART: A test step focuses nothing.",
+    "Please fix this error: CHART_FAILED: A test chart fails.",
   );
   await expect(page.locator(".context-items")).toContainText("Chapter 1 · First page");
   // The page changes, the open tab renders the new revision, and the finding is gone.

@@ -8,11 +8,12 @@ import type { AddressInfo } from "node:net";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
 import { createLogger } from "../logger.ts";
-import { apiPrefix, type UpdateEvents } from "../protocol.ts";
+import { apiPrefix, type ServerFile, type UpdateEvents } from "../protocol.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { ChatStore } from "./chat.ts";
 import { ChatResource } from "./chat-resource.ts";
 import { DiagnosticStore } from "./diagnostics.ts";
+import { FigureServer } from "./figures.ts";
 import { FileServer } from "./files.ts";
 import { Router } from "./http.ts";
 
@@ -80,6 +81,7 @@ export function installApi(server: ViteDevServer, content: string, files: Source
   diagnostics.mount(router);
   const fileServer = new FileServer({ files, server });
   fileServer.mount(router);
+  new FigureServer({ root, content, server }).mount(router);
   server.middlewares.use(apiPrefix, router.middleware());
 
   const onFile = (file: string) => {
@@ -93,7 +95,8 @@ export function installApi(server: ViteDevServer, content: string, files: Source
   server.watcher.on("change", onFile);
   server.watcher.on("unlink", onFile);
 
-  // The agent library finds the server through this file in the project folder.
+  // The agent library finds the server, and the document it serves, through this file in the
+  // project folder.
   // The newest server writes it; a server removes it on close only if it is still its own.
   const serverFile = path.join(root, ".yapparatus", "server.json");
   let written = "";
@@ -101,7 +104,8 @@ export function installApi(server: ViteDevServer, content: string, files: Source
     const address = server.httpServer?.address() as AddressInfo | null;
     if (!address) return;
     const host = address.family === "IPv6" ? `[${address.address}]` : address.address;
-    written = `${JSON.stringify({ url: `http://${host}:${address.port}` })}\n`;
+    const announced: ServerFile = { url: `http://${host}:${address.port}` };
+    written = `${JSON.stringify(announced)}\n`;
     mkdirSync(path.dirname(serverFile), { recursive: true });
     writeFileSync(serverFile, written);
     log.info(`API at ${JSON.parse(written).url}${apiPrefix}, announced in ${serverFile}`);

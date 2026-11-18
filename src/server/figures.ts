@@ -1,0 +1,93 @@
+/**
+ * Pictures of diagrams: GET /-/api/figures/{page}/{figure} answers with a PNG of the figure as
+ * the reader draws it in the light theme, or with its part ids, so that an agent can look at
+ * what it drew. The page compiler keeps each page's drawings; this resource draws one
+ * as an SVG with text as outlines, and rasterizes it without a browser.
+ */
+import { existsSync } from "node:fs";
+import path from "node:path";
+import { Resvg } from "@resvg/resvg-js";
+import type { ViteDevServer } from "vite";
+import type { CompiledDiagram } from "../diagram/compiled.ts";
+import { pictureOf } from "../diagram/picture.ts";
+import { pageFigures } from "../diagram-plugin.ts";
+import { fontMeasure, textOutline } from "../font-measure.ts";
+import { createLogger } from "../logger.ts";
+import { compilePage } from "./diagnostics.ts";
+import { HttpError, type Router } from "./http.ts";
+import { pictureErrors } from "./prompt.ts";
+
+const log = createLogger("figures");
+
+/** Pixels per drawing unit: small text stays legible to a model. */
+export const pictureScale = 2;
+
+/** A figure's picture as PNG, at `pictureScale` pixels per unit. */
+export function renderPicture(drawing: CompiledDiagram, options: { ids: boolean }): Uint8Array {
+  const { svg } = pictureOf(drawing, options, {
+    measure: fontMeasure().measure,
+    outline: textOutline,
+  });
+  return new Resvg(svg, {
+    fitTo: { mode: "zoom", value: pictureScale },
+    // Text is drawn as outlines, so no font is needed.
+    font: { loadSystemFonts: false },
+  })
+    .render()
+    .asPng();
+}
+
+export class FigureServer {
+  private readonly root: string;
+  private readonly content: string;
+  private readonly server: ViteDevServer;
+
+  constructor(options: { root: string; content: string; server: ViteDevServer }) {
+    this.root = options.root;
+    this.content = options.content;
+    this.server = options.server;
+  }
+
+  mount(router: Router) {
+    router.on("GET", "/figures/:rest*", async ({ params, query }) => {
+      const segments = params.rest?.split("/") ?? [];
+      const id = segments.pop() ?? "";
+      const page = segments.join("/");
+      const address = `/${page}#${id}`;
+      if (!page || !id || segments.some((s) => !s || s === "." || s === ".."))
+        throw new HttpError(400, pictureErrors.badPath());
+      const ids = query.get("ids");
+      if (ids !== null && ids !== "true" && ids !== "false")
+        throw new HttpError(400, pictureErrors.badIds());
+      const figures = await this.figuresOf(page);
+      if (!figures) throw new HttpError(404, pictureErrors.noPage(page));
+      const figure = figures.diagrams.get(id);
+      if (!figure) {
+        if (figures.charts.has(id)) throw new HttpError(404, pictureErrors.chart(address));
+        throw new HttpError(404, pictureErrors.noDiagram(address, [...figures.diagrams.keys()]));
+      }
+      if (!figure.ok) throw new HttpError(422, pictureErrors.notDrawn(address));
+      const started = performance.now();
+      const data = renderPicture(figure, { ids: ids === "true" });
+      log.debug(`${address}: ${Math.round(performance.now() - started)} ms`);
+      return { status: 200, content: { type: "image/png", data } };
+    });
+  }
+
+  /**
+   * The figures of a page as its text is on disk now. A page edited since it was last compiled,
+   * or never compiled, is compiled first.
+   */
+  private async figuresOf(page: string) {
+    const source = `${this.content}/${page}.mdx`;
+    const file = path.join(this.root, source);
+    if (!existsSync(file)) return undefined;
+    try {
+      await compilePage(this.server, this.root, `/${source}`);
+    } catch (error) {
+      const message = error instanceof Error ? (error.message.split("\n")[0] ?? "") : "";
+      throw new HttpError(422, pictureErrors.notCompiled(`/${page}`, message));
+    }
+    return pageFigures.get(file);
+  }
+}

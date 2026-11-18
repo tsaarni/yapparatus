@@ -1,16 +1,17 @@
 /**
  * Diagnostics: the errors and warnings in the document, for the agent first. The server finds
- * what follows from the source alone: it compiles each page and checks links and
- * `document.json` whenever a file changes. A browser reports what only exists when a page
- * runs: diagram layout, render and runtime errors, and replies that fail to show. Its findings
- * belong to the revision of the page it rendered and only add: a changed page has a new
- * revision, and the findings of the old one stop counting. A page no browser has rendered
+ * what follows from the source alone: it compiles each page, with its diagrams, and checks
+ * links and `document.json` whenever a file changes. A browser reports what only exists when a
+ * page runs: chart layout, render and runtime errors, and replies that fail to show. Its
+ * findings belong to the revision of the page it rendered and only add: a changed page has a
+ * new revision, and the findings of the old one stop counting. A page no browser has rendered
  * since it changed is unchecked, and is never reported as clean.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
 import { excerptFiles } from "../code-plugin.ts";
+import { pageFigures } from "../diagram-plugin.ts";
 import {
   checkIcons,
   checkLinks,
@@ -51,7 +52,7 @@ const settleLimit = 8000;
 /** Revisions of a page whose findings are kept: the current one, and those before it. */
 const keptRevisions = 3;
 
-const browserOrigins: DiagnosticOrigin[] = ["diagram", "render", "runtime", "reply"];
+const browserOrigins: DiagnosticOrigin[] = ["chart", "render", "runtime", "reply"];
 
 /** What identifies a diagnostic across renders, line shifts, and rewording. */
 export function diagnosticKey(d: Diagnostic): string {
@@ -87,6 +88,8 @@ export class DiagnosticStore {
   private timer: ReturnType<typeof setTimeout> | undefined;
   private lastFileChange = 0;
   private checking = false;
+  /** When the last check of the sources started. */
+  private checkStarted = 0;
   private readonly options: DiagnosticOptions;
   private readonly root: string;
   private readonly content: string;
@@ -152,9 +155,10 @@ export class DiagnosticStore {
   }
 
   /**
-   * Pages whose diagram and render checks are out of date: no browser has rendered their
-   * current revision, though one rendered an earlier one or the page changed since the
-   * server started. Each comes with what was found in the revision last rendered.
+   * Pages whose browser checks (charts, render and runtime errors) are out of date: no browser
+   * has rendered their current revision, though one rendered an earlier one or the page
+   * changed since the server started. Each comes with what was found in the revision last
+   * rendered.
    */
   unchecked(): UncheckedPage[] {
     const pages: UncheckedPage[] = [];
@@ -257,6 +261,9 @@ export class DiagnosticStore {
 
   /** Every diagnostic and the unchecked pages, once recent edits are checked, with text for the agent. */
   async document(): Promise<DocumentDiagnostics> {
+    // An agent edits a file and reads the diagnostics at once, often before the watcher
+    // reports the edit. The read finds such an edit itself and waits for its checks.
+    if (this.savedSinceCheck()) this.fileChanged();
     await this.settle();
     const diagnostics = this.list();
     this.give(diagnostics.filter((d) => d.severity === "error"));
@@ -300,13 +307,21 @@ export class DiagnosticStore {
     return pages;
   }
 
-  /**
-   * Compile a page with the same plugins as the browser, in the server's own environment.
-   * The browser environment's dependency optimizer must not see these requests: at startup
-   * they hold back the first page load.
-   */
   private compile(url: string) {
-    return this.server.environments.ssr.transformRequest(url);
+    return compilePage(this.server, this.root, url);
+  }
+
+  /**
+   * Whether a page, a file it reads, or `document.json` was saved after the last check
+   * started. The watcher has then not reported the edit yet.
+   */
+  private savedSinceCheck(): boolean {
+    const settings = path.join(this.root, this.content, "document.json");
+    const saved = Math.max(
+      existsSync(settings) ? statSync(settings).mtimeMs : 0,
+      ...this.pageSources().map((source) => this.changedAt(source)),
+    );
+    return saved >= this.checkStarted;
   }
 
   private settings(): {
@@ -339,6 +354,7 @@ export class DiagnosticStore {
   }
 
   private async runChecks() {
+    this.checkStarted = Date.now();
     const settingsSource = `${this.content}/document.json`;
     const { listed, theme, files, logo, favicon, error } = this.settings();
     const pageErrors = error
@@ -383,7 +399,9 @@ export class DiagnosticStore {
               ...(issue.subject ? { subject: issue.subject } : {}),
               message: issue.message,
               source,
-              line: issue.line,
+              ...(issue.line ? { line: issue.line } : {}),
+              ...(issue.target ? { target: issue.target } : {}),
+              ...(issue.elements ? { elements: issue.elements } : {}),
             }),
           );
       this.setCheck(`compile:${source}`, issues);
@@ -533,4 +551,21 @@ function parseDiagnostics(input: unknown): Diagnostic[] {
       ...(elements?.length ? { elements } : {}),
     };
   });
+}
+
+/**
+ * Compile a page as its file is on disk, with the same plugins as the browser, in the server's
+ * own environment. The browser environment's dependency optimizer must not see these requests:
+ * at startup they hold back the first page load. The watcher reports an edit a moment after it
+ * is saved, and until then the module is the old one, so a page whose file differs from the
+ * text it was compiled from is compiled again. `url` is the page's path from the project, such
+ * as `/docs/cache.mdx`.
+ */
+export function compilePage(server: ViteDevServer, root: string, url: string) {
+  const environment = server.environments.ssr;
+  const file = path.join(root, url);
+  const module = environment.moduleGraph.getModuleById(file);
+  if (module && existsSync(file) && pageFigures.get(file)?.source !== readFileSync(file, "utf8"))
+    environment.moduleGraph.invalidateModule(module);
+  return environment.transformRequest(url);
 }

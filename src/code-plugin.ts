@@ -1,17 +1,20 @@
 /**
  * Code highlighting for pages, excerpts, and the file view, so code looks the same wherever it
- * appears. `<Excerpt from="/-/files/…" start="…" />` finds its lines in the file by their text
- * at compile time and becomes a highlighted code block that keeps the file's line numbers.
+ * appears. Each becomes `HighlightedCode`, which the reader draws. `<Excerpt from="/-/files/…"
+ * start="…" />` finds its lines in the file by their text at compile time and becomes a
+ * highlighted code block that keeps the file's line numbers.
  */
-import type { RehypeShikiOptions } from "@shikijs/rehype";
-import rehypeShiki from "@shikijs/rehype";
 import type { Element, Root } from "hast";
+import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import {
+  type BundledLanguage,
   bundledLanguages,
-  codeToHast,
+  codeToTokens,
   createCssVariablesTheme,
-  type ShikiTransformer,
+  getTokenStyleObject,
+  isSpecialLang,
+  stringifyTokenStyle,
 } from "shiki";
 import { visit } from "unist-util-visit";
 import {
@@ -21,72 +24,118 @@ import {
   parseFileAddress,
   parseLines,
 } from "./files.ts";
-import { codeMarks, contentIssues, type MarksMeta } from "./markdown-plugin.ts";
-import type { DiagnosticCode, SourceFileView } from "./protocol.ts";
+import { codeMarks, contentIssues } from "./markdown-plugin.ts";
+import type { CodeMark, DiagnosticCode, HighlightedCode, SourceFileView } from "./protocol.ts";
 import type { SourceFile, SourceFiles } from "./source-files.ts";
 
 /** Code colors come from CSS variables, so they follow the reader theme. */
 const codeTheme = createCssVariablesTheme({ name: "yapparatus", variablePrefix: "--shiki-" });
 
-const languageLabel: ShikiTransformer = {
-  pre(node) {
-    node.properties["data-language"] = this.options.lang;
-  },
-};
+/** Shiki's font style bits for underline and strikethrough. */
+const underOrThrough = 4 | 8;
 
-/** An excerpt's first line number and marked lines travel to Shiki in the code's meta. */
-interface ExcerptMeta {
-  start: number;
-  marks: LineRange[];
-}
-
-function excerptMeta(raw: unknown): ExcerptMeta | undefined {
-  if (typeof raw !== "string" || !raw.startsWith("excerpt")) return;
-  const start = Number(/\bstart=(\d+)/.exec(raw)?.[1] ?? 1);
-  const marks = (/\bmark=(\S+)/.exec(raw)?.[1] ?? "")
-    .split(",")
-    .flatMap((range) => parseLines(range) ?? []);
-  return { start, marks };
+/**
+ * Highlight `code` in `language`. A language Shiki does not know reads as text. Shiki loads a
+ * language the first time code uses it.
+ */
+export async function highlight(
+  code: string,
+  language: string,
+  lines: Pick<HighlightedCode, "start" | "pageLines" | "marks"> = {},
+): Promise<HighlightedCode> {
+  const lang =
+    Object.hasOwn(bundledLanguages, language) || isSpecialLang(language) ? language : "text";
+  const { tokens } = await codeToTokens(code, { lang: lang as BundledLanguage, theme: codeTheme });
+  const styles: string[] = [];
+  const index = new Map<string, number>();
+  const styleOf = (style: string) => {
+    let at = index.get(style);
+    if (at === undefined) {
+      at = styles.push(style) - 1;
+      index.set(style, at);
+    }
+    return at;
+  };
+  return {
+    language: lang,
+    styles,
+    lines: tokens.map((line) => {
+      const runs: Array<number | string> = [];
+      // Whitespace joins the token after it, as in Shiki's HTML, unless that token draws a
+      // line under or through its text.
+      let space = "";
+      line.forEach((token, i) => {
+        const joins = !((token.fontStyle ?? 0) & underOrThrough);
+        if (joins && /^\s+$/.test(token.content) && line[i + 1]) {
+          space += token.content;
+          return;
+        }
+        if (space && !joins) runs.push(styleOf(""), space);
+        const style = stringifyTokenStyle(token.htmlStyle || getTokenStyleObject(token));
+        runs.push(styleOf(style), (joins ? space : "") + token.content);
+        space = "";
+      });
+      return runs;
+    }),
+    ...lines,
+  };
 }
 
 /**
- * Each line of code carries its line in its file. A file's line, in an excerpt or the file view,
- * is `data-line`, which shows as a line number, and a marked line gets its mark. A page's code
- * block shows no numbers: its lines are lines of the page, `data-source-line`, so a selection
- * in it points at the lines selected.
+ * Where a block's code comes from travels in its meta: `page start=N` for code written on a
+ * page, whose first line is line N of the page, and `excerpt start=N mark=L3,L5-L7` for lines
+ * of a file, whose first line is line N of the file.
  */
-const sourceLines: ShikiTransformer = {
-  name: "yapparatus:source-lines",
-  line(node, line) {
-    const raw = this.options.meta?.__raw;
-    const page = typeof raw === "string" ? /^page start=(\d+)/.exec(raw) : null;
-    if (page) {
-      const written = (this.meta as MarksMeta).codeLines?.[line - 1] ?? line;
-      node.properties["data-source-line"] = Number(page[1]) + written - 1;
-      return;
-    }
-    const meta = excerptMeta(raw);
-    if (!meta) return;
-    const number = meta.start + line - 1;
-    node.properties["data-line"] = number;
-    if (meta.marks.some((m) => number >= m.start && number <= m.end))
-      node.properties["data-mark"] = "highlight";
-  },
-};
+function codeOf(element: Element): Promise<HighlightedCode> {
+  const classes = Array.isArray(element.properties.className) ? element.properties.className : [];
+  const language =
+    classes
+      .map(String)
+      .find((c) => c.startsWith("language-"))
+      ?.slice("language-".length) ?? "text";
+  const meta = String((element.data as { meta?: unknown } | undefined)?.meta ?? "");
+  const text = textOf(element).replace(/\n$/, "");
+  if (meta.startsWith("excerpt")) {
+    const start = Number(/\bstart=(\d+)/.exec(meta)?.[1] ?? 1);
+    const ranges = (/\bmark=(\S+)/.exec(meta)?.[1] ?? "")
+      .split(",")
+      .flatMap((range) => parseLines(range) ?? []);
+    const marks: Record<number, CodeMark> = {};
+    text.split("\n").forEach((_line, i) => {
+      if (ranges.some((r) => start + i >= r.start && start + i <= r.end)) marks[i] = "highlight";
+    });
+    return highlight(text, language, { start, ...marked(marks) });
+  }
+  // Code written on a page may mark lines with comments; the comments are not shown.
+  const { lines, written, marks } = codeMarks(text);
+  const page = /^page start=(\d+)/.exec(meta);
+  return highlight(lines.join("\n"), language, {
+    ...(page ? { pageLines: written.map((line) => Number(page[1]) + line - 1) } : {}),
+    ...marked(marks),
+  });
+}
 
-export const codeHighlighting: [typeof rehypeShiki, RehypeShikiOptions] = [
-  rehypeShiki,
-  {
-    theme: codeTheme,
-    defaultLanguage: "text",
-    fallbackLanguage: "text",
-    // Common languages load at startup; any other Shiki language loads when a page uses it.
-    // biome-ignore format: a list of names reads best on few lines.
-    langs: ["ts", "tsx", "js", "jsx", "json", "sh", "bash", "http", "html", "css", "mdx", "md", "py", "go", "rust", "yaml", "sql"],
-    lazy: true,
-    transformers: [languageLabel, codeMarks, sourceLines],
-  },
-];
+const marked = (marks: Record<number, CodeMark>) => (Object.keys(marks).length ? { marks } : {});
+
+/**
+ * Highlight every code block. A block becomes a `pre` without children whose `data-code` is
+ * its `HighlightedCode` as JSON: MDX keeps it as one string, which the browser parses fast.
+ */
+export function codeHighlighting() {
+  return async (tree: Root) => {
+    const blocks: Array<{ pre: Element; code: Element }> = [];
+    visit(tree, "element", (pre: Element) => {
+      const code = pre.tagName === "pre" ? pre.children[0] : undefined;
+      if (code?.type === "element" && code.tagName === "code") blocks.push({ pre, code });
+    });
+    await Promise.all(
+      blocks.map(async ({ pre, code }) => {
+        pre.properties = { dataCode: JSON.stringify(await codeOf(code)) };
+        pre.children = [];
+      }),
+    );
+  };
+}
 
 /** Files known by name rather than by extension, in lowercase. */
 const languageByName: Record<string, string> = {
@@ -149,21 +198,12 @@ export function languageOf(file: string): string {
 const own = (map: Record<string, string>, key: string) =>
   Object.hasOwn(map, key) ? map[key] : undefined;
 
-/** A whole file as the file view shows it: highlighted like an excerpt that starts at line 1. */
+/** A whole file as the file view shows it: highlighted, numbered from line 1. */
 export async function fileView(address: FileAddress, file: SourceFile): Promise<SourceFileView> {
-  const language = languageOf(address.path);
-  const code: Root = await codeToHast(file.lines.join("\n"), {
-    lang: language,
-    theme: codeTheme,
-    meta: { __raw: "excerpt start=1" },
-    transformers: [languageLabel, sourceLines],
-  });
   return {
     address: fileAddress({ folder: address.folder, path: address.path }),
     source: file.source,
-    language,
-    lines: file.lines.length,
-    code,
+    code: await highlight(file.lines.join("\n"), languageOf(address.path), { start: 1 }),
   };
 }
 

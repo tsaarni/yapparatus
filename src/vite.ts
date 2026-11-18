@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import mdx from "@mdx-js/rollup";
@@ -9,19 +9,28 @@ import remarkGfm from "remark-gfm";
 import type { CustomCollectionIconLoader } from "unplugin-icons";
 import { FileSystemHMRIconLoader } from "unplugin-icons/loaders";
 import Icons from "unplugin-icons/vite";
-import type { PluginOption } from "vite";
+import type { PluginOption, ViteDevServer } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { charts, dataModule, dataModuleCode, readChartFile } from "./chart-plugin.ts";
 import { codeHighlighting, excerptFiles, excerpts, fileView } from "./code-plugin.ts";
-import { checkIcons, checkPages, checkTheme, pageIdOf, type ThemeSetting } from "./document.ts";
+import { diagrams } from "./diagram-plugin.ts";
+import {
+  checkIcons,
+  checkPages,
+  checkTheme,
+  type PageOutline,
+  pageIdOf,
+  type ThemeSetting,
+} from "./document.ts";
 import { documentError } from "./document-directory.ts";
 import { checkFiles, type FileAddress, parseFileAddress } from "./files.ts";
 import { iconImports } from "./icon-plugin.ts";
 import { logLevel } from "./logger.ts";
 import { markdownConventions } from "./markdown-plugin.ts";
-import { pageOutline } from "./outline-plugin.ts";
+import { compiled, pageOutline } from "./outline-plugin.ts";
 import { apiPrefix, appPrefix } from "./protocol.ts";
 import { installApi } from "./server/api.ts";
+import { compilePage } from "./server/diagnostics.ts";
 import { SourceFiles } from "./source-files.ts";
 import { sourceContext } from "./source-plugin.ts";
 
@@ -89,6 +98,13 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
   const iconCollections: Record<string, CustomCollectionIconLoader> = {};
   const sourceFiles = new SourceFiles(() => root, content);
   let building = false;
+  let base = "/";
+  /** The dev server, which compiles pages for their outlines; undefined in a build. */
+  let devServer: ViteDevServer | undefined;
+  /** Each page's chunk and the chunks it imports, other than the entry, by page id. */
+  const pageChunks = new Map<string, string[]>();
+  /** The text of document.json that the document module was last loaded from. */
+  let loadedSettings: string | undefined;
   /**
    * The files a build carries: those the pages name that can be shown. A build never
    * carries a whole folder, only what the document points at.
@@ -118,6 +134,43 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
           .replace(/\.mdx$/, ""),
       )
       .sort();
+  };
+  /** Page ids in the order of document.json, or none when the list is missing or broken. */
+  const listedPages = (): string[] => {
+    try {
+      const listed = JSON.parse(readFileSync(path.join(root, content, "document.json"), "utf8"));
+      return Array.isArray(listed.pages) ? listed.pages.map(pageIdOf) : [];
+    } catch {
+      return [];
+    }
+  };
+  /** Is `file` a page, or a file that a page reads, so that page outlines depend on it? */
+  const feedsOutline = (file: string) =>
+    (file.endsWith(".mdx") && file.startsWith(path.join(root, content) + path.sep)) ||
+    [...excerptFiles.values()].some((read) => read.has(file));
+  /**
+   * A page's outline, compiled by the same pipeline as the page. A page that does not compile
+   * has an empty outline, so the reader lists it and shows its error when it is opened.
+   */
+  const outlineOf = async (
+    id: string,
+    compile: (url: string) => Promise<string | undefined>,
+  ): Promise<PageOutline> => {
+    const empty = {
+      revision: "",
+      title: id,
+      headings: [],
+      numbered: [],
+      anchors: [],
+      links: [],
+      refs: [],
+    };
+    try {
+      const file = await compile(`/${content}/${id}.mdx`);
+      return (file && compiled.get(file)?.outline) || empty;
+    } catch {
+      return empty;
+    }
   };
   /** The first paint, before the reader app runs, uses the document's color scheme. */
   const page = () => {
@@ -201,7 +254,9 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
           if (!address || !source || "error" in source)
             return this.error(`yapparatus: cannot read ${id}.`);
           this.addWatchFile(source.file);
-          return `export default ${JSON.stringify(await fileView(address, source))};`;
+          // JSON text in a string literal: V8 parses it faster than the same object literal.
+          const view = JSON.stringify(await fileView(address, source));
+          return `export default JSON.parse(${JSON.stringify(view)});`;
         }
         // A chart's data, loaded when the chart nears the screen. Its id carries the file's
         // version, so a changed file is a new module, and a build gives it its own chunk.
@@ -224,9 +279,10 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
           logo?: unknown;
           favicon?: unknown;
         } = {};
-        if (existsSync(settingsFile)) {
+        loadedSettings = existsSync(settingsFile) ? readFileSync(settingsFile, "utf8") : undefined;
+        if (loadedSettings !== undefined) {
           try {
-            settings = JSON.parse(readFileSync(settingsFile, "utf8"));
+            settings = JSON.parse(loadedSettings);
           } catch (error) {
             this.error(`${content}/document.json: ${(error as Error).message}`);
           }
@@ -240,7 +296,25 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
         if (errors.length) this.error(`Pages in ${content}/: ${errors.join(" ")}`);
         const ids = (settings.pages as string[]).map(pageIdOf);
         const files = ids.map((id) => `/${content}/${id}.mdx`);
+        // Every outline is here, so the contents, numbers, and references need no page's code.
+        // The dev server compiles pages in its own environment, as its checks do; a build
+        // loads each page module, which it bundles anyway.
+        const server = devServer;
+        const compile = server
+          ? async (url: string) => {
+              await compilePage(server, root, url);
+              return path.join(root, url);
+            }
+          : async (url: string) => {
+              const resolved = await this.resolve(url);
+              if (resolved) await this.load({ id: resolved.id });
+              return resolved?.id;
+            };
+        const outlines = Object.fromEntries(
+          await Promise.all(ids.map(async (id) => [id, await outlineOf(id, compile)] as const)),
+        );
         // Generated so the glob pattern and the accepted files are literal, as Vite requires.
+        // A page's code loads when the page is first shown, as its own chunk in a build.
         // An edited page updates its entry in place and notifies listeners, instead of
         // reloading the app: page modules export `outline`, so React cannot refresh them alone.
         // The logo is a component and the favicon its SVG text, from the same icon collections
@@ -253,13 +327,25 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
           settings.favicon
             ? `import favicon from ${icon(`${settings.favicon}?raw`)};\nexport { favicon };`
             : "export const favicon = undefined;",
-          `const modules = import.meta.glob(${JSON.stringify(`/${content}/**/*.mdx`)}, { eager: true });`,
+          `const modules = import.meta.glob(${JSON.stringify(`/${content}/**/*.mdx`)});`,
+          `const outlines = ${JSON.stringify(outlines)};`,
           `export const contentDir = ${JSON.stringify(content)};`,
           `export const settings = ${JSON.stringify(settings)};`,
-          `export const pages = ${JSON.stringify(ids)}.map((id) => ({`,
+          `const loading = [];`,
+          `export const pages = ${JSON.stringify(ids)}.map((id, i) => ({`,
           `  id,`,
           `  source: \`${content}/\${id}.mdx\`,`,
-          `  ...modules[\`/${content}/\${id}.mdx\`],`,
+          `  outline: outlines[id],`,
+          `  module: undefined,`,
+          `  error: undefined,`,
+          `  load: () =>`,
+          `    (loading[i] ??= modules[\`/${content}/\${id}.mdx\`]().then(`,
+          `      (module) => (pages[i].module = module),`,
+          `      (error) => {`,
+          `        pages[i].error = error;`,
+          `        throw error;`,
+          `      },`,
+          `    )),`,
           `}));`,
           `const listeners = new Set();`,
           `export function onPagesChanged(listener) {`,
@@ -268,7 +354,11 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
           `}`,
           `if (import.meta.hot)`,
           `  import.meta.hot.accept(${JSON.stringify(files)}, (updated) => {`,
-          `    updated.forEach((module, i) => { if (module) Object.assign(pages[i], module); });`,
+          `    updated.forEach((module, i) => {`,
+          `      if (!module) return;`,
+          `      Object.assign(pages[i], { module, outline: module.outline, error: undefined });`,
+          `      loading[i] = Promise.resolve(module);`,
+          `    });`,
           `    for (const listener of listeners) listener();`,
           `  });`,
         ].join("\n");
@@ -293,9 +383,19 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
           config.optimizeDeps.include = include.filter((entry) => !sharedEntries.includes(entry));
         }
         building = config.command === "build";
+        base = config.base;
         Object.assign(iconCollections, FileSystemHMRIconLoader(path.join(root, "icons"), "local"));
       },
+      // The document module holds every outline. It is not part of a page's hot update, which
+      // it accepts, but a reload must compile it again with the new outline.
+      hotUpdate({ file }) {
+        if (this.environment.name !== "client" || !feedsOutline(file)) return;
+        const graph = this.environment.moduleGraph;
+        const module = graph.getModuleById(resolvedId(documentModule));
+        if (module) graph.invalidateModule(module);
+      },
       configureServer(server) {
+        devServer = server;
         installApi(server, content, sourceFiles);
         // After Vite's own middlewares: every page address, and every source file's, is the
         // reader app. Other paths with an extension are missing assets.
@@ -305,6 +405,15 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
             // Vite's fallback has already rewritten page addresses to /index.html.
             const isPage = url === "/index.html" || !path.posix.extname(url);
             if (req.method !== "GET" || !isPage || url.startsWith(apiPrefix)) return next();
+            // The watcher reports an edit of document.json a moment late, or not at all in an
+            // ignored folder. A page load finds the edit itself, so the app gets the new settings.
+            const settingsFile = path.join(root, content, "document.json");
+            const settings = existsSync(settingsFile)
+              ? readFileSync(settingsFile, "utf8")
+              : undefined;
+            const graph = server.environments.client.moduleGraph;
+            const module = graph.getModuleById(resolvedId(documentModule));
+            if (module && settings !== loadedSettings) graph.invalidateModule(module);
             try {
               const html = await server.transformIndexHtml(url, page(), req.originalUrl);
               res.setHeader("Content-Type", "text/html");
@@ -314,20 +423,54 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
             }
           });
       },
+      generateBundle(_output, bundle) {
+        pageChunks.clear();
+        const pagesDir = path.join(root, content);
+        for (const chunk of Object.values(bundle)) {
+          if (chunk.type !== "chunk" || !chunk.facadeModuleId?.endsWith(".mdx")) continue;
+          const id = path
+            .relative(pagesDir, chunk.facadeModuleId)
+            .split(path.sep)
+            .join("/")
+            .replace(/\.mdx$/, "");
+          // The chunks it imports, but not the entry, which every page loads already.
+          const files = new Set<string>();
+          const add = (name: string) => {
+            const imported = bundle[name];
+            if (files.has(name) || imported?.type !== "chunk" || imported.isEntry) return;
+            files.add(name);
+            for (const next of imported.imports) add(next);
+          };
+          add(chunk.fileName);
+          pageChunks.set(id, [...files]);
+        }
+      },
       writeBundle(output) {
         // Give every page a real file, so any static host can serve its path directly.
         if (options.singleFile || !output.dir) return;
         const index = path.join(output.dir, "index.html");
         if (!existsSync(index)) return;
-        const fileIds = builtFiles().map(({ folder, path: file }) =>
-          path.join(appPrefix.slice(1), "files", folder, file),
-        );
-        for (const id of [...pageIds(), ...fileIds]) {
+        const html = readFileSync(index, "utf8");
+        // Each page's file fetches that page's code with the app, so the page shows without a
+        // second round trip. The root shows the first page.
+        const withPage = (id: string | undefined) => {
+          const links = (id ? (pageChunks.get(id) ?? []) : [])
+            .map((file) => `<link rel="modulepreload" crossorigin href="${base}${file}">`)
+            .join("");
+          return html.replace("</head>", `${links}</head>`);
+        };
+        writeFileSync(index, withPage(listedPages()[0]));
+        for (const id of pageIds()) {
           const dir = path.join(output.dir, id);
           mkdirSync(dir, { recursive: true });
-          copyFileSync(index, path.join(dir, "index.html"));
+          writeFileSync(path.join(dir, "index.html"), withPage(id));
         }
-        copyFileSync(index, path.join(output.dir, "404.html"));
+        for (const { folder, path: file } of builtFiles()) {
+          const dir = path.join(output.dir, appPrefix.slice(1), "files", folder, file);
+          mkdirSync(dir, { recursive: true });
+          writeFileSync(path.join(dir, "index.html"), html);
+        }
+        writeFileSync(path.join(output.dir, "404.html"), html);
       },
     },
     {
@@ -338,6 +481,7 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
           markdownConventions,
           excerpts(sourceFiles),
           charts(sourceFiles),
+          diagrams,
           [pageOutline, (file: string) => file.startsWith(path.join(root, content) + path.sep)],
           sourceContext(() => root),
           codeHighlighting,

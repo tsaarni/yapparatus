@@ -10,17 +10,18 @@ This page describes how a page file is compiled and then rendered on screen, how
 
 ## Compiling a page
 
-<Diagram id="page-pipeline" caption="The path of a page file. Steps 1 to 4 run in the dev server, steps 5 and 6 in the browser." draw={(d) => {
+<Diagram id="page-pipeline" caption="The path of a page file. Steps 1 to 5 run in the dev server, steps 6 and 7 in the browser." draw={(d) => {
   const file = d.box("rendering.mdx", { id: "mdx-file", mono: true, sub: "a page file" })
   const list = d.box("1. Page list", { id: "page-list", sub: "checks document.json" })
   const parse = d.box("2. MDX parser", { id: "mdx-parser", sub: "reads Markdown and tags" })
   const icons = d.box("3. Icon step", { id: "icon-step", sub: "links the icons" })
-  const marks = d.box("4. Outline and marks", { id: "source-marks", sub: "tags each block" })
-  const reader = d.box("5. Reader app", { id: "reader-app", sub: "picks the page" })
-  const screen = d.box("6. The screen", { id: "screen", sub: "the styled page", role: "accent" })
-  d.equalSize([file, list, parse, icons, marks, reader, screen])
+  const drawings = d.box("4. Diagram step", { id: "diagram-step", sub: "compiles each drawing" })
+  const marks = d.box("5. Outline and marks", { id: "source-marks", sub: "tags each block" })
+  const reader = d.box("6. Reader app", { id: "reader-app", sub: "picks the page" })
+  const screen = d.box("7. The screen", { id: "screen", sub: "the styled page", role: "accent" })
+  d.equalSize([file, list, parse, icons, drawings, marks, reader, screen])
 
-  const server = d.column([list, parse, icons, marks], { gap: 32 })
+  const server = d.column([list, parse, icons, drawings, marks], { gap: 32 })
   d.place(file, { above: server, gap: 64 })
   d.place(reader, { rightOf: marks, gap: 112 })
   d.place(screen, { below: reader, gap: 32 })
@@ -30,29 +31,38 @@ This page describes how a page file is compiled and then rendered on screen, how
   d.arrow(file, list)
   d.arrow(list, parse)
   d.arrow(parse, icons)
-  d.arrow(icons, marks)
+  d.arrow(icons, drawings)
+  d.arrow(drawings, marks)
   d.arrow(marks, reader, { label: "module" })
   d.arrow(reader, screen)
 }} />
 
-<Ref to="page-pipeline" /> follows one file through these steps. Steps 1 to 4 are the page compiler, which runs in the dev server or in a build. It records what the page contains and reports the problems it finds as [diagnostics](diagnostics).
+<Ref to="page-pipeline" /> follows one file through these steps. Steps 1 to 5 are the page compiler, which runs in the dev server or in a build. It records what the page contains and reports the problems it finds as [diagnostics](diagnostics).
 
-1. **Page list.** The plugin checks the page names and the list in `document.json`. It then generates the module `virtual:yapparatus/document`, which contains the pages in the order of `document.json`. When a file is added or the list is edited, the module updates without a restart.
-2. **MDX parser.** The parser reads Markdown with GitHub-flavored tables, component tags, and JavaScript in braces. A diagram's `draw` is therefore an ordinary function. Headings get GitHub-style anchors. The conventions step then turns alerts and file trees into components, marks code lines, and checks code languages and heading depth. See [components](components).
+1. **Page list.** The plugin checks the page names and the list in `document.json`. It then generates the module `virtual:yapparatus/document`, which lists the pages in the order of `document.json`. The module holds each page's outline (step 5) and a function that loads the page's code. When a file is added or the list is edited, the module updates without a restart.
+2. **MDX parser.** The parser reads Markdown with GitHub-flavored tables, component tags, and JavaScript in braces. A diagram's `draw` is therefore an ordinary function, which the diagram step runs. Headings get GitHub-style anchors. The conventions step then turns alerts and file trees into components, marks code lines, and checks code languages and heading depth. See [components](components).
 3. **Icon step.** An `<Icon name="…">` with a literal name becomes an import of that one SVG file, so a page includes only the icons it uses. The compiler cannot resolve a name that is built at run time, so it reports an error.
-4. **Outline and source marks.** The outline records the title, sections, numbered blocks, ids, links, and references. Numbering and link checking use the outline. The outline step marks each top-level block, list item, and table row with its file, its lines, and a hash of its source lines. It marks each line of a code block with its line in the page. With these marks, the reader app maps a selection to its source lines, so authors do not give paragraphs ids. The page shows no line numbers, because line numbers of the page file are not useful to a reader. See [asking about the page](reader-app#asking-about-the-page).
+4. **Diagram step.** Each `<Diagram>`'s `draw` runs in the server process, and the figure is compiled with the reader's font files and checked with its steps. The drawing replaces `draw` in the page as data, and its problems are the page's diagnostics. The page that reaches the browser has no draw program and needs no compiler. See [where a diagram is compiled](diagrams#where-a-diagram-is-compiled).
+5. **Outline and source marks.** The outline records the title, sections, numbered blocks, ids, links, and references. Numbering and link checking use the outline. The outline step marks each top-level block, list item, and table row with its file, its lines, and a hash of its source lines. It marks each line of a code block with its line in the page. With these marks, the reader app maps a selection to its source lines, so authors do not give paragraphs ids. The page shows no line numbers, because line numbers of the page file are not useful to a reader. See [asking about the page](reader-app#asking-about-the-page).
 
 ## Rendering a page
 
-Steps 5 and 6 render the page in the browser.
+Steps 6 and 7 render the page in the browser.
 
-5. **Reader app.** The router picks the page from the address and renders it with styled Markdown elements and the page components. Pages use the components without imports.
-6. **The screen.** StyleX compiles the styles at build time. See [styling](styling).
+6. **Reader app.** The router picks the page from the address, loads the page's code, and renders it with styled Markdown elements and the page components. Pages use the components without imports. A diagram draws the drawing that the page compiler made.
+7. **The screen.** StyleX compiles the styles at build time. See [styling](styling).
 
-**The browser compiles diagrams and charts when it renders the page.** Their programs run in the browser, so the page compiler cannot check them. The browser reports their diagnostics when a reader opens the page. The page compiler checks only a chart's data; see [external files](#external-files). See [diagnostics](diagnostics).
+**The browser draws charts when it renders the page.** A chart's `plot` runs in the browser at the width of the page, so the page compiler checks only its data; see [external files](#external-files). The browser reports a chart's diagnostics when a reader opens the page. See [diagnostics](diagnostics).
 
 
-**The browser replaces an edited page without a reload.** The page list accepts the update and replaces the page's module. The numbers, the contents, and the links then update to match. A reload would make the page flash, and the reader would lose their place while an agent edits. Pages do not use React Fast Refresh. They export `outline`, and Fast Refresh answers that export with a full reload. The chat is rendered outside the page component, so an update keeps the reader's draft and selections.
+**A page's code loads when the page is first shown.** The page list holds every outline, so the contents, the numbers, `Ref`, and the file view's list of sections need no page's code. Only the page on screen runs its code. A document with many diagrams and code blocks therefore starts as fast as a small one.
+
+1. **The page list keeps every outline.** In the dev server, the plugin compiles each page for its outline, in the same environment as the server's checks. A build loads each page module, which it bundles anyway. A page that does not compile gets an empty outline titled with its id. The reader lists the page, and opening it shows its error.
+2. **The router switches to a page when its code has loaded.** The address changes at once, and the old page stays on screen until the new page's code has loaded, so the reader never sees an empty page. When the reader follows another link or goes back in the meantime, the latest address wins. The app renders for the first time when the page at the address has loaded.
+3. **A page arrives with its content.** Scrolling to an anchor, returning to the position on Back, Show on page, and Ask on a diagnostic therefore find the page's content in the document. A page whose code fails to load is shown with its error.
+4. **The reader app loads a page before it is needed.** It starts loading the page a link goes to when the pointer or the focus reaches the link, and the next page when the browser is idle.
+
+**The browser replaces an edited page without a reload.** The page list accepts the update and replaces the page's module and outline. The numbers, the contents, and the links then update to match. The dev server also marks the page list as changed, so a reload compiles it with the new outline. A reload would make the page flash, and the reader would lose their place while an agent edits. Pages do not use React Fast Refresh. They export `outline`, and Fast Refresh answers that export with a full reload. The chat is rendered outside the page component, so an update keeps the reader's draft and selections.
 
 ## Layout
 
@@ -132,12 +142,13 @@ A document includes files from outside its project, such as the code it explains
     d.arrow(source.bottom, out.top, { route: { viaY: d.lerp(source.bottom, out.top) } })
 }} />
 
-1. **The same app is built in three forms,** as <Ref to="three-outputs" /> shows. All three use the same reader app, styles, and diagram code. In each form, the browser draws the diagrams from the same program.
+1. **The same app is built in three forms,** as <Ref to="three-outputs" /> shows. All three use the same reader app, styles, and page compiler. In each form, the page compiler compiles the diagrams, and the browser draws the same drawings.
 2. **Builds have no chat** and make no requests to a backend. A shared document is read-only.
 3. **A build contains no chat state.** A build includes only the pages of the document directory and leaves out `.yapparatus/`. Sharing a document therefore does not share the conversation about it.
 4. **Every address is a file in the website build,** and the build also contains `404.html`. Any static host can therefore serve links to any page and section.
-5. **The single file uses `#/page#anchor` addresses** and embeds all pages, fonts, and assets. The file needs no server and works offline when opened from disk.
-6. **A build contains the external files that its pages name, and no other files.** For every file address in a page that names a readable file, the build contains the highlighted file. In the website build, each such address is its own file. An author publishes a file by naming it in a page. A build does not copy whole directories.
+5. **Each page is its own file of code in the website build.** A page's HTML file preloads that code with the app, and the root preloads the first page, so the first page shows without a second request.
+6. **The single file uses `#/page#anchor` addresses** and embeds all pages, fonts, and assets. The file needs no server and works offline when opened from disk. Each page's code is in the file, and it runs when the page is first shown.
+7. **A build contains the external files that its pages name, and no other files.** For every file address in a page that names a readable file, the build contains the highlighted file, as the same JSON that the server returns in live mode. The build wraps it in `JSON.parse` of a string, which the browser parses faster than an object written as code. In the website build, each such address is its own file. An author publishes a file by naming it in a page. A build does not copy whole directories.
 
 ## Sources
 

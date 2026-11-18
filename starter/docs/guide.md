@@ -14,7 +14,7 @@ npx giget gh:tsaarni/yapparatus/starter my-document && cd my-document && pnpm in
 
 2. Write `document.json` and the pages in the document directory: `content/` for the first document, or a new directory such as `tutorial/` when `content/` already holds one. Name the documented repository under `"files"`.
 3. End your turn: tell the user to run `pnpm dev <directory>`, such as `pnpm dev content`, in the project directory, open the address it prints, and paste the prompt the document's chat shows back to you.
-4. The prompt connects you to the chat. It lists diagnostics, including diagrams and charts, which are checked only once the browser shows them. Fix them, then answer the reader's questions there.
+4. The prompt connects you to the chat. It lists diagnostics, including diagrams, which are checked when a page compiles, and charts, which are checked only once the browser shows them. Fix them, then answer the reader's questions there.
 
 A minimal document for a repository `myapp` next to the project `my-document`:
 
@@ -110,6 +110,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 - Draw with `<Diagram>`, never with hand-written SVG. Read [the diagram reference](diagrams.md) before drawing, and the page for the form you draw: [structures](diagram-structures.md) for tables, headers, and marked text, [sequences](diagram-sequences.md) for messages over time. Start from the closest example.
 - Use `d.sequence` for interactions over time.
 - Add `<Step>` children when the figure is best explained in order. Each step is one or two sentences. Focus containers instead of listing their parts, and use `stepOnly` notes for words that belong on the drawing. See [steps](diagrams.md#steps).
+- The page compiler runs `draw` and checks the figure, so three rules hold. `draw` uses only `d` and the values it defines itself, not the page's imports or constants. Write `<Diagram>` in a page or a reply, not inside a `.tsx` component. Write a step's `id` and `focus` as plain text, such as `focus="client api"`, not `focus={…}`.
 - Keep text-heavy drawings under about 960 units wide. Stack rows into columns rather than letting a figure scroll.
 
 ## Charts
@@ -126,7 +127,7 @@ A reply to a reader is MDX shown in the chat. Every built-in component works in 
 
 - A reply is not part of the document: nothing in it is numbered, and it has no Link or Ask buttons. Point at document content with links and addresses: `<Ref to="/setup#install" />`.
 - Custom components do not work in replies, because a reply has no imports.
-- The server checks a reply like a page, and refuses it with file and line until it compiles and its links resolve.
+- The server checks a reply like a page, and refuses it with file and line until it compiles, its links resolve, and its diagrams have no errors.
 - Reply after every change to the pages, and say what changed, so the reader knows where to look.
 
 ## Icons
@@ -148,4 +149,9 @@ node --input-type=module-typescript -e 'import { checkDocument } from "yapparatu
 ```
 
 - In the chat, read them after editing and fix them before you reply. Errors found later, when a browser opens a changed page, end your wait for messages.
-- Diagrams and charts are checked only when a browser shows the page, because text is measured with the page font. The diagnostics list the pages no browser has shown since they changed, with what was found before the change. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.
+- Diagrams are checked when their page compiles, so their diagnostics are listed at once. Charts, render errors, and runtime errors are checked only when a browser shows the page. The diagnostics list the pages no browser has shown since they changed, with what was found before the change. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.
+- Diagnostics do not tell you that a diagram is hard to read. After you write or change a diagram and its diagnostics are clean, look at it once. This saves its picture as the reader sees it in the PNG file that you name. Open the file as an image, and delete it afterwards. `savePicture("/cache#flow", "/tmp/flow.png", { ids: true })` labels each part with its id.
+
+```sh
+node --input-type=module-typescript -e 'import { savePicture } from "yapparatus/agent"; await savePicture("/page#figure", "/tmp/figure.png");'
+```

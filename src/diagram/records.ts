@@ -205,12 +205,7 @@ export function createRecords(
     const segs = node.label.split("\t");
     const centered = (record.options.columns ?? 1) > 1 && segs.length === 1;
     const lines = centered
-      ? [
-          {
-            ...textAt(node.label, rect.x + rect.width / 2, cy, g.font),
-            align: "middle" as const,
-          },
-        ]
+      ? [textAt(node.label, rect.x + rect.width / 2, cy, g.font, false, "middle")]
       : tabbed(node.label, g, rect.x, cy, false);
     const need =
       (g.stops[segs.length - 1] ?? 0) +
@@ -319,7 +314,7 @@ export function createRecords(
         ]);
     }
     const label = (text: string, x: number, y: number) =>
-      text ? [{ ...textAt(text, x, y, fonts.ruler, true), align: "middle" as const }] : [];
+      text ? [textAt(text, x, y, fonts.ruler, true, "middle")] : [];
     g.ruler.top.forEach((t, k) => {
       lines.push(...label(t, left + (k + 0.5) * fit.unit, top - shapes.record.ruler / 2));
     });

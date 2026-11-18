@@ -34,6 +34,30 @@ export interface Content {
 
 export type Text = ReturnType<typeof createText>;
 
+/** Where a line of text is anchored: at its start, or at its middle. */
+export type Align = "start" | "middle";
+
+/** A placed line of text, with its false flags and its default alignment left out. */
+export function textLine(
+  text: string,
+  x: number,
+  y: number,
+  font: { size: number; weight: number; mono: boolean },
+  muted: boolean,
+  align: Align,
+): TextLine {
+  return {
+    text,
+    x,
+    y,
+    size: font.size,
+    weight: font.weight,
+    ...(font.mono ? { mono: true } : {}),
+    ...(muted ? { muted: true } : {}),
+    ...(align === "start" ? { align } : {}),
+  };
+}
+
 function wrap(text: string, font: FontSpec, width: number, measure: Measure): string[] {
   if (!Number.isFinite(width) || measure(text, font) <= width) return [text];
   const lines: string[] = [];
@@ -110,17 +134,15 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
   }
 
   /** One line of text at a point, in a font the renderer draws as measured. */
-  function textAt(text: string, x: number, y: number, font: FontSpec, muted = false): TextLine {
-    return {
-      text,
-      x,
-      y,
-      size: font.size,
-      weight: font.weight,
-      mono: font.family === m.mono,
-      muted,
-      align: "start",
-    };
+  function textAt(
+    text: string,
+    x: number,
+    y: number,
+    font: FontSpec,
+    muted = false,
+    align: Align = "start",
+  ): TextLine {
+    return textLine(text, x, y, { ...font, mono: font.family === m.mono }, muted, align);
   }
 
   /** The font of a text's label, which its marks repeat over their highlight. */

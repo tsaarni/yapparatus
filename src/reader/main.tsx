@@ -7,6 +7,7 @@ import { App } from "./App.tsx";
 import { installTheme } from "./appearance.ts";
 import { installGlobalReporters } from "./diagnostics.tsx";
 import { installFavicon } from "./favicon.ts";
+import { currentPage } from "./router.ts";
 import { fontSize, lineHeight, theme } from "./theme.stylex.ts";
 
 const page = stylex.create({
@@ -42,5 +43,10 @@ if (container) {
   // Hot updates re-execute this module; reuse the root instead of creating a second one.
   const root = (import.meta.hot?.data.root as Root | undefined) ?? createRoot(container);
   if (import.meta.hot) import.meta.hot.data.root = root;
-  root.render(<App />);
+  // The app renders when the page at the address has loaded, so the first paint has the page.
+  // A build preloads that page's code with the app.
+  const page = currentPage();
+  void (page ? page.load().catch(() => undefined) : Promise.resolve()).then(() =>
+    root.render(<App />),
+  );
 }

@@ -1,0 +1,107 @@
+/**
+ * The font file measure in src/font-measure.ts must give the widths the reader's canvas gives,
+ * so a diagram compiled in Node has the layout the browser would compute.
+ */
+import { expect, test } from "@playwright/test";
+import { compile } from "../../src/diagram/compile.ts";
+import { type FontSpec, defaultMetrics as m } from "../../src/diagram/metrics.ts";
+import { DiagramBuilder } from "../../src/diagram/scene.ts";
+import { fontMeasure } from "../../src/font-measure.ts";
+import { examplePages, examples } from "../diagram-examples.ts";
+
+/** Every font the compiler measures with: the sans weights at each size, and mono. */
+const fonts: FontSpec[] = [m.labelSize, m.smallSize, m.tabSize].flatMap((size) => [
+  ...[m.textWeight, m.edgeWeight, m.labelWeight].map((weight) => ({
+    family: m.sans,
+    weight,
+    size,
+  })),
+  { family: m.mono, weight: m.textWeight, size },
+]);
+
+const hard = [
+  "AV",
+  "To",
+  "Ty",
+  "WAVE Tyrant Võ",
+  "0123456789",
+  // Runs without letters: see the comment on the script in src/font-measure.ts.
+  "24",
+  "1,024",
+  "^&",
+  "10.0.0.1:443",
+  "1,024 × 768 px; 3.14 (~ 22/7)",
+  "!?.,:;'\"()[]{}<>/\\|@#$%^&*-_+=~`",
+  "“quoted” — ‘single’ … – end",
+  "α-β Ωmega Σigma Δ",
+  "Привет мир Жук",
+  "fi fl ffi office",
+  "-> => <= != ==",
+  "The gateway forwards each authenticated request to the order service, which writes it to the database",
+  "x".repeat(120),
+];
+
+/** The texts the compiler measures in the diagram reference, with their fonts. */
+function referenceTexts(): Array<{ text: string; font: FontSpec }> {
+  const found = new Map<string, { text: string; font: FontSpec }>();
+  for (const page of examplePages)
+    for (const { draw } of examples(page)) {
+      const d = new DiagramBuilder();
+      new Function("d", draw)(d);
+      compile(d, (text, font) => {
+        found.set(`${font.family}|${font.weight}|${font.size}|${text}`, { text, font });
+        return text.length * 7;
+      });
+    }
+  return [...found.values()];
+}
+
+test("font file widths match the reader's canvas measurement", async ({ page }) => {
+  const corpus = [
+    ...referenceTexts(),
+    ...fonts.flatMap((font) => hard.map((text) => ({ text, font }))),
+  ];
+  const arrow = fonts.map((font) => ({ text: "client → server", font }));
+
+  await page.goto("/");
+  const canvas = await page.evaluate(
+    async (items) => {
+      const context = document.createElement("canvas").getContext("2d");
+      if (!context) throw new Error("no canvas");
+      const css = ({ font }: (typeof items)[number]) =>
+        `${font.weight} ${font.size}px ${font.family}`;
+      await Promise.all(items.map((item) => document.fonts.load(css(item), item.text)));
+      await document.fonts.ready;
+      return items.map((item) => {
+        context.font = css(item);
+        return context.measureText(item.text).width;
+      });
+    },
+    [...corpus, ...arrow],
+  );
+
+  const compare = ({ text, font }: { text: string; font: FontSpec }, width: number, i: number) => {
+    const family = font.family === m.mono ? "mono" : "sans";
+    const diff = width - (canvas[i] ?? Number.NaN);
+    return {
+      diff,
+      label: `${diff.toFixed(3)} px, ${family} ${font.weight} ${font.size}px ${JSON.stringify(text)}`,
+    };
+  };
+
+  const { measure, uncovered } = fontMeasure();
+  const rows = corpus.map((item, i) => compare(item, measure(item.text, item.font), i));
+  expect([...uncovered]).toEqual([]);
+  const largest = rows.reduce((a, b) => (Math.abs(b.diff) > Math.abs(a.diff) ? b : a));
+  console.log(`${rows.length} texts; largest difference ${largest.label}`);
+  expect(rows.filter((row) => !(Math.abs(row.diff) < 0.5)).map((row) => row.label)).toEqual([]);
+
+  // No font file has "→": a browser draws it with a system font, so its width is an estimate
+  // that the measure reports.
+  const estimated = fontMeasure();
+  for (const [i, item] of arrow.entries()) {
+    const row = compare(item, estimated.measure(item.text, item.font), corpus.length + i);
+    console.log(`estimated: ${row.label}`);
+  }
+  expect([...estimated.uncovered]).toEqual(["→"]);
+});

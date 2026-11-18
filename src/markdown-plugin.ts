@@ -7,13 +7,21 @@ import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxAttribute, MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
-import { bundledLanguages, type ShikiTransformer } from "shiki";
+import { bundledLanguages } from "shiki";
 import { visit } from "unist-util-visit";
-import type { DiagnosticCode } from "./protocol.ts";
+import type { CodeMark, DiagnosticCode } from "./protocol.ts";
 
 export interface ContentIssue {
   code: DiagnosticCode;
-  line: number;
+  /**
+   * The line in the file. A figure's issue may leave it out: the server then reads the
+   * figure's lines from the page as it is now.
+   */
+  line?: number;
+  /** The figure it is about, by id. */
+  target?: string;
+  /** The diagram parts it is about. */
+  elements?: string[];
   /**
    * What the issue is about, so the same problem keeps one identity as its wording changes.
    * Without it, the message identifies the issue.
@@ -146,7 +154,7 @@ function literal(jsx: MdxJsxFlowElementHast, name: string) {
 }
 
 /** An attribute whose value is computed at compile time, which authors never write. */
-function compiledAttribute(name: string, value: unknown): MdxJsxAttribute {
+export function compiledAttribute(name: string, value: unknown): MdxJsxAttribute {
   return {
     type: "mdxJsxAttribute",
     name,
@@ -331,8 +339,6 @@ function listEntry(item: Element): FileTreeEntry {
   };
 }
 
-export type CodeMark = "highlight" | "add" | "remove";
-
 const markOf: Record<string, CodeMark> = { highlight: "highlight", "++": "add", "--": "remove" };
 
 /**
@@ -345,42 +351,34 @@ const markOf: Record<string, CodeMark> = { highlight: "highlight", "++": "add", 
 const notation =
   /[ \t]*(?:\/\/|#|--|;|%|\/\*|<!--)[ \t]*\[!code (highlight|\+\+|--)(?::(\d+))?\][ \t]*(?:\*\/|-->)?[ \t]*$/;
 
-/**
- * Shiki shares `meta` between a block's hooks; options are copied between them. `codeLines`
- * holds, for each line shown, its line in the code as written, which differs once a comment
- * alone on its line is removed.
- */
-export type MarksMeta = { codeMarks?: Map<number, CodeMark>; codeLines?: number[] };
+/** Code written on a page, with its mark comments removed. */
+export interface MarkedCode {
+  /** The lines shown. */
+  lines: string[];
+  /** For each line shown, its line in the code as written; a comment alone on its line is gone. */
+  written: number[];
+  /** Marked lines, by their index in `lines`. */
+  marks: Record<number, CodeMark>;
+}
 
-export const codeMarks: ShikiTransformer = {
-  name: "yapparatus:code-marks",
-  preprocess(code) {
-    if (!code.includes("[!code ") || String(this.options.meta?.__raw ?? "").startsWith("excerpt"))
-      return;
-    const lines: string[] = [];
-    const written: number[] = [];
-    const marked = new Map<number, CodeMark>();
-    let active: { mark: CodeMark; left: number } | undefined;
-    for (const [index, raw] of code.split("\n").entries()) {
-      const match = notation.exec(raw);
-      if (match?.[1]) {
-        active = { mark: markOf[match[1]] as CodeMark, left: Number(match[2] ?? 1) };
-        const before = raw.slice(0, match.index);
-        if (!before.trim()) continue;
-        lines.push(before);
-      } else lines.push(raw);
-      written.push(index + 1);
-      if (active && active.left > 0) {
-        marked.set(lines.length, active.mark);
-        active.left -= 1;
-      }
+export function codeMarks(code: string): MarkedCode {
+  const lines: string[] = [];
+  const written: number[] = [];
+  const marks: Record<number, CodeMark> = {};
+  let active: { mark: CodeMark; left: number } | undefined;
+  for (const [index, raw] of code.split("\n").entries()) {
+    const match = raw.includes("[!code ") ? notation.exec(raw) : null;
+    if (match?.[1]) {
+      active = { mark: markOf[match[1]] as CodeMark, left: Number(match[2] ?? 1) };
+      const before = raw.slice(0, match.index);
+      if (!before.trim()) continue;
+      lines.push(before);
+    } else lines.push(raw);
+    written.push(index + 1);
+    if (active && active.left > 0) {
+      marks[lines.length - 1] = active.mark;
+      active.left -= 1;
     }
-    (this.meta as MarksMeta).codeMarks = marked;
-    (this.meta as MarksMeta).codeLines = written;
-    return lines.join("\n");
-  },
-  line(node, line) {
-    const mark = (this.meta as MarksMeta).codeMarks?.get(line);
-    if (mark) node.properties["data-mark"] = mark;
-  },
-};
+  }
+  return { lines, written, marks };
+}

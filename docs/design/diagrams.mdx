@@ -1,6 +1,6 @@
 # Diagrams
 
-This page describes the design of the diagram API and the diagram compiler. The compiler turns a program into an SVG drawing, and a diagram can explain itself in steps. The diagram reference, [`starter/docs/diagrams.md`](/-/files/yapparatus/starter/docs/diagrams.md), explains how to use the API. The code is in `src/diagram/`. `scene.ts` is the authoring API, `compile.ts` runs the compiler, and `DiagramView.tsx` draws the result. Each compiler stage has a file: `text.ts` measures text, `layout.ts` sizes and places nodes, `records.ts` lays out record cells, `nodes.ts` and `edges.ts` produce the drawing, and `validate.ts` checks it. `compile.ts` gives each stage the results of the stages before it. Layout and records need each other, so `layout.ts` creates the records stage and passes it its own `bounds`.
+This page describes the design of the diagram API and the diagram compiler. The compiler turns a program into an SVG drawing, and a diagram can explain itself in steps. The diagram reference, [`starter/docs/diagrams.md`](/-/files/yapparatus/starter/docs/diagrams.md), explains how to use the API. The code is in `src/diagram/`. `scene.ts` is the authoring API, `compile.ts` runs the compiler, and `DiagramView.tsx` draws the result. Each compiler stage has a file: `text.ts` measures text, `layout.ts` sizes and places nodes, `records.ts` lays out record cells, `nodes.ts` and `edges.ts` produce the drawing, and `validate.ts` checks it. `compile.ts` gives each stage the results of the stages before it. Layout and records need each other, so `layout.ts` creates the records stage and passes it its own `bounds`. `figure.ts` runs the draw program, compiles it, and checks the steps and the width of the drawing. The page compiler calls it from `src/diagram-plugin.ts` when it compiles a page, and `Diagram.tsx` draws the result in the browser and keeps the reader's state. `picture.ts` draws the same result as a standalone SVG for the agent.
 
 ## Goal
 
@@ -41,7 +41,7 @@ The design is judged by the number of repair rounds a diagram needs. A repair ro
   for (let i = 4; i < 6; i++) d.arrow(steps[i], steps[i + 1])
 }}>
   <Step focus="record">Running `draw` records the parts and their relationships. Nothing is positioned yet, so statement order does not matter.</Step>
-  <Step focus="measure size">The compiler measures text with the page font, and each node grows to fit its text. See [size and text](#size-and-text).</Step>
+  <Step focus="measure size">The compiler measures text with the reader's font files, and each node grows to fit its text. See [size and text](#size-and-text).</Step>
   <Step focus="place">Rows, columns, and placements set positions in dependency order. See [geometry](#geometry).</Step>
   <Step focus="route">Each edge attaches to the outlines of its nodes and gets its label. See [edges](#edges).</Step>
   <Step focus="check">The compiler reports overlaps and crossings as diagnostics and moves nothing.</Step>
@@ -49,10 +49,19 @@ The design is judged by the number of repair rounds a diagram needs. A repair ro
 </Diagram>
 
 1. **The compiler resolves layout in dependency order.** It calculates sizes from children up to their parents, and positions from parents down to their children. A real cycle is an error that names its chain (`PLACEMENT_CYCLE: api → cache → api`). The compiler does not repeat the layout until the coordinates stop changing. Repeating would hide contradictions.
-2. **Each diagnostic names a code, the parts, and a fix.** A [diagnostic](diagnostics) appears under the diagram, in the browser console, as a dashed outline on the parts, in the list in the page header, and in the agent's prompt. The agent can repair the problem from the message alone.
+2. **Each diagnostic names a code, the parts, and a fix.** A [diagnostic](diagnostics) appears under the diagram, as a dashed outline on the parts, in the list in the page header, and in the agent's prompt. The agent can repair the problem from the message alone.
 3. **The compiler reports an overlap only for a real conflict.** It does not report containment, edge endpoints that touch their nodes, or passive decorations such as lifelines. False warnings would teach everyone to ignore warnings.
-4. **A drawing compiles once per source text.** `draw` must be pure: for the same source it returns the same result and changes nothing else. Re-renders, step changes, and typing elsewhere on the page reuse the compiled result. Measuring text is the most expensive stage, and a page can contain many diagrams.
-5. **A failed compile keeps the last valid drawing.** The page shows it dimmed, above the errors. The diagram stays visible while an edit is in progress.
+4. **A drawing compiles once per source text.** `draw` must be pure: for the same source it returns the same result and changes nothing else. The page compiler keeps each drawing by the text of `draw`, the steps, and `build`. An edit elsewhere on the page compiles the page again, and its unchanged diagrams reuse their drawings. Measuring text is the most expensive stage, and a page can contain many diagrams.
+5. **A failed compile keeps the last valid drawing.** In live mode, the page shows it dimmed, above the errors. The diagram stays visible while an edit is in progress.
+
+## Where a diagram is compiled
+
+1. **The page compiler compiles each diagram.** When a page or a reply is compiled, `src/diagram-plugin.ts` takes the source text of each `<Diagram>`'s `draw`, runs it in the server process, compiles the figure, and replaces `draw` with the drawing as data. This happens on every save in the dev server and once in a build. The browser draws the data and runs the steps. It has no diagram compiler and measures no diagram text, and a build contains the drawings and not the programs.
+2. **The drawing is kept small.** The page's code carries every drawing, so each byte reaches every reader. The compiler rounds coordinates to hundredths of a unit, which no screen shows, and leaves out a flag that is false and the alignment of a centered line. It rounds once, after the checks, so the checks see the exact geometry. The drawing keeps no data that only the compiler uses, such as whether an id was the author's.
+3. **A diagram's diagnostics are compile diagnostics of its page.** The server knows them as soon as the page compiles, whether or not a browser has the page open. A reply with a diagram error is refused like a reply that does not compile. See [diagnostics](diagnostics#where-diagnostics-come-from).
+4. **`draw` stands alone.** It uses only its parameter and the values it defines itself. It runs apart from the page's module, where the page's imports and constants are, in its own context with the standard JavaScript globals and none of Node's. A name from outside `draw`, such as a page constant or `process`, is a `DRAW_FAILED` error that names it. When `draw` throws, the error names the page line of the statement that threw. The context only keeps out names. It is not a sandbox: `draw` runs in the server process and can reach it through the builder's objects.
+5. **`<Diagram>` is written in pages and replies only.** The page compiler finds diagrams in the MDX. A `<Diagram>` inside a document's own `.tsx` component is not compiled, so it has no drawing, and the page fails to render with an error that says so. `DiagramProps` is what an author writes. `CompiledDiagramProps` is what the component receives: the same props, with `drawing` in place of `draw`.
+6. **A step's `id` and `focus` are plain text.** The compiler reads them from the page to check the steps. A computed value, such as `focus={ids}`, is a `STEP_NOT_TEXT` error. The step's text stays MDX and renders in the browser.
 
 ## Names in the API
 
@@ -83,16 +92,18 @@ An id is the address of a diagram part. The link `/page#figure--part` points to 
 
 1. **Nodes fit their measured text.** A fixed `width` makes the text wrap. A fixed `height` makes the compiler report overflow. `equalSize` gives all the listed nodes the largest measured size.
 2. **The compiler keeps text at its measured size.** When text does not fit, the compiler reports the problem. A shrunken label would be unreadable.
-3. **Text is measured with the page font.** The fonts load before the compiler runs, and the browser measures the text. Counting characters gives wrong widths for proportional fonts.
-4. **The compiler sets every font.** Each text that the compiler places carries the size and weight it was measured with, and the renderer draws the text with exactly those values. Diagram text has three sizes: 13.5 px for node labels, 12 px for all other text, and 11 px for tabs. It uses the three font weights of the reader app. A size chosen by the renderer could differ from the measured size, and the text could then overflow without a report.
-5. **Labels are plain text.** A label can contain line breaks, a second line (`sub`), and monospace text. Markdown, HTML, and math in labels would each need their own design.
+3. **Text is measured with the reader's font files.** Counting characters gives wrong widths for proportional fonts. `src/font-measure.ts` reads the `unicode-range` of each `@font-face` from the stylesheets the reader loads, picks the file for each character as a browser does, and shapes each run with fontkit. Its widths stay within 0.5 px of the browser's canvas, and a test compares the two.
+4. **A run of spaces is measured as one space,** because SVG text draws it as one.
+5. **A character that no font file has is a warning.** A browser draws such a character, such as "→", in a system font, so its width is not known. The measure gives it 1 em, and the compiler reports `FONT_FALLBACK` with the characters.
+6. **The compiler sets every font.** Each text that the compiler places carries the size and weight it was measured with, and the renderer draws the text with exactly those values. Diagram text has three sizes: 13.5 px for node labels, 12 px for all other text, and 11 px for tabs. It uses the three font weights of the reader app. A size chosen by the renderer could differ from the measured size, and the text could then overflow without a report.
+6. **Labels are plain text.** A label can contain line breaks, a second line (`sub`), and monospace text. Markdown, HTML, and math in labels would each need their own design.
 
 ## Edges
 
 1. **Endpoints, route, and decoration are separate.** An endpoint at a part attaches to the side of the outline that faces the route. An endpoint at an anchor stays exactly where the author put it. Arrowheads, dashes, and rounded corners do not change the route. The author can therefore reason about each of them separately.
 2. **A route has one of four forms.** A route is straight, has one elbow, runs in a channel at a given x or y, or follows explicit vertices. Point expressions (`offset`, `xy`, `lerp`) cover the remaining cases.
 3. **The compiler keeps every route as written.** It reports an edge that passes through a node, and the edge keeps its route.
-4. **A label belongs to one segment of its edge.** The label stays horizontal and takes part in the overlap checks. The words for sides of the canvas (`above`, `left`) differ from the words for sides relative to the path.
+4. **A label belongs to one segment of its edge.** The label stays horizontal and takes part in the overlap checks. A `\n` starts a new line, as in a node label. The label is as wide as its widest line, its box covers all its lines, and diagnostics quote it on one line. The words for sides of the canvas (`above`, `left`) differ from the words for sides relative to the path.
 5. **Curves and loops are general edges.** `bend` curves a straight edge to its left, as seen in the direction of travel. An A→B edge and a B→A edge with the same `bend` value therefore separate. `d.arrow(a, a)` draws a loop on one side of `a`. The compiler places the labels of curves and loops outside them. State diagrams need both curves and loops, as in [the agent's state](chat#the-agents-state). They need no component of their own.
 
 ## Color
@@ -296,6 +307,20 @@ A step does more than point at parts. An explanation also needs an overview, gro
 3. **The diagram is named with `aria-label`.** It has no SVG `<title>`, because browsers show `<title>` as a tooltip that covers the drawing.
 4. **A diagram with steps has the role `group`.** The role `img` would hide its parts, which are buttons, from assistive technology.
 5. **Width follows the reading layout.** A diagram can grow into the breakout track, which is the space beside the text column for wide content. It can shrink to 75 % of its natural size, and below that it scrolls sideways. See [layout](rendering#layout).
+
+## Pictures for the agent
+
+The agent that writes a diagram can look at it. Diagnostics catch what breaks a rule, such as an overlap or an unknown part. A picture lets a multimodal agent also catch what no rule covers, such as an arrangement that is valid but hard to read. [Looking at a diagram](chat#looking-at-a-diagram) describes the agent's call, and [the server API](api#read-a-figures-picture) the request.
+
+1. **The server draws the picture without a browser.** `src/diagram/picture.ts` writes the compiled drawing as a standalone SVG, and [resvg](https://github.com/linebender/resvg) turns it into a PNG at 2 pixels per unit. A headless browser would add a large dependency and seconds of startup for one image. A picture takes about 10 to 50 ms.
+2. **Models read raster images,** so the server sends a PNG and not the SVG.
+3. **Text is drawn as glyph outlines.** `src/font-measure.ts` shapes each line from the reader's font files, as it does to measure it, and returns the outlines as path data. The rasterizer then needs no fonts, and the text is exactly as wide as the compiler measured it. Runs of spaces are drawn as one space, as SVG text draws them.
+4. **The picture uses the light theme,** with its colors written into the SVG. One theme gives every agent the same picture, whatever theme a reader picked, and the light theme is also the one that print uses.
+5. **The picture draws what the reader draws, in the same order.** Frames, enclosures and their tabs, lifelines, shapes, record outlines over their cells, badges and pins, edges with their heads and labels, then frame labels. A legend of the categories goes under the drawing, as in the reader.
+6. **The picture shows the diagram before any step.** Every part is drawn plainly, and a part that only a step shows is left out. A picture of each step would cost the agent a turn per step, and the server already checks the steps.
+7. **The id overlay names the parts.** With `ids`, each part's id is written beside it, and the parts that diagnostics name are outlined. The agent can then connect what it sees to the ids in its draw program. The reader's `debug` option is the same idea for a person.
+8. **The geometry and the paint are shared.** The reader's views and the picture build every outline with the same functions in `shapes.ts`. The picture takes its colors, role table, and stroke values from the theme file and the role styles in `part.tsx`, which `paint.ts` reads when the server starts. See [tokens](styling#tokens).
+9. **The picture is a still image.** It has no hover, no focus ring, and no step text or controls. It does not show the dashed outlines that the reader shows on flagged parts while editing, except with `ids`. Glyphs are rendered by resvg, so text edges differ slightly from a browser's.
 
 ## Sources
 

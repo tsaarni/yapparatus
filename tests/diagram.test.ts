@@ -22,6 +22,39 @@ test("row places children with boundary gaps and centered cross-axis alignment",
   assert.equal(rb?.y, 0);
 });
 
+test("the drawing keeps hundredths and leaves out false flags and centered alignment", () => {
+  const d = new DiagramBuilder();
+  // An advance with many decimals, as real font measurement gives.
+  const precise: Measure = (text) => text.length * 7.123456;
+  const a = d.box("Alpha", { sub: "first" });
+  const b = d.box("Beta");
+  d.row([a, b], { gap: 41.987654 });
+  d.arrow(a, b, "calls");
+  const out = compile(d, precise);
+  const numbers: number[] = [];
+  JSON.stringify([out.nodes, out.edges], (_, v) => {
+    if (typeof v === "number") numbers.push(v);
+    return v;
+  });
+  assert.ok(numbers.length > 20);
+  for (const n of numbers) assert.equal(Math.round(n * 100) / 100, n);
+  const node = out.nodes[0];
+  const edge = out.edges[0];
+  assert.ok(node && edge);
+  for (const key of ["passive", "stepOnly", "explicitId"]) {
+    assert.ok(!(key in node), `node has no ${key}`);
+    assert.ok(!(key in edge), `edge has no ${key}`);
+  }
+  assert.ok(!("dashed" in edge));
+  assert.deepEqual(
+    node.lines.map((l) => Object.keys(l)),
+    [
+      ["text", "x", "y", "size", "weight"],
+      ["text", "x", "y", "size", "weight", "muted"],
+    ],
+  );
+});
+
 test("place below uses layout-boundary gap and resolves regardless of order", () => {
   const d = new DiagramBuilder();
   const db = d.cylinder("Database");
@@ -75,6 +108,73 @@ test("elbow route keeps anchors and labels a vertical leg on its right", () => {
   assert.equal(p0?.x, p1?.x, "first leg is vertical");
   const label = edge?.labels[0];
   assert.ok(label && p0 && label.rect.x > p0.x, "label sits right of the vertical leg");
+});
+
+test("\\n in an edge label starts a new line; the rect covers every line", () => {
+  const d = new DiagramBuilder();
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b], { gap: 200 });
+  const e = d.arrow(a, b, "ab\ncdef");
+  const out = compile(d, measure);
+  assert.deepEqual(codes(out), []);
+  const label = out.edges.find((x) => x.id === e.id)?.labels[0];
+  assert.ok(label);
+  assert.deepEqual(
+    label.lines.map((l) => [l.text, l.size, l.weight, l.align]),
+    [
+      ["ab", 12, 500, undefined],
+      ["cdef", 12, 500, undefined],
+    ],
+    "centered lines leave out align",
+  );
+  const [first, second] = label.lines;
+  assert.ok(first && second);
+  const lineHeight = 12 * 1.38;
+  assert.equal(label.rect.width, 4 * 7 + 8, "as wide as the widest line, plus padding");
+  assert.ok(Math.abs(label.rect.height - (2 * lineHeight + 2)) < 1e-9);
+  assert.equal(first.x, label.rect.x + label.rect.width / 2, "lines are centered");
+  assert.equal(second.x, first.x);
+  assert.ok(Math.abs(second.y - first.y - lineHeight) < 1e-9);
+  const middle = label.rect.y + label.rect.height / 2;
+  assert.ok(Math.abs((first.y + second.y) / 2 - middle) < 1e-9, "the lines sit in the middle");
+  assert.ok(out.viewBox.y <= label.rect.y, "the view box holds both lines");
+  assert.ok(
+    out.edges.find((x) => x.id === e.id)?.ariaLabel.startsWith("ab cdef, "),
+    "the accessible name reads the label on one line",
+  );
+});
+
+test("a multi-line label is checked with its full height and quoted on one line", () => {
+  // A node above the middle of the edge: clear of one line of label, not of three.
+  const overlaps = (text: string) => {
+    const d = new DiagramBuilder();
+    const x = d.box("X");
+    const y = d.box("Y");
+    const top = d.box("Top");
+    d.place(x, { at: [0, 0] });
+    d.place(y, { at: [400, 0] });
+    d.place(top, { at: [200, -35], anchor: "bottom" });
+    d.arrow(x, y, text);
+    return compile(d, measure).diagnostics.filter((x) => x.code === "LABEL_OVERLAP");
+  };
+  assert.deepEqual(overlaps("short"), []);
+  const hits = overlaps("one\ntwo\nthree");
+  assert.equal(hits.length, 1);
+  assert.match(hits[0]?.message ?? "", /label "one two three" intersects top/);
+});
+
+test("sequence message labels break lines like edge labels", () => {
+  const d = new DiagramBuilder();
+  const a = d.box("A");
+  const b = d.box("B");
+  d.sequence([a, b], [{ from: a, to: b, label: "first\nsecond", id: "msg" }]);
+  const out = compile(d, measure);
+  const label = out.edges.find((e) => e.id === "msg")?.labels[0];
+  assert.deepEqual(
+    label?.lines.map((l) => l.text),
+    ["first", "second"],
+  );
 });
 
 test("element endpoints snap to facing sides; obstacles are reported, not avoided", () => {
@@ -580,4 +680,13 @@ test("an edge leaves a wide cell through the side its line crosses first", () =>
   const tip = out.edges[0]?.heads[0]?.[0];
   assert.ok(cell && tip);
   assert.deepEqual(tip, { x: cell.x + cell.width / 2, y: cell.y + cell.height });
+});
+
+test("a run of spaces is measured as one space, as SVG text draws it", () => {
+  const size = (label: string) => {
+    const d = new DiagramBuilder();
+    d.box(label, { id: "a" });
+    return compile(d, measure).nodes.find((n) => n.id === "a")?.rect.width;
+  };
+  assert.equal(size("Read  model   cache"), size("Read model cache"));
 });

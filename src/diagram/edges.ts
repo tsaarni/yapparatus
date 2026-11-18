@@ -17,7 +17,7 @@ import {
   type Side,
   toExpr,
 } from "./scene.ts";
-import type { Report } from "./text.ts";
+import { type Report, textLine } from "./text.ts";
 
 /** Legs a curved edge is sampled into; even, so a vertex sits at the apex. */
 const curveLegs = 16;
@@ -57,16 +57,15 @@ export function createEdges(
     } else shape = { points: routed(edge, fromEl, toEl), label: {}, radius: 6 };
     const points = dedupe(shape.points);
     const heads: Vec[][] = [];
-    const base = {
+    const base: Omit<CompiledEdge, "labels" | "ariaLabel"> = {
       id: edge.id,
-      explicitId: edge.explicitId,
       role: edge.role,
       ...categoryOf(edge.category),
-      dashed: edge.dashed,
+      ...(edge.dashed ? { dashed: true } : {}),
       head: edge.head,
       radius: shape.radius,
-      passive: edge.passive,
-      stepOnly: edge.stepOnly,
+      ...(edge.passive ? { passive: true } : {}),
+      ...(edge.stepOnly ? { stepOnly: true } : {}),
       points,
       heads,
     };
@@ -78,7 +77,7 @@ export function createEdges(
     const open = edge.head === "open";
     if (edge.ends === "->" || edge.ends === "<->") heads.push(arrowHead(points, "end", open));
     if (edge.ends === "<-" || edge.ends === "<->") heads.push(arrowHead(points, "start", open));
-    const text = edge.labels.map((l) => l.text).join(", ");
+    const text = edge.labels.map((l) => l.text.split("\n").join(" ")).join(", ");
     const ends = `from ${endpointName(edge.from)} to ${endpointName(edge.to)}`;
     return { ...base, labels, ariaLabel: text ? `${text}, ${ends}` : `Connection ${ends}` };
   }
@@ -222,6 +221,9 @@ export function createEdges(
   }
 
   function placeLabel(edge: Edge, points: Vec[], l: LabelOptions): CompiledLabel {
+    const texts = l.text.split("\n");
+    // Diagnostics quote the label on one line.
+    const quoted = texts.join(" ");
     const legs = points.length - 1;
     let segment = l.segment;
     if (segment === undefined) {
@@ -235,7 +237,7 @@ export function createEdges(
     } else if (segment < 0 || segment >= legs) {
       report(
         "LABEL_SEGMENT",
-        `${edge.id} label "${l.text}" names segment ${segment}, but the route has ${legs} (0–${legs - 1}).`,
+        `${edge.id} label "${quoted}" names segment ${segment}, but the route has ${legs} (0–${legs - 1}).`,
         [edge.id],
       );
       segment = Math.min(Math.max(segment, 0), legs - 1);
@@ -248,8 +250,9 @@ export function createEdges(
     const side = l.side ?? (vertical ? "right" : "above");
     const gap = l.gap ?? 6;
     const font = { family: m.sans, size: m.smallSize, weight: m.edgeWeight };
-    const width = measure(l.text, font) + 8;
-    const height = m.smallSize * m.lineHeight + 2;
+    const lineHeight = font.size * m.lineHeight;
+    const width = Math.max(...texts.map((line) => measure(line, font))) + 8;
+    const height = texts.length * lineHeight + 2;
     let center: Vec;
     switch (side) {
       case "above":
@@ -272,14 +275,21 @@ export function createEdges(
     if (legs === 1 && (side === "above" || side === "below") !== vertical && along + 12 > leg)
       report(
         "LABEL_CROWDED",
-        `${edge.id} label "${l.text}" needs ${round(along + 12)} units along segment ${segment}, which is ${round(leg)} long. Widen the gap or move the label.`,
+        `${edge.id} label "${quoted}" needs ${round(along + 12)} units along segment ${segment}, which is ${round(leg)} long. Widen the gap or move the label.`,
         [edge.id],
       );
+    const top = center.y - (texts.length * lineHeight) / 2;
     return {
-      text: l.text,
-      center,
-      size: font.size,
-      weight: font.weight,
+      lines: texts.map((line, i) =>
+        textLine(
+          line,
+          center.x,
+          top + (i + 0.5) * lineHeight,
+          { ...font, mono: false },
+          false,
+          "middle",
+        ),
+      ),
       rect: { x: center.x - width / 2, y: center.y - height / 2, width, height },
     };
   }

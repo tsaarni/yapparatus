@@ -1,7 +1,14 @@
 export { Chart, type ChartProps } from "./chart/Chart.tsx";
 export type { ChartColumn, ChartData, ColumnType } from "./chart/data.ts";
 export type { ChartSpec, PlotFunction, Row } from "./chart/plot.ts";
-export { Diagram, type DiagramProps, Step, type StepProps } from "./diagram/Diagram.tsx";
+export type { CompiledDiagram } from "./diagram/compiled.ts";
+export {
+  type CompiledDiagramProps,
+  Diagram,
+  type DiagramProps,
+  Step,
+  type StepProps,
+} from "./diagram/Diagram.tsx";
 export type {
   Align,
   AnchorName,
@@ -26,7 +33,13 @@ export type {
   SequenceStep,
 } from "./diagram/sequence.ts";
 export type { DocumentSettings, NumberingSettings, PageOutline } from "./document.ts";
-export type { ContextItem, SourceFileView, TargetKind } from "./protocol.ts";
+export type {
+  CodeMark,
+  ContextItem,
+  HighlightedCode,
+  SourceFileView,
+  TargetKind,
+} from "./protocol.ts";
 export {
   Excerpt,
   type ExcerptProps,

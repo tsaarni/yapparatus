@@ -10,13 +10,24 @@ declare module "virtual:yapparatus/document" {
   import type { MDXProps } from "mdx/types";
   import type { ComponentType, SVGProps } from "react";
   import type { DocumentSettings, PageOutline } from "yapparatus";
+  /** A compiled page file. */
+  export interface PageModule {
+    default: ComponentType<MDXProps>;
+    outline: PageOutline;
+  }
   export interface DocumentPage {
     /** Path inside the content folder without `.mdx`, which is also its address: "reading". */
     id: string;
     /** Path from the project root: "docs/design/rendering.mdx". */
     source: string;
-    default: ComponentType<MDXProps>;
+    /** Loaded with the app. Empty, titled with the id, when the page does not compile. */
     outline: PageOutline;
+    /** The page's code, once `load` has finished. */
+    module: PageModule | undefined;
+    /** Why `load` failed, if it did. */
+    error: Error | undefined;
+    /** Load the page's code, once: every call returns the same promise, which an edit replaces. */
+    load(): Promise<PageModule>;
   }
   export const settings: DocumentSettings;
   /** The `logo` icon, or undefined. */

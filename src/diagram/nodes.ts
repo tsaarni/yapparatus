@@ -7,7 +7,7 @@ import type { Rect, Vec } from "./geometry.ts";
 import type { Layout } from "./layout.ts";
 import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "./metrics.ts";
 import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "./scene.ts";
-import type { Content, Text } from "./text.ts";
+import { type Align, type Content, type Text, textLine } from "./text.ts";
 
 export function createNodes(
   m: Metrics,
@@ -22,26 +22,11 @@ export function createNodes(
 
   function compileNode(node: Node, rect: Rect): CompiledNode {
     const c = measureNode(node);
-    const line = (l: Content["lines"][number], x: number, y: number, align: TextLine["align"]) => ({
-      text: l.text,
-      x,
-      y,
-      size: l.size,
-      weight: l.weight,
-      mono: l.mono,
-      muted: l.muted,
-      align,
-    });
-    const stackLines = (
-      list: Content["lines"],
-      top: number,
-      x: number,
-      align: TextLine["align"],
-    ) => {
+    const stackLines = (list: Content["lines"], top: number, x: number, align: Align) => {
       let y = top;
       return list.map((l) => {
         const lh = l.size * m.lineHeight;
-        const out = line(l, x, y + lh / 2, align);
+        const out = textLine(l.text, x, y + lh / 2, l, l.muted, align);
         y += lh;
         return out;
       });
@@ -97,15 +82,14 @@ export function createNodes(
     }
     return {
       id: node.id,
-      explicitId: node.explicitId,
       shape: node.shape,
       role: node.options.role ?? "default",
       ...categoryOf(node.options.category),
       label: [node.label, node.options.sub].filter(Boolean).join(", "),
       rect,
       lines,
-      passive: node.passive,
-      stepOnly: node.options.stepOnly ?? false,
+      ...(node.passive ? { passive: true } : {}),
+      ...(node.options.stepOnly ? { stepOnly: true } : {}),
       ...(node.follows ? { follows: node.follows.id } : {}),
       ...(divider !== undefined ? { divider } : {}),
       // A record with cells always has rules, even none: it is drawn under and over its cells.
@@ -185,7 +169,6 @@ export function createNodes(
     const rect = enclosureRect(e);
     return {
       id: e.id,
-      explicitId: e.explicitId,
       role: e.options.role ?? "muted",
       ...categoryOf(e.options.category),
       rect,

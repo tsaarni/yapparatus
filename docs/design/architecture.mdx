@@ -63,7 +63,7 @@ A project can hold several documents. Each one is a document directory: a direct
   })
 }}>
   <Step focus="page-files">Pages are MDX files in the project directory.</Step>
-  <Step focus="reads-mdx page-compiler serves-pages page-view">The page compiler turns each page into code that the browser runs, and the page view shows the result. See [from a file to a page](rendering#compiling-a-page).</Step>
+  <Step focus="reads-mdx page-compiler serves-pages page-view">The page compiler turns each page, with its diagrams, into code that the browser runs, and the page view shows the result. See [from a file to a page](rendering#compiling-a-page).</Step>
   <Step focus="chat-panel http-api chat-server saves-state yapparatus-dir">When the reader sends a message from the chat panel, the chat server receives it and saves it in `.yapparatus/`.</Step>
   <Step focus="agent wait-reply">The reader's agent uses the `yapparatus/agent` library to wait for messages and to reply. See [the agent channel](chat#how-the-agent-connects).</Step>
   <Step focus="agent-edits page-files">The agent can also edit pages. The compiler picks up the change, and the page view updates without a reload.</Step>
@@ -74,7 +74,7 @@ A project can hold several documents. Each one is a document directory: a direct
 
 The programs communicate through HTTP messages and through files in the project directory.
 
-**The server API has three resources, `chat`, `diagnostics`, and `files`, under `/-/api`.** Each is named after a part of the document. The browser and the agent use the same resources. A request names what it needs in parameters. The server sends changes to the browser on Vite's hot-update connection. [The server API](api) describes every request, its parameters and JSON bodies, and the updates.
+**The server API has four resources, `chat`, `diagnostics`, `files`, and `figures`, under `/-/api`.** Each is named after a part of the document. The browser and the agent use the same resources. A request names what it needs in parameters. The server sends changes to the browser on Vite's hot-update connection. [The server API](api) describes every request, its parameters and bodies, and the updates.
 
 ## The project directory
 
@@ -106,7 +106,7 @@ The code is organized by where it runs, as <Ref to="source-layout" /> shows.
   - vite.ts the Vite plugin, in the dev server, with its compile steps in files next to it
   - server/ the chat server and the diagnostic store
   - reader/ the reader app, in the browser
-  - diagram/ the diagram compiler, in the browser
+  - diagram/ the diagram compiler, in the dev server, and the diagram view, in the browser
   - agent.ts the `yapparatus/agent` library, in the agent's process
   - protocol.ts the types that the browser, the server, and the agent share
   - logger.ts the logger that all the code uses
@@ -123,19 +123,21 @@ The dev server is [Vite](https://vite.dev). The package adds one Vite plugin, `y
 
 | Piece | What it does | Source |
 |---|---|---|
-| Page list | Checks the document directory and its page files against `document.json`, and combines the pages into one module | [`src/vite.ts`](/-/files/yapparatus/src/vite.ts), [`src/document.ts`](/-/files/yapparatus/src/document.ts), [`src/document-directory.ts`](/-/files/yapparatus/src/document-directory.ts) |
+| Page list | Checks the document directory and its page files against `document.json`, and lists the pages in one module with their outlines and a loader for each page's code | [`src/vite.ts`](/-/files/yapparatus/src/vite.ts), [`src/document.ts`](/-/files/yapparatus/src/document.ts), [`src/document-directory.ts`](/-/files/yapparatus/src/document-directory.ts) |
 | MDX compiler | Turns MDX into React code | [`src/vite.ts`](/-/files/yapparatus/src/vite.ts) |
 | Icon step | Turns `<Icon name="…">` into SVG imports | [`src/icon-plugin.ts`](/-/files/yapparatus/src/icon-plugin.ts) |
-| Markdown conventions | Turns alerts and file trees into components, marks code lines, and checks code languages and heading depth | [`src/markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
+| Markdown conventions | Turns alerts and file trees into components, reads code marks, and checks code languages and heading depth | [`src/markdown-plugin.ts`](/-/files/yapparatus/src/markdown-plugin.ts) |
+| Diagram step | Runs each diagram's `draw`, compiles and checks the figure, and puts the drawing in the page. See [diagrams](diagrams). | [`src/diagram-plugin.ts`](/-/files/yapparatus/src/diagram-plugin.ts), `src/diagram/` |
 | Outline step | Records each page's title, sections, numbered blocks, ids, links, and references | [`src/outline-plugin.ts`](/-/files/yapparatus/src/outline-plugin.ts) |
 | Source marks | Tags each block, list item, and table row with its file and lines, and each line of a code block with its line | [`src/source-plugin.ts`](/-/files/yapparatus/src/source-plugin.ts) |
-| Code highlighting | Highlights code blocks, fills excerpts from their files, and highlights whole files | [`src/code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts) |
+| Code highlighting | Highlights code blocks, excerpts, and whole files into one form, `HighlightedCode`, and fills excerpts from their files. See [code](components#code). | [`src/code-plugin.ts`](/-/files/yapparatus/src/code-plugin.ts) |
 | External files | Reads files only from the directories that `document.json` names | [`src/source-files.ts`](/-/files/yapparatus/src/source-files.ts), [`src/files.ts`](/-/files/yapparatus/src/files.ts) |
 | File API | Serves an external file to the file view and watches it for changes | [`src/server/files.ts`](/-/files/yapparatus/src/server/files.ts) |
+| Figure pictures | Draws a diagram as a PNG for the agent, plain or with its part ids, without a browser. See [pictures](diagrams#pictures-for-the-agent). | [`src/server/figures.ts`](/-/files/yapparatus/src/server/figures.ts), [`src/diagram/picture.ts`](/-/files/yapparatus/src/diagram/picture.ts), [`src/font-measure.ts`](/-/files/yapparatus/src/font-measure.ts) |
 | Chat log | Keeps the message log, clears the chat, and checks replies | [`src/server/chat.ts`](/-/files/yapparatus/src/server/chat.ts) |
 | Chat resource | Answers reads of the chat, which may wait, accepts messages and replies, and computes the agent's state | [`src/server/chat-resource.ts`](/-/files/yapparatus/src/server/chat-resource.ts) |
 | API | Routes HTTP requests under `/-/api/`, sends changes to the browser, and writes `.yapparatus/server.json` | [`src/server/api.ts`](/-/files/yapparatus/src/server/api.ts), [`http.ts`](/-/files/yapparatus/src/server/http.ts) |
-| Diagnostic store | Runs the server's checks, holds what browsers found in each page revision, remembers which errors the agent was given, and tracks which pages were rendered | [`src/server/diagnostics.ts`](/-/files/yapparatus/src/server/diagnostics.ts) |
+| Diagnostic store | Runs the server's checks, diagrams included, holds what browsers found in each page revision, remembers which errors the agent was given, and tracks which pages were rendered | [`src/server/diagnostics.ts`](/-/files/yapparatus/src/server/diagnostics.ts) |
 | Prompt text | Holds all text the agent reads, including the snippet the agent runs next | [`src/server/prompt.ts`](/-/files/yapparatus/src/server/prompt.ts) |
 
 </Table>
@@ -151,21 +153,21 @@ The reader app is one React app that runs in the browser. <Ref to="browser-piece
 | App shell | Shows the header, contents, page, and selection menu, and handles Show on page | [`src/reader/App.tsx`](/-/files/yapparatus/src/reader/App.tsx) |
 | Targets | Adds Link and Ask buttons to sections, figures, tables, and code | [`src/reader/targets.tsx`](/-/files/yapparatus/src/reader/targets.tsx) |
 | Context capture | Turns a selection or a target into a context item | [`src/reader/selection.ts`](/-/files/yapparatus/src/reader/selection.ts) |
-| Router | Turns addresses into pages, external files, and anchors, and back | [`src/reader/router.ts`](/-/files/yapparatus/src/reader/router.ts) |
+| Router | Turns addresses into pages, external files, and anchors, and back. It shows a page when its code has loaded, and starts loading a page when a link to it is pointed at or focused | [`src/reader/router.ts`](/-/files/yapparatus/src/reader/router.ts) |
 | File view | Shows an external file with its line numbers and the sections that discuss it | [`src/reader/FileView.tsx`](/-/files/yapparatus/src/reader/FileView.tsx) |
 | Contents | Lists the pages and the sections of the current page | [`src/reader/Sidebar.tsx`](/-/files/yapparatus/src/reader/Sidebar.tsx) |
 | Numbering | Computes chapter, section, and figure numbers and the targets of `Ref` | [`src/reader/numbering.ts`](/-/files/yapparatus/src/reader/numbering.ts) |
 | Chat panel | Shows messages and replies, and the message box | [`src/reader/Chat.tsx`](/-/files/yapparatus/src/reader/Chat.tsx) |
-| Prose | Styles headings, paragraphs, lists, tables, and code | [`src/reader/prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
+| Prose | Styles headings, paragraphs, lists, and tables, and draws highlighted code | [`src/reader/prose.tsx`](/-/files/yapparatus/src/reader/prose.tsx) |
 | Components | Provides the components that pages and replies use without imports. See [components](components). | [`src/reader/registry.ts`](/-/files/yapparatus/src/reader/registry.ts) |
-| Diagram compiler | Measures, places, and draws diagrams. See [diagrams](diagrams). | `src/diagram/` |
+| Diagram view | Draws a compiled diagram and runs its steps. See [diagrams](diagrams). | [`src/diagram/Diagram.tsx`](/-/files/yapparatus/src/diagram/Diagram.tsx) |
 | Links and pages | Checks page names, resolves links, and checks every link and reference | [`src/document.ts`](/-/files/yapparatus/src/document.ts) |
 
 </Table>
 
 ### Agent library
 
-[`src/agent.ts`](/-/files/yapparatus/src/agent.ts) is the package's `yapparatus/agent` export. It provides the functions `waitForMessage()`, `sendReply()`, and `checkDocument()`. The agent calls them from snippets. The library runs in the agent's Node process and finds the server through `.yapparatus/server.json`. It prints only the text that the server writes. [Waiting for messages](chat#waiting-for-messages) describes the library's behavior.
+[`src/agent.ts`](/-/files/yapparatus/src/agent.ts) is the package's `yapparatus/agent` export. It provides the functions `waitForMessage()`, `sendReply()`, `checkDocument()`, and `savePicture()`. The agent calls them from snippets. The library runs in the agent's Node process and finds the server through `.yapparatus/server.json`. It prints only the text that the server writes. [Waiting for messages](chat#waiting-for-messages) describes the library's behavior.
 
 ### Logging
 

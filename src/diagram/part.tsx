@@ -5,12 +5,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { partSeparator } from "../document.ts";
 import { dash, duration, stroke, theme, when } from "../reader/theme.stylex.ts";
-import type { TextLine } from "./compiled.ts";
-import type { Rect } from "./geometry.ts";
+import type { PartState, TextLine } from "./compiled.ts";
 import type { Role } from "./scene.ts";
-
-/** How a part looks in the current step. "absent" is a step-only part outside its steps. */
-export type PartState = "focus" | "dim" | "hidden" | "absent" | undefined;
 
 /**
  * Diagram parts are targets: a namespaced DOM id (`figure--part`) makes them linkable.
@@ -89,10 +85,6 @@ export function Lines({ lines }: { lines: TextLine[] }) {
   return lines.map((line, i) => <Line key={i} line={line} />);
 }
 
-export function outline(r: Rect, pad: number) {
-  return { x: r.x - pad, y: r.y - pad, width: r.width + 2 * pad, height: r.height + 2 * pad };
-}
-
 /**
  * A part's role, the same for shapes, edges, and enclosures: its ink, fill, label color, and
  * stroke weight, as custom properties that the shape and line styles read.
@@ -125,12 +117,6 @@ export function categoryStyle(slot: number | undefined): stylex.StyleXStyles | n
       return null;
   }
 }
-
-/** Shape corners, by kind. */
-export const corner = { shape: 6, group: 10, frame: 4, mark: 3 };
-
-/** The warning badge on a part's corner. */
-export const badge = { radius: 7 };
 
 export const partStyles = stylex.create({
   /**

@@ -48,9 +48,8 @@ const dark = {
   category3Surface: "#3d2c36",
   category4: "#b86ae3",
   category4Surface: "#3b294d",
-  // The shade under a note's folded corner, and the figure's drafting grid.
+  // The shade under a note's folded corner.
   diagramShade: "#00000040",
-  figureGrid: "#ffffff0d",
   // Code tokens. Plain code is textBody; comments and punctuation are textMuted.
   codeKeyword: "#a5b0ff",
   codeString: "#9fd8b4",
@@ -97,7 +96,6 @@ const light: Record<Role, string> = {
   category4: "#6e1a94",
   category4Surface: "#dfd3e8",
   diagramShade: "#0000001a",
-  figureGrid: "#0000000f",
   codeKeyword: "#3d4fd6",
   codeString: "#1a6b48",
   codeFunction: "#7a4f00",
@@ -176,7 +174,6 @@ export const theme = stylex.defineVars({
   category4: darkRole("category4"),
   category4Surface: darkRole("category4Surface"),
   diagramShade: darkRole("diagramShade"),
-  figureGrid: darkRole("figureGrid"),
   codeKeyword: darkRole("codeKeyword"),
   codeString: darkRole("codeString"),
   codeFunction: darkRole("codeFunction"),
@@ -221,7 +218,6 @@ export const lightTheme = stylex.createTheme(theme, {
   category4: lightRole("category4"),
   category4Surface: lightRole("category4Surface"),
   diagramShade: lightRole("diagramShade"),
-  figureGrid: lightRole("figureGrid"),
   codeKeyword: lightRole("codeKeyword"),
   codeString: lightRole("codeString"),
   codeFunction: lightRole("codeFunction"),

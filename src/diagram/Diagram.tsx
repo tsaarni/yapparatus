@@ -1,5 +1,6 @@
 /**
- * The `<Diagram>` component: compiles the draw program, runs its steps, and reports problems.
+ * The `<Diagram>` component: draws the drawing the page compiler made from `draw`, and runs
+ * its steps.
  */
 import * as stylex from "@stylexjs/stylex";
 import {
@@ -10,30 +11,37 @@ import {
   type ReactNode,
   useEffect,
   useId,
-  useMemo,
   useState,
 } from "react";
 import { partSeparator } from "../document.ts";
-import type { DiagnosticCode } from "../protocol.ts";
 import { FigureFrame } from "../reader/components.tsx";
-import { useDiagramReport } from "../reader/diagnostics.tsx";
 import { AppIcon } from "../reader/icons.tsx";
 import { useScopedId } from "../reader/prose.tsx";
 import { useRoute } from "../reader/router.ts";
 import { fontSize, lineHeight, sizes, space, theme, when } from "../reader/theme.stylex.ts";
 import { Button, styled } from "../reader/ui.tsx";
-import { compile } from "./compile.ts";
-import type { CompiledDiagram } from "./compiled.ts";
+import {
+  type CompiledDiagram,
+  expand,
+  type PartState,
+  partState,
+  type StepView,
+  stepOnlyParts,
+} from "./compiled.ts";
 import { Diagnostics } from "./Diagnostics.tsx";
-import { DiagramView, minScale } from "./DiagramView.tsx";
-import { canvasMeasure, useFontsReady } from "./fonts.ts";
-import { overlap } from "./geometry.ts";
+import { DiagramView } from "./DiagramView.tsx";
 import { Legend } from "./Legend.tsx";
-import type { PartState } from "./part.tsx";
-import { type Diagnostic, DiagramBuilder } from "./scene.ts";
+import type { DiagramBuilder } from "./scene.ts";
 
+/**
+ * What an author writes: `<Diagram>` in a page or a reply, not in a document's own components.
+ * The page compiler runs `draw` and passes the component the drawing instead.
+ */
 export interface DiagramProps {
-  /** Builds the scene: create elements, arrange them, connect them. */
+  /**
+   * Builds the scene: create elements, arrange them, connect them. It uses only `d` and the
+   * values it defines itself.
+   */
   draw: (d: DiagramBuilder) => void;
   /** Figure id for references and links. With a caption, the figure is numbered. */
   id?: string;
@@ -47,12 +55,22 @@ export interface DiagramProps {
   debug?: boolean;
 }
 
+/** What the component receives: the page compiler replaced `draw` with the drawing. */
+export interface CompiledDiagramProps extends Omit<DiagramProps, "draw"> {
+  /** The compiled drawing, with its diagnostics. */
+  drawing: CompiledDiagram;
+}
+
 export interface StepProps {
-  /** An address for the step: `/page#figure--id`. Unique among the figure's parts and steps. */
+  /**
+   * An address for the step: `/page#figure--id`. Unique among the figure's parts and steps.
+   * Plain text: the page compiler checks it.
+   */
   id?: string;
   /**
    * Ids of the parts this step is about, separated by spaces. A container (an enclosure,
-   * row, column, sequence, or fragment) stands for everything in it.
+   * row, column, sequence, or fragment) stands for everything in it. Plain text: the page
+   * compiler checks it.
    */
   focus?: string;
   /** One or two sentences. */
@@ -79,43 +97,43 @@ const dev = import.meta.env.DEV;
 
 const lastValid = new Map<string, CompiledDiagram>();
 
-/** Inner width of a figure in the wide track: text column plus breakout. */
-const readingWidth = 960;
-
-export function Diagram({ draw, id, caption, description, build, children, debug }: DiagramProps) {
-  const ready = useFontsReady();
+export function Diagram({
+  drawing,
+  id,
+  caption,
+  description,
+  build,
+  children,
+  debug,
+}: CompiledDiagramProps) {
   const marker = useId();
   const figure = useScopedId(id);
-  // `draw` is a new function on every render, but a pure one: its source text identifies
-  // the drawing. Compile once per source, not on every step or parent render.
-  const source = draw.toString();
-  // biome-ignore lint/correctness/useExhaustiveDependencies: The source text stands for `draw`.
-  const result = useMemo(() => (ready ? compileDraw(draw) : undefined), [ready, source]);
+  if (!drawing)
+    throw new Error(
+      "<Diagram> has no drawing. The page compiler compiles a <Diagram> written in a page or a reply, not one inside a component.",
+    );
   // While editing, keep showing the last valid drawing above the errors.
   const key = id ?? caption;
-  if (result?.ok && key) lastValid.set(key, result);
-  const fallback = dev && result && !result.ok && key ? lastValid.get(key) : undefined;
-  const shown = fallback ?? result;
+  if (drawing.ok && key) lastValid.set(key, drawing);
+  const fallback = dev && !drawing.ok && key ? lastValid.get(key) : undefined;
+  const shown = fallback ?? drawing;
 
-  const steps = collectSteps(children, shown?.groups ?? {});
+  const steps = collectSteps(children).map((step) => ({
+    ...step,
+    parts: expand(step.focus, shown.groups),
+  }));
   const stepsOf = (part: string) => steps.flatMap((step, i) => (step.parts.has(part) ? [i] : []));
-  const stepOnly = new Set([
-    ...(shown?.nodes ?? []).filter((n) => n.stepOnly).map((n) => n.id),
-    ...(shown?.edges ?? []).filter((e) => e.stepOnly).map((e) => e.id),
-  ]);
   const [active, setActive] = useState<number | undefined>(undefined);
   // Parts a legend entry highlights while the reader points at it or focuses it.
   const [preview, setPreview] = useState<string[]>();
-  const current = active === undefined ? undefined : steps[active];
-  const stateOf = (part: string): PartState => {
-    if (preview) return preview.includes(part) ? "focus" : stepOnly.has(part) ? "absent" : "dim";
-    if (current?.parts.has(part)) return "focus";
-    if (stepOnly.has(part)) return "absent";
-    if (!current || active === undefined) return undefined;
-    const first = stepsOf(part)[0];
-    if (build && first !== undefined && first > active) return "hidden";
-    return "dim";
+  const view: StepView = {
+    steps: steps.map((step) => step.parts),
+    active,
+    build: build ?? false,
+    stepOnly: stepOnlyParts(shown),
+    ...(preview ? { preview } : {}),
   };
+  const stateOf = (part: string): PartState => partState(part, view);
 
   // A link to a step, or to a part, opens that step, or the first step about the part.
   const route = useRoute();
@@ -136,28 +154,7 @@ export function Diagram({ draw, id, caption, description, build, children, debug
     if (active !== undefined) revealFocused(marker);
   }, [active, marker]);
 
-  const natural = result?.ok ? result.viewBox.width : 0;
-  const diagnostics: Diagnostic[] = result ? [...result.diagnostics] : [];
-  // Checked against a fixed budget, not the current window, so every author sees the same result.
-  if (natural * minScale > readingWidth)
-    diagnostics.push({
-      code: "DIAGRAM_SCROLLS",
-      message: `The drawing is ${natural} units wide. The widest figure area fits ${readingWidth} at full size and ${Math.floor(readingWidth / minScale)} when shrunk, so readers must scroll sideways. Stack rows into columns or shorten labels.`,
-      ids: [],
-    });
-  if (result?.ok) diagnostics.push(...checkSteps(steps, result, build ?? false));
-  useDiagramReport(
-    marker,
-    key ?? marker,
-    result &&
-      diagnostics.map((d) => ({
-        code: d.code,
-        message: d.message,
-        ...(d.subject ? { subject: d.subject } : {}),
-        ...(id ? { target: id } : {}),
-        ...(d.ids.length ? { elements: d.ids } : {}),
-      })),
-  );
+  const diagnostics = drawing.diagnostics;
 
   const label = caption ?? "Diagram";
   const partOf = (target: EventTarget) =>
@@ -183,24 +180,20 @@ export function Diagram({ draw, id, caption, description, build, children, debug
   };
   const body = (
     <>
-      {shown ? (
-        <DiagramView
-          diagram={shown}
-          title={label}
-          debug={debug ?? false}
-          stale={!!fallback}
-          marker={marker}
-          figure={figure}
-          stateOf={stateOf}
-          stepped={(part) => stepsOf(part).length > 0}
-          {...(steps.length
-            ? { onClick: (event: MouseEvent) => openPart(partOf(event.target)), onKeyDown }
-            : {})}
-        />
-      ) : (
-        <div data-diagram={marker} {...stylex.props(styles.pending)} />
-      )}
-      {shown && shown.legend.length > 0 && <Legend legend={shown.legend} preview={setPreview} />}
+      <DiagramView
+        diagram={shown}
+        title={label}
+        debug={debug ?? false}
+        stale={!!fallback}
+        marker={marker}
+        figure={figure}
+        stateOf={stateOf}
+        stepped={(part) => stepsOf(part).length > 0}
+        {...(steps.length
+          ? { onClick: (event: MouseEvent) => openPart(partOf(event.target)), onKeyDown }
+          : {})}
+      />
+      {shown.legend.length > 0 && <Legend legend={shown.legend} preview={setPreview} />}
       {dev && diagnostics.length > 0 && <Diagnostics items={diagnostics} />}
     </>
   );
@@ -226,60 +219,20 @@ export function Diagram({ draw, id, caption, description, build, children, debug
 
 Diagram.breakout = true;
 
-function compileDraw(draw: DiagramProps["draw"]): CompiledDiagram {
-  const scene = new DiagramBuilder();
-  try {
-    draw(scene);
-  } catch (error) {
-    return {
-      ok: false,
-      viewBox: { x: 0, y: 0, width: 0, height: 0 },
-      nodes: [],
-      edges: [],
-      enclosures: [],
-      frames: [],
-      legend: [],
-      groups: {},
-      diagnostics: [
-        {
-          code: "DRAW_FAILED",
-          message: error instanceof Error ? error.message : String(error),
-          ids: [],
-        },
-      ],
-    };
-  }
-  return compile(scene, canvasMeasure);
-}
-
 /* ---------- steps ---------- */
 
-function collectSteps(children: ReactNode, groups: Record<string, string[]>): StepItem[] {
+function collectSteps(children: ReactNode): Omit<StepItem, "parts">[] {
   return Children.toArray(children).flatMap((child) => {
     if (!isValidElement<StepProps>(child)) return [];
     if (!(child.type as { diagramStep?: boolean }).diagramStep) return [];
-    const focus = (child.props.focus ?? "").split(/\s+/).filter(Boolean);
     return [
       {
         ...(child.props.id ? { id: child.props.id } : {}),
-        focus,
-        parts: expand(focus, groups),
+        focus: (child.props.focus ?? "").split(/\s+/).filter(Boolean),
         content: child.props.children,
       },
     ];
   });
-}
-
-/** The parts named, with every container replaced by itself plus all it holds. */
-function expand(ids: string[], groups: Record<string, string[]>): Set<string> {
-  const parts = new Set<string>();
-  const visit = (id: string) => {
-    if (parts.has(id)) return;
-    parts.add(id);
-    for (const member of groups[id] ?? []) visit(member);
-  };
-  for (const id of ids) visit(id);
-  return parts;
 }
 
 /** Scroll a sideways-scrolling figure so its focused parts are visible. */
@@ -300,80 +253,6 @@ function revealFocused(marker: string) {
     left: (left + right) / 2 - (view.left + view.right) / 2,
     behavior: smooth ? "smooth" : "auto",
   });
-}
-
-function checkSteps(steps: StepItem[], diagram: CompiledDiagram, build: boolean): Diagnostic[] {
-  const parts = [
-    ...diagram.nodes.filter((n) => !n.passive).map((n) => n.id),
-    ...diagram.edges.filter((e) => !e.passive).map((e) => e.id),
-    ...diagram.enclosures.map((e) => e.id),
-    ...diagram.frames.map((f) => f.id),
-  ];
-  const known = new Set([...parts, ...Object.keys(diagram.groups)]);
-  const diagnostic = (
-    code: DiagnosticCode,
-    message: string,
-    ids: string[] = [],
-    subject?: string,
-  ): Diagnostic => ({ code, message, ids, ...(subject ? { subject } : {}) });
-  const diagnostics: Diagnostic[] = steps.flatMap((step, i) =>
-    step.focus
-      .filter((part) => !known.has(part))
-      .map((part) =>
-        diagnostic(
-          "UNKNOWN_PART",
-          `Step ${i + 1} focuses "${part}", which is not a part of this diagram. Parts: ${parts.join(", ")}.`,
-          [],
-          part,
-        ),
-      ),
-  );
-  const ids = new Set<string>();
-  for (const step of steps) {
-    if (!step.id) continue;
-    if (known.has(step.id) || ids.has(step.id))
-      diagnostics.push(
-        diagnostic(
-          "DUPLICATE_ID",
-          `Step id "${step.id}" is already used in this figure.`,
-          [],
-          step.id,
-        ),
-      );
-    ids.add(step.id);
-  }
-  // Step-only parts: each must appear somewhere, and those shown together must not collide.
-  const stepOnly = diagram.nodes.filter((n) => n.stepOnly);
-  for (const part of [...stepOnly, ...diagram.edges.filter((e) => e.stepOnly)])
-    if (!steps.some((step) => step.parts.has(part.id)))
-      diagnostics.push(
-        diagnostic("STEP_ONLY_UNUSED", `${part.id} is stepOnly, but no step focuses it.`, [
-          part.id,
-        ]),
-      );
-  steps.forEach((step, i) => {
-    const together = stepOnly.filter((n) => step.parts.has(n.id));
-    for (let a = 0; a < together.length; a++)
-      for (let b = a + 1; b < together.length; b++) {
-        const [x, y] = [together[a], together[b]];
-        if (x && y && overlap(x.rect, y.rect))
-          diagnostics.push(
-            diagnostic(
-              "NODE_OVERLAP",
-              `${x.id} and ${y.id} overlap, and step ${i + 1} shows both.`,
-              [x.id, y.id],
-            ),
-          );
-      }
-  });
-  if (build && !steps.length)
-    diagnostics.push(
-      diagnostic(
-        "BUILD_WITHOUT_STEPS",
-        "build reveals parts step by step, but the diagram has no <Step> children.",
-      ),
-    );
-  return diagnostics;
 }
 
 /** Previous and next buttons, and the text of every step; print shows all of them. */
@@ -441,7 +320,6 @@ function StepControls({
 /* ---------- rendering ---------- */
 
 const styles = stylex.create({
-  pending: { minHeight: 120 },
   steps: {
     maxWidth: sizes.textWidth,
     marginTop: space.md,

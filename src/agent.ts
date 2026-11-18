@@ -8,7 +8,7 @@
  * writes the next snippet to run; the library writes only transport errors.
  */
 import { randomUUID } from "node:crypto";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { createLogger } from "./logger.ts";
 import {
@@ -19,6 +19,7 @@ import {
   type DocumentDiagnostics,
   type NewMessage,
   type ReplyRefusal,
+  type ServerFile,
 } from "./protocol.ts";
 
 export type {
@@ -61,14 +62,17 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-/** The server's address, from `.yapparatus/server.json` in this folder or the nearest above. */
-function serverUrl(): string {
+/**
+ * The running server, from `.yapparatus/server.json` in this folder or the nearest above: its
+ * address, the document it serves, and the project folder.
+ */
+function findServer(): ServerFile {
   for (let dir = process.cwd(); ; dir = path.dirname(dir)) {
     const file = path.join(dir, ".yapparatus", "server.json");
     if (existsSync(file)) {
-      const { url } = JSON.parse(readFileSync(file, "utf8")) as { url: string };
-      log.debug(`server ${url}, from ${file}`);
-      return url;
+      const found = JSON.parse(readFileSync(file, "utf8")) as ServerFile;
+      log.debug(`server ${found.url}, from ${file}`);
+      return found;
     }
     if (path.dirname(dir) === dir)
       throw new YapparatusError(
@@ -119,7 +123,7 @@ export async function waitForMessage(): Promise<Chat> {
     include: "diagnostics",
     wait: String(requestWait),
   });
-  const url = `${serverUrl()}${apiPrefix}/chat?${query}`;
+  const url = `${findServer().url}${apiPrefix}/chat?${query}`;
   // One agent for the whole wait: its reads are one long wait, and a newer one takes over.
   const headers = { [agentHeader]: randomUUID() };
   let unreachableSince: number | undefined;
@@ -155,7 +159,7 @@ export async function sendReply(): Promise<void> {
     );
   const message: NewMessage = { author: "agent", mdx: readFileSync(0, "utf8") };
   const response = await call(
-    `${serverUrl()}${apiPrefix}/chat`,
+    `${findServer().url}${apiPrefix}/chat`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -173,7 +177,26 @@ export async function sendReply(): Promise<void> {
  * return them again. Run it after editing pages, before replying, or without a chat at all.
  */
 export async function checkDocument(): Promise<DocumentDiagnostics> {
-  const response = await call(`${serverUrl()}${apiPrefix}/diagnostics`, {}, requestWait);
+  const response = await call(`${findServer().url}${apiPrefix}/diagnostics`, {}, requestWait);
   if (!response.ok) throw await failure(response);
   return (await response.json()) as DocumentDiagnostics;
+}
+
+/**
+ * Save a diagram's picture as the reader sees it in the light theme, as a PNG file to open as
+ * an image. The address is the figure's, `/page#figure`. The file is where the picture is
+ * written; the caller chooses it and removes it. `ids` labels each part with its id and
+ * outlines the parts that diagnostics name.
+ */
+export async function savePicture(
+  address: string,
+  file: string,
+  options: { ids?: boolean } = {},
+): Promise<void> {
+  const [page = "", figure = ""] = address.replace(/^\//, "").split("#");
+  const resource = `${apiPrefix}/figures/${page}/${encodeURIComponent(figure)}`;
+  const query = options.ids ? "?ids=true" : "";
+  const response = await call(`${findServer().url}${resource}${query}`, {}, requestWait);
+  if (!response.ok) throw await failure(response);
+  writeFileSync(file, new Uint8Array(await response.arrayBuffer()));
 }

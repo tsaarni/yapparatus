@@ -13,7 +13,7 @@ import {
   maxCategories,
 } from "./compiled.ts";
 import { createEdges } from "./edges.ts";
-import { inflate, union } from "./geometry.ts";
+import { inflate, rounded, union } from "./geometry.ts";
 import { CycleError, createLayout } from "./layout.ts";
 import { defaultMetrics, type Measure, type Metrics } from "./metrics.ts";
 import { createNodes } from "./nodes.ts";
@@ -23,10 +23,12 @@ import { checkIds, checkPlaced, groupsOf, validate } from "./validate.ts";
 
 export function compile(
   scene: DiagramBuilder,
-  measure: Measure,
+  measureText: Measure,
   metrics: Metrics = defaultMetrics,
 ): CompiledDiagram {
   const m = metrics;
+  // SVG text draws a run of spaces as one space, so it is measured as one.
+  const measure: Measure = (text, font) => measureText(text.replace(/ {2,}/g, " "), font);
   const diagnostics: Diagnostic[] = [...scene.diagnostics];
   const report = (code: DiagnosticCode, message: string, ids: string[]) =>
     diagnostics.push({ code, message, ids });
@@ -98,10 +100,11 @@ export function compile(
         width: Math.ceil(viewBox.width),
         height: Math.ceil(viewBox.height),
       },
-      nodes,
-      edges,
-      enclosures,
-      frames,
+      // The checks above ran on exact geometry; the drawing keeps hundredths.
+      nodes: rounded(nodes),
+      edges: rounded(edges),
+      enclosures: rounded(enclosures),
+      frames: rounded(frames),
       legend,
       diagnostics,
       groups: { ...groups, ...categoryGroups },

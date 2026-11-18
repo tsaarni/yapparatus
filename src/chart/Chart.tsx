@@ -1,13 +1,13 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Diagnostics } from "../diagram/Diagnostics.tsx";
-import { useFontsReady } from "../diagram/fonts.ts";
 import { diagnosticCodes } from "../protocol.ts";
 import { FigureFrame } from "../reader/components.tsx";
-import { useDiagramReport } from "../reader/diagnostics.tsx";
+import { useChartReport } from "../reader/diagnostics.tsx";
 import { fontSize, radius, sizes, space, theme } from "../reader/theme.stylex.ts";
 import { Button, styled } from "../reader/ui.tsx";
 import { type ChartData, rowObjects } from "./data.ts";
+import { useFontsReady } from "./fonts.ts";
 import {
   type ChartProblem,
   type ChartSpec,
@@ -184,7 +184,7 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
     }
   }, [drawn, preview]);
 
-  useDiagramReport(
+  useChartReport(
     marker,
     key ?? marker,
     result || missing || error

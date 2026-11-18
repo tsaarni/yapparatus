@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compile, run } from "@mdx-js/mdx";
-import rehypeShiki from "@shikijs/rehype";
 import { createElement } from "react";
 import * as runtime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import remarkGfm from "remark-gfm";
-import { codeMarks, contentIssues, markdownConventions } from "../src/markdown-plugin.ts";
+import { codeHighlighting } from "../src/code-plugin.ts";
+import { contentIssues, markdownConventions } from "../src/markdown-plugin.ts";
+import type { HighlightedCode } from "../src/protocol.ts";
 
 /** Compile MDX with the conventions and highlighting; returns the JS and the issues found. */
 async function build(source: string, outputFormat: "program" | "function-body" = "program") {
@@ -17,20 +18,7 @@ async function build(source: string, outputFormat: "program" | "function-body" =
       {
         outputFormat,
         remarkPlugins: [remarkGfm],
-        rehypePlugins: [
-          markdownConventions,
-          [
-            rehypeShiki,
-            {
-              theme: "github-dark",
-              langs: ["ts"],
-              lazy: true,
-              defaultLanguage: "text",
-              fallbackLanguage: "text",
-              transformers: [codeMarks],
-            },
-          ],
-        ],
+        rehypePlugins: [markdownConventions, codeHighlighting],
       },
     ),
   );
@@ -103,8 +91,18 @@ test("code marks: end-of-line comments, counts, and comment-only lines, in any l
       fence,
     ].join("\n"),
   );
-  const marks = [...js.matchAll(/"data-mark": "(\w+)"/g)].map((m) => m[1]);
-  assert.deepEqual(marks, ["remove", "add", "highlight", "highlight", "highlight"]);
+  const blocks = [...js.matchAll(/"data-code": ("(?:[^"\\]|\\.)*")/g)].map(
+    (m) => JSON.parse(JSON.parse(m[1] as string)) as HighlightedCode,
+  );
+  assert.deepEqual(
+    blocks.map((b) => b.marks),
+    [
+      { 1: "remove", 2: "add" },
+      { 0: "highlight", 1: "highlight", 2: "highlight" },
+    ],
+  );
+  // The comment alone on its line is gone; the others leave their lines' code.
+  assert.equal(blocks[1]?.lines.length, 3);
   assert.doesNotMatch(js, /\[!code/);
 });
 

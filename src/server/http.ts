@@ -1,4 +1,4 @@
-/** A small JSON router for the /-/api resources. */
+/** A small router for the /-/api resources, whose bodies are JSON except for pictures. */
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { createLogger } from "../logger.ts";
 
@@ -20,6 +20,8 @@ export interface Reply {
   headers?: Record<string, string>;
   /** JSON body. Omit for 204. */
   body?: unknown;
+  /** A body that is not JSON, such as an image, with its content type, in place of `body`. */
+  content?: { type: string; data: Uint8Array };
 }
 
 type Handler = (request: ApiRequest) => Reply | Promise<Reply>;
@@ -79,13 +81,17 @@ export class Router {
       res.on("finish", () =>
         log.debug(req.method, req.url, res.statusCode, `${Date.now() - started} ms${failure}`),
       );
-      const send = ({ status, headers = {}, body }: Reply) => {
+      const send = ({ status, headers = {}, body, content }: Reply) => {
         res.writeHead(status, {
           "Cache-Control": "no-store",
-          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...(content
+            ? { "Content-Type": content.type }
+            : body === undefined
+              ? {}
+              : { "Content-Type": "application/json" }),
           ...headers,
         });
-        res.end(body === undefined ? undefined : JSON.stringify(body));
+        res.end(content ? content.data : body === undefined ? undefined : JSON.stringify(body));
       };
       void (async () => {
         if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`)

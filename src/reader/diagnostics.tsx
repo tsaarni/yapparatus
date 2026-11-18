@@ -1,9 +1,9 @@
 /**
  * Diagnostics the browser finds, and the header's list of all of them. The browser reports
- * what only exists when a page runs: diagram layout, render and runtime errors, and replies
+ * what only exists when a page runs: chart layout, render and runtime errors, and replies
  * that fail to show. Each report is about the revision of the page it rendered, so it never
- * has to take anything back: a changed page has a new revision. The server checks the source
- * itself and tells the agent about both.
+ * has to take anything back: a changed page has a new revision. The server checks the source,
+ * diagrams included, itself and tells the agent about both.
  */
 
 import { pages } from "virtual:yapparatus/document";
@@ -65,12 +65,12 @@ export function installGlobalReporters() {
 }
 
 /**
- * Report what a diagram or chart found against the revision of the page it sits in. A figure
- * with nothing to report sends nothing: the page's own report says it was rendered.
+ * Report what a chart found against the revision of the page it sits in. A chart with nothing
+ * to report sends nothing: the page's own report says it was rendered.
  */
-export function useDiagramReport(
+export function useChartReport(
   marker: string,
-  figure: string,
+  chart: string,
   diagnostics: Omit<Diagnostic, "source" | "origin">[] | undefined,
 ) {
   const signature = JSON.stringify(diagnostics ?? null);
@@ -84,20 +84,15 @@ export function useDiagramReport(
     reportDiagnostics({
       source: page.source,
       revision: page.outline.revision,
-      diagnostics: diagnostics.map((d) => ({
-        ...d,
-        origin: "diagram",
-        // The parts identify a diagram diagnostic; its message may mention a step that moves.
-        ...(!d.subject && d.elements?.length ? { subject: d.elements.join(",") } : {}),
-      })),
+      diagnostics: diagnostics.map((d) => ({ ...d, origin: "chart" })),
     });
-  }, [marker, figure, signature]);
+  }, [marker, chart, signature]);
 }
 
 /**
  * Catches a page that fails to render, shows the error, and reports it. Each render at a new
  * revision is reported, even without errors, so the server knows the page was checked.
- * Children's effects run first, so the page's diagrams have reported by then.
+ * Children's effects run first, so the page's charts have reported by then.
  */
 export class PageBoundary extends Component<
   { source: string | undefined; revision: string | undefined; children: ReactNode },

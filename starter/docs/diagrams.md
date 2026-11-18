@@ -22,7 +22,11 @@
 
 `id` and `caption` make a numbered figure. `description` is the accessible description. `debug` shows bounds, ids, and route points.
 
-`draw` uses only `d` and values written inside it. The figure is compiled once per source text, so outside variables are not seen when they change.
+The page compiler runs `draw` when it compiles the page, and the browser only draws the result. Three rules follow:
+
+- `draw` uses only `d` and the values it defines itself. A page's imports and constants do not exist where it runs, and a name from outside is a `DRAW_FAILED` error that names it.
+- Write `<Diagram>` in a page or a reply. One inside a `.tsx` component is not compiled.
+- Write a `<Step>`'s `id` and `focus` as plain text, such as `focus="client api"`. A computed value, `focus={…}`, is a `STEP_NOT_TEXT` error.
 
 ## Pick a form
 
@@ -124,7 +128,7 @@ Options:
 - `height`: a fixed height; overflow is reported.
 - `minWidth`, `minHeight`, `mono`.
 
-`\n` in a label starts a new line.
+`\n` starts a new line in a shape's label or `sub` and in an edge or message label. Sequence fragment titles and divider labels are one line.
 
 ## Ids
 
@@ -308,7 +312,7 @@ Use steps when the order matters. A simple figure needs none.
 
 ## Diagnostics
 
-In development, diagnostics appear under the figure, in the console, as dashed outlines on the parts, and in the header's list. New errors are also sent to the agent at once. If a compile fails, the last valid drawing stays on screen, dimmed.
+The page compiler finds diagnostics when it compiles the page, so they are listed without a browser. In development, they also appear under the figure, as dashed outlines on the parts, and in the header's list. New errors are sent to the agent at once. If a compile fails, the last valid drawing stays on screen, dimmed.
 
 | Code | Severity | Fix |
 |---|---|---|
@@ -316,7 +320,7 @@ In development, diagnostics appear under the figure, in the console, as dashed o
 | `CONFLICTING_PLACEMENT` | error | A shape is in a row and also placed. Keep one |
 | `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or a part has the same id as a category, so steps cannot focus the category. Rename one |
 | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT` | error | Check the `place()` options |
-| `DRAW_FAILED` | error | The `draw` function threw |
+| `DRAW_FAILED` | error | The `draw` function threw, at the line given, or it uses a name it does not define |
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or use `loop` |
 | `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |
@@ -331,9 +335,11 @@ In development, diagnostics appear under the figure, in the console, as dashed o
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a row or column, or `place()` it |
 | `UNKNOWN_PART` | error | A step focuses an id that does not exist, or `part()` names a member that does not. The message lists the valid ids |
+| `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |
 | `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |
 | `STEP_ONLY_UNUSED` | warning | A `stepOnly` part that no step focuses is never shown |
 | `DIAGRAM_SCROLLS` | warning | Wider than 1280 units. Stack it more vertically |
+| `FONT_FALLBACK` | warning | The text has characters the reader's fonts lack, such as "→", so its width is estimated. Use characters the fonts have, such as `->` |
 | `ACCENT_OVERUSED` | warning | Keep `role: "accent"` on one part; give the others the default role |
 | `TOO_MANY_CATEGORIES` | warning | Merge categories, or split the figure. Four is the most |
 
@@ -342,13 +348,13 @@ In development, diagnostics appear under the figure, in the console, as dashed o
 - Figures are at least as wide as the text column (560 px). They grow to the right to fit the drawing, up to about 960 units at natural size.
 - On small screens, drawings shrink to 75 % of their natural size, then scroll sideways.
 - Keep text-heavy diagrams under about 960 units.
-- Text is measured with the page font, so check the result in the browser.
+- Text is measured with the reader's font files, so the checks match what the browser draws.
 
 ## Checklist
 
 Before you finish a figure:
 
-- The page shows it with no diagnostics. Text is measured in the browser, so a figure is checked only when a page shows it.
+- The document check lists no diagnostics for it.
 - The caption says what the figure shows in one or two sentences, and the text refers to it with `<Ref>` before or where it appears.
 - A figure that is hard to describe from its labels alone has a `description`.
 - At most one part has `role: "accent"`, and it is the part the text is about.

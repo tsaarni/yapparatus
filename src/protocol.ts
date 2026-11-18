@@ -8,11 +8,10 @@
  *   GET    /diagnostics                                             the document's problems
  *   POST   /diagnostics                                             what a browser found
  *   GET    /files/{directory}/{path}                                a source file
+ *   GET    /figures/{page}/{figure}?ids=true                        a diagram's picture, as PNG
  * An agent's reads of the chat carry its id in the `Yapparatus-Agent` header.
  * Changes reach the browser on Vite's hot-update connection, as the events in `UpdateEvents`.
  */
-
-import type { Root } from "hast";
 
 /**
  * Every path the application serves besides pages starts with this: the API, built assets.
@@ -26,6 +25,11 @@ export const apiPrefix = `${appPrefix}/api`;
  * in the response; it drives the agent's state, and the newest agent takes over.
  */
 export const agentHeader = "Yapparatus-Agent";
+
+/** `.yapparatus/server.json` in the project folder: where the running dev server is. */
+export interface ServerFile {
+  url: string;
+}
 
 /* ---------- Chat ---------- */
 
@@ -135,15 +139,15 @@ export interface Chat {
 /* ---------- Diagnostics ---------- */
 
 /**
- * Who found a diagnostic. The server compiles pages and checks links and `document.json`;
- * the browser finds what only exists when a page runs: diagram layout, render and runtime
- * errors, and replies that fail to show.
+ * Who found a diagnostic. The server compiles pages, with their diagrams, and checks links and
+ * `document.json`; the browser finds what only exists when a page runs: chart layout, render
+ * and runtime errors, and replies that fail to show.
  */
 export type DiagnosticOrigin =
   | "compile"
   | "link"
   | "pages"
-  | "diagram"
+  | "chart"
   | "render"
   | "runtime"
   | "reply";
@@ -261,6 +265,10 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A step or part() names a part the diagram does not have.",
   },
+  STEP_NOT_TEXT: {
+    severity: "error",
+    meaning: "A step's id or focus is computed; the compiler reads only plain text.",
+  },
   TEXT_OVERFLOW: { severity: "warning", meaning: "Text does not fit its box." },
   RULER_CROWDED: { severity: "warning", meaning: "A record's column labels run into each other." },
   LABEL_CROWDED: { severity: "warning", meaning: "An edge label has too little room." },
@@ -286,6 +294,10 @@ export const diagnosticCodes = {
   DIAGRAM_SCROLLS: {
     severity: "warning",
     meaning: "The drawing is too wide, so readers scroll sideways.",
+  },
+  FONT_FALLBACK: {
+    severity: "warning",
+    meaning: "Diagram text has characters the reader's fonts lack, so their width is estimated.",
   },
   STEP_ONLY_UNUSED: { severity: "warning", meaning: "A stepOnly part is in no step." },
   BUILD_WITHOUT_STEPS: { severity: "warning", meaning: "A diagram has build but no steps." },
@@ -376,18 +388,38 @@ export interface ReplyRefusal {
 
 /**
  * Body of GET /-/api/files/{directory}/{path}: a source file, highlighted like the code on
- * pages. Each line is a `span` with `data-line`. Builds carry the same object.
+ * pages. Builds carry the same object.
  */
 export interface SourceFileView {
   /** "/-/files/app/x.go" */
   address: string;
   /** The file, relative to the project folder. */
   source: string;
+  /** The whole file, numbered from line 1. */
+  code: HighlightedCode;
+}
+
+/** How a line of code is marked: highlighted, added, or removed. */
+export type CodeMark = "highlight" | "add" | "remove";
+
+/**
+ * Highlighted code, as everything that shows code carries it: code blocks and excerpts on
+ * pages and in replies, and the file view. Each token style is written once in `styles`, and
+ * each line is a list of its tokens.
+ */
+export interface HighlightedCode {
   /** The Shiki language, or "text". */
   language: string;
-  lines: number;
-  /** The highlighted code: a `pre` element, as hast. */
-  code: Root;
+  /** Each token style once, as CSS: "color:var(--shiki-token-keyword)". */
+  styles: string[];
+  /** Each line's tokens, as pairs: the index of the token's style, then its text. */
+  lines: Array<Array<number | string>>;
+  /** Code from a file: the first line's number in the file. Its lines show their numbers. */
+  start?: number;
+  /** Code written on a page: each line's line in the page. */
+  pageLines?: number[];
+  /** Marked lines, by their index in `lines`. */
+  marks?: Record<number, CodeMark>;
 }
 
 /* ---------- Updates ---------- */

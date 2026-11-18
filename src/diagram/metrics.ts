@@ -72,6 +72,12 @@ export const shapes = {
   bar: 10,
 } as const;
 
+/** Inner width of a figure in the wide track: text column plus breakout. */
+export const readingWidth = 960;
+
+/** Drawings shrink to this fraction of their natural size before the figure scrolls. */
+export const minScale = 0.75;
+
 /** Boundary title tabs. */
 export const tab = { height: 20, pad: 8 };
 
@@ -91,3 +97,9 @@ export function fontsOf(m: Metrics) {
 export function cylinderCap(width: number): number {
   return Math.min(12, Math.max(6, width * 0.07));
 }
+
+/** Shape corners, by kind. */
+export const corner = { shape: 6, group: 10, frame: 4, mark: 3 };
+
+/** The warning badge on a part's corner. */
+export const badge = { radius: 7 };

@@ -94,6 +94,20 @@ test("static reading retains navigation without the chat or its records", async 
     const output = readFileSync(path.join(root, "dist/content/-/assets", entry), "utf8");
     expect(output).not.toContain(privateSentinel);
   }
+  // Each page's file preloads that page's code with the app; the root preloads the first page.
+  const preloads = (file: string) =>
+    [
+      ...readFileSync(path.join(root, "dist/content", file), "utf8").matchAll(
+        /rel="modulepreload"[^>]*href="\/-\/assets\/([^"]+)"/g,
+      ),
+    ].map((match) => match[1] ?? "");
+  expect(preloads("index.html")).toEqual([expect.stringMatching(/^first-page-.*\.js$/)]);
+  expect(preloads("second-page/index.html")).toEqual([
+    expect.stringMatching(/^second-page-.*\.js$/),
+  ]);
+  expect(preloads("404.html")).toEqual([]);
+  for (const file of [...preloads("index.html"), ...preloads("second-page/index.html")])
+    expect(readdirSync(path.join(root, "dist/content/-/assets"))).toContain(file);
   // Every page has its own file, so a deep link works on any static host.
   await page.goto("http://127.0.0.1:4174/second-page#details");
   await expect(page.getByRole("heading", { name: "Second page" })).toBeVisible();

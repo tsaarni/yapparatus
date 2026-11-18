@@ -1,31 +1,9 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { pathToFileURL } from "node:url";
+import { loadThemes } from "../src/diagram/paint.ts";
 
-/**
- * The contrast every theme must reach, checked on the real theme file. StyleX only runs
- * when it compiles the app, so the file is loaded with `defineVars`, `defineConsts`, and
- * `createTheme` returning their input: each role's screen, print, and increased-contrast values.
- */
-type Value = string | Record<string, string>;
-type Roles = Record<string, Value>;
-async function loadThemes(): Promise<{ theme: Roles; lightTheme: Roles }> {
-  const source = readFileSync("src/reader/theme.stylex.ts", "utf8").replace(
-    'import * as stylex from "@stylexjs/stylex";',
-    "const stylex = { defineVars: (v: any) => v, defineConsts: (v: any) => v, createTheme: (_: unknown, v: any) => v };",
-  );
-  const dir = mkdtempSync(path.join(os.tmpdir(), "yapparatus-theme-"));
-  try {
-    const file = path.join(dir, "theme.ts");
-    writeFileSync(file, source);
-    return await import(pathToFileURL(file).href);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
-}
+/** The contrast every theme must reach, checked on the real theme file. */
 const { theme, lightTheme } = await loadThemes();
 
 /** Each theme, in each condition its values change for: [roles, condition]. */

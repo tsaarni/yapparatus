@@ -20,13 +20,14 @@ import { parseFileAddress } from "../files.ts";
 import { createLogger } from "../logger.ts";
 import { contentIssues } from "../markdown-plugin.ts";
 import { compiled } from "../outline-plugin.ts";
-import type {
-  AgentMessage,
-  ContextItem,
-  Diagnostic,
-  Message,
-  ReaderMessage,
-  TargetKind,
+import {
+  type AgentMessage,
+  type ContextItem,
+  type Diagnostic,
+  diagnosticCodes,
+  type Message,
+  type ReaderMessage,
+  type TargetKind,
 } from "../protocol.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { HttpError, isRecord } from "./http.ts";
@@ -48,7 +49,7 @@ const kinds: TargetKind[] = [
 
 function optionalText(value: unknown, max: number): string | undefined {
   if (value === undefined) return undefined;
-  if (typeof value !== "string" || value.length > max) throw new Error("Invalid context.");
+  if (typeof value !== "string" || value.length > max) throw new HttpError(400, "Invalid context.");
   return value;
 }
 
@@ -62,7 +63,7 @@ export function acceptContext(
   files: SourceFiles,
   input: unknown,
 ): ContextItem[] {
-  if (!Array.isArray(input) || input.length > 30) throw new Error("Invalid context.");
+  if (!Array.isArray(input) || input.length > 30) throw new HttpError(400, "Invalid context.");
   return input.map((item: unknown) => {
     if (
       !isRecord(item) ||
@@ -73,15 +74,15 @@ export function acceptContext(
       !Number.isInteger(item.startLine) ||
       !Number.isInteger(item.endLine)
     )
-      throw new Error("Invalid context.");
+      throw new HttpError(400, "Invalid context.");
     if (item.kind === "file" || item.kind === "lines") return acceptFileItem(files, item);
     const sourceRoot = realpathSync(path.join(root, content));
     const filename = realpathSync(path.resolve(root, item.source));
     if (!filename.startsWith(`${sourceRoot}${path.sep}`) || !filename.endsWith(".mdx"))
-      throw new Error("Context must refer to a document page.");
+      throw new HttpError(400, "Context must refer to a document page.");
     const startLine = Number(item.startLine);
     const endLine = Number(item.endLine);
-    if (startLine < 1 || endLine < startLine) throw new Error("Invalid context.");
+    if (startLine < 1 || endLine < startLine) throw new HttpError(400, "Invalid context.");
     const step = optionalText(item.step, 600);
     return {
       kind: item.kind as TargetKind,
@@ -101,13 +102,14 @@ export function acceptContext(
 function acceptFileItem(files: SourceFiles, item: Record<string, unknown>): ContextItem {
   const address = parseFileAddress(item.address as string);
   const kind = item.kind as "file" | "lines";
-  if (!address || (kind === "lines") !== !!address.lines) throw new Error("Invalid context.");
+  if (!address || (kind === "lines") !== !!address.lines)
+    throw new HttpError(400, "Invalid context.");
   const file = files.read({ folder: address.folder, path: address.path });
   if ("error" in file || file.source !== item.source)
-    throw new Error("Context must refer to a file the document shows.");
+    throw new HttpError(400, "Context must refer to a file the document shows.");
   const lines = address.lines ?? { start: 1, end: file.lines.length };
   if (item.startLine !== lines.start || item.endLine !== lines.end || lines.end > file.lines.length)
-    throw new Error("Invalid context.");
+    throw new HttpError(400, "Invalid context.");
   return {
     kind,
     address: item.address as string,
@@ -234,8 +236,9 @@ export class ChatStore {
   }
 
   /**
-   * Compile a reply like a page and check its components and links, with the codes pages use.
-   * Returns the problems, all errors: a reply is not stored with any.
+   * Compile a reply like a page, with its diagrams, and check its components and links, with
+   * the codes pages use. Returns the errors: a reply is not stored with any. Warnings, such as
+   * an overlap in a diagram, do not keep it out.
    */
   private async check(file: string, url: string): Promise<Diagnostic[]> {
     try {
@@ -266,14 +269,19 @@ export class ChatStore {
         subject: name,
         message: `<${name}> is not a component. Use ${pageComponents.join(", ")}.`,
       }));
-    for (const issue of contentIssues.get(file) ?? [])
+    // A warning does not keep a reply out; a figure's issue without a line is at the figure.
+    for (const issue of contentIssues.get(file) ?? []) {
+      if (diagnosticCodes[issue.code].severity !== "error") continue;
+      const line = issue.line ?? (issue.target ? entry.places[issue.target]?.start : undefined);
       errors.push({
         origin: "reply",
         code: issue.code,
         ...(issue.subject ? { subject: issue.subject } : {}),
         message: issue.message,
-        line: issue.line,
+        ...(line ? { line } : {}),
+        ...(issue.elements ? { elements: issue.elements } : {}),
       });
+    }
     contentIssues.delete(file);
     const links = checkLinks(
       [...(await this.options.outlines()), { id: "", outline: entry.outline }],

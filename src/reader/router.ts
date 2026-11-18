@@ -59,12 +59,26 @@ function parse(): { slug: string; fragment: string } {
 let cache: { key: string; route: Route } | undefined;
 let restore: number | undefined;
 
+/** The page the address names, if it names one. */
+function pageAt(slug: string): DocumentPage | undefined {
+  if (parseFileAddress(`/${slug}`)) return;
+  return slug ? pages.find((p) => p.id === slug) : pages[0];
+}
+
+/** Can the page be shown now: its code has loaded, or failed to, which shows the error? */
+const ready = (page: DocumentPage) => page.module !== undefined || page.error !== undefined;
+
+/**
+ * The route on screen. A new page is shown once its code has loaded, so the old page stays
+ * until then, and the new one renders with its content. The latest address wins.
+ */
 function snapshot(): Route {
   const key = `${location.pathname}${location.hash}`;
   if (cache?.key === key) return cache.route;
   const { slug, fragment } = parse();
   const file = parseFileAddress(`/${slug}`);
-  const page = file ? undefined : slug ? pages.find((p) => p.id === slug) : pages[0];
+  const page = pageAt(slug);
+  if (cache && page && !ready(page)) return cache.route;
   const route: Route = {
     page,
     ...(file ? { file } : {}),
@@ -77,18 +91,25 @@ function snapshot(): Route {
 }
 
 function subscribe(notify: () => void) {
+  // The address changed. A page whose code is not loaded yet is shown when it has loaded,
+  // if the address still names it then.
+  const update = () => {
+    const page = pageAt(parse().slug);
+    if (page && !ready(page)) page.load().then(notify, notify);
+    else notify();
+  };
   const pop = (event: PopStateEvent) => {
     const scroll = (event.state as { scroll?: unknown } | null)?.scroll;
     restore = typeof scroll === "number" ? scroll : undefined;
-    notify();
+    update();
   };
   window.addEventListener("popstate", pop);
-  window.addEventListener("hashchange", notify);
-  window.addEventListener(changed, notify);
+  window.addEventListener("hashchange", update);
+  window.addEventListener(changed, update);
   return () => {
     window.removeEventListener("popstate", pop);
-    window.removeEventListener("hashchange", notify);
-    window.removeEventListener(changed, notify);
+    window.removeEventListener("hashchange", update);
+    window.removeEventListener(changed, update);
   };
 }
 
@@ -111,6 +132,7 @@ export function scrollRoot(): HTMLElement {
 
 /** Go to an address produced by `href`. Remembers the scroll position for Back. */
 export function navigate(to: string, { replace = false } = {}) {
+  restore = undefined;
   history.replaceState({ ...(history.state as object), scroll: scrollRoot().scrollTop }, "");
   if (replace) history.replaceState({}, "", to);
   else history.pushState({}, "", to);
@@ -159,12 +181,8 @@ export function resolveHref(raw: string | undefined, from: DocumentPage | undefi
   return page ? href(page, resolved.fragment) : raw;
 }
 
-/** Handle clicks on internal links without reloading the app. */
-export function interceptLinks(event: MouseEvent) {
-  if (event.defaultPrevented || event.button !== 0) return;
-  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-  const anchor = (event.target as Element | null)?.closest?.("a[href]");
-  if (!(anchor instanceof HTMLAnchorElement)) return;
+/** The address an internal link goes to, as `navigate` takes it, or undefined for any other link. */
+function internalTarget(anchor: HTMLAnchorElement): string | undefined {
   if (anchor.target && anchor.target !== "_self") return;
   if (anchor.hasAttribute("download")) return;
   const url = new URL(anchor.href);
@@ -177,7 +195,17 @@ export function interceptLinks(event: MouseEvent) {
       pages.some((p) => p.id === slug) || url.pathname.startsWith(`${base}${filesPrefix}/`);
     if (slug && !known) return;
   }
-  const target = hashMode ? raw : `${url.pathname}${url.hash}`;
+  return hashMode ? raw : `${url.pathname}${url.hash}`;
+}
+
+/** Handle clicks on internal links without reloading the app. */
+export function interceptLinks(event: MouseEvent) {
+  if (event.defaultPrevented || event.button !== 0) return;
+  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+  const anchor = (event.target as Element | null)?.closest?.("a[href]");
+  if (!(anchor instanceof HTMLAnchorElement)) return;
+  const target = internalTarget(anchor);
+  if (!target) return;
   if (target === (hashMode ? location.hash : `${location.pathname}${location.hash}`)) {
     // The same address again: scroll to its anchor without a new history entry.
     event.preventDefault();
@@ -186,6 +214,22 @@ export function interceptLinks(event: MouseEvent) {
   }
   event.preventDefault();
   navigate(target);
+}
+
+/**
+ * Start loading the page a link goes to when the pointer or focus reaches the link, so the
+ * page is usually ready when the link is followed.
+ */
+export function prefetchLinks(event: Event) {
+  const anchor = (event.target as Element | null)?.closest?.("a[href]");
+  if (!(anchor instanceof HTMLAnchorElement)) return;
+  const target = internalTarget(anchor);
+  if (!target) return;
+  const slug = (hashMode ? target.slice(1) : target.slice(base.length))
+    .split("#")[0]
+    ?.replace(/^\/+|\/+$/g, "");
+  const page = slug ? pages.find((p) => p.id === slug) : pages[0];
+  page?.load().catch(() => undefined);
 }
 
 /** Scroll to an anchor, or to the top when there is none. */

@@ -1,7 +1,7 @@
 /**
  * Checks over the scene and the compiled drawing: ids, positions, overlaps, crossings.
  */
-import type { CompiledEdge, CompiledEnclosure, CompiledNode } from "./compiled.ts";
+import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "./compiled.ts";
 import {
   contains,
   inflate,
@@ -164,7 +164,7 @@ export function validate(
       if (o)
         report(
           "LABEL_OVERLAP",
-          `${edge.id} label "${label.text}" intersects ${node.id} by ${round(o.width)} × ${round(o.height)}.`,
+          `${edge.id} label "${textOf(label)}" intersects ${node.id} by ${round(o.width)} × ${round(o.height)}.`,
           [edge.id, node.id],
         );
     }
@@ -172,10 +172,11 @@ export function validate(
       if (other === edge || other.passive || (other.stepOnly && edge.stepOnly)) continue;
       for (let i = 0; i < other.points.length - 1; i++)
         if (segmentHitsRect(other.points[i] as Vec, other.points[i + 1] as Vec, label.rect)) {
-          report("LABEL_OVERLAP", `${edge.id} label "${label.text}" is crossed by ${other.id}.`, [
-            edge.id,
-            other.id,
-          ]);
+          report(
+            "LABEL_OVERLAP",
+            `${edge.id} label "${textOf(label)}" is crossed by ${other.id}.`,
+            [edge.id, other.id],
+          );
           break;
         }
     }
@@ -187,7 +188,7 @@ export function validate(
       if (a && b && !(a.edge.stepOnly && b.edge.stepOnly) && overlap(a.label.rect, b.label.rect))
         report(
           "LABEL_OVERLAP",
-          `Labels "${a.label.text}" (${a.edge.id}) and "${b.label.text}" (${b.edge.id}) overlap.`,
+          `Labels "${textOf(a.label)}" (${a.edge.id}) and "${textOf(b.label)}" (${b.edge.id}) overlap.`,
           [a.edge.id, b.edge.id],
         );
     }
@@ -249,4 +250,9 @@ function memberIds(e: Enclosure): string[] {
         ? [el.id, ...el.members.flatMap(walk)]
         : [el.id];
   return e.members.flatMap(walk);
+}
+
+/** An edge label on one line, as messages quote it. */
+function textOf(label: CompiledLabel): string {
+  return label.lines.map((l) => l.text).join(" ");
 }

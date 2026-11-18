@@ -4,47 +4,18 @@
 import * as stylex from "@stylexjs/stylex";
 import { dash, stroke, theme } from "../reader/theme.stylex.ts";
 import { styled } from "../reader/ui.tsx";
-import type { CompiledEdge, CompiledEnclosure, CompiledFrame } from "./compiled.ts";
-import type { Vec } from "./geometry.ts";
+import type { CompiledEdge, CompiledEnclosure, CompiledFrame, PartState } from "./compiled.ts";
+import { corner } from "./metrics.ts";
 import {
   categoryStyle,
-  corner,
   Line,
-  outline,
-  type PartState,
   partStyles,
   roleStyle,
   stateStyle,
   type Target,
   targetFor,
 } from "./part.tsx";
-
-/** A polyline whose bends are rounded by up to `radius`. */
-function roundedPath(points: Vec[], radius: number): string {
-  const first = points[0];
-  if (!first) return "";
-  let d = `M${first.x} ${first.y}`;
-  for (let i = 1; i < points.length - 1; i++) {
-    const prev = points[i - 1] as Vec;
-    const at = points[i] as Vec;
-    const next = points[i + 1] as Vec;
-    const inLen = Math.hypot(at.x - prev.x, at.y - prev.y);
-    const outLen = Math.hypot(next.x - at.x, next.y - at.y);
-    const r = Math.min(radius, inLen / 2, outLen / 2);
-    if (r < 0.5) {
-      d += `L${at.x} ${at.y}`;
-      continue;
-    }
-    const a = { x: at.x - ((at.x - prev.x) / inLen) * r, y: at.y - ((at.y - prev.y) / inLen) * r };
-    const b = {
-      x: at.x + ((next.x - at.x) / outLen) * r,
-      y: at.y + ((next.y - at.y) / outLen) * r,
-    };
-    d += `L${a.x} ${a.y}Q${at.x} ${at.y} ${b.x} ${b.y}`;
-  }
-  const last = points[points.length - 1] as Vec;
-  return `${d}L${last.x} ${last.y}`;
-}
+import { fragmentTab, outline, pointList, roundedPath, rule } from "./shapes.ts";
 
 export function EdgeView({
   edge,
@@ -79,31 +50,33 @@ export function EdgeView({
           <polyline
             // biome-ignore lint/suspicious/noArrayIndexKey: Heads are positional.
             key={i}
-            points={head.map((p) => `${p.x},${p.y}`).join(" ")}
+            points={pointList(head)}
             {...stylex.props(styles.openHead)}
           />
         ) : (
           <polygon
             // biome-ignore lint/suspicious/noArrayIndexKey: Heads are positional.
             key={i}
-            points={head.map((p) => `${p.x},${p.y}`).join(" ")}
+            points={pointList(head)}
             {...stylex.props(styles.head)}
           />
         ),
       )}
-      {edge.labels.map((label, i) => (
-        <text
-          // biome-ignore lint/suspicious/noArrayIndexKey: Labels are positional.
-          key={i}
-          x={label.center.x}
-          y={label.center.y}
-          fontSize={label.size}
-          fontWeight={label.weight}
-          {...stylex.props(partStyles.text, partStyles.sans, styles.edgeLabel, partStyles.halo)}
-        >
-          {label.text}
-        </text>
-      ))}
+      {edge.labels.flatMap((label, i) =>
+        label.lines.map((line, j) => (
+          <text
+            // biome-ignore lint/suspicious/noArrayIndexKey: Labels and their lines are positional.
+            key={`${i}-${j}`}
+            x={line.x}
+            y={line.y}
+            fontSize={line.size}
+            fontWeight={line.weight}
+            {...stylex.props(partStyles.text, partStyles.sans, styles.edgeLabel, partStyles.halo)}
+          >
+            {line.text}
+          </text>
+        )),
+      )}
       {flagged &&
         edge.labels.map((label, i) => (
           <rect
@@ -181,7 +154,7 @@ export function FrameView({
           <path
             // biome-ignore lint/suspicious/noArrayIndexKey: Dividers are positional.
             key={i}
-            d={`M${x} ${divider.y}H${x + w}`}
+            d={rule(f.rect, divider.y)}
             {...stylex.props(styles.frame, partStyles.dashed)}
           />
         ))}
@@ -192,10 +165,7 @@ export function FrameView({
     <g {...fade}>
       {f.tab && tab && (
         <>
-          <path
-            d={`M${tab.x} ${tab.y}H${tab.x + tab.width}V${tab.y + tab.height - 6}L${tab.x + tab.width - 6} ${tab.y + tab.height}H${tab.x}Z`}
-            {...stylex.props(styles.frameTab)}
-          />
+          <path d={fragmentTab(tab)} {...stylex.props(styles.frameTab)} />
           <Line line={f.tab.line} />
         </>
       )}
