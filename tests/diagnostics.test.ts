@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
-import { diagnosticCodes, isDiagnosticCode } from "../src/protocol.ts";
+import { diagnosticCodes, isDiagnosticCode } from "../src/document/diagnostic.ts";
 
 const repo = path.join(import.meta.dirname, "..");
 

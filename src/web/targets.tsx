@@ -8,7 +8,7 @@
  */
 import * as stylex from "@stylexjs/stylex";
 import { createContext, type ReactNode, useContext } from "react";
-import type { TargetKind } from "../protocol.ts";
+import type { TargetKind } from "../document/reference.ts";
 import { AppIcon as Icon } from "./icons.tsx";
 import { duration, layer, radius, space, theme, when } from "./theme.stylex.ts";
 import { Button, styled, useCopy } from "./ui.tsx";

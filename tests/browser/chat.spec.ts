@@ -2,13 +2,13 @@ import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type APIRequestContext, expect, test } from "@playwright/test";
+import type { Reference } from "../../src/document/reference.ts";
 import {
   agentHeader,
   type Chat,
   type DiagnosticReport,
   type DocumentDiagnostics,
-  type Reference,
-} from "../../src/protocol.ts";
+} from "../../src/protocol/rest-api.ts";
 import { pageRevision } from "../../src/source-plugin.ts";
 import { commands, replyCommand, root, runCommand } from "./workspace.ts";
 

@@ -9,16 +9,16 @@ import { existsSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { fileSource } from "../files.ts";
-import { createLogger } from "../logger.ts";
+import type { Diagnostic } from "../document/diagnostic.ts";
+import { fileSource } from "../document/file-address.ts";
+import { createLogger } from "../protocol/log.ts";
 import {
   type AgentState,
   agentHeader,
   type Chat,
-  type Diagnostic,
   type Message,
   type ReplyRefusal,
-} from "../protocol.ts";
+} from "../protocol/rest-api.ts";
 import type { ChatStore } from "./chat.ts";
 import { type DiagnosticStore, diagnosticKey } from "./diagnostics.ts";
 import { HttpError, type Reply, type Router } from "./http.ts";

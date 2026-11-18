@@ -1,7 +1,11 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
-import { agentHeader, type DocumentDiagnostics, type ReplyRefusal } from "../../src/protocol.ts";
+import {
+  agentHeader,
+  type DocumentDiagnostics,
+  type ReplyRefusal,
+} from "../../src/protocol/rest-api.ts";
 import { root, runCommand } from "./workspace.ts";
 
 /** The document's diagnostics once recent edits are checked, as the agent reads them. */

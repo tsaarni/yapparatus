@@ -5,7 +5,7 @@
  * excerpt, a click opens the file at that line.
  */
 import type { MouseEvent } from "react";
-import type { LineRange } from "../files.ts";
+import type { LineRange } from "../document/file-address.ts";
 import type { SourceFileCode } from "./prose.tsx";
 import { fileHref, navigate } from "./router.ts";
 

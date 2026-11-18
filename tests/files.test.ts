@@ -14,10 +14,17 @@ import {
   fileView,
   languageOf,
 } from "../src/code-plugin.ts";
-import { checkLinks, type PageOutline, quoteOf, resolveLink } from "../src/document.ts";
-import { checkFiles, fileAddress, fileSource, parseFileAddress, parseLines } from "../src/files.ts";
+import { checkFiles } from "../src/compiler/document-checks.ts";
+import { checkLinks } from "../src/compiler/link-checks.ts";
+import { quoteOf, resolveLink } from "../src/document/address.ts";
+import {
+  fileAddress,
+  fileSource,
+  parseFileAddress,
+  parseLines,
+} from "../src/document/file-address.ts";
+import type { HighlightedCode, PageOutline } from "../src/document/page-module.ts";
 import { contentIssues } from "../src/markdown-plugin.ts";
-import type { HighlightedCode } from "../src/protocol.ts";
 import { acceptReferences } from "../src/server/chat.ts";
 import { messagesPrompt, startPrompt } from "../src/server/prompt.ts";
 import { SourceFiles } from "../src/source-files.ts";

@@ -1,9 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
 import { type HTMLAttributes, type ReactNode, useContext } from "react";
-import { elementSeparator } from "../document.ts";
-import { parseFileAddress } from "../files.ts";
-import { createLogger } from "../logger.ts";
-import type { FileTreeEntry } from "../markdown-plugin.ts";
+import { elementSeparator } from "../document/address.ts";
+import { parseFileAddress } from "../document/file-address.ts";
+import type { FileTreeEntry } from "../document/page-module.ts";
+import { createLogger } from "../protocol/log.ts";
 import { AppIcon as Icon } from "./icons.tsx";
 import { blockLabel, findTarget, usePage } from "./numbering.ts";
 import {

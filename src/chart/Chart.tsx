@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Diagnostics } from "../diagram/Diagnostics.tsx";
-import { diagnosticCodes } from "../protocol.ts";
+import { diagnosticCodes } from "../document/diagnostic.ts";
 import { FigureFrame } from "../web/components.tsx";
 import { useChartReport } from "../web/diagnostics.tsx";
 import { fontSize, radius, sizes, space, theme } from "../web/theme.stylex.ts";

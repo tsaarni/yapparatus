@@ -10,8 +10,8 @@
 
 import { type DocumentPage, pages } from "virtual:yapparatus/document";
 import { useSyncExternalStore } from "react";
-import { resolveLink, splitAddress } from "../document.ts";
-import { type FileAddress, fileAddress, parseFileAddress } from "../files.ts";
+import { resolveLink, splitAddress } from "../document/address.ts";
+import { type FileAddress, fileAddress, parseFileAddress } from "../document/file-address.ts";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 export const hashMode = __YAPPARATUS_HASH_ROUTES__ || location.protocol === "file:";

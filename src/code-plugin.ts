@@ -17,15 +17,17 @@ import {
   stringifyTokenStyle,
 } from "shiki";
 import { visit } from "unist-util-visit";
+import type { DiagnosticCode } from "./document/diagnostic.ts";
 import {
   type FileAddress,
   fileAddress,
   type LineRange,
   parseFileAddress,
   parseLines,
-} from "./files.ts";
+} from "./document/file-address.ts";
+import type { CodeMark, HighlightedCode } from "./document/page-module.ts";
 import { codeMarks, contentIssues } from "./markdown-plugin.ts";
-import type { CodeMark, DiagnosticCode, HighlightedCode, SourceFileView } from "./protocol.ts";
+import type { SourceFileView } from "./protocol/rest-api.ts";
 import type { SourceFile, SourceFiles } from "./source-files.ts";
 
 /** Code colors come from CSS variables, so they follow the theme. */

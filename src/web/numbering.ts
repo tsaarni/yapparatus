@@ -5,8 +5,9 @@
 
 import { type DocumentPage, onPagesChanged, pages, settings } from "virtual:yapparatus/document";
 import { createContext, useContext } from "react";
-import { type NumberedKind, numberingOf } from "../document.ts";
-import { createLogger } from "../logger.ts";
+import type { NumberedKind } from "../document/page-module.ts";
+import { numberingOf } from "../document/settings.ts";
+import { createLogger } from "../protocol/log.ts";
 
 const log = createLogger("numbering");
 

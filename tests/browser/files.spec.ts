@@ -1,7 +1,8 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
-import { agentHeader, type Chat, type Reference } from "../../src/protocol.ts";
+import type { Reference } from "../../src/document/reference.ts";
+import { agentHeader, type Chat } from "../../src/protocol/rest-api.ts";
 import { commands, replyCommand, root, runCommand } from "./workspace.ts";
 
 const storedReferences = () =>

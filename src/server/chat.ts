@@ -15,20 +15,15 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
-import { checkLinks, type PageOutline, pageComponents } from "../document.ts";
-import { parseFileAddress } from "../files.ts";
-import { createLogger } from "../logger.ts";
+import { checkLinks } from "../compiler/link-checks.ts";
+import { type Diagnostic, diagnosticCodes } from "../document/diagnostic.ts";
+import { parseFileAddress } from "../document/file-address.ts";
+import { type PageOutline, pageComponents } from "../document/page-module.ts";
+import type { Reference, TargetKind } from "../document/reference.ts";
 import { contentIssues } from "../markdown-plugin.ts";
 import { compiled } from "../outline-plugin.ts";
-import {
-  type AgentMessage,
-  type Diagnostic,
-  diagnosticCodes,
-  type Message,
-  type ReaderMessage,
-  type Reference,
-  type TargetKind,
-} from "../protocol.ts";
+import { createLogger } from "../protocol/log.ts";
+import type { AgentMessage, Message, ReaderMessage } from "../protocol/rest-api.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { HttpError, isRecord } from "./http.ts";
 

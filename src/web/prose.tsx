@@ -14,10 +14,9 @@ import {
   useMemo,
   useRef,
 } from "react";
-import type { LineRange } from "../files.ts";
-import { type FileAddress, fileAddress, linesLabel } from "../files.ts";
-import type { AlertKind } from "../markdown-plugin.ts";
-import type { HighlightedCode } from "../protocol.ts";
+import type { LineRange } from "../document/file-address.ts";
+import { type FileAddress, fileAddress, linesLabel } from "../document/file-address.ts";
+import type { AlertKind, HighlightedCode } from "../document/page-module.ts";
 import { AppIcon as Icon } from "./icons.tsx";
 import { clickLineNumber, pressLineNumber } from "./line-numbers.ts";
 import { numbering, numbersOf, usePage } from "./numbering.ts";

@@ -3,7 +3,7 @@
  * size, fonts, colors, and margins, and checks what the marks name.
  */
 import type * as PlotModule from "@observablehq/plot";
-import type { DiagnosticCode } from "../protocol.ts";
+import type { DiagnosticCode } from "../document/diagnostic.ts";
 
 export type PlotLibrary = typeof PlotModule;
 export type Row = Record<string, number | string | Date | null>;

@@ -3,16 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import {
-  checkLinks,
-  checkPages,
-  checkTheme,
-  type PageOutline,
-  quoteOf,
-  resolveLink,
-  splitAddress,
-  textFragment,
-} from "../src/document.ts";
+import { checkPages, checkTheme } from "../src/compiler/document-checks.ts";
+import { checkLinks } from "../src/compiler/link-checks.ts";
+import { quoteOf, resolveLink, splitAddress, textFragment } from "../src/document/address.ts";
+import type { PageOutline } from "../src/document/page-module.ts";
 import { acceptReferences } from "../src/server/chat.ts";
 import { diagnosticKey } from "../src/server/diagnostics.ts";
 import { messagesPrompt } from "../src/server/prompt.ts";

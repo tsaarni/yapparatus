@@ -13,7 +13,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, type Page, test } from "@playwright/test";
 import { build, type PreviewServer, preview } from "vite";
-import { apiPrefix } from "../../src/protocol.ts";
+import { apiPrefix } from "../../src/protocol/rest-api.ts";
 import { yapparatus } from "../../src/vite.ts";
 
 let root: string;

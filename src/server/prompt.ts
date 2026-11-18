@@ -2,15 +2,10 @@
  * Everything the agent reads, written in one place: messages, idle output, errors, and the
  * exact command to run next. The library passes this text on unchanged.
  */
-import { quoteOf, splitAddress } from "../document.ts";
-import {
-  type Diagnostic,
-  diagnosticCodes,
-  type ReaderMessage,
-  type Reference,
-  type ReportedDiagnostic,
-  type UncheckedPage,
-} from "../protocol.ts";
+import { quoteOf, splitAddress } from "../document/address.ts";
+import { type Diagnostic, diagnosticCodes } from "../document/diagnostic.ts";
+import type { Reference } from "../document/reference.ts";
+import type { ReaderMessage, ReportedDiagnostic, UncheckedPage } from "../protocol/rest-api.ts";
 
 const run = "node --input-type=module-typescript -e";
 

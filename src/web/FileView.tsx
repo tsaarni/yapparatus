@@ -8,8 +8,14 @@ import { type DocumentPage, pages } from "virtual:yapparatus/document";
 import { files as builtFiles } from "virtual:yapparatus/files";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
-import { type FileAddress, fileAddress, parseFileAddress, parseLines } from "../files.ts";
-import type { Reference, SourceFileView } from "../protocol.ts";
+import {
+  type FileAddress,
+  fileAddress,
+  parseFileAddress,
+  parseLines,
+} from "../document/file-address.ts";
+import type { Reference } from "../document/reference.ts";
+import type { SourceFileView } from "../protocol/rest-api.ts";
 import { onFileChanged, readFile } from "./api.ts";
 import { CodeBlock, SourceFileContext } from "./prose.tsx";
 import { fileHref, href } from "./router.ts";

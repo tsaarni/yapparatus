@@ -3,7 +3,7 @@
  * lines, and its address as a link and a button.
  */
 import * as stylex from "@stylexjs/stylex";
-import { elementSeparator } from "../document.ts";
+import { elementSeparator } from "../document/address.ts";
 import { dash, duration, stroke, theme, when } from "../web/theme.stylex.ts";
 import type { ElementState, TextLine } from "./compiled.ts";
 import type { Role } from "./scene.ts";

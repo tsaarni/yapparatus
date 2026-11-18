@@ -8,7 +8,7 @@ import { test } from "node:test";
 import { compile } from "../src/diagram/compile.ts";
 import type { Measure } from "../src/diagram/metrics.ts";
 import { DiagramBuilder } from "../src/diagram/scene.ts";
-import { diagnosticCodes } from "../src/protocol.ts";
+import { diagnosticCodes } from "../src/document/diagnostic.ts";
 import { examples, examplePages as pages } from "./diagram-examples.ts";
 
 const measure: Measure = (text) => text.length * 7;

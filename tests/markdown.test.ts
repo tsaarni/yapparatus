@@ -6,8 +6,8 @@ import * as runtime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
 import remarkGfm from "remark-gfm";
 import { codeHighlighting } from "../src/code-plugin.ts";
+import type { HighlightedCode } from "../src/document/page-module.ts";
 import { contentIssues, markdownConventions } from "../src/markdown-plugin.ts";
-import type { HighlightedCode } from "../src/protocol.ts";
 
 /** Compile MDX with the conventions and highlighting; returns the JS and the issues found. */
 async function build(source: string, outputFormat: "program" | "function-body" = "program") {

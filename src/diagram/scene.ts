@@ -2,7 +2,7 @@
  * Authoring API: a retained scene of handles and relationships.
  * Nothing is measured or positioned here; `compile` resolves geometry later.
  */
-import type { DiagnosticCode } from "../protocol.ts";
+import type { DiagnosticCode } from "../document/diagnostic.ts";
 import type { AnchorName, Side } from "./geometry.ts";
 import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
 

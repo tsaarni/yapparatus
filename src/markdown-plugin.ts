@@ -9,7 +9,8 @@ import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxAttribute, MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { bundledLanguages } from "shiki";
 import { visit } from "unist-util-visit";
-import type { CodeMark, DiagnosticCode } from "./protocol.ts";
+import type { DiagnosticCode } from "./document/diagnostic.ts";
+import { alertKinds, type CodeMark, type FileTreeEntry } from "./document/page-module.ts";
 
 export interface ContentIssue {
   code: DiagnosticCode;
@@ -33,22 +34,8 @@ export interface ContentIssue {
 /** Issues found in each compiled file, by absolute path. Replaced on every compile. */
 export const contentIssues = new Map<string, ContentIssue[]>();
 
-export const alertKinds = ["note", "tip", "important", "warning", "caution"] as const;
-export type AlertKind = (typeof alertKinds)[number];
-
 /** Plain text needs no grammar; every other name must be one Shiki knows. */
 const plainLanguages = ["text", "txt", "plain"];
-
-/** One entry of a `<FileTree>`, parsed from its Markdown list at compile time. */
-export interface FileTreeEntry {
-  name: string;
-  kind: "directory" | "file" | "more";
-  /** Words after the name, shown beside it. */
-  comment?: string;
-  /** Written in bold: the entry the text is about. */
-  highlight?: boolean;
-  children?: FileTreeEntry[];
-}
 
 export function markdownConventions() {
   return (tree: Root, file: { path: string }) => {

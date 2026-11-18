@@ -99,7 +99,7 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
 
 ## Where the code is
 
-<Ref to="overview-source" /> shows the main files. The files at the top of `src/` run in the server, except the agent library, which runs in the agent's process. The web app also imports the shared files, such as the address code.
+<Ref to="overview-source" /> shows the main files. The files at the top of `src/` run in the server, except the agent library, which runs in the agent's process. The web app also imports `document/` and `protocol/`, which hold no server or browser code.
 
 <Figure id="overview-source" caption="The main source files and the pages that describe them.">
 
@@ -109,12 +109,12 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
   - cli.ts the [`yap` command](server#starting)
   - vite.ts the [page compiler](page-compiler)
   - *-plugin.ts the [stages](page-compiler#pipeline) of the page compiler
-  - document.ts [pages and addresses](documents)
-  - files.ts [file addresses](documents#external-files)
   - source-files.ts reading [external files](documents#external-files)
-  - protocol.ts the types of the [REST API](rest-api)
   - agent.ts the [agent library](agent-library)
   - …
+  - document/ [pages, addresses](documents), references, and diagnostics
+  - protocol/ the types of the [REST API](rest-api), and the logger
+  - compiler/ the checks of `document.json` and of links
   - server/ the [server](server)
   - diagram/ the [diagram compiler](diagram-compiler)
   - chart/ the [chart](charts) component
@@ -130,12 +130,14 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
 
 | Code | Lines |
 |---|---:|
-| `src/web/` | 6516 |
+| `src/web/` | 6528 |
 | `src/diagram/` | 5688 |
-| Page compiler: `vite.ts`, `*-plugin.ts` | 2139 |
-| `src/server/` | 1919 |
-| Other files at the top of `src/` | 1723 |
+| Page compiler: `vite.ts`, `*-plugin.ts`, `src/compiler/` | 2311 |
+| `src/server/` | 1907 |
+| Other files at the top of `src/` | 769 |
 | `src/chart/` | 873 |
+| `src/document/` | 569 |
+| `src/protocol/` | 232 |
 
 </Table>
 

@@ -1,10 +1,14 @@
 /**
  * Source files a document shows: their addresses, and where they are on disk. A document names
  * folders in `document.json` under `"files"`, such as `{ "contour": "../contour" }`, and its
- * pages point into them with `/-/files/contour/internal/dag/builder.go#L40-L72`. Shared by the
- * compiler, the dev server, and the web app.
+ * pages point into them with `/-/files/contour/internal/dag/builder.go#L40-L72`.
  */
-import { appPrefix } from "./protocol.ts";
+
+/**
+ * Every path the application serves besides pages starts with this: the API, built assets,
+ * source files. Page names cannot start with "-", so no page collides with the application.
+ */
+export const appPrefix = "/-";
 
 export const filesPrefix = `${appPrefix}/files`;
 
@@ -20,7 +24,8 @@ export interface FileAddress {
   lines?: LineRange;
 }
 
-const folderName = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+/** A folder name in the `files` field of `document.json`. */
+export const folderName = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * "/-/files/contour/x.go#L40-L72" → the folder, the path, and the lines. Undefined for anything
@@ -85,26 +90,16 @@ export function fileSource(
   return out.join("/");
 }
 
-/** The folders a document names, from the `files` field of `document.json`. */
+/**
+ * The folders a document names, from the `files` field of `document.json`. None when the
+ * field has an error, as `checkFiles` reports it.
+ */
 export function foldersOf(settings: { files?: unknown }): Record<string, string> {
-  return checkFiles(settings.files).length
-    ? {}
-    : ((settings.files ?? {}) as Record<string, string>);
-}
-
-/** Errors in the `files` field of `document.json`, as readable messages. */
-export function checkFiles(files: unknown): string[] {
-  if (files === undefined) return [];
-  if (typeof files !== "object" || files === null || Array.isArray(files))
-    return [
-      '"files" in document.json names external directories by name: { "files": { "app": "../app" } }.',
-    ];
-  return Object.entries(files).flatMap(([name, folder]) => [
-    ...(folderName.test(name)
-      ? []
-      : [`"files" in document.json names "${name}": use lowercase letters, digits, and hyphens.`]),
-    ...(typeof folder === "string" && folder
-      ? []
-      : [`"files" in document.json gives "${name}" no directory path.`]),
-  ]);
+  const { files } = settings;
+  if (files === undefined || typeof files !== "object" || files === null || Array.isArray(files))
+    return {};
+  const valid = Object.entries(files).every(
+    ([name, folder]) => folderName.test(name) && typeof folder === "string" && folder,
+  );
+  return valid ? (files as Record<string, string>) : {};
 }

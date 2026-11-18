@@ -4,7 +4,7 @@
  * so built pages never touch /-/api.
  */
 import { useSyncExternalStore } from "react";
-import { createLogger } from "../logger.ts";
+import { createLogger } from "../protocol/log.ts";
 import {
   apiPrefix,
   type Chat,
@@ -13,7 +13,7 @@ import {
   type ReportedDiagnostic,
   type SourceFileView,
   type UpdateEvents,
-} from "../protocol.ts";
+} from "../protocol/rest-api.ts";
 
 const log = createLogger("api");
 const live = import.meta.env.DEV;

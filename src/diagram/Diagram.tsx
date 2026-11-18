@@ -13,7 +13,7 @@ import {
   useId,
   useState,
 } from "react";
-import { elementSeparator } from "../document.ts";
+import { elementSeparator } from "../document/address.ts";
 import { FigureFrame } from "../web/components.tsx";
 import { AppIcon } from "../web/icons.tsx";
 import { useScopedId } from "../web/prose.tsx";

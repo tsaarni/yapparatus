@@ -11,28 +11,25 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
 import { excerptFiles } from "../code-plugin.ts";
+import { checkFiles, checkIcons, checkPages, checkTheme } from "../compiler/document-checks.ts";
+import { checkLinks } from "../compiler/link-checks.ts";
 import { pageFigures } from "../diagram-plugin.ts";
-import {
-  checkIcons,
-  checkLinks,
-  checkPages,
-  checkTheme,
-  type PageOutline,
-  pageIdOf,
-} from "../document.ts";
-import { checkFiles } from "../files.ts";
-import { createLogger } from "../logger.ts";
-import { contentIssues } from "../markdown-plugin.ts";
-import { compiled } from "../outline-plugin.ts";
 import {
   type Diagnostic,
   type DiagnosticOrigin,
-  type DocumentDiagnostics,
   diagnosticCodes,
   isDiagnosticCode,
-  type ReportedDiagnostic,
-  type UncheckedPage,
-} from "../protocol.ts";
+} from "../document/diagnostic.ts";
+import type { PageOutline } from "../document/page-module.ts";
+import { pageIdOf } from "../document/settings.ts";
+import { contentIssues } from "../markdown-plugin.ts";
+import { compiled } from "../outline-plugin.ts";
+import { createLogger } from "../protocol/log.ts";
+import type {
+  DocumentDiagnostics,
+  ReportedDiagnostic,
+  UncheckedPage,
+} from "../protocol/rest-api.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { pageRevision } from "../source-plugin.ts";
 import { HttpError, isRecord, type Router } from "./http.ts";

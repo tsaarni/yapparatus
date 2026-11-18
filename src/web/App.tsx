@@ -18,9 +18,10 @@ import {
   useState,
 } from "react";
 import { flashElement } from "../diagram/element.tsx";
-import { elementSeparator, splitAddress, textFragment } from "../document.ts";
-import { parseFileAddress } from "../files.ts";
-import type { Reference, ReportedDiagnostic } from "../protocol.ts";
+import { elementSeparator, splitAddress, textFragment } from "../document/address.ts";
+import { parseFileAddress } from "../document/file-address.ts";
+import type { Reference } from "../document/reference.ts";
+import type { ReportedDiagnostic } from "../protocol/rest-api.ts";
 import { useLive } from "./api.ts";
 import { type ThemeChoice, themeSwitchable, useThemeChoice } from "./appearance.ts";
 import { Chat } from "./Chat.tsx";

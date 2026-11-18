@@ -19,7 +19,7 @@ import {
 } from "./chart/data.ts";
 import { type DataFormat, formatNamed, formatNames, formatOfFile } from "./chart/formats.ts";
 import { excerptFiles } from "./code-plugin.ts";
-import { type FileAddress, parseFileAddress } from "./files.ts";
+import { type FileAddress, parseFileAddress } from "./document/file-address.ts";
 import { contentIssues } from "./markdown-plugin.ts";
 import type { SourceFile, SourceFiles } from "./source-files.ts";
 import { revision } from "./source-plugin.ts";

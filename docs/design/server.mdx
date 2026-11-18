@@ -75,7 +75,7 @@ The server listens on `127.0.0.1` only. When it starts, it writes its address to
 
 ## Chat log
 
-The chat of a document is a log in `.yapparatus/<directory>/chat.jsonl`, with one JSON object per line. `<directory>` is the path of the document directory. The [chat log module](/-/files/yapparatus/src/server/chat.ts#L142-L340) keeps the log in memory and appends each new message as one line. It never rewrites a line. <Ref to="server-chat-record" /> shows a reader message and the reply to it.
+The chat of a document is a log in `.yapparatus/<directory>/chat.jsonl`, with one JSON object per line. `<directory>` is the path of the document directory. The [chat log module](/-/files/yapparatus/src/server/chat.ts#L137-L335) keeps the log in memory and appends each new message as one line. It never rewrites a line. <Ref to="server-chat-record" /> shows a reader message and the reply to it.
 
 <Diagram id="server-chat-record" caption="A reader message with one reference, and the reply to it, as two lines of chat.jsonl." description="Three records: a reader message with seq 12, its reference, and an agent message with seq 13 whose inReplyTo is 12." draw={(d) => {
   const reader = d.record([
@@ -173,7 +173,7 @@ A read with `wait` stays open while it would return nothing. When the chat or th
 
 ## Reply checks
 
-A reply is an agent's `POST` with MDX. The server refuses it with `409` when no agent read has returned a reader message since the chat was last cleared. Otherwise [it checks the reply](/-/files/yapparatus/src/server/chat.ts#L306-L339) and stores it:
+A reply is an agent's `POST` with MDX. The server refuses it with `409` when no agent read has returned a reader message since the chat was last cleared. Otherwise [it checks the reply](/-/files/yapparatus/src/server/chat.ts#L301-L334) and stores it:
 
 1. An empty reply is refused with `REPLY_EMPTY`.
 2. The MDX is written to a temporary file in the chat directory and compiled through Vite with the [page compiler](page-compiler#replies). A failure is `COMPILE_FAILED`.
@@ -184,7 +184,7 @@ Errors in the pages do not hold back a reply. Reader messages sent while the age
 
 ## Diagnostic store
 
-The [diagnostic store](/-/files/yapparatus/src/server/diagnostics.ts#L72-L515) holds the diagnostics of the document. After each file change, it compiles every page and checks the links and `document.json`. It also keeps what browsers report for each page and each reply. How diagnostics are found, when an error becomes new for the agent, and how a read waits for recent checks are described in [diagnostics](diagnostics).
+The [diagnostic store](/-/files/yapparatus/src/server/diagnostics.ts#L69-L512) holds the diagnostics of the document. After each file change, it compiles every page and checks the links and `document.json`. It also keeps what browsers report for each page and each reply. How diagnostics are found, when an error becomes new for the agent, and how a read waits for recent checks are described in [diagnostics](diagnostics).
 
 ## External files
 
@@ -204,4 +204,4 @@ The server trusts local processes, which can already read and write the project,
 
 ## Logging
 
-The server, the web app, and the agent library share [one logger](/-/files/yapparatus/src/logger.ts). The environment variable `YAPPARATUS_LOG` sets the level everywhere: `debug`, `info`, `warn` (the default), `error`, or `silent`. The server passes its level to the web app. In Node every line goes to stderr, because the agent reads the agent library's stdout as its prompt.
+The server, the web app, and the agent library share [one logger](/-/files/yapparatus/src/protocol/log.ts). The environment variable `YAPPARATUS_LOG` sets the level everywhere: `debug`, `info`, `warn` (the default), `error`, or `silent`. The server passes its level to the web app. In Node every line goes to stderr, because the agent reads the agent library's stdout as its prompt.

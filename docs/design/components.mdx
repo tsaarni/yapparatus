@@ -226,7 +226,7 @@ A document can import its own React components from `.tsx` files next to its pag
 A new built-in component is added in one change, in these places:
 
 1. [The registry](/-/files/yapparatus/src/web/registry.ts), so pages and replies can use it without an import.
-2. [The list of page components](/-/files/yapparatus/src/document.ts#L65-L80) that the reply check accepts.
+2. [The list of page components](/-/files/yapparatus/src/document/page-module.ts#L6-L21) that the reply check accepts.
 3. The component list in [the start prompt](/-/files/yapparatus/src/server/prompt.ts).
 4. The authoring guide and [`starter/docs/components.md`](/-/files/yapparatus/starter/docs/components.md).
 5. This page: a row in <Ref to="components-inventory" />, a section, and a live example.

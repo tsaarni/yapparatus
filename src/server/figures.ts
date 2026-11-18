@@ -12,7 +12,7 @@ import type { CompiledDiagram } from "../diagram/compiled.ts";
 import { pictureOf } from "../diagram/picture.ts";
 import { pageFigures } from "../diagram-plugin.ts";
 import { fontMeasure, textOutline } from "../font-measure.ts";
-import { createLogger } from "../logger.ts";
+import { createLogger } from "../protocol/log.ts";
 import { compilePage } from "./diagnostics.ts";
 import { HttpError, type Router } from "./http.ts";
 import { pictureErrors } from "./prompt.ts";

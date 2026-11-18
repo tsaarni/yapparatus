@@ -63,7 +63,7 @@ MDX
 
 </Listing>
 
-The server writes [every command](/-/files/yapparatus/src/server/prompt.ts#L15-L39), and each prompt ends with the command to run next. The code uses only double quotes, because a single quote would end the shell argument. The reply goes in a quoted heredoc, `<<'MDX'`, so the shell expands nothing in it, or comes from a file with `< reply.mdx`. When `sendReply()` rejects, `waitForMessage()` does not run, and the output is the error.
+The server writes [every command](/-/files/yapparatus/src/server/prompt.ts#L10-L34), and each prompt ends with the command to run next. The code uses only double quotes, because a single quote would end the shell argument. The reply goes in a quoted heredoc, `<<'MDX'`, so the shell expands nothing in it, or comes from a file with `< reply.mdx`. When `sendReply()` rejects, `waitForMessage()` does not run, and the output is the error.
 
 ## waitForMessage
 
@@ -106,9 +106,9 @@ A prompt is text the server writes for the agent. The library passes it on uncha
 
 </Table>
 
-The [start prompt](/-/files/yapparatus/src/server/prompt.ts#L220-L231) holds the instructions for the whole session: where the authoring guide is, which components a reply may use, how to run the wait command, and when to check the document and look at a picture. It also lists the external directories, so the agent can open the files that references name. Later prompts hold only the messages, the diagnostics, and the next commands. The commands take no arguments, so the loop keeps working after the agent compacts its conversation.
+The [start prompt](/-/files/yapparatus/src/server/prompt.ts#L215-L226) holds the instructions for the whole session: where the authoring guide is, which components a reply may use, how to run the wait command, and when to check the document and look at a picture. It also lists the external directories, so the agent can open the files that references name. Later prompts hold only the messages, the diagnostics, and the next commands. The commands take no arguments, so the loop keeps working after the agent compacts its conversation.
 
-<Ref to="agent-prompt" /> shows [a prompt with one reader message](/-/files/yapparatus/src/server/prompt.ts#L162-L187).
+<Ref to="agent-prompt" /> shows [a prompt with one reader message](/-/files/yapparatus/src/server/prompt.ts#L157-L182).
 
 <Diagram id="agent-prompt" caption="A prompt with one reader message, in its four parts. The two commands are shortened. The reply command is in full in its listing." description="The text of a prompt, with the reader's message, the references, the diagnostics, and the next commands marked" draw={(d) => {
   d.text("Reader, 14:02:\n--- reader ---\nWhy does a read wait at most 25 s?\n--- end reader ---\nReferences, at the lines the reader saw. If the file changed since, find each by its address and words:\n- section, docs/design/rest-api.mdx:88-140, /rest-api#read-the-chat\n- file lines, src/agent.ts:120-147, /-/files/yapparatus/src/agent.ts#L120-L147\n\nDiagnostics: none\n\nEdit pages (/home/me/doc/docs/guide.md) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\nnode --input-type=module-typescript -e '… checkDocument() …'\n\nThen reply and wait:\n\nnode --input-type=module-typescript -e '… sendReply() … waitForMessage() …' <<'MDX'\n<your reply>\nMDX", {

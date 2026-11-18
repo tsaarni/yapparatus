@@ -5,8 +5,8 @@
 import path from "node:path";
 import type { ViteDevServer } from "vite";
 import { fileView } from "../code-plugin.ts";
-import { fileAddress, filesPrefix, parseFileAddress } from "../files.ts";
-import { createLogger } from "../logger.ts";
+import { fileAddress, filesPrefix, parseFileAddress } from "../document/file-address.ts";
+import { createLogger } from "../protocol/log.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { HttpError, type Router } from "./http.ts";
 

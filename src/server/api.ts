@@ -7,8 +7,8 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
-import { createLogger } from "../logger.ts";
-import { apiPrefix, type ServerFile, type UpdateEvents } from "../protocol.ts";
+import { createLogger } from "../protocol/log.ts";
+import { apiPrefix, type ServerFile, type UpdateEvents } from "../protocol/rest-api.ts";
 import type { SourceFiles } from "../source-files.ts";
 import { ChatStore } from "./chat.ts";
 import { ChatResource } from "./chat-resource.ts";

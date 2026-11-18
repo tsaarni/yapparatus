@@ -4,7 +4,7 @@
  */
 import { readFileSync, realpathSync, statSync } from "node:fs";
 import path from "node:path";
-import { type FileAddress, fileSource, foldersOf } from "./files.ts";
+import { type FileAddress, fileSource, foldersOf } from "./document/file-address.ts";
 
 /** Larger files are not shown: they would make a page or a build heavy for little use. */
 export const maxFileSize = 1_000_000;

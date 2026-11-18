@@ -4,7 +4,7 @@ import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
 import { excerptFiles } from "./code-plugin.ts";
-import type { NumberedKind, PageOutline } from "./document.ts";
+import type { NumberedKind, PageOutline } from "./document/page-module.ts";
 import { contentIssues } from "./markdown-plugin.ts";
 import { pageRevision } from "./source-plugin.ts";
 

@@ -2,7 +2,7 @@
 
 import { contentDir, type DocumentPage, settings } from "virtual:yapparatus/document";
 import { useEffect, useState } from "react";
-import { elementSeparator, textFragment } from "../document.ts";
+import { elementSeparator, textFragment } from "../document/address.ts";
 import {
   type FileAddress,
   fileAddress,
@@ -10,8 +10,8 @@ import {
   foldersOf,
   type LineRange,
   parseFileAddress,
-} from "../files.ts";
-import type { Reference, TargetKind } from "../protocol.ts";
+} from "../document/file-address.ts";
+import type { Reference, TargetKind } from "../document/reference.ts";
 import { addressOf } from "./router.ts";
 
 const excerptLength = 400;

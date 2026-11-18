@@ -15,17 +15,17 @@ import {
   useRef,
   useState,
 } from "react";
-import { elementSeparator, quoteOf, splitAddress } from "../document.ts";
-import { linesLabel, parseFileAddress } from "../files.ts";
-import { createLogger } from "../logger.ts";
+import { elementSeparator, quoteOf, splitAddress } from "../document/address.ts";
+import { linesLabel, parseFileAddress } from "../document/file-address.ts";
+import type { Reference } from "../document/reference.ts";
+import { createLogger } from "../protocol/log.ts";
 import type {
   AgentMessage,
   AgentState,
   Chat as ChatRead,
   Message,
   ReaderMessage,
-  Reference,
-} from "../protocol.ts";
+} from "../protocol/rest-api.ts";
 import { commands, reportDiagnostics } from "./api.ts";
 import { type AppIconName, AppIcon as Icon } from "./icons.tsx";
 import { findTarget, numbering, numbersOf, PageContext } from "./numbering.ts";

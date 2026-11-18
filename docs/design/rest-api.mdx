@@ -4,7 +4,7 @@ The server has an HTTP API under `/-/api`, which the web app and the agent libra
 
 ## Conventions
 
-<Ref to="api-requests" /> lists every request. The types of the bodies are in [the protocol types](/-/files/yapparatus/src/protocol.ts).
+<Ref to="api-requests" /> lists every request. The types of the bodies are in [the REST API types](/-/files/yapparatus/src/protocol/rest-api.ts), which use the document's types in `src/document/`.
 
 <Table id="api-requests" caption="The requests under /-/api.">
 
@@ -452,4 +452,4 @@ The server sends changes to the web app on Vite's hot-update connection, as the 
 
 </Table>
 
-The events are typed in [the protocol types](/-/files/yapparatus/src/protocol.ts#L428-L441).
+The events are typed in [the REST API types](/-/files/yapparatus/src/protocol/rest-api.ts#L169-L182).

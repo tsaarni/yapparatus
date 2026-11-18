@@ -2,7 +2,7 @@
  * Compilation: measure → size → place → route → label → validate → bounds. Each step has
  * its own file; this file runs them in order, each with what the steps before it made.
  */
-import { type DiagnosticCode, diagnosticCodes } from "../protocol.ts";
+import { type DiagnosticCode, diagnosticCodes } from "../document/diagnostic.ts";
 import {
   type CompiledDiagram,
   type CompiledEdge,

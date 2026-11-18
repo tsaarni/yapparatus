@@ -13,22 +13,17 @@ import type { PluginOption, ViteDevServer } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
 import { charts, dataModule, dataModuleCode, readChartFile } from "./chart-plugin.ts";
 import { codeHighlighting, excerptFiles, excerpts, fileView } from "./code-plugin.ts";
+import { checkFiles, checkIcons, checkPages, checkTheme } from "./compiler/document-checks.ts";
 import { diagrams } from "./diagram-plugin.ts";
-import {
-  checkIcons,
-  checkPages,
-  checkTheme,
-  type PageOutline,
-  pageIdOf,
-  type ThemeSetting,
-} from "./document.ts";
+import { appPrefix, type FileAddress, parseFileAddress } from "./document/file-address.ts";
+import type { PageOutline } from "./document/page-module.ts";
+import { pageIdOf, type ThemeSetting } from "./document/settings.ts";
 import { documentError } from "./document-directory.ts";
-import { checkFiles, type FileAddress, parseFileAddress } from "./files.ts";
 import { iconImports } from "./icon-plugin.ts";
-import { logLevel } from "./logger.ts";
 import { markdownConventions } from "./markdown-plugin.ts";
 import { compiled, pageOutline } from "./outline-plugin.ts";
-import { apiPrefix, appPrefix } from "./protocol.ts";
+import { logLevel } from "./protocol/log.ts";
+import { apiPrefix } from "./protocol/rest-api.ts";
 import { installApi } from "./server/api.ts";
 import { compilePage } from "./server/diagnostics.ts";
 import { SourceFiles } from "./source-files.ts";

@@ -1,7 +1,7 @@
 /**
  * Text: measuring labels, wrapping them, and placing lines in the fonts the compiler chose.
  */
-import type { DiagnosticCode } from "../protocol.ts";
+import type { DiagnosticCode } from "../document/diagnostic.ts";
 import type { TextLine } from "./compiled.ts";
 import { round } from "./geometry.ts";
 import {

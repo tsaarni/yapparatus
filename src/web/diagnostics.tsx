@@ -9,8 +9,9 @@
 import { pages } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { Component, type ErrorInfo, type ReactNode, useEffect, useRef, useState } from "react";
-import { createLogger } from "../logger.ts";
-import type { Diagnostic, ReportedDiagnostic } from "../protocol.ts";
+import type { Diagnostic } from "../document/diagnostic.ts";
+import { createLogger } from "../protocol/log.ts";
+import type { ReportedDiagnostic } from "../protocol/rest-api.ts";
 import { reportDiagnostics } from "./api.ts";
 import { AppIcon as Icon } from "./icons.tsx";
 import { currentPage, href, navigate } from "./router.ts";

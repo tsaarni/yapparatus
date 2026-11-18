@@ -1,6 +1,6 @@
 /** A small router for the /-/api resources, whose bodies are JSON except for pictures. */
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { createLogger } from "../logger.ts";
+import { createLogger } from "../protocol/log.ts";
 
 const log = createLogger("http");
 

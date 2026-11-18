@@ -3,7 +3,7 @@
  */
 import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { diagnosticCodes } from "../protocol.ts";
+import { diagnosticCodes } from "../document/diagnostic.ts";
 import { fontSize, space, theme } from "../web/theme.stylex.ts";
 import type { CompiledDiagram, ElementState } from "./compiled.ts";
 import { EdgeView, EnclosureView, FrameView } from "./EdgeView.tsx";
