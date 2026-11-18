@@ -7,7 +7,7 @@ import type { CompiledDiagram, ElementState } from "../../diagram/drawing.ts";
 import { minScale } from "../../diagram/metrics.ts";
 import { outline } from "../../diagram/outlines.ts";
 import { diagnosticCodes } from "../../document/diagnostic.ts";
-import { fontSize, space, theme } from "../theme.stylex.ts";
+import { fontSize, space, theme } from "../style/theme.stylex.ts";
 import { EdgeView, EnclosureView, FrameView } from "./edge-view.tsx";
 import { interactive } from "./element.tsx";
 import { CellWarning, NodeView, Pin, RecordOutline } from "./node-view.tsx";

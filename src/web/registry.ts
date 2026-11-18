@@ -1,10 +1,13 @@
 import type { pageComponents } from "../document/page-module.ts";
-import { Columns, Panel, Tabs } from "./alternatives.tsx";
 import { Chart } from "./chart/chart.tsx";
-import { Excerpt, Figure, FileTree, Listing, Ref, Table } from "./components.tsx";
+import { Columns, Panel, Tabs } from "./components/alternatives.tsx";
+import { Excerpt } from "./components/excerpt.tsx";
+import { Figure, Listing, Table } from "./components/figure.tsx";
+import { FileTree } from "./components/file-tree.tsx";
+import { Ref } from "./components/ref.tsx";
 import { Diagram, Step } from "./diagram/diagram.tsx";
-import { Icon } from "./icons.tsx";
-import { prose } from "./prose.tsx";
+import { prose } from "./prose/elements.tsx";
+import { Icon } from "./style/icon.tsx";
 
 /**
  * Components available in MDX pages and chat replies without imports. The server checks

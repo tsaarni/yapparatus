@@ -7,7 +7,7 @@
     "yap": "./lib/vite/yap.js"
   },
   "exports": {
-    ".": "./src/index.ts",
+    ".": "./src/web/index.ts",
     "./agent": {
       "types": "./lib/agent/index.d.ts",
       "default": "./lib/agent/index.js"
@@ -16,8 +16,8 @@
       "types": "./lib/vite/plugin.d.ts",
       "default": "./lib/vite/plugin.js"
     },
-    "./styles.css": "./src/web/styles.css",
-    "./theme.stylex": "./src/web/theme.stylex.ts"
+    "./styles.css": "./src/web/style/styles.css",
+    "./theme.stylex": "./src/web/style/theme.stylex.ts"
   },
   "scripts": {
     "dev": "pnpm build:lib && node lib/vite/yap.js dev",

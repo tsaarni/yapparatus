@@ -1,9 +1,10 @@
 /** A diagram's steps: the buttons that walk through them, and the text of each. */
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
-import { AppIcon } from "../icons.tsx";
-import { fontSize, lineHeight, sizes, space, theme, when } from "../theme.stylex.ts";
-import { Button, styled } from "../ui.tsx";
+import { AppIcon } from "../style/app-icon.tsx";
+import { Button } from "../style/button.tsx";
+import { styled } from "../style/styled.ts";
+import { fontSize, lineHeight, sizes, space, theme, when } from "../style/theme.stylex.ts";
 
 /** One step, as the diagram collected it from its `<Step>` children. */
 export interface StepItem {

@@ -6,8 +6,8 @@ import type { CompiledNode, ElementState } from "../../diagram/drawing.ts";
 import { type Rect, union } from "../../diagram/geometry.ts";
 import { badge, corner, defaultMetrics } from "../../diagram/metrics.ts";
 import * as shape from "../../diagram/outlines.ts";
-import { stroke, theme } from "../theme.stylex.ts";
-import { styled } from "../ui.tsx";
+import { styled } from "../style/styled.ts";
+import { stroke, theme } from "../style/theme.stylex.ts";
 import {
   categoryStyle,
   elementStyles,

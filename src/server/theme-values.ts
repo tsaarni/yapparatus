@@ -10,7 +10,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { colorTokens, type DashToken, type Paint, type StrokeToken } from "../diagram/paint.ts";
 
 // The same path from src/server/ and from the compiled lib/server/.
-const themeFile = fileURLToPath(new URL("../../src/web/theme.stylex.ts", import.meta.url));
+const themeFile = fileURLToPath(new URL("../../src/web/style/theme.stylex.ts", import.meta.url));
 
 type Value = string | Record<string, string>;
 export type Roles = Record<string, Value>;

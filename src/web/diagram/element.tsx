@@ -6,7 +6,7 @@ import * as stylex from "@stylexjs/stylex";
 import type { ElementState, TextLine } from "../../diagram/drawing.ts";
 import type { Role } from "../../diagram/elements.ts";
 import { elementSeparator } from "../../document/address.ts";
-import { dash, duration, stroke, theme, when } from "../theme.stylex.ts";
+import { dash, duration, stroke, theme, when } from "../style/theme.stylex.ts";
 
 /**
  * Diagram elements are targets: a namespaced DOM id (`figure--element`) makes them linkable.

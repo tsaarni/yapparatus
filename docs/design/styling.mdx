@@ -6,7 +6,7 @@ This page explains how the web app, its components, and its figures are styled: 
 
 ## Overview
 
-The web app is styled with [StyleX](https://stylexjs.com/), which compiles the styles of each component to atomic CSS at build time, so the style sheet grows only with the number of distinct values. Each component keeps its styles in its own file, next to its markup. Every value that a style uses, such as a color, a space, or a duration, is a token: a named, typed value defined once in [the theme file](/-/files/yapparatus/src/web/theme.stylex.ts). <Ref to="styling-files" /> shows where the styles are.
+The web app is styled with [StyleX](https://stylexjs.com/), which compiles the styles of each component to atomic CSS at build time, so the style sheet grows only with the number of distinct values. Each component keeps its styles in its own file, next to its markup. Every value that a style uses, such as a color, a space, or a duration, is a token: a named, typed value defined once in [the theme file](/-/files/yapparatus/src/web/style/theme.stylex.ts). <Ref to="styling-files" /> shows where the styles are.
 
 <Figure id="styling-files" caption="The files that hold the styles.">
 
@@ -14,11 +14,15 @@ The web app is styled with [StyleX](https://stylexjs.com/), which compiles the s
 
 - src/
   - web/
-    - **theme.stylex.ts** every token
-    - ui.tsx the focus ring, the button, and the class name helper
-    - prose.tsx Markdown elements, for pages and replies
-    - appearance.ts applies the theme
-    - styles.css a reset and the reduced-motion rule
+    - style/
+      - **theme.stylex.ts** every token
+      - styled.ts the class name helper
+      - focus.ts the focus ring
+      - button.tsx the button
+      - styles.css a reset and the reduced-motion rule
+    - prose/ Markdown elements, for pages and replies
+    - shell/
+      - appearance.ts applies the theme
     - diagram/
       - element.tsx the styles that every diagram element shares
     - …
@@ -45,13 +49,13 @@ Authors' own components import the same tokens from `yapparatus/theme.stylex`; s
 The colors, shadows, and font stacks change with the theme, so they are CSS variables. The scales, such as font sizes and spaces, are the same in every theme, so StyleX writes their values into each rule. Each color has a value for the screen, a light value for print, and a stronger value for increased contrast, which <Ref to="styling-role" /> combines into one.
 
 <Listing id="styling-role" caption="One role, with its screen, print, and increased-contrast values.">
-<Excerpt from="/-/files/yapparatus/src/web/theme.stylex.ts" start="/** One role in a theme:" end="const lightRole" />
+<Excerpt from="/-/files/yapparatus/src/web/style/theme.stylex.ts" start="/** One role in a theme:" end="const lightRole" />
 </Listing>
 
 Conditions, such as a narrow reading column, are tokens too, as <Ref to="styling-conditions" /> shows.
 
 <Listing id="styling-conditions" caption="The conditions.">
-<Excerpt from="/-/files/yapparatus/src/web/theme.stylex.ts" start="export const when =" mark="narrow" />
+<Excerpt from="/-/files/yapparatus/src/web/style/theme.stylex.ts" start="export const when =" mark="narrow" />
 </Listing>
 
 The narrow condition is a container query on the reading column, which narrows both when the window shrinks and when the reader widens the chat. The chat panel uses a media query, because on a phone it covers the window. See [page layout](/web-app#page-layout).
@@ -137,7 +141,7 @@ The web app shows feedback where the reader acted. A copy button confirms on its
 
 ## Accessibility and print
 
-Keyboard focus shows a 2 px ring, which stays visible as an outline in forced-colors mode. Reduced motion makes every transition instant, with one rule in [the base style sheet](/-/files/yapparatus/src/web/styles.css). StyleX puts its own rules in cascade layers, so this rule wins over all of them.
+Keyboard focus shows a 2 px ring, which stays visible as an outline in forced-colors mode. Reduced motion makes every transition instant, with one rule in [the base style sheet](/-/files/yapparatus/src/web/style/styles.css). StyleX puts its own rules in cascade layers, so this rule wins over all of them.
 
 Print uses the light theme, because browsers leave out backgrounds and a dark theme would print light text on white. The header, the contents, and the chat are hidden, every tab prints with its label, and a diagram prints with its steps as a numbered list.
 
@@ -145,7 +149,7 @@ Print uses the light theme, because browsers leave out backgrounds and a dark th
 
 `pnpm verify` runs [the style check](/-/files/yapparatus/scripts/check-styles.ts), which rejects two things that StyleX accepts. One is shorthand properties, such as `border`: StyleX silently drops a shorthand that holds a theme variable, so styles write longhands such as `borderWidth`. The other is literal colors, such as hex values.
 
-Two more rules are kept by convention. A component that needs a class name, for tests and debugging, sets it with `styled("name", ...styles)`, because spreading StyleX's props after a `className` replaces it. Each element carries its own style: a figure does not style the elements inside it.
+Two more rules are kept by convention. A component that needs a class name, for tests and debugging, sets it with `styled("name", ...styles)` from [`styled.ts`](/-/files/yapparatus/src/web/style/styled.ts), because spreading StyleX's props after a `className` replaces it. Each element carries its own style: a figure does not style the elements inside it.
 
 ## Icons
 

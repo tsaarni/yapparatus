@@ -155,10 +155,10 @@ The web app loads Observable Plot with the first chart on a page and calls the a
 
 ```csv
 Module,Lines
-Chat.tsx,1099
-App.tsx,1007
-prose.tsx,885
-components.tsx,495
+shell/app.tsx,441
+prose/code-block.tsx,387
+chart/chart.tsx,369
+components/alternatives.tsx,364
 ```
 
 </Chart>
@@ -178,11 +178,11 @@ The page compiler reads the Markdown list inside a `FileTree` into entries. The 
 
 - src/
   - web/
-    - prose.tsx Markdown elements, alerts, code
-    - **components.tsx** figures, tables, listings, excerpts, file trees
-    - alternatives.tsx tabs and columns
-    - icons.tsx
     - registry.ts
+    - prose/ Markdown elements, alerts, code blocks
+    - **components/** figures, tables, listings, excerpts, file trees, tabs and columns
+    - style/
+      - icon.tsx
     - diagram/
       - diagram.tsx
       - …

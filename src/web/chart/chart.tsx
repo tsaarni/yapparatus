@@ -11,11 +11,12 @@ import {
 } from "../../chart/spec.ts";
 import { type ChartData, rowObjects } from "../../chart/table.ts";
 import { diagnosticCodes } from "../../document/diagnostic.ts";
+import { FigureFrame } from "../components/figure.tsx";
 import { Diagnostics } from "../components/figure-diagnostics.tsx";
-import { FigureFrame } from "../components.tsx";
-import { useChartReport } from "../diagnostics.tsx";
-import { fontSize, radius, sizes, space, theme } from "../theme.stylex.ts";
-import { Button, styled } from "../ui.tsx";
+import { useChartReport } from "../live/reporters.ts";
+import { Button } from "../style/button.tsx";
+import { styled } from "../style/styled.ts";
+import { fontSize, radius, sizes, space, theme } from "../style/theme.stylex.ts";
 import { useFontsReady } from "./fonts-ready.ts";
 import { fitMargins, type Margins, type PlotDrawing } from "./margins.ts";
 

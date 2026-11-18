@@ -3,8 +3,9 @@
  */
 import * as stylex from "@stylexjs/stylex";
 import type { LegendEntry } from "../../diagram/drawing.ts";
-import { space } from "../theme.stylex.ts";
-import { Button, styled } from "../ui.tsx";
+import { Button } from "../style/button.tsx";
+import { styled } from "../style/styled.ts";
+import { space } from "../style/theme.stylex.ts";
 import { categoryStyle } from "./element.tsx";
 
 /**

@@ -14,7 +14,7 @@ import {
   roles,
   type StrokeToken,
 } from "../src/diagram/paint.ts";
-import type { dash, stroke, theme } from "../src/web/theme.stylex.ts";
+import type { dash, stroke, theme } from "../src/web/style/theme.stylex.ts";
 
 // Every token the table names is a theme role or constant.
 type Within<T extends K, K> = T;

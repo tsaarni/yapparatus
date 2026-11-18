@@ -4,7 +4,7 @@
  *
  * - No shorthands StyleX drops when they hold theme variables: `border*`, `background`,
  *   and `outline`. Write the longhands.
- * - No literal colors. Colors come from the theme, in src/web/theme.stylex.ts.
+ * - No literal colors. Colors come from the theme, in src/web/style/theme.stylex.ts.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";

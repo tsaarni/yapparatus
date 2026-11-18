@@ -22,10 +22,10 @@ import {
   stepOnlyElements,
 } from "../../diagram/drawing.ts";
 import { elementSeparator } from "../../document/address.ts";
+import { FigureFrame } from "../components/figure.tsx";
 import { Diagnostics } from "../components/figure-diagnostics.tsx";
-import { FigureFrame } from "../components.tsx";
-import { useScopedId } from "../prose.tsx";
-import { useRoute } from "../router.ts";
+import { useRoute } from "../page/router.ts";
+import { useScopedId } from "../prose/contexts.ts";
 import { DiagramView } from "./diagram-view.tsx";
 import { Legend } from "./legend.tsx";
 import { StepControls, type StepItem } from "./step-controls.tsx";

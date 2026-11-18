@@ -4,7 +4,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { Diagnostic } from "../../diagram/elements.ts";
 import { type DiagnosticCode, diagnosticCodes } from "../../document/diagnostic.ts";
-import { fontSize, fontWeight, lineHeight, radius, space, theme } from "../theme.stylex.ts";
+import { fontSize, fontWeight, lineHeight, radius, space, theme } from "../style/theme.stylex.ts";
 
 /** A figure's diagnostics under it, open while there are errors. Charts show theirs here too. */
 export function Diagnostics({

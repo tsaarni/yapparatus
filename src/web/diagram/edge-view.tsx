@@ -10,8 +10,8 @@ import type {
 } from "../../diagram/drawing.ts";
 import { corner } from "../../diagram/metrics.ts";
 import { fragmentTab, outline, pointList, roundedPath, rule } from "../../diagram/outlines.ts";
-import { dash, stroke, theme } from "../theme.stylex.ts";
-import { styled } from "../ui.tsx";
+import { styled } from "../style/styled.ts";
+import { dash, stroke, theme } from "../style/theme.stylex.ts";
 import {
   categoryStyle,
   elementStyles,
