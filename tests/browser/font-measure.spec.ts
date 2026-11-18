@@ -7,7 +7,7 @@ import { fontMeasure } from "../../src/compiler/font-measure.ts";
 import { DiagramBuilder } from "../../src/diagram/builder.ts";
 import { compile } from "../../src/diagram/compile/compile.ts";
 import { type FontSpec, defaultMetrics as m } from "../../src/diagram/metrics.ts";
-import { examplePages, examples } from "../diagram-examples.ts";
+import { examplePages, examples } from "../unit/diagram/examples.ts";
 
 /** Every font the compiler measures with: the sans weights at each size, and mono. */
 const fonts: FontSpec[] = [m.labelSize, m.smallSize, m.tabSize].flatMap((size) => [

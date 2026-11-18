@@ -13,8 +13,6 @@ import { elementSeparator, splitAddress } from "../../document/address.ts";
 import { parseFileAddress } from "../../document/file-address.ts";
 import type { Reference } from "../../document/reference.ts";
 import type { ReportedDiagnostic } from "../../protocol/rest-api.ts";
-import { Chat } from "../chat/chat.tsx";
-import { useLive } from "../live/client.ts";
 import {
   canonicalize,
   fileHref,
@@ -25,19 +23,25 @@ import {
   scrollRoot,
   scrollToFragment,
   useRoute,
-} from "../page/router.ts";
-import { referenceFromDiagram, referenceFromTarget, useSelectionMenu } from "../page/selection.ts";
-import type { TargetHandlers } from "../page/targets.tsx";
+} from "../addressing/router.ts";
+import {
+  referenceFromDiagram,
+  referenceFromTarget,
+  useSelectionMenu,
+} from "../addressing/selection.ts";
+import type { TargetHandlers } from "../addressing/targets.tsx";
+import { Chat } from "../chat/chat.tsx";
+import { useLive } from "../live/client.ts";
 import { styled } from "../style/styled.ts";
 import { layer, sizes, space, theme, when } from "../style/theme.stylex.ts";
-import { FileView } from "./file-view.tsx";
-import { flash } from "./flash.ts";
+import { FileView } from "../views/file-view.tsx";
+import { flash } from "../views/flash.ts";
+import { PageView } from "../views/page-view.tsx";
+import { findReferenced, whenPresent } from "../views/target-search.ts";
 import { documentTitle, Header } from "./header.tsx";
 import { Notifications } from "./notifications.tsx";
-import { PageContent } from "./page-content.tsx";
 import { SelectionMenu } from "./selection-menu.tsx";
 import { Sidebar } from "./sidebar.tsx";
-import { findReferenced, whenPresent } from "./target-search.ts";
 
 const live = import.meta.env.DEV;
 
@@ -335,7 +339,7 @@ export function App() {
                 {...(live ? { onComment: addReferences } : {})}
               />
             ) : (
-              <PageContent page={page} handlers={handlers} revision={pagesRevision} />
+              <PageView page={page} handlers={handlers} revision={pagesRevision} />
             )}
           </article>
         </main>

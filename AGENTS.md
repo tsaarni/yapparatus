@@ -26,6 +26,30 @@ Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtur
 - Browser tests run in an isolated temporary workspace with their own Vite cache.
 - `yapparatus/vite`, `yapparatus/agent`, and the `yap` command load from `lib/`, compiled by `pnpm build:lib`; `pnpm dev`, `pnpm build`, and `pnpm test` run it. A project installs this package, as `starter/` does: test a change to how it installs with `pnpm pack` into a copy of the starter.
 
+## Code layout
+
+Each directory under `src/` has one runtime: pure (no DOM, no Node), node, or browser. A directory imports only what its row allows, type-only imports included. Its `tsconfig.json` sets the runtime's `lib` and `types` and references exactly these directories, so `tsc -b` in `pnpm verify` rejects anything else. Code that two runtimes share goes in a pure directory.
+
+| Directory | Runtime | May import |
+|---|---|---|
+| `document/` | pure | nothing |
+| `protocol/`, `diagram/`, `chart/` | pure | `document` |
+| `compiler/` | node | all pure |
+| `server/` | node | `compiler`, all pure |
+| `agent/` | node | `protocol`, `document` |
+| `vite/` | node | `compiler`, `server`, all pure |
+| `web/` | browser | all pure |
+
+Unit tests mirror the tree in `tests/unit/<directory>/`; browser tests are in `tests/browser/`.
+
+File names:
+
+- Lowercase, with dashes between words. Dots only for suffixes a tool requires: `.stylex.ts`, `.test.ts`, `.spec.ts`, `.d.ts`.
+- A file is named after the one thing it defines, as a noun: `file-view.tsx` exports `FileView`. No bucket files such as `utils.ts`.
+- The directory gives the role and the file the subject: no `-plugin` or `-resource` suffixes.
+- Singular for one concept (`diagnostic.ts`), plural for a set of like things (`formats.ts`).
+- Relative imports with `.ts`/`.tsx` extensions, no path aliases, no barrel files. Only the published entries re-export: `web/index.ts`, `agent/index.ts`, `vite/plugin.ts`.
+
 ## Writing
 
 - **Write simple, direct technical English.** No filler words, marketing tone, em dashes in prose, or dramatic contrasts such as "not X, but Y". This covers code comments, commit messages, and READMEs; document pages also follow [the guide's writing rules](starter/docs/guide.md#writing).

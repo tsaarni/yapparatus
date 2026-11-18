@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { Reference } from "../../document/reference.ts";
-import { AppIcon as Icon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
 import { focus } from "../style/focus.ts";
 import { styled } from "../style/styled.ts";
 import {

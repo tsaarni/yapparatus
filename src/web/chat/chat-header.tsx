@@ -1,9 +1,9 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
 import type { AgentState } from "../../protocol/rest-api.ts";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
 import { commands } from "../live/client.ts";
-import { AppIcon as Icon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
 import { styled } from "../style/styled.ts";
 import { fontSize, fontWeight, radius, sizes, space, theme } from "../style/theme.stylex.ts";
 

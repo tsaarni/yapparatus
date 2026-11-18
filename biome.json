@@ -17,6 +17,7 @@
       "!**/*.md",
       "!**/dist",
       "!lib",
+      "!.cache",
       "!**/dist-single",
       "!**/node_modules",
       "!**/.yapparatus",

@@ -1,5 +1,5 @@
-import { AppIcon as Icon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
 import { type ThemeChoice, useThemeChoice } from "./appearance.ts";
 
 const themeNames: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };

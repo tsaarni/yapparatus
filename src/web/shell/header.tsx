@@ -8,10 +8,10 @@ import {
 import * as stylex from "@stylexjs/stylex";
 import type { FileAddress } from "../../document/file-address.ts";
 import type { ReportedDiagnostic } from "../../protocol/rest-api.ts";
-import { numbering, numbersOf } from "../page/numbering.ts";
-import { href } from "../page/router.ts";
-import { AppIcon as Icon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
+import { numbering, numbersOf } from "../addressing/numbering.ts";
+import { href } from "../addressing/router.ts";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
 import { focus } from "../style/focus.ts";
 import { styled } from "../style/styled.ts";
 import {

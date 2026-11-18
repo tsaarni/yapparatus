@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { HTMLAttributes } from "react";
 import type { AlertKind } from "../../document/page-module.ts";
-import { AppIcon as Icon } from "../style/app-icon.tsx";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
 import { styled } from "../style/styled.ts";
 import { fontSize, fontWeight, radius, space, theme } from "../style/theme.stylex.ts";
 

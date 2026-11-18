@@ -1,0 +1,15 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "outDir": "../../.cache/tsc/web",
+    "tsBuildInfoFile": "../../.cache/tsc/web.tsbuildinfo"
+  },
+  "references": [
+    { "path": "../document" },
+    { "path": "../protocol" },
+    { "path": "../diagram" },
+    { "path": "../chart" }
+  ]
+}

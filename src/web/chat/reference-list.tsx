@@ -3,9 +3,9 @@ import * as stylex from "@stylexjs/stylex";
 import { elementSeparator, quoteOf, splitAddress } from "../../document/address.ts";
 import { linesLabel, parseFileAddress } from "../../document/file-address.ts";
 import type { Reference } from "../../document/reference.ts";
-import { findTarget, numbering, numbersOf } from "../page/numbering.ts";
-import { type AppIconName, AppIcon as Icon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
+import { findTarget, numbering, numbersOf } from "../addressing/numbering.ts";
+import { type AppIconName, AppIcon as Icon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
 import { focus } from "../style/focus.ts";
 import { fontSize, lineHeight, radius, space, theme } from "../style/theme.stylex.ts";
 

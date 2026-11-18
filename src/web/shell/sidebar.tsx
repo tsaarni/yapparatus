@@ -1,8 +1,8 @@
 import { type DocumentPage, pages, settings } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
-import { numbering, numbersOf } from "../page/numbering.ts";
-import { href, scrollRoot } from "../page/router.ts";
+import { numbering, numbersOf } from "../addressing/numbering.ts";
+import { href, scrollRoot } from "../addressing/router.ts";
 import { focus } from "../style/focus.ts";
 import { styled } from "../style/styled.ts";
 import {

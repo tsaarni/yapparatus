@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Pure code, but spec.ts uses the types of @observablehq/plot, which name DOM types such as
+    // SVGElement. Without the DOM library they would resolve to nothing and check nothing.
+    "lib": ["ESNext", "DOM"],
+    "types": [],
+    "outDir": "../../.cache/tsc/chart",
+    "tsBuildInfoFile": "../../.cache/tsc/chart.tsbuildinfo"
+  },
+  "references": [{ "path": "../document" }]
+}

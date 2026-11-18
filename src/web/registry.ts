@@ -5,9 +5,9 @@ import { Excerpt } from "./components/excerpt.tsx";
 import { Figure, Listing, Table } from "./components/figure.tsx";
 import { FileTree } from "./components/file-tree.tsx";
 import { Ref } from "./components/ref.tsx";
+import { Icon } from "./controls/icon.tsx";
 import { Diagram, Step } from "./diagram/diagram.tsx";
 import { prose } from "./prose/elements.tsx";
-import { Icon } from "./style/icon.tsx";
 
 /**
  * Components available in MDX pages and chat replies without imports. The server checks

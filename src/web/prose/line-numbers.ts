@@ -6,7 +6,7 @@
  */
 import type { MouseEvent } from "react";
 import type { LineRange } from "../../document/file-address.ts";
-import { fileHref, navigate } from "../page/router.ts";
+import { fileHref, navigate } from "../addressing/router.ts";
 import type { SourceFileCode } from "./contexts.ts";
 
 /** Where a range started, so shift-clicks extend from the line clicked first. */

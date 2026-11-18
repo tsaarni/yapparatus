@@ -24,10 +24,10 @@
     "build": "pnpm build:lib && node lib/vite/yap.js build",
     "build:single": "pnpm build:lib && node lib/vite/yap.js build --single",
     "preview": "pnpm build:lib && node lib/vite/yap.js preview",
-    "verify": "biome check . && tsc --noEmit && node scripts/check-styles.ts",
+    "verify": "biome check . && tsc -b && node scripts/check-styles.ts",
     "format": "biome check --write .",
     "test": "pnpm build:lib && playwright test",
-    "test:unit": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:unit": "node --experimental-strip-types --test \"tests/unit/**/*.test.ts\"",
     "api:report": "node scripts/api-report.ts",
     "build:lib": "node -e \"fs.rmSync('lib', { recursive: true, force: true })\" && tsc -p tsconfig.lib.json",
     "prepare": "tsc -p tsconfig.lib.json"
@@ -81,6 +81,7 @@
     "src",
     "lib",
     "docs/design",
-    "tsconfig.json"
+    "tsconfig.json",
+    "tsconfig.base.json"
   ]
 }

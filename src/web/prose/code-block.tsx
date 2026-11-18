@@ -10,10 +10,10 @@ import {
 import type { LineRange } from "../../document/file-address.ts";
 import { fileAddress, linesLabel } from "../../document/file-address.ts";
 import type { HighlightedCode } from "../../document/page-module.ts";
-import { fileHref } from "../page/router.ts";
-import { TargetActions, targetHost, targetProps } from "../page/targets.tsx";
-import { Button } from "../style/button.tsx";
-import { useCopy } from "../style/clipboard.ts";
+import { fileHref } from "../addressing/router.ts";
+import { TargetActions, targetHost, targetProps } from "../addressing/targets.tsx";
+import { Button } from "../controls/button.tsx";
+import { useCopy } from "../controls/clipboard.ts";
 import { focus } from "../style/focus.ts";
 import { styled } from "../style/styled.ts";
 import {

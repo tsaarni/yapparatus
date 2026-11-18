@@ -33,7 +33,7 @@ export function logLevel(): LogLevel {
 }
 
 const threshold = levels[logLevel()];
-const browser = typeof window !== "undefined";
+const browser = "window" in globalThis;
 
 /** A logger whose lines start with `[yapparatus:<scope>]`. */
 export function createLogger(scope: string): Logger {

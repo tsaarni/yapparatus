@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": ["node"],
+    "outDir": "../../.cache/tsc/agent",
+    "tsBuildInfoFile": "../../.cache/tsc/agent.tsbuildinfo"
+  },
+  "references": [{ "path": "../document" }, { "path": "../protocol" }]
+}

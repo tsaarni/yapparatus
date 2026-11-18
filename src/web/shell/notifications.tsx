@@ -1,6 +1,6 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
-import { Button } from "../style/button.tsx";
+import { Button } from "../controls/button.tsx";
 import { styled } from "../style/styled.ts";
 import { fontSize, layer, radius, sizes, space, theme, when } from "../style/theme.stylex.ts";
 

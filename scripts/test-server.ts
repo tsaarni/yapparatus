@@ -7,8 +7,9 @@ import { createServer } from "vite";
 const root = path.join(realpathSync(os.tmpdir()), "yapparatus-browser");
 rmSync(root, { recursive: true, force: true });
 mkdirSync(root);
-// package.json lets commands import "yapparatus/agent" by the package's own name.
-for (const entry of ["src", "lib", "icons", "package.json"])
+// package.json lets commands import "yapparatus/agent" by the package's own name; Vite reads
+// the tsconfig.json files in src, which extend tsconfig.base.json, as in an installed package.
+for (const entry of ["src", "lib", "icons", "package.json", "tsconfig.base.json"])
   cpSync(entry, path.join(root, entry), { recursive: true });
 cpSync("tests/fixtures/content", path.join(root, "content"), { recursive: true });
 cpSync("tests/fixtures/source", path.join(root, "source"), { recursive: true });

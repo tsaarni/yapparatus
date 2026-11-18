@@ -32,6 +32,7 @@ export { Chart, type ChartProps } from "./chart/chart.tsx";
 export { Excerpt, type ExcerptProps } from "./components/excerpt.tsx";
 export { Figure, type FigureProps, Listing, Table } from "./components/figure.tsx";
 export { Ref, type RefProps } from "./components/ref.tsx";
+export { Icon, type IconProps } from "./controls/icon.tsx";
 export {
   type CompiledDiagramProps,
   Diagram,
@@ -39,5 +40,3 @@ export {
   Step,
   type StepProps,
 } from "./diagram/diagram.tsx";
-
-export { Icon, type IconProps } from "./style/icon.tsx";

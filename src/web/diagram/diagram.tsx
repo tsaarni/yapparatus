@@ -22,9 +22,9 @@ import {
   stepOnlyElements,
 } from "../../diagram/drawing.ts";
 import { elementSeparator } from "../../document/address.ts";
+import { useRoute } from "../addressing/router.ts";
 import { FigureFrame } from "../components/figure.tsx";
 import { Diagnostics } from "../components/figure-diagnostics.tsx";
-import { useRoute } from "../page/router.ts";
 import { useScopedId } from "../prose/contexts.ts";
 import { DiagramView } from "./diagram-view.tsx";
 import { Legend } from "./legend.tsx";

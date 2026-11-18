@@ -10,8 +10,8 @@ import {
 } from "react";
 import { createLogger } from "../../protocol/log.ts";
 import type { AgentMessage } from "../../protocol/rest-api.ts";
+import { PageContext } from "../addressing/numbering.ts";
 import { reportDiagnostics } from "../live/client.ts";
-import { PageContext } from "../page/numbering.ts";
 import { ReadingContext } from "../prose/contexts.ts";
 import { components } from "../registry.ts";
 import { duration, fontSize, theme } from "../style/theme.stylex.ts";

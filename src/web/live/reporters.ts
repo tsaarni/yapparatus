@@ -9,7 +9,7 @@
 import { pages } from "virtual:yapparatus/document";
 import { useEffect } from "react";
 import type { Diagnostic } from "../../document/diagnostic.ts";
-import { currentPage } from "../page/router.ts";
+import { currentPage } from "../addressing/router.ts";
 import { reportDiagnostics } from "./client.ts";
 
 const live = import.meta.env.DEV;

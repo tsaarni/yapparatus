@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": ["node"],
+    "outDir": "../../.cache/tsc/vite",
+    "tsBuildInfoFile": "../../.cache/tsc/vite.tsbuildinfo"
+  },
+  "references": [
+    { "path": "../document" },
+    { "path": "../protocol" },
+    { "path": "../diagram" },
+    { "path": "../chart" },
+    { "path": "../compiler" },
+    { "path": "../server" }
+  ]
+}

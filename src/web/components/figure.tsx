@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { type HTMLAttributes, type ReactNode, useContext } from "react";
-import { blockLabel, usePage } from "../page/numbering.ts";
-import { TargetActions, targetHost, targetProps } from "../page/targets.tsx";
+import { blockLabel, usePage } from "../addressing/numbering.ts";
+import { TargetActions, targetHost, targetProps } from "../addressing/targets.tsx";
 import {
   InFigureContext,
   InTargetContext,

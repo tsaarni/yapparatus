@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": ["node"],
+    "outDir": "../../.cache/tsc/server",
+    "tsBuildInfoFile": "../../.cache/tsc/server.tsbuildinfo"
+  },
+  "references": [
+    { "path": "../document" },
+    { "path": "../protocol" },
+    { "path": "../diagram" },
+    { "path": "../chart" },
+    { "path": "../compiler" }
+  ]
+}

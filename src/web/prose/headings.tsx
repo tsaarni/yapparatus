@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { type HTMLAttributes, useContext } from "react";
-import { numbering, numbersOf, usePage } from "../page/numbering.ts";
-import { TargetActions, targetHost, targetProps } from "../page/targets.tsx";
+import { numbering, numbersOf, usePage } from "../addressing/numbering.ts";
+import { TargetActions, targetHost, targetProps } from "../addressing/targets.tsx";
 import {
   fontSize,
   fontWeight,

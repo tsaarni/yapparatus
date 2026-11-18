@@ -99,27 +99,58 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
 
 ## Where the code is
 
-<Ref to="overview-source" /> shows the main files. `compiler/`, `server/`, and `vite/` run in the server's process, and `agent/` runs in the agent's process. The web app also imports `document/` and `protocol/`, which hold no server or browser code.
+Each directory under `src/` has one runtime. Pure code uses neither the DOM nor Node, so the server, the agent library, and the web app can all import it. Node code runs in the server's process or the agent's process. Browser code runs in the web app. <Ref to="overview-directories" /> lists the directories, their runtimes, and the directories that each may import.
 
-<Figure id="overview-source" caption="The main source files and the pages that describe them.">
+<Table id="overview-directories" caption="The directories under src/, their runtimes, and what each may import.">
 
-<FileTree>
+| Directory | Runtime | May import | Holds |
+|---|---|---|---|
+| `document/` | Pure | Nothing | [Pages, addresses](documents), references, and diagnostics |
+| `protocol/` | Pure | `document/` | The types of the [REST API](rest-api), and the logger |
+| `diagram/` | Pure | `document/` | The [diagram compiler](diagram-compiler) |
+| `chart/` | Pure | `document/` | The [chart](charts) data and specification checks |
+| `compiler/` | Node | The pure directories | The [page compiler](page-compiler) and its [stages](page-compiler#pipeline), reading [external files](documents#external-files), and the checks of `document.json` and of links |
+| `server/` | Node | `compiler/` and the pure directories | The [server](server) |
+| `agent/` | Node | `protocol/` and `document/` | The [agent library](agent-library) |
+| `vite/` | Node | `compiler/`, `server/`, and the pure directories | The `yapparatus()` plugin, which combines the compiler and the server, and the [`yap` command](server#starting) |
+| `web/` | Browser | The pure directories | The [web app](web-app) |
 
-- src/
-  - vite/ the `yapparatus()` plugin, which combines the compiler and the server, and the [`yap` command](server#starting)
-  - compiler/ the [page compiler](page-compiler), reading [external files](documents#external-files), and the checks of `document.json` and of links
-    - stages/ the [stages](page-compiler#pipeline) of the page compiler
-  - server/ the [server](server)
-  - agent/ the [agent library](agent-library)
-  - document/ [pages, addresses](documents), references, and diagnostics
-  - protocol/ the types of the [REST API](rest-api), and the logger
-  - diagram/ the [diagram compiler](diagram-compiler)
-  - chart/ the [chart](charts) data and specification checks
-  - web/ the [web app](web-app)
+</Table>
 
-</FileTree>
+<Ref to="overview-imports" /> draws the same rule. The web app and the server share only pure code, and so do the server and the agent library.
 
-</Figure>
+<Diagram id="overview-imports" caption="What each directory under src/ may import." description="The browser directory web and the Node directories vite, server, compiler, and agent above the pure directories diagram, chart, protocol, and document, with an arrow for each import the rule allows" draw={(d) => {
+  const dir = (name, runtime) => d.box(`${name}/`, { id: name, mono: true, category: runtime })
+  const web = dir("web", "Browser")
+  const vite = dir("vite", "Node")
+  const server = dir("server", "Node")
+  const compiler = dir("compiler", "Node")
+  const agent = dir("agent", "Node")
+  const diagram = dir("diagram", "Pure")
+  const chart = dir("chart", "Pure")
+  const protocol = dir("protocol", "Pure")
+  const doc = dir("document", "Pure")
+  d.equalSize([web, vite, server, compiler, agent, diagram, chart, protocol, doc])
+  const upper = d.row([web, vite, server, compiler, agent], { gap: 56 })
+  const lower = d.row([diagram, chart, protocol], { gap: 56 })
+  d.place(lower, { below: upper, gap: 104 })
+  d.place(doc, { below: chart, gap: 64 })
+  const pure = d.enclose([lower, doc], { id: "pure-directories", title: "Pure directories", titleAt: "bottomLeft" })
+  d.arrow(vite, server)
+  d.arrow(server, compiler)
+  d.arrow(vite, compiler, { bend: 40 })
+  d.arrow(web.bottom, pure.left, { route: "vh" })
+  for (const from of [vite, server, compiler]) d.arrow(from.bottom, d.xy(from.bottom, pure.top))
+  d.arrow(agent, protocol)
+  d.arrow(agent.right, doc.right, { route: { viaX: agent.right.offset(32, 0) } })
+  for (const from of [diagram, chart, protocol]) d.arrow(from, doc)
+}} />
+
+Each directory has a `tsconfig.json` that makes it a TypeScript project, with the library and types of its runtime and a reference to each directory it may import. The pure projects have neither the DOM library nor Node's types, the Node projects have Node's types, and `web/` has the DOM library and Vite's client types. [`tsconfig.base.json`](/-/files/yapparatus/tsconfig.base.json) holds the options that the projects share, and the root [`tsconfig.json`](/-/files/yapparatus/tsconfig.json) checks the tests and scripts against every project. `pnpm verify` builds the projects with `tsc -b`, so an import from a directory that a project does not reference is an error, and so is a name from another runtime, such as `document` in `diagram/`.
+
+Two pure directories need more than the standard library. `chart/` has the DOM library, because the types of Observable Plot, which [the chart specification](/-/files/yapparatus/src/chart/spec.ts) uses, name DOM types. The logger in `protocol/` runs in both runtimes, and [its declarations](/-/files/yapparatus/src/protocol/runtime.d.ts) give it the console methods that both runtimes have and the level that Vite's `define` gives the browser. The web app declares the [document module](page-compiler#the-document-module), the other virtual modules, and the single-file build's constant in [its own declarations](/-/files/yapparatus/src/web/env.d.ts).
+
+`tsconfig.lib.json` compiles the `yap` command and the `yapparatus/vite` and `yapparatus/agent` entries to `lib/`, which then holds only Node and pure code. The web app is published as source, and the Vite of the project that uses it compiles it. The unit tests in `tests/unit/` follow the directories under `src/`, and each test file is named after the file or subject that it tests.
 
 <Ref to="overview-lines" /> gives the size of each directory, counted with `wc -l`, and <Ref to="overview-lines-chart" /> draws it.
 
@@ -127,16 +158,15 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
 
 | Code | Lines |
 |---|---:|
-| `src/web/` | 9088 |
+| `src/web/` | 9136 |
 | `src/diagram/` | 4166 |
 | `src/compiler/` | 2647 |
 | `src/server/` | 1963 |
-| `src/vite/` | 260 |
-| `src/agent/` | 202 |
-| `src/env.d.ts` | 47 |
-| `src/chart/` | 405 |
 | `src/document/` | 582 |
-| `src/protocol/` | 232 |
+| `src/chart/` | 405 |
+| `src/vite/` | 260 |
+| `src/protocol/` | 249 |
+| `src/agent/` | 202 |
 
 </Table>
 

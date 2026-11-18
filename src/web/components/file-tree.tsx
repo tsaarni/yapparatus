@@ -1,8 +1,8 @@
 import * as stylex from "@stylexjs/stylex";
 import { useContext } from "react";
 import type { FileTreeEntry } from "../../document/page-module.ts";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
 import { InFigureContext } from "../prose/contexts.ts";
-import { AppIcon as Icon } from "../style/app-icon.tsx";
 import { styled } from "../style/styled.ts";
 import {
   fontSize,

@@ -18,8 +18,9 @@ The web app is styled with [StyleX](https://stylexjs.com/), which compiles the s
       - **theme.stylex.ts** every token
       - styled.ts the class name helper
       - focus.ts the focus ring
-      - button.tsx the button
       - styles.css a reset and the reduced-motion rule
+    - controls/
+      - button.tsx the button
     - prose/ Markdown elements, for pages and replies
     - shell/
       - appearance.ts applies the theme
@@ -34,9 +35,9 @@ The web app is styled with [StyleX](https://stylexjs.com/), which compiles the s
     - …
 - scripts/
   - check-styles.ts the style check of `pnpm verify`
-- tests/
-  - theme.test.ts the contrast checks
-  - paint.test.ts the role styles agree with the picture's table
+- tests/unit/
+  - web/style/theme.test.ts the contrast checks
+  - diagram/paint.test.ts the role styles agree with the picture's table
 
 </FileTree>
 
@@ -60,7 +61,7 @@ Conditions, such as a narrow reading column, are tokens too, as <Ref to="styling
 
 The narrow condition is a container query on the reading column, which narrows both when the window shrinks and when the reader widens the chat. The chat panel uses a media query, because on a phone it covers the window. See [page layout](/web-app#page-layout).
 
-The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run. [The picture's table](/-/files/yapparatus/src/diagram/paint.ts) names the theme tokens that each role and category paints with, and [the server](/-/files/yapparatus/src/server/theme-values.ts) reads the theme file as plain values and resolves the tokens to the light theme's values. [A unit test](/-/files/yapparatus/tests/paint.test.ts) checks that the table names the same tokens as the role styles in `element.tsx`. Pictures, tests, and the web app then use the same colors.
+The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run. [The picture's table](/-/files/yapparatus/src/diagram/paint.ts) names the theme tokens that each role and category paints with, and [the server](/-/files/yapparatus/src/server/theme-values.ts) reads the theme file as plain values and resolves the tokens to the light theme's values. [A unit test](/-/files/yapparatus/tests/unit/diagram/paint.test.ts) checks that the table names the same tokens as the role styles in `element.tsx`. Pictures, tests, and the web app then use the same colors.
 
 A new value goes into a scale in the theme file, with a comment on what it is for. A new color role needs a dark and a light value and a contrast rule in the test.
 
@@ -91,7 +92,7 @@ Surfaces step away from the background in lightness: `canvas`, `surface`, `surfa
 
 ## Contrast
 
-[The theme test](/-/files/yapparatus/tests/theme.test.ts) computes the WCAG contrast of each pair of roles drawn together, in the dark and light themes, each with increased contrast and in print. Text and status colors need 4.5:1, the [AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html). Control edges and diagram outlines need 3:1, the [minimum for graphics](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Tinted fills and dividers need 1.3:1. The test also checks that the category colors stay apart with red-green color blindness.
+[The theme test](/-/files/yapparatus/tests/unit/web/style/theme.test.ts) computes the WCAG contrast of each pair of roles drawn together, in the dark and light themes, each with increased contrast and in print. Text and status colors need 4.5:1, the [AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html). Control edges and diagram outlines need 3:1, the [minimum for graphics](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Tinted fills and dividers need 1.3:1. The test also checks that the category colors stay apart with red-green color blindness.
 
 <Ref to="styling-contrast" /> lists the ratios on `surface`, computed with the test's formula, and <Ref to="styling-contrast-chart" /> draws them. The smallest margin is `textMuted` on a tinted surface, at 4.82:1.
 

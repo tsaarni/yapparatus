@@ -1,11 +1,17 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "noEmit": false,
-    "outDir": "lib",
+    "types": ["node"],
+    "composite": false,
+    "emitDeclarationOnly": false,
     "rootDir": "src",
-    "declaration": true,
+    "outDir": "lib",
     "rewriteRelativeImportExtensions": true
   },
-  "include": ["src/vite/yap.ts", "src/vite/plugin.ts", "src/agent/index.ts", "src/env.d.ts"]
+  "include": [
+    "src/vite/yap.ts",
+    "src/vite/plugin.ts",
+    "src/agent/index.ts",
+    "src/protocol/runtime.d.ts"
+  ]
 }

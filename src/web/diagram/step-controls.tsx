@@ -1,8 +1,8 @@
 /** A diagram's steps: the buttons that walk through them, and the text of each. */
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
-import { AppIcon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
+import { AppIcon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
 import { styled } from "../style/styled.ts";
 import { fontSize, lineHeight, sizes, space, theme, when } from "../style/theme.stylex.ts";
 

@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
-import { AppIcon as Icon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
-import { useCopy } from "../style/clipboard.ts";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
+import { useCopy } from "../controls/clipboard.ts";
 import { styled } from "../style/styled.ts";
 import { fontSize, lineHeight, space, theme } from "../style/theme.stylex.ts";
 

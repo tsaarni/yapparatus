@@ -2,8 +2,8 @@ import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { elementSeparator } from "../../document/address.ts";
 import { createLogger } from "../../protocol/log.ts";
-import { findTarget, usePage } from "../page/numbering.ts";
-import { href } from "../page/router.ts";
+import { findTarget, usePage } from "../addressing/numbering.ts";
+import { href } from "../addressing/router.ts";
 import { focus } from "../style/focus.ts";
 import { theme } from "../style/theme.stylex.ts";
 

@@ -4,7 +4,7 @@ import * as stylex from "@stylexjs/stylex";
  * Design tokens. `theme` holds what a theme changes (colors, shadows, fonts) as CSS
  * variables; the scales below are constants, compiled into the styles that use them.
  * The roles and the reasons for them are in docs/design/styling.mdx, and
- * tests/theme.test.ts checks the contrast every role must reach.
+ * tests/unit/web/style/theme.test.ts checks the contrast every role must reach.
  */
 
 /** The dark reading theme, which is the default. */

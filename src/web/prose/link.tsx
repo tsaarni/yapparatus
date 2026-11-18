@@ -1,7 +1,7 @@
 import * as stylex from "@stylexjs/stylex";
 import type { AnchorHTMLAttributes } from "react";
-import { usePage } from "../page/numbering.ts";
-import { resolveHref } from "../page/router.ts";
+import { usePage } from "../addressing/numbering.ts";
+import { resolveHref } from "../addressing/router.ts";
 import { focus } from "../style/focus.ts";
 import { duration, theme } from "../style/theme.stylex.ts";
 

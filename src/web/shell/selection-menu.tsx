@@ -2,17 +2,17 @@ import type { DocumentPage } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { textFragment } from "../../document/address.ts";
 import type { Reference } from "../../document/reference.ts";
-import { addressHref, hashMode, href, parseAddress } from "../page/router.ts";
-import type { SelectionMenu as MenuState } from "../page/selection.ts";
+import { addressHref, hashMode, href, parseAddress } from "../addressing/router.ts";
+import type { SelectionMenu as MenuState } from "../addressing/selection.ts";
 import {
   codeAddress,
   fileReferencesFromRange,
   referencesFromRange,
   selectedCode,
-} from "../page/selection.ts";
-import { AppIcon as Icon } from "../style/app-icon.tsx";
-import { Button } from "../style/button.tsx";
-import { useCopy } from "../style/clipboard.ts";
+} from "../addressing/selection.ts";
+import { AppIcon as Icon } from "../controls/app-icon.tsx";
+import { Button } from "../controls/button.tsx";
+import { useCopy } from "../controls/clipboard.ts";
 import { styled } from "../style/styled.ts";
 import { layer, radius, space, theme, when } from "../style/theme.stylex.ts";
 
