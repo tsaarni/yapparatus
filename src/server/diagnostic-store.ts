@@ -7,33 +7,24 @@
  * new revision, and the findings of the old one stop counting. A page no browser has rendered
  * since it changed is unchecked, and is never reported as clean.
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
-import { excerptFiles } from "../code-plugin.ts";
-import { checkFiles, checkIcons, checkPages, checkTheme } from "../compiler/document-checks.ts";
+import { checkIcons, checkPages, checkTheme } from "../compiler/document-checks.ts";
+import { pageIds } from "../compiler/document-directory.ts";
+import type { ExternalFiles } from "../compiler/external-files.ts";
 import { checkLinks } from "../compiler/link-checks.ts";
-import { pageFigures } from "../diagram-plugin.ts";
-import {
-  type Diagnostic,
-  type DiagnosticOrigin,
-  diagnosticCodes,
-  isDiagnosticCode,
-} from "../document/diagnostic.ts";
+import { compilePage } from "../compiler/page.ts";
+import { pageRevision } from "../compiler/revision.ts";
+import { contentIssues } from "../compiler/stages/conventions.ts";
+import { excerptFiles } from "../compiler/stages/excerpts.ts";
+import { compiled } from "../compiler/stages/outline.ts";
+import { type Diagnostic, diagnosticCodes } from "../document/diagnostic.ts";
+import { checkFiles } from "../document/file-address.ts";
 import type { PageOutline } from "../document/page-module.ts";
 import { pageIdOf } from "../document/settings.ts";
-import { contentIssues } from "../markdown-plugin.ts";
-import { compiled } from "../outline-plugin.ts";
 import { createLogger } from "../protocol/log.ts";
-import type {
-  DocumentDiagnostics,
-  ReportedDiagnostic,
-  UncheckedPage,
-} from "../protocol/rest-api.ts";
-import type { SourceFiles } from "../source-files.ts";
-import { pageRevision } from "../source-plugin.ts";
-import { HttpError, isRecord, type Router } from "./http.ts";
-import { diagnosticsSection } from "./prompt.ts";
+import type { ReportedDiagnostic, UncheckedPage } from "../protocol/rest-api.ts";
 
 const log = createLogger("diagnostics");
 
@@ -49,8 +40,6 @@ const settleLimit = 8000;
 /** Revisions of a page whose findings are kept: the current one, and those before it. */
 const keptRevisions = 3;
 
-const browserOrigins: DiagnosticOrigin[] = ["chart", "render", "runtime", "reply"];
-
 /** What identifies a diagnostic across renders, line shifts, and rewording. */
 export function diagnosticKey(d: Diagnostic): string {
   return [d.code, d.source ?? "", d.target ?? "", d.subject ?? d.message].join("|");
@@ -60,7 +49,7 @@ export interface DiagnosticOptions {
   root: string;
   content: string;
   server: ViteDevServer;
-  files: SourceFiles;
+  files: ExternalFiles;
   /** The module files of the replies in the chat, from the project folder. */
   replies: () => Set<string>;
   changed: () => void;
@@ -205,8 +194,13 @@ export class DiagnosticStore {
     return !this.timer && !this.checking && Date.now() - this.lastFileChange > browserDelay;
   }
 
-  /** Wait until the checks of recent edits are done, for at most a few seconds. */
+  /**
+   * Wait until the checks of recent edits are done, for at most a few seconds. An agent edits a
+   * file and reads the diagnostics at once, often before the watcher reports the edit. The wait
+   * finds such an edit itself and waits for its checks.
+   */
   async settle() {
+    if (this.savedSinceCheck()) this.fileChanged();
     const until = Date.now() + settleLimit;
     while (Date.now() < until && !this.settled())
       await new Promise((resolve) => setTimeout(resolve, 200));
@@ -256,40 +250,9 @@ export class DiagnosticStore {
     return added;
   }
 
-  /** Every diagnostic and the unchecked pages, once recent edits are checked, with text for the agent. */
-  async document(): Promise<DocumentDiagnostics> {
-    // An agent edits a file and reads the diagnostics at once, often before the watcher
-    // reports the edit. The read finds such an edit itself and waits for its checks.
-    if (this.savedSinceCheck()) this.fileChanged();
-    await this.settle();
-    const diagnostics = this.list();
-    this.give(diagnostics.filter((d) => d.severity === "error"));
-    const unchecked = this.unchecked();
-    return {
-      diagnostics,
-      unchecked,
-      prompt: diagnosticsSection(diagnostics, () => false, unchecked),
-    };
-  }
-
   /** The pages in the content folder, as files from the project folder. */
   private pageSources(): string[] {
-    return this.pageIds().map((id) => `${this.content}/${id}.mdx`);
-  }
-
-  /** Page ids from the content folder, as `document.json` should list them. */
-  private pageIds(): string[] {
-    const dir = path.join(this.root, this.content);
-    if (!existsSync(dir)) return [];
-    return (readdirSync(dir, { recursive: true }) as string[])
-      .filter((file) => file.endsWith(".mdx"))
-      .map((file) =>
-        file
-          .split(path.sep)
-          .join("/")
-          .replace(/\.mdx$/, ""),
-      )
-      .sort();
+    return pageIds(this.root, this.content).map((id) => `${this.content}/${id}.mdx`);
   }
 
   /** Outlines of the pages `document.json` lists, compiled by the same pipeline as in the browser. */
@@ -357,7 +320,7 @@ export class DiagnosticStore {
     const pageErrors = error
       ? [error]
       : [
-          ...checkPages(this.pageIds(), listed),
+          ...checkPages(pageIds(this.root, this.content), listed),
           ...checkTheme(theme),
           ...checkFiles(files),
           ...checkIcons({ logo, favicon }),
@@ -372,7 +335,7 @@ export class DiagnosticStore {
         source: settingsSource,
       })),
     );
-    for (const id of this.pageIds()) {
+    for (const id of pageIds(this.root, this.content)) {
       const source = `${this.content}/${id}.mdx`;
       let failure: Diagnostic | undefined;
       try {
@@ -404,7 +367,7 @@ export class DiagnosticStore {
       this.setCheck(`compile:${source}`, issues);
     }
     const found = checkLinks(await this.outlines(), this.options.files.lineCount);
-    for (const id of this.pageIds()) {
+    for (const id of pageIds(this.root, this.content)) {
       const source = `${this.content}/${id}.mdx`;
       this.setCheck(
         `links:${source}`,
@@ -442,21 +405,19 @@ export class DiagnosticStore {
     this.options.changed();
   }
 
+  /** Whether `source` is a page of the document, a reply in the chat, or neither. */
+  kindOf(source: string): "page" | "reply" | undefined {
+    if (this.options.replies().has(source)) return "reply";
+    return this.pageSources().includes(source) ? "page" : undefined;
+  }
+
   /**
-   * Add what a browser found in one revision of a page, or in a reply. Findings only add; a
-   * report without any still records that the revision was rendered.
+   * Add what a browser found in one revision of a page, or in a reply, which has no revision.
+   * Findings only add; a report without any still records that the revision was rendered.
    */
-  report(input: Record<string, unknown>) {
-    const source = typeof input.source === "string" ? input.source : "";
-    const revision = typeof input.revision === "string" ? input.revision : undefined;
-    const reply = this.options.replies().has(source);
-    if (!reply && !this.pageSources().includes(source))
-      throw new HttpError(400, "source must be a page of the document or a reply in the chat.");
-    if (reply === (revision !== undefined))
-      throw new HttpError(400, "A page's report needs its revision; a reply's has none.");
-    const diagnostics = parseDiagnostics(input.diagnostics).map(
-      (d): Diagnostic => (reply ? d : { ...d, source }),
-    );
+  report(source: string, revision: string | undefined, found: Diagnostic[]) {
+    const reply = revision === undefined;
+    const diagnostics = found.map((d): Diagnostic => (reply ? d : { ...d, source }));
     let items: Map<string, Diagnostic>;
     let added = false;
     if (reply) {
@@ -500,69 +461,4 @@ export class DiagnosticStore {
     this.revisions.set(file, { stamp, revision: value });
     return value;
   }
-
-  mount(router: Router) {
-    router
-      .on("GET", "/diagnostics", async () => ({ status: 200, body: await this.document() }))
-      .on("POST", "/diagnostics", ({ body }) => {
-        this.report(body);
-        return { status: 204 };
-      });
-  }
-}
-
-function text(value: unknown, max: number): string | undefined {
-  return typeof value === "string" ? value.slice(0, max) : undefined;
-}
-
-/** A browser's diagnostics: its own origins, codes from the registry, and no source of their own. */
-function parseDiagnostics(input: unknown): Diagnostic[] {
-  if (!Array.isArray(input) || input.length > 200)
-    throw new HttpError(400, "diagnostics must be a list of at most 200 items.");
-  return input.map((item): Diagnostic => {
-    if (!isRecord(item)) throw new HttpError(400, "Each diagnostic must be an object.");
-    const origin = item.origin as DiagnosticOrigin;
-    const code = text(item.code, 80);
-    const message = text(item.message, 4000);
-    if (!browserOrigins.includes(origin))
-      throw new HttpError(400, "A diagnostic needs a known origin.");
-    if (!code || !message) throw new HttpError(400, "A diagnostic needs a code and a message.");
-    if (!isDiagnosticCode(code))
-      throw new HttpError(
-        400,
-        `Unknown diagnostic code ${code}. The codes are in diagnosticCodes.`,
-      );
-    const target = text(item.target, 200);
-    const subject = text(item.subject, 500);
-    const line = Number.isInteger(item.line) ? Number(item.line) : undefined;
-    const elements = Array.isArray(item.elements)
-      ? item.elements.filter((e): e is string => typeof e === "string").slice(0, 20)
-      : undefined;
-    return {
-      origin,
-      code,
-      message,
-      ...(line ? { line } : {}),
-      ...(target ? { target } : {}),
-      ...(subject ? { subject } : {}),
-      ...(elements?.length ? { elements } : {}),
-    };
-  });
-}
-
-/**
- * Compile a page as its file is on disk, with the same plugins as the browser, in the server's
- * own environment. The browser environment's dependency optimizer must not see these requests:
- * at startup they hold back the first page load. The watcher reports an edit a moment after it
- * is saved, and until then the module is the old one, so a page whose file differs from the
- * text it was compiled from is compiled again. `url` is the page's path from the project, such
- * as `/docs/cache.mdx`.
- */
-export function compilePage(server: ViteDevServer, root: string, url: string) {
-  const environment = server.environments.ssr;
-  const file = path.join(root, url);
-  const module = environment.moduleGraph.getModuleById(file);
-  if (module && existsSync(file) && pageFigures.get(file)?.source !== readFileSync(file, "utf8"))
-    environment.moduleGraph.invalidateModule(module);
-  return environment.transformRequest(url);
 }

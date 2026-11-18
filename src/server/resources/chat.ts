@@ -9,19 +9,18 @@ import { existsSync } from "node:fs";
 import type { ServerResponse } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Diagnostic } from "../document/diagnostic.ts";
-import { fileSource } from "../document/file-address.ts";
-import { createLogger } from "../protocol/log.ts";
+import type { Diagnostic } from "../../document/diagnostic.ts";
+import { fileSource } from "../../document/file-address.ts";
+import { createLogger } from "../../protocol/log.ts";
 import {
   type AgentState,
   agentHeader,
   type Chat,
   type Message,
   type ReplyRefusal,
-} from "../protocol/rest-api.ts";
-import type { ChatStore } from "./chat.ts";
-import { type DiagnosticStore, diagnosticKey } from "./diagnostics.ts";
-import { HttpError, type Reply, type Router } from "./http.ts";
+} from "../../protocol/rest-api.ts";
+import type { ChatLog } from "../chat-log.ts";
+import { type DiagnosticStore, diagnosticKey } from "../diagnostic-store.ts";
 import {
   diagnosticsSection,
   errorsPrompt,
@@ -31,7 +30,8 @@ import {
   rejectedReply,
   startPrompt,
   takenOver,
-} from "./prompt.ts";
+} from "../prompt.ts";
+import { HttpError, type Reply, type Router } from "../router.ts";
 
 const log = createLogger("chat");
 
@@ -75,7 +75,7 @@ export interface ChatResourceOptions {
   content: string;
   /** The source folders `document.json` names, relative to the content folder. */
   folders: () => Record<string, string>;
-  chat: ChatStore;
+  chat: ChatLog;
   diagnostics: DiagnosticStore;
   /** The agent's state changed: waiting, working, or away. */
   changed: () => void;
@@ -104,7 +104,7 @@ export class ChatResource {
     const own = path.join(options.root, guide);
     this.guide = existsSync(own)
       ? own
-      : fileURLToPath(new URL(`../../starter/${guide}`, import.meta.url));
+      : fileURLToPath(new URL(`../../../starter/${guide}`, import.meta.url));
   }
 
   /** The text a person gives a new agent session. */
@@ -167,7 +167,7 @@ export class ChatResource {
   }
 
   /** The prompt for reader messages and new errors, ending with the next command. */
-  private prompt(readers: ReturnType<ChatStore["readers"]>, fresh: Diagnostic[]): string {
+  private prompt(readers: ReturnType<ChatLog["readers"]>, fresh: Diagnostic[]): string {
     const { diagnostics } = this.options;
     const isNew = new Set(fresh.map(diagnosticKey));
     const section = () =>
@@ -183,7 +183,7 @@ export class ChatResource {
   }
 
   /** Reader messages reached an agent: remember the newest, and when, for `readAt` and the working state. */
-  private handedOver(readers: ReturnType<ChatStore["readers"]>) {
+  private handedOver(readers: ReturnType<ChatLog["readers"]>) {
     const now = new Date().toISOString();
     for (const message of readers)
       if (!this.readAt.has(message.seq)) this.readAt.set(message.seq, now);

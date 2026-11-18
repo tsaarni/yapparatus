@@ -15,17 +15,17 @@ import {
 } from "node:fs";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
+import type { ExternalFiles } from "../compiler/external-files.ts";
 import { checkLinks } from "../compiler/link-checks.ts";
+import { contentIssues } from "../compiler/stages/conventions.ts";
+import { compiled } from "../compiler/stages/outline.ts";
 import { type Diagnostic, diagnosticCodes } from "../document/diagnostic.ts";
 import { parseFileAddress } from "../document/file-address.ts";
 import { type PageOutline, pageComponents } from "../document/page-module.ts";
 import type { Reference, TargetKind } from "../document/reference.ts";
-import { contentIssues } from "../markdown-plugin.ts";
-import { compiled } from "../outline-plugin.ts";
 import { createLogger } from "../protocol/log.ts";
 import type { AgentMessage, Message, ReaderMessage } from "../protocol/rest-api.ts";
-import type { SourceFiles } from "../source-files.ts";
-import { HttpError, isRecord } from "./http.ts";
+import { HttpError, isRecord } from "./router.ts";
 
 const log = createLogger("chat");
 
@@ -56,7 +56,7 @@ function optionalText(value: unknown, max: number): string | undefined {
 export function acceptReferences(
   root: string,
   content: string,
-  files: SourceFiles,
+  files: ExternalFiles,
   input: unknown,
 ): Reference[] {
   if (!Array.isArray(input) || input.length > 30) throw new HttpError(400, "Invalid reference.");
@@ -95,7 +95,7 @@ export function acceptReferences(
  * A source file or lines in it. The address names the file and lines; `source` and the line
  * fields must agree with it, so the reference says one thing however it is read.
  */
-function acceptFileReference(files: SourceFiles, item: Record<string, unknown>): Reference {
+function acceptFileReference(files: ExternalFiles, item: Record<string, unknown>): Reference {
   const address = parseFileAddress(item.address as string);
   const kind = item.kind as "file" | "lines";
   if (!address || (kind === "lines") !== !!address.lines)
@@ -122,7 +122,7 @@ export interface ChatOptions {
   /** The document's chat state directory, from the project folder: `.yapparatus/<directory>`, with `/` between segments. */
   state: string;
   /** The source files the document shows. */
-  files: SourceFiles;
+  files: ExternalFiles;
   /** Page outlines, for checking the links in a reply. */
   outlines: () => Promise<Array<{ id: string; outline: PageOutline }>>;
   /** Something the reader sees changed: a message or a reply was added, or the chat was cleared. */
@@ -135,7 +135,7 @@ export interface ChatOptions {
  * by their place in the log, so the numbers start again after the chat is cleared. A reply's
  * file has a random name, so a new reply never reuses the module of a deleted one.
  */
-export class ChatStore {
+export class ChatLog {
   private entries: Message[] = [];
   private readonly dir: string;
   private readonly file: string;

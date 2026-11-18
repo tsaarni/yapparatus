@@ -1,5 +1,32 @@
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
+import type { ExternalFiles } from "./external-files.ts";
+
+/**
+ * The document the compiler compiles: the project folder, known once Vite resolves its
+ * config, the document directory in it, with `/` between segments, and the files outside it
+ * that its pages may show.
+ */
+export interface DocumentDirectory {
+  root: () => string;
+  content: string;
+  files: ExternalFiles;
+}
+
+/** Page ids from disk, relative to the document directory and without extension. */
+export function pageIds(root: string, content: string): string[] {
+  const dir = path.join(root, content);
+  if (!existsSync(dir)) return [];
+  return (readdirSync(dir, { recursive: true }) as string[])
+    .filter((file) => file.endsWith(".mdx"))
+    .map((file) =>
+      file
+        .split(path.sep)
+        .join("/")
+        .replace(/\.mdx$/, ""),
+    )
+    .sort();
+}
 
 /**
  * Why `document`, a path with `/` between segments, cannot be a document directory of the project

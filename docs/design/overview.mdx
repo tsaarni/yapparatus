@@ -99,23 +99,20 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
 
 ## Where the code is
 
-<Ref to="overview-source" /> shows the main files. The files at the top of `src/` run in the server, except the agent library, which runs in the agent's process. The web app also imports `document/` and `protocol/`, which hold no server or browser code.
+<Ref to="overview-source" /> shows the main files. `compiler/`, `server/`, and `vite/` run in the server's process, and `agent/` runs in the agent's process. The web app also imports `document/` and `protocol/`, which hold no server or browser code.
 
 <Figure id="overview-source" caption="The main source files and the pages that describe them.">
 
 <FileTree>
 
 - src/
-  - cli.ts the [`yap` command](server#starting)
-  - vite.ts the [page compiler](page-compiler)
-  - *-plugin.ts the [stages](page-compiler#pipeline) of the page compiler
-  - source-files.ts reading [external files](documents#external-files)
-  - agent.ts the [agent library](agent-library)
-  - …
+  - vite/ the `yapparatus()` plugin, which combines the compiler and the server, and the [`yap` command](server#starting)
+  - compiler/ the [page compiler](page-compiler), reading [external files](documents#external-files), and the checks of `document.json` and of links
+    - stages/ the [stages](page-compiler#pipeline) of the page compiler
+  - server/ the [server](server)
+  - agent/ the [agent library](agent-library)
   - document/ [pages, addresses](documents), references, and diagnostics
   - protocol/ the types of the [REST API](rest-api), and the logger
-  - compiler/ the checks of `document.json` and of links
-  - server/ the [server](server)
   - diagram/ the [diagram compiler](diagram-compiler)
   - chart/ the [chart](charts) data and specification checks
   - web/ the [web app](web-app)
@@ -130,13 +127,15 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
 
 | Code | Lines |
 |---|---:|
-| `src/web/` | 8525 |
+| `src/web/` | 8578 |
 | `src/diagram/` | 4166 |
-| Page compiler: `vite.ts`, `*-plugin.ts`, `src/compiler/` | 2311 |
-| `src/server/` | 1975 |
-| Other files at the top of `src/` | 769 |
+| `src/compiler/` | 2647 |
+| `src/server/` | 1963 |
+| `src/vite/` | 260 |
+| `src/agent/` | 202 |
+| Other files at the top of `src/` | 97 |
 | `src/chart/` | 405 |
-| `src/document/` | 569 |
+| `src/document/` | 582 |
 | `src/protocol/` | 232 |
 
 </Table>

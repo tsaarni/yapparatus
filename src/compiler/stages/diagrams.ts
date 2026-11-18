@@ -12,11 +12,11 @@ import type {
   MdxJsxTextElementHast,
 } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
-import type { DiagramBuilder } from "./diagram/builder.ts";
-import type { CompiledDiagram } from "./diagram/drawing.ts";
-import { compileFigure, drawFailed, type FigureStep } from "./diagram/figure.ts";
-import { fontMeasure } from "./font-measure.ts";
-import { type ContentIssue, compiledAttribute, contentIssues } from "./markdown-plugin.ts";
+import type { DiagramBuilder } from "../../diagram/builder.ts";
+import type { CompiledDiagram } from "../../diagram/drawing.ts";
+import { compileFigure, drawFailed, type FigureStep } from "../../diagram/figure.ts";
+import { fontMeasure } from "../font-measure.ts";
+import { type ContentIssue, compiledAttribute, contentIssues } from "./conventions.ts";
 
 type Jsx = MdxJsxFlowElementHast | MdxJsxTextElementHast;
 

@@ -82,8 +82,8 @@ for (const mode of Object.keys(modes) as Mode[])
   });
 
 test("the HTML's theme-color is the canvas, so the first paint matches", () => {
-  // The page is a template in the Vite plugin.
-  const html = readFileSync("src/vite.ts", "utf8");
+  // The page is a template in the virtual modules.
+  const html = readFileSync("src/compiler/virtual-modules.ts", "utf8");
   assert.match(html, new RegExp(`name="theme-color" content="${color("canvas", "dark")}"`));
 });
 

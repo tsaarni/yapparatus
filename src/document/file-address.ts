@@ -90,16 +90,29 @@ export function fileSource(
   return out.join("/");
 }
 
+/** Errors in the `files` field of `document.json`, as readable messages. */
+export function checkFiles(files: unknown): string[] {
+  if (files === undefined) return [];
+  if (typeof files !== "object" || files === null || Array.isArray(files))
+    return [
+      '"files" in document.json names external directories by name: { "files": { "app": "../app" } }.',
+    ];
+  return Object.entries(files).flatMap(([name, folder]) => [
+    ...(folderName.test(name)
+      ? []
+      : [`"files" in document.json names "${name}": use lowercase letters, digits, and hyphens.`]),
+    ...(typeof folder === "string" && folder
+      ? []
+      : [`"files" in document.json gives "${name}" no directory path.`]),
+  ]);
+}
+
 /**
  * The folders a document names, from the `files` field of `document.json`. None when the
  * field has an error, as `checkFiles` reports it.
  */
 export function foldersOf(settings: { files?: unknown }): Record<string, string> {
   const { files } = settings;
-  if (files === undefined || typeof files !== "object" || files === null || Array.isArray(files))
-    return {};
-  const valid = Object.entries(files).every(
-    ([name, folder]) => folderName.test(name) && typeof folder === "string" && folder,
-  );
-  return valid ? (files as Record<string, string>) : {};
+  if (files === undefined || checkFiles(files).length) return {};
+  return files as Record<string, string>;
 }

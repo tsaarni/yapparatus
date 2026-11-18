@@ -8,15 +8,15 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import type { ViteDevServer } from "vite";
-import type { CompiledDiagram } from "../diagram/drawing.ts";
-import { pictureOf } from "../diagram/picture.ts";
-import { pageFigures } from "../diagram-plugin.ts";
-import { fontMeasure, textOutline } from "../font-measure.ts";
-import { createLogger } from "../protocol/log.ts";
-import { compilePage } from "./diagnostics.ts";
-import { HttpError, type Router } from "./http.ts";
-import { pictureErrors } from "./prompt.ts";
-import { lightPaint } from "./theme-values.ts";
+import { fontMeasure, textOutline } from "../../compiler/font-measure.ts";
+import { compilePage } from "../../compiler/page.ts";
+import { pageFigures } from "../../compiler/stages/diagrams.ts";
+import type { CompiledDiagram } from "../../diagram/drawing.ts";
+import { pictureOf } from "../../diagram/picture.ts";
+import { createLogger } from "../../protocol/log.ts";
+import { pictureErrors } from "../prompt.ts";
+import { HttpError, type Router } from "../router.ts";
+import { lightPaint } from "../theme-values.ts";
 
 const log = createLogger("figures");
 
@@ -36,7 +36,7 @@ export function renderPicture(drawing: CompiledDiagram, options: { ids: boolean 
     .asPng();
 }
 
-export class FigureServer {
+export class FiguresResource {
   private readonly root: string;
   private readonly content: string;
   private readonly server: ViteDevServer;

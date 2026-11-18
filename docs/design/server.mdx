@@ -1,6 +1,6 @@
 # Server
 
-The server is the dev server: Vite with the `yapparatus()` plugin, serving one document. This page describes what the server stores and computes. The requests and their bodies are in [the REST API](rest-api).
+The server is the dev server: Vite with the `yapparatus()` plugin, serving one document. [The plugin](/-/files/yapparatus/src/vite/plugin.ts) combines the [page compiler](page-compiler)'s plugins with the server, which it installs when Vite starts the dev server. This page describes what the server stores and computes. The requests and their bodies are in [the REST API](rest-api).
 
 ## Overview
 
@@ -11,14 +11,14 @@ The server is the dev server: Vite with the `yapparatus()` plugin, serving one d
   const library = d.box("Agent library", { id: "agent-library", role: "external" })
   d.equalSize([web, library])
 
-  const router = d.box("Router", { id: "router", sub: "api.ts, http.ts", role: "accent" })
-  const resource = d.box("Chat handler", { id: "chat-handler", sub: "chat-resource.ts" })
+  const router = d.box("Router", { id: "router", sub: "rest-api.ts, router.ts", role: "accent" })
+  const resource = d.box("Chat handler", { id: "chat-handler", sub: "resources/chat.ts" })
   const store = d.box("Diagnostic store", { id: "diagnostic-store", sub: "diagnostics.ts" })
-  const figures = d.box("Pictures", { id: "pictures", sub: "figures.ts" })
-  const files = d.box("External files", { id: "files", sub: "files.ts" })
+  const figures = d.box("Pictures", { id: "pictures", sub: "resources/figures.ts" })
+  const files = d.box("External files", { id: "files", sub: "resources/files.ts" })
   const prompt = d.box("Prompts", { id: "prompts", sub: "prompt.ts" })
-  const log = d.box("Chat log", { id: "chat-log", sub: "chat.ts" })
-  const compiler = d.box("Page compiler", { id: "page-compiler", sub: "vite.ts and plugins" })
+  const log = d.box("Chat log", { id: "chat-log", sub: "chat-log.ts" })
+  const compiler = d.box("Page compiler", { id: "page-compiler", sub: "src/compiler/" })
   d.equalSize([router, prompt, resource, store, figures, files, log, compiler])
 
   const modules = d.row([resource, store, figures, files], { gap: 48 })
@@ -63,11 +63,11 @@ The server is the dev server: Vite with the `yapparatus()` plugin, serving one d
   <Step focus="pictures to-pictures draws files to-files reads-files external-dirs">The other two handlers draw [pictures](#pictures) and read [external files](#external-files).</Step>
 </Diagram>
 
-[One function](/-/files/yapparatus/src/server/api.ts#L22-L127) creates the modules and connects them. When a module changes, this function sends an update to the web app and tells the chat handler, which answers the waiting agent reads.
+The server's code is in `src/server/`, and each resource is a module in `src/server/resources/`. [One function](/-/files/yapparatus/src/server/rest-api.ts#L23-L128) creates the modules and connects them. When a module changes, this function sends an update to the web app and tells the chat handler, which answers the waiting agent reads.
 
 ## Starting
 
-The [`yap` command](/-/files/yapparatus/src/cli.ts) takes a subcommand and a document directory, as in `yap dev docs/design`. The other subcommands are `preview` and [`build`](page-compiler#builds).
+The [`yap` command](/-/files/yapparatus/src/vite/yap.ts) takes a subcommand and a document directory, as in `yap dev docs/design`. The other subcommands are `preview` and [`build`](page-compiler#builds).
 
 The current directory is the project and Vite's root, and a project's `vite.config.ts` can add Vite options and plugins. The plugin stops with an error when the document directory is outside the project, has no `document.json`, or lies inside or around another document directory.
 
@@ -75,7 +75,7 @@ The server listens on `127.0.0.1` only. When it starts, it writes its address to
 
 ## Chat log
 
-The chat of a document is a log in `.yapparatus/<directory>/chat.jsonl`, with one JSON object per line. `<directory>` is the path of the document directory. The [chat log module](/-/files/yapparatus/src/server/chat.ts#L137-L335) keeps the log in memory and appends each new message as one line. It never rewrites a line. <Ref to="server-chat-record" /> shows a reader message and the reply to it.
+The chat of a document is a log in `.yapparatus/<directory>/chat.jsonl`, with one JSON object per line. `<directory>` is the path of the document directory. The [chat log module](/-/files/yapparatus/src/server/chat-log.ts#L138-L336) keeps the log in memory and appends each new message as one line. It never rewrites a line. <Ref to="server-chat-record" /> shows a reader message and the reply to it.
 
 <Diagram id="server-chat-record" caption="A reader message with one reference, and the reply to it, as two lines of chat.jsonl." description="Three records: a reader message with seq 12, its reference, and an agent message with seq 13 whose inReplyTo is 12." draw={(d) => {
   const reader = d.record([
@@ -173,7 +173,7 @@ A read with `wait` stays open while it would return nothing. When the chat or th
 
 ## Reply checks
 
-A reply is an agent's `POST` with MDX. The server refuses it with `409` when no agent read has returned a reader message since the chat was last cleared. Otherwise [it checks the reply](/-/files/yapparatus/src/server/chat.ts#L301-L334) and stores it:
+A reply is an agent's `POST` with MDX. The server refuses it with `409` when no agent read has returned a reader message since the chat was last cleared. Otherwise [it checks the reply](/-/files/yapparatus/src/server/chat-log.ts#L301-L334) and stores it:
 
 1. An empty reply is refused with `REPLY_EMPTY`.
 2. The MDX is written to a temporary file in the chat directory and compiled through Vite with the [page compiler](page-compiler#replies). A failure is `COMPILE_FAILED`.
@@ -184,7 +184,7 @@ Errors in the pages do not hold back a reply. Reader messages sent while the age
 
 ## Diagnostic store
 
-The [diagnostic store](/-/files/yapparatus/src/server/diagnostics.ts#L69-L512) holds the diagnostics of the document. After each file change, it compiles every page and checks the links and `document.json`. It also keeps what browsers report for each page and each reply. How diagnostics are found, when an error becomes new for the agent, and how a read waits for recent checks are described in [diagnostics](diagnostics).
+The [diagnostic store](/-/files/yapparatus/src/server/diagnostic-store.ts#L58-L464) holds the diagnostics of the document, and [the diagnostics resource](/-/files/yapparatus/src/server/resources/diagnostics.ts) answers its requests. After each file change, it compiles every page and checks the links and `document.json`. It also keeps what browsers report for each page and each reply. How diagnostics are found, when an error becomes new for the agent, and how a read waits for recent checks are described in [diagnostics](diagnostics).
 
 ## External files
 

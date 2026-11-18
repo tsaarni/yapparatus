@@ -4,13 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { checkPages, checkTheme } from "../src/compiler/document-checks.ts";
+import { ExternalFiles } from "../src/compiler/external-files.ts";
 import { checkLinks } from "../src/compiler/link-checks.ts";
 import { quoteOf, resolveLink, splitAddress, textFragment } from "../src/document/address.ts";
 import type { PageOutline } from "../src/document/page-module.ts";
-import { acceptReferences } from "../src/server/chat.ts";
-import { diagnosticKey } from "../src/server/diagnostics.ts";
+import { acceptReferences } from "../src/server/chat-log.ts";
+import { diagnosticKey } from "../src/server/diagnostic-store.ts";
 import { messagesPrompt } from "../src/server/prompt.ts";
-import { SourceFiles } from "../src/source-files.ts";
 
 const page =
   "# Page\n\n## First\n\nOriginal paragraph.\n\n```md\n## not a heading\n```\n\n## Second\n\nMore.\n";
@@ -36,7 +36,7 @@ const paragraph = {
 
 test("references are kept as sent, with the lines the reader saw", () => {
   withWorkspace((root) => {
-    const [item] = acceptReferences(root, "content", new SourceFiles(() => root, "content"), [
+    const [item] = acceptReferences(root, "content", new ExternalFiles(() => root, "content"), [
       { ...paragraph, snapshot: "dropped" },
     ]);
     assert.ok(item);
@@ -89,7 +89,7 @@ test("rejects unknown kinds and files outside the document", () => {
   withWorkspace((root) => {
     assert.throws(
       () =>
-        acceptReferences(root, "content", new SourceFiles(() => root, "content"), [
+        acceptReferences(root, "content", new ExternalFiles(() => root, "content"), [
           { ...paragraph, kind: "x" },
         ]),
       /Invalid/,
@@ -98,7 +98,7 @@ test("rejects unknown kinds and files outside the document", () => {
     symlinkSync(path.join(root, "outside.mdx"), path.join(root, "content/escape.mdx"));
     assert.throws(
       () =>
-        acceptReferences(root, "content", new SourceFiles(() => root, "content"), [
+        acceptReferences(root, "content", new ExternalFiles(() => root, "content"), [
           { ...paragraph, source: "content/escape.mdx" },
         ]),
       /document page/,

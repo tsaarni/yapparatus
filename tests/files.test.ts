@@ -7,28 +7,23 @@ import { compile, run } from "@mdx-js/mdx";
 import { createElement, type ReactNode } from "react";
 import * as runtime from "react/jsx-runtime";
 import { renderToStaticMarkup } from "react-dom/server";
-import {
-  codeHighlighting,
-  excerptRange,
-  excerpts,
-  fileView,
-  languageOf,
-} from "../src/code-plugin.ts";
-import { checkFiles } from "../src/compiler/document-checks.ts";
+import { ExternalFiles } from "../src/compiler/external-files.ts";
 import { checkLinks } from "../src/compiler/link-checks.ts";
+import { contentIssues } from "../src/compiler/stages/conventions.ts";
+import { excerptRange, excerpts } from "../src/compiler/stages/excerpts.ts";
+import { codeHighlighting, fileView, languageOf } from "../src/compiler/stages/highlight.ts";
+import { sourceContext } from "../src/compiler/stages/source-context.ts";
 import { quoteOf, resolveLink } from "../src/document/address.ts";
 import {
+  checkFiles,
   fileAddress,
   fileSource,
   parseFileAddress,
   parseLines,
 } from "../src/document/file-address.ts";
 import type { HighlightedCode, PageOutline } from "../src/document/page-module.ts";
-import { contentIssues } from "../src/markdown-plugin.ts";
-import { acceptReferences } from "../src/server/chat.ts";
+import { acceptReferences } from "../src/server/chat-log.ts";
 import { messagesPrompt, startPrompt } from "../src/server/prompt.ts";
-import { SourceFiles } from "../src/source-files.ts";
-import { sourceContext } from "../src/source-plugin.ts";
 
 const main = [
   "export function greet(name: string) {",
@@ -59,7 +54,7 @@ const textOf = (line: Array<number | string> | undefined) =>
   (line ?? []).filter((run) => typeof run === "string").join("");
 
 /** A project with a document in content/ that shows the folder app/. */
-function withProject(run: (root: string, files: SourceFiles) => void | Promise<void>) {
+function withProject(run: (root: string, files: ExternalFiles) => void | Promise<void>) {
   const root = mkdtempSync(path.join(os.tmpdir(), "yapparatus-files-"));
   const done = () => rmSync(root, { recursive: true, force: true });
   mkdirSync(path.join(root, "content"));
@@ -72,7 +67,7 @@ function withProject(run: (root: string, files: SourceFiles) => void | Promise<v
   writeFileSync(path.join(root, "app/src/main.ts"), main);
   writeFileSync(path.join(root, "app/.git/config"), "[core]\n");
   writeFileSync(path.join(root, "secret.txt"), "private\n");
-  const result = run(root, new SourceFiles(() => root, "content"));
+  const result = run(root, new ExternalFiles(() => root, "content"));
   if (result instanceof Promise) return result.finally(done);
   done();
 }
@@ -387,7 +382,7 @@ test("two folders with the same paths stay apart, in references and in the agent
       path.join(root, "guide/document.json"),
       JSON.stringify({ pages: [], files: { app: "../app", lib: "../lib" } }),
     );
-    const files = new SourceFiles(() => root, "guide");
+    const files = new ExternalFiles(() => root, "guide");
     const item = (folder: string) => {
       const read = files.read({ folder, path: "src/main.ts" });
       assert.ok(!("error" in read));

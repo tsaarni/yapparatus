@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type APIRequestContext, expect, test } from "@playwright/test";
+import { pageRevision } from "../../src/compiler/revision.ts";
 import type { Reference } from "../../src/document/reference.ts";
 import {
   agentHeader,
@@ -9,7 +10,6 @@ import {
   type DiagnosticReport,
   type DocumentDiagnostics,
 } from "../../src/protocol/rest-api.ts";
-import { pageRevision } from "../../src/source-plugin.ts";
 import { commands, replyCommand, root, runCommand } from "./workspace.ts";
 
 /** A page with no excerpts or charts, so its revision is its text's. */

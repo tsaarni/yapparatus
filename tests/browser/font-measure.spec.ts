@@ -1,12 +1,12 @@
 /**
- * The font file measure in src/font-measure.ts must give the widths the web app's canvas gives,
+ * The font file measure in src/compiler/font-measure.ts must give the widths the web app's canvas gives,
  * so a diagram compiled in Node has the layout the browser would compute.
  */
 import { expect, test } from "@playwright/test";
+import { fontMeasure } from "../../src/compiler/font-measure.ts";
 import { DiagramBuilder } from "../../src/diagram/builder.ts";
 import { compile } from "../../src/diagram/compile/compile.ts";
 import { type FontSpec, defaultMetrics as m } from "../../src/diagram/metrics.ts";
-import { fontMeasure } from "../../src/font-measure.ts";
 import { examplePages, examples } from "../diagram-examples.ts";
 
 /** Every font the compiler measures with: the sans weights at each size, and mono. */
@@ -25,7 +25,7 @@ const hard = [
   "Ty",
   "WAVE Tyrant Võ",
   "0123456789",
-  // Runs without letters: see the comment on the script in src/font-measure.ts.
+  // Runs without letters: see the comment on the script in src/compiler/font-measure.ts.
   "24",
   "1,024",
   "^&",

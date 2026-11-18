@@ -183,7 +183,7 @@ A derived id changes when its label changes. The link check verifies only the fi
 
 [Text measurement](/-/files/yapparatus/src/diagram/compile/text.ts#L76-L162) splits each label into lines, and wraps them at word boundaries when the shape has a fixed `width`. Every line in the compiled diagram carries its font size and weight, and the web app and the picture draw it with exactly those values.
 
-The widths come from [the font measure](/-/files/yapparatus/src/font-measure.ts#L57-L71), which reads the font files and `@font-face` rules that the web app loads. For each character, it picks the face that a browser picks, and it shapes the text with fontkit. A browser test checks that its widths are within 0.5 pixels of the browser's own. A character that no face has gets a width of one em and is reported as `FONT_FALLBACK`, because a browser draws it in a system font of unknown width.
+The widths come from [the font measure](/-/files/yapparatus/src/compiler/font-measure.ts#L57-L71), which reads the font files and `@font-face` rules that the web app loads. For each character, it picks the face that a browser picks, and it shapes the text with fontkit. A browser test checks that its widths are within 0.5 pixels of the browser's own. A character that no face has gets a width of one em and is reported as `FONT_FALLBACK`, because a browser draws it in a system font of unknown width.
 
 ## Layout
 
@@ -418,9 +418,9 @@ A picture is a PNG of a diagram that the server draws for the agent. The agent a
   d.arrow(glyphs, svg)
 }} />
 
-[The SVG writer](/-/files/yapparatus/src/diagram/picture.ts#L98-L375) writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same [shape outlines](/-/files/yapparatus/src/diagram/outlines.ts), and adds a legend below. The picture shows the diagram with no step open. It paints each role and category with the theme tokens in [a plain table](/-/files/yapparatus/src/diagram/paint.ts), the tokens that the web app's role styles use, and a unit test checks that the two agree. The server resolves the tokens to the light theme's values and passes them to the SVG writer, so every agent gets the same picture; [styling](styling) describes how the server reads them. Text is drawn as [glyph outlines](/-/files/yapparatus/src/font-measure.ts#L111-L143) from the web app's font files, so it is exactly as wide as the compiler measured it.
+[The SVG writer](/-/files/yapparatus/src/diagram/picture.ts#L98-L375) writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same [shape outlines](/-/files/yapparatus/src/diagram/outlines.ts), and adds a legend below. The picture shows the diagram with no step open. It paints each role and category with the theme tokens in [a plain table](/-/files/yapparatus/src/diagram/paint.ts), the tokens that the web app's role styles use, and a unit test checks that the two agree. The server resolves the tokens to the light theme's values and passes them to the SVG writer, so every agent gets the same picture; [styling](styling) describes how the server reads them. Text is drawn as [glyph outlines](/-/files/yapparatus/src/compiler/font-measure.ts#L111-L143) from the web app's font files, so it is exactly as wide as the compiler measured it.
 
-With the `ids` option, the picture also writes each element's id beside it and outlines the elements that diagnostics name. [The server](/-/files/yapparatus/src/server/figures.ts#L27-L37) passes the SVG to resvg at two pixels per unit, so that small text stays legible to a model.
+With the `ids` option, the picture also writes each element's id beside it and outlines the elements that diagnostics name. [The server](/-/files/yapparatus/src/server/resources/figures.ts#L27-L37) passes the SVG to resvg at two pixels per unit, so that small text stays legible to a model.
 
 ## Where the code is
 
@@ -448,10 +448,11 @@ With the `ids` option, the picture also writes each element's id beside it and o
     - outlines.ts outlines as path data, for the web app and the picture
     - paint.ts the theme tokens of each role and category, for the picture
     - picture.ts the compiled diagram as a standalone SVG
-  - diagram-plugin.ts the page compiler's diagram stage
-  - font-measure.ts widths and glyph outlines from the font files
+  - compiler/
+    - stages/diagrams.ts the page compiler's diagram stage
+    - font-measure.ts widths and glyph outlines from the font files
   - server/
-    - figures.ts the figures resource and resvg
+    - resources/figures.ts the figures resource and resvg
     - theme-values.ts the light theme's values for the picture
   - web/
     - diagram/ the web app's views, and element.tsx with the role styles; see [components](components#diagram)

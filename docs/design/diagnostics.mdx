@@ -29,7 +29,7 @@ The server finds problems in the source files, and the web app reports those tha
   <Step focus="new-error wait">The error lasts 2 s and is new to the agent, so it ends the agent's wait.</Step>
 </Diagram>
 
-The store is in [`src/server/diagnostics.ts`](/-/files/yapparatus/src/server/diagnostics.ts). The requests that read and report diagnostics are in [the REST API](/rest-api#diagnostics).
+The store is in [`src/server/diagnostic-store.ts`](/-/files/yapparatus/src/server/diagnostic-store.ts), and [`src/server/resources/diagnostics.ts`](/-/files/yapparatus/src/server/resources/diagnostics.ts) answers its requests. The requests that read and report diagnostics are in [the REST API](/rest-api#diagnostics).
 
 ## Origins
 

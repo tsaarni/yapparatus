@@ -1,6 +1,6 @@
 import type { Root } from "mdast";
 import { visit } from "unist-util-visit";
-import { iconName } from "./document/settings.ts";
+import { iconName } from "../../document/settings.ts";
 
 /** Compile literal MDX icon names into ordinary, tree-shaken SVG imports. */
 export function iconImports() {

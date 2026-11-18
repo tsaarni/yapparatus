@@ -10,8 +10,8 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import type { Diagnostic } from "./document/diagnostic.ts";
-import { createLogger } from "./protocol/log.ts";
+import type { Diagnostic } from "../document/diagnostic.ts";
+import { createLogger } from "../protocol/log.ts";
 import {
   agentHeader,
   apiPrefix,
@@ -20,10 +20,10 @@ import {
   type NewMessage,
   type ReplyRefusal,
   type ServerFile,
-} from "./protocol/rest-api.ts";
+} from "../protocol/rest-api.ts";
 
-export type { Diagnostic } from "./document/diagnostic.ts";
-export type { Reference } from "./document/reference.ts";
+export type { Diagnostic } from "../document/diagnostic.ts";
+export type { Reference } from "../document/reference.ts";
 export type {
   AgentMessage,
   AgentState,
@@ -33,7 +33,7 @@ export type {
   ReaderMessage,
   ReportedDiagnostic,
   UncheckedPage,
-} from "./protocol/rest-api.ts";
+} from "../protocol/rest-api.ts";
 
 const log = createLogger("agent");
 

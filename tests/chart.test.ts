@@ -5,10 +5,10 @@ import * as Plot from "@observablehq/plot";
 import remarkGfm from "remark-gfm";
 import { type ChartProblem, chartLibrary, checkSpec, firstUseOrder } from "../src/chart/spec.ts";
 import { parseDelimited, type RawTable, rowObjects, typeTable } from "../src/chart/table.ts";
-import { charts, dataModuleCode, readChartFile } from "../src/chart-plugin.ts";
-import { excerpts } from "../src/code-plugin.ts";
-import { contentIssues } from "../src/markdown-plugin.ts";
-import type { SourceFiles } from "../src/source-files.ts";
+import type { ExternalFiles } from "../src/compiler/external-files.ts";
+import { charts, dataModuleCode, readChartFile } from "../src/compiler/stages/charts.ts";
+import { contentIssues } from "../src/compiler/stages/conventions.ts";
+import { excerpts } from "../src/compiler/stages/excerpts.ts";
 
 const table = (header: string[], ...rows: string[][]): RawTable => ({
   header,
@@ -113,7 +113,7 @@ const files = {
     source: "source/throughput.csv",
     lines: csv.trimEnd().split("\n"),
   }),
-} as unknown as SourceFiles;
+} as unknown as ExternalFiles;
 
 /** Compile MDX with the chart step; returns the JS and the issues found. */
 async function build(source: string) {

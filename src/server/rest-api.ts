@@ -7,19 +7,20 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node
 import type { AddressInfo } from "node:net";
 import path from "node:path";
 import type { ViteDevServer } from "vite";
+import type { ExternalFiles } from "../compiler/external-files.ts";
 import { createLogger } from "../protocol/log.ts";
 import { apiPrefix, type ServerFile, type UpdateEvents } from "../protocol/rest-api.ts";
-import type { SourceFiles } from "../source-files.ts";
-import { ChatStore } from "./chat.ts";
-import { ChatResource } from "./chat-resource.ts";
-import { DiagnosticStore } from "./diagnostics.ts";
-import { FigureServer } from "./figures.ts";
-import { FileServer } from "./files.ts";
-import { Router } from "./http.ts";
+import { ChatLog } from "./chat-log.ts";
+import { DiagnosticStore } from "./diagnostic-store.ts";
+import { ChatResource } from "./resources/chat.ts";
+import { DiagnosticsResource } from "./resources/diagnostics.ts";
+import { FiguresResource } from "./resources/figures.ts";
+import { FilesResource } from "./resources/files.ts";
+import { Router } from "./router.ts";
 
 const log = createLogger("server");
 
-export function installApi(server: ViteDevServer, content: string, files: SourceFiles) {
+export function installRestApi(server: ViteDevServer, content: string, files: ExternalFiles) {
   const root = server.config.root;
   // Each document keeps its chat state under its own path; one server runs at a time.
   const state = `.yapparatus/${content}`;
@@ -55,7 +56,7 @@ export function installApi(server: ViteDevServer, content: string, files: Source
       resource.changed();
     },
   });
-  const chat: ChatStore = new ChatStore({
+  const chat: ChatLog = new ChatLog({
     root,
     state,
     content,
@@ -78,16 +79,16 @@ export function installApi(server: ViteDevServer, content: string, files: Source
 
   const router = new Router();
   resource.mount(router);
-  diagnostics.mount(router);
-  const fileServer = new FileServer({ files, server });
-  fileServer.mount(router);
-  new FigureServer({ root, content, server }).mount(router);
+  new DiagnosticsResource(diagnostics).mount(router);
+  const fileResource = new FilesResource({ files, server });
+  fileResource.mount(router);
+  new FiguresResource({ root, content, server }).mount(router);
   server.middlewares.use(apiPrefix, router.middleware());
 
   const onFile = (file: string) => {
     if (file.startsWith(path.join(root, ".yapparatus") + path.sep)) return;
     diagnostics.fileChanged();
-    const address = fileServer.addressOf(file);
+    const address = fileResource.addressOf(file);
     // Keyed by address: two files saved together are two updates.
     if (address) send("yapparatus:file", () => address, `file:${address}`);
   };

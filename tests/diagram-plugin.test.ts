@@ -5,8 +5,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compile } from "@mdx-js/mdx";
-import { diagrams } from "../src/diagram-plugin.ts";
-import { contentIssues } from "../src/markdown-plugin.ts";
+import { contentIssues } from "../src/compiler/stages/conventions.ts";
+import { diagrams } from "../src/compiler/stages/diagrams.ts";
 
 let pages = 0;
 

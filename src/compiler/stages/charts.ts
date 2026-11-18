@@ -10,19 +10,19 @@ import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
-import { type DataFormat, formatNamed, formatNames, formatOfFile } from "./chart/formats.ts";
+import { type DataFormat, formatNamed, formatNames, formatOfFile } from "../../chart/formats.ts";
 import {
   type ChartData,
   type DataIssue,
   type RawTable,
   rowCount,
   typeTable,
-} from "./chart/table.ts";
-import { excerptFiles } from "./code-plugin.ts";
-import { type FileAddress, parseFileAddress } from "./document/file-address.ts";
-import { contentIssues } from "./markdown-plugin.ts";
-import type { SourceFile, SourceFiles } from "./source-files.ts";
-import { revision } from "./source-plugin.ts";
+} from "../../chart/table.ts";
+import { type FileAddress, parseFileAddress } from "../../document/file-address.ts";
+import type { ExternalFiles, SourceFile } from "../external-files.ts";
+import { revision } from "../revision.ts";
+import { contentIssues } from "./conventions.ts";
+import { excerptFiles } from "./excerpts.ts";
 
 /** A JavaScript expression in the syntax tree, as MDX stores a prop's value. */
 type Expression = ReturnType<typeof valueToEstree>;
@@ -48,7 +48,7 @@ export interface ChartFile {
 
 /** Read and type a chart's file, or say why it cannot be read. */
 export function readChartFile(
-  files: SourceFiles,
+  files: ExternalFiles,
   address: FileAddress,
 ): ChartFile | { error: string; line?: number; subject?: string } {
   const format = formatOfFile(address.path);
@@ -122,7 +122,7 @@ function pageTables(tree: Root) {
   return tables;
 }
 
-export function charts(files: SourceFiles) {
+export function charts(files: ExternalFiles) {
   return () => (tree: Root, file: { path: string }) => {
     const issues = contentIssues.get(file.path) ?? [];
     contentIssues.set(file.path, issues);

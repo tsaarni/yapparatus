@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { documentError } from "../src/document-directory.ts";
+import { documentError } from "../src/compiler/document-directory.ts";
 
 /** A project with a document.json in each of `documents`. */
 function project(documents: string[]): string {

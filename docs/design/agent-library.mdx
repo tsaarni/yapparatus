@@ -1,6 +1,6 @@
 # Agent library
 
-The agent library is the package export `yapparatus/agent`, in [`src/agent.ts`](/-/files/yapparatus/src/agent.ts). The agent calls it from shell commands to wait for the reader's messages, reply, check the document, and look at diagrams. This page describes the calls, the commands that run them, and the prompts the agent reads.
+The agent library is the package export `yapparatus/agent`, in [`src/agent/index.ts`](/-/files/yapparatus/src/agent/index.ts). The agent calls it from shell commands to wait for the reader's messages, reply, check the document, and look at diagrams. This page describes the calls, the commands that run them, and the prompts the agent reads.
 
 ## Overview
 
@@ -67,7 +67,7 @@ The server writes [every command](/-/files/yapparatus/src/server/prompt.ts#L10-L
 
 ## waitForMessage
 
-[`waitForMessage()`](/-/files/yapparatus/src/agent.ts#L120-L147) resolves with the unanswered reader messages and the errors that the agent has not been given. It takes no arguments, because [the server remembers both](server#what-the-agent-has-to-do).
+[`waitForMessage()`](/-/files/yapparatus/src/agent/index.ts#L120-L147) resolves with the unanswered reader messages and the errors that the agent has not been given. It takes no arguments, because [the server remembers both](server#what-the-agent-has-to-do).
 
 Each call makes a random agent id and sends it in the `Yapparatus-Agent` header of every read. The call reads with `wait=25` and repeats the read until the answer holds a message or an error. The start prompt tells the agent to run the wait command in the background when its shell notifies it of finished commands, and otherwise with the longest shell timeout, running it again when the shell stops it.
 
@@ -75,17 +75,17 @@ A call that is killed before it prints loses nothing, because the next call retu
 
 ## sendReply
 
-[`sendReply()`](/-/files/yapparatus/src/agent.ts#L155-L171) reads the reply's MDX from stdin and sends it as `{ "author": "agent", "mdx": … }`. It answers the reader messages that the last wait returned. When stdin is a terminal, it rejects at once instead of waiting for input.
+[`sendReply()`](/-/files/yapparatus/src/agent/index.ts#L155-L171) reads the reply's MDX from stdin and sends it as `{ "author": "agent", "mdx": … }`. It answers the reader messages that the last wait returned. When stdin is a terminal, it rejects at once instead of waiting for input.
 
 The server [checks the reply](server#reply-checks) before it stores it. A refused reply rejects with a `YapparatusError` whose message lists the errors and what to do next, and whose `diagnostics` hold the errors as data.
 
 ## checkDocument
 
-[`checkDocument()`](/-/files/yapparatus/src/agent.ts#L179-L183) resolves with every diagnostic once the checks of recent edits are done, the pages that no browser has checked since they changed, and a prompt that lists both. The agent runs it after editing and before replying. It sends no agent id, so it can run while a wait is open. What the list holds is described in [diagnostics](diagnostics#what-the-agent-sees).
+[`checkDocument()`](/-/files/yapparatus/src/agent/index.ts#L179-L183) resolves with every diagnostic once the checks of recent edits are done, the pages that no browser has checked since they changed, and a prompt that lists both. The agent runs it after editing and before replying. It sends no agent id, so it can run while a wait is open. What the list holds is described in [diagnostics](diagnostics#what-the-agent-sees).
 
 ## savePicture
 
-[`savePicture(address, file, options?)`](/-/files/yapparatus/src/agent.ts#L191-L202) saves a diagram's picture as a PNG in the file that the agent names. The address is the figure's `/page#figure`. With `{ ids: true }`, the picture labels each element with its id and outlines the elements that diagnostics name. The agent opens the file as an image and deletes it afterwards. The picture shows what no diagnostic covers, such as a layout that is valid but hard to read, so the start prompt asks the agent to look once after it changes a diagram and the check is clean.
+[`savePicture(address, file, options?)`](/-/files/yapparatus/src/agent/index.ts#L191-L202) saves a diagram's picture as a PNG in the file that the agent names. The address is the figure's `/page#figure`. With `{ ids: true }`, the picture labels each element with its id and outlines the elements that diagnostics name. The agent opens the file as an image and deletes it afterwards. The picture shows what no diagnostic covers, such as a layout that is valid but hard to read, so the start prompt asks the agent to look once after it changes a diagram and the check is clean.
 
 ## Prompts
 
@@ -111,7 +111,7 @@ The [start prompt](/-/files/yapparatus/src/server/prompt.ts#L215-L226) holds the
 <Ref to="agent-prompt" /> shows [a prompt with one reader message](/-/files/yapparatus/src/server/prompt.ts#L157-L182).
 
 <Diagram id="agent-prompt" caption="A prompt with one reader message, in its four parts. The two commands are shortened. The reply command is in full in its listing." description="The text of a prompt, with the reader's message, the references, the diagnostics, and the next commands marked" draw={(d) => {
-  d.text("Reader, 14:02:\n--- reader ---\nWhy does a read wait at most 25 s?\n--- end reader ---\nReferences, at the lines the reader saw. If the file changed since, find each by its address and words:\n- section, docs/design/rest-api.mdx:88-140, /rest-api#read-the-chat\n- file lines, src/agent.ts:120-147, /-/files/yapparatus/src/agent.ts#L120-L147\n\nDiagnostics: none\n\nEdit pages (/home/me/doc/docs/guide.md) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\nnode --input-type=module-typescript -e '… checkDocument() …'\n\nThen reply and wait:\n\nnode --input-type=module-typescript -e '… sendReply() … waitForMessage() …' <<'MDX'\n<your reply>\nMDX", {
+  d.text("Reader, 14:02:\n--- reader ---\nWhy does a read wait at most 25 s?\n--- end reader ---\nReferences, at the lines the reader saw. If the file changed since, find each by its address and words:\n- section, docs/design/rest-api.mdx:88-140, /rest-api#read-the-chat\n- file lines, src/agent/index.ts:120-147, /-/files/yapparatus/src/agent/index.ts#L120-L147\n\nDiagnostics: none\n\nEdit pages (/home/me/doc/docs/guide.md) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\nnode --input-type=module-typescript -e '… checkDocument() …'\n\nThen reply and wait:\n\nnode --input-type=module-typescript -e '… sendReply() … waitForMessage() …' <<'MDX'\n<your reply>\nMDX", {
     mono: true,
     id: "prompt",
     marks: {
@@ -139,7 +139,7 @@ When the server does not answer, `waitForMessage()` tries again every second for
 
 When [a newer agent](server#what-the-agent-has-to-do) reads the chat, the older agent's `waitForMessage()` rejects with "Another agent took over the chat. Stop waiting."
 
-A `YapparatusError` that a command does not catch is [printed to stderr](/-/files/yapparatus/src/agent.ts#L56-L63) without a stack trace, and the process exits with code 1. Other errors keep their stack. The agent needs the instructions for the fix, and a stack trace does not help it.
+A `YapparatusError` that a command does not catch is [printed to stderr](/-/files/yapparatus/src/agent/index.ts#L56-L63) without a stack trace, and the process exits with code 1. Other errors keep their stack. The agent needs the instructions for the fix, and a stack trace does not help it.
 
 ## Packaging
 
@@ -147,7 +147,7 @@ Commands import the library as `yapparatus/agent`. The export points at JavaScri
 
 Commands use erasable TypeScript only: TypeScript whose types can be removed without changing the code. Node removes the types without checking them, and an enum or a parameter property is an error.
 
-Each call [finds the server](/-/files/yapparatus/src/agent.ts#L69-L82) through `.yapparatus/server.json` in the current directory or the nearest one above it, so a command names no document and no port. Without the file, or when the file is stale after a crash, the call rejects with instructions to start the server. The library [logs](server#logging) to stderr.
+Each call [finds the server](/-/files/yapparatus/src/agent/index.ts#L69-L82) through `.yapparatus/server.json` in the current directory or the nearest one above it, so a command names no document and no port. Without the file, or when the file is stale after a crash, the call rejects with instructions to start the server. The library [logs](server#logging) to stderr.
 
 ## Design decisions
 

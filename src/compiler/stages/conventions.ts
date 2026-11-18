@@ -9,8 +9,8 @@ import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxAttribute, MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { bundledLanguages } from "shiki";
 import { visit } from "unist-util-visit";
-import type { DiagnosticCode } from "./document/diagnostic.ts";
-import { alertKinds, type CodeMark, type FileTreeEntry } from "./document/page-module.ts";
+import type { DiagnosticCode } from "../../document/diagnostic.ts";
+import { alertKinds, type CodeMark, type FileTreeEntry } from "../../document/page-module.ts";
 
 export interface ContentIssue {
   code: DiagnosticCode;

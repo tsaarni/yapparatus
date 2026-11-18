@@ -15,8 +15,8 @@ cpSync("tests/fixtures/source", path.join(root, "source"), { recursive: true });
 symlinkSync(path.resolve("node_modules"), path.join(root, "node_modules"), "dir");
 // The workspace's copy, so the web app it serves is inside the workspace, as in a project.
 const { yapparatus } = (await import(
-  path.join(root, "src", "vite.ts")
-)) as typeof import("../src/vite.ts");
+  path.join(root, "src", "vite", "plugin.ts")
+)) as typeof import("../src/vite/plugin.ts");
 const server = await createServer({
   root,
   configFile: false,

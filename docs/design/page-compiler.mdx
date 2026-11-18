@@ -4,7 +4,7 @@ The page compiler turns an MDX page into a JavaScript module that the web app ca
 
 ## Pipeline
 
-The page compiler is the MDX plugin for Vite, [set up with a list of stages](/-/files/yapparatus/src/vite.ts#L471-L486). Each stage reads or changes the page's syntax tree, which holds its headings, paragraphs, and components. <Ref to="compiler-pipeline" /> shows the stages in order.
+The page compiler is [a list of Vite plugins](/-/files/yapparatus/src/compiler/pipeline.ts) in `src/compiler/`. Its core is the MDX plugin, [set up with the stages in order](/-/files/yapparatus/src/compiler/page.ts#L26-L43); the others add icons, styles, and React, and [virtual modules](/-/files/yapparatus/src/compiler/virtual-modules.ts) give the web app the document. The `yapparatus()` plugin in [`src/vite/plugin.ts`](/-/files/yapparatus/src/vite/plugin.ts) combines these plugins with the [server](server) and with what only a build needs. Each stage reads or changes the page's syntax tree, which holds its headings, paragraphs, and components. <Ref to="compiler-pipeline" /> shows the stages in order.
 
 <Diagram id="compiler-pipeline" caption="The stages of the page compiler, in order. Each color is one form of the page's syntax tree." draw={(d) => {
   const file = d.box("Page file", { id: "page-file", sub: "MDX" })
@@ -42,6 +42,8 @@ The page compiler is the MDX plugin for Vite, [set up with a list of stages](/-/
 </Diagram>
 
 Files are read before the outline is recorded, because the page's [revision](#revisions) covers those files. Highlighting runs after the excerpts and the source marks, so it colors every code block and numbers its lines.
+
+On the dev server, the diagnostic store, the pictures, and the document module compile a page [in the server's own environment](/-/files/yapparatus/src/compiler/page.ts#L45-L60), so these compiles do not hold back the browser's first page load. A page whose file changed since its last compile is compiled again.
 
 A stage that finds a problem adds an issue for the file. After each compile, the server turns the issues into diagnostics at the page's lines, as [origins](diagnostics#origins) describes. A stage that cannot continue throws, and the compile fails with `COMPILE_FAILED`. <Ref to="compiler-sample" /> shows a page and its module.
 
@@ -90,7 +92,7 @@ function _createMdxContent(props) {
 
 ## The document module
 
-The web app reads the list of pages from one module, which the plugin [writes from `document.json` and the page files](/-/files/yapparatus/src/vite.ts#L267-L360). <Ref to="compiler-document-module" /> shows what it holds.
+The web app reads the list of pages from one module, which the compiler [writes from `document.json` and the page files](/-/files/yapparatus/src/compiler/virtual-modules.ts#L170-L263). <Ref to="compiler-document-module" /> shows what it holds.
 
 <Diagram id="compiler-document-module" caption="What the document module holds, and one entry of its page list." draw={(d) => {
   const exports = d.record([
@@ -111,9 +113,9 @@ The web app reads the list of pages from one module, which the plugin [writes fr
   d.arrow(exports.element("pages"), entry)
 }} />
 
-The plugin first checks `document.json` and its page list against the files on disk, and reports errors as `PAGE_LIST`.
+The compiler first checks `document.json` and its page list against the files on disk, and reports errors as `PAGE_LIST`.
 
-The module holds every page's outline, so the contents, figure numbers, and `<Ref>` work before any page's code loads. To get the outlines, the plugin compiles every page. A page that fails to compile gets an empty outline, so the contents still list it.
+The module holds every page's outline, so the contents, figure numbers, and `<Ref>` work before any page's code loads. To get the outlines, the compiler compiles every page. A page that fails to compile gets an empty outline, so the contents still list it.
 
 A page's code loads when the page is first shown. When it changes, the module swaps in the new page module and outline and tells the web app, as [hot updates](web-app#hot-updates) describes. Pages are compiled without React Fast Refresh, which would reload the browser for a module that exports an outline.
 
@@ -143,7 +145,7 @@ For each `<Icon name="collection:name">`, the icon stage imports that one icon, 
 
 ## Diagrams
 
-The diagram stage runs each draw program in [a fresh JavaScript context](/-/files/yapparatus/src/diagram-plugin.ts#L201-L238) without Node's names or the page's, and hands the result and the steps to the [diagram compiler](diagram-compiler). The context keeps names out but is not a sandbox. A program that throws is `DRAW_FAILED` at the page's line.
+The diagram stage runs each draw program in [a fresh JavaScript context](/-/files/yapparatus/src/compiler/stages/diagrams.ts#L201-L238) without Node's names or the page's, and hands the result and the steps to the [diagram compiler](diagram-compiler). The context keeps names out but is not a sandbox. A program that throws is `DRAW_FAILED` at the page's line.
 
 The compiled diagram replaces the draw program, so the browser receives only data, and its diagnostics become issues of the page. Compiled diagrams are cached by their source, so an edit elsewhere on the page does not compile them again.
 
@@ -153,7 +155,7 @@ The chart stage reads and checks each chart's data. Data written on the page goe
 
 ## Code and excerpts
 
-Code blocks, excerpts, and the [file view](web-app#file-view) share [one highlighting function](/-/files/yapparatus/src/code-plugin.ts#L39-L84), which uses the Shiki highlighter with the theme's colors. <Ref to="compiler-highlighted-code" /> shows its result: each token style once, and each line as pairs of a style and a text.
+Code blocks, excerpts, and the [file view](web-app#file-view) share [one highlighting function](/-/files/yapparatus/src/compiler/stages/highlight.ts#L29-L74), which uses the Shiki highlighter with the theme's colors. <Ref to="compiler-highlighted-code" /> shows its result: each token style once, and each line as pairs of a style and a text.
 
 <Listing id="compiler-highlighted-code" caption="Highlighted code, as code blocks, excerpts, and the file view carry it.">
 <Excerpt from="/-/files/yapparatus/src/document/page-module.ts" start="export interface HighlightedCode {" />
@@ -203,7 +205,7 @@ The `yap` command makes three outputs from one document directory, as <Ref to="c
     d.arrow(source.bottom, out.top, { route: { viaY: d.lerp(source.bottom, out.top) } })
 }} />
 
-The website build writes an HTML file for every address, so any static host serves every page, as <Ref to="compiler-site" /> shows.
+The website build [writes an HTML file for every address](/-/files/yapparatus/src/vite/page-files.ts), so any static host serves every page, as <Ref to="compiler-site" /> shows.
 
 <Figure id="compiler-site" caption="The website build of the document directory docs/design.">
 

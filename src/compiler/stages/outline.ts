@@ -3,10 +3,10 @@ import type { Element, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
-import { excerptFiles } from "./code-plugin.ts";
-import type { NumberedKind, PageOutline } from "./document/page-module.ts";
-import { contentIssues } from "./markdown-plugin.ts";
-import { pageRevision } from "./source-plugin.ts";
+import type { NumberedKind, PageOutline } from "../../document/page-module.ts";
+import { pageRevision } from "../revision.ts";
+import { contentIssues } from "./conventions.ts";
+import { excerptFiles } from "./excerpts.ts";
 
 /** Which MDX components are numbered blocks, and of which kind. */
 const numberedComponents: Record<string, NumberedKind> = {

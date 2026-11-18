@@ -6,7 +6,7 @@
  */
 import { parseArgs } from "node:util";
 import { build, createServer, type InlineConfig, preview } from "vite";
-import { yapparatus } from "./vite.ts";
+import { yapparatus } from "./plugin.ts";
 
 const usage = `Usage:
   yap dev <directory> [--port <port>] [--open] [--force]

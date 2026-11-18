@@ -1,6 +1,4 @@
 /** Checks of the content folder's `document.json` and its page files, as readable messages. */
-
-import { folderName } from "../document/file-address.ts";
 import { iconName, pageIdOf, type ThemeSetting, themeSettings } from "../document/settings.ts";
 
 const pageName = /^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)*$/;
@@ -50,21 +48,4 @@ export function checkIcons(settings: { logo?: unknown; favicon?: unknown }): str
       `"${field}" in document.json is ${JSON.stringify(value)}; use an icon name such as "lucide:book-open" or "local:logo".`,
     ];
   });
-}
-
-/** Errors in the `files` field of `document.json`, as readable messages. */
-export function checkFiles(files: unknown): string[] {
-  if (files === undefined) return [];
-  if (typeof files !== "object" || files === null || Array.isArray(files))
-    return [
-      '"files" in document.json names external directories by name: { "files": { "app": "../app" } }.',
-    ];
-  return Object.entries(files).flatMap(([name, folder]) => [
-    ...(folderName.test(name)
-      ? []
-      : [`"files" in document.json names "${name}": use lowercase letters, digits, and hyphens.`]),
-    ...(typeof folder === "string" && folder
-      ? []
-      : [`"files" in document.json gives "${name}" no directory path.`]),
-  ]);
 }
