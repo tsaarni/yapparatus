@@ -1,3 +1,4 @@
+import { Contrast } from "./contrast.tsx";
 import { Swatch } from "./swatch.tsx";
 
 # Styling
@@ -43,7 +44,7 @@ The web app is styled with [StyleX](https://stylexjs.com/), which compiles the s
 
 </Figure>
 
-Authors' own components import the same tokens from `yapparatus/theme.stylex`; see [custom components](/components#custom-components).
+Authors' own components import the same tokens from `yapparatus/theme.stylex`; see [custom components](/components#custom-components). `palettes` gives the hex values of each theme for a component that computes with them, as [the contrast table](#contrast) does.
 
 ## Tokens
 
@@ -94,37 +95,44 @@ Surfaces step away from the background in lightness: `canvas`, `surface`, `surfa
 
 [The theme test](/-/files/yapparatus/tests/unit/web/style/theme.test.ts) computes the WCAG contrast of each pair of roles drawn together, in the dark and light themes, each with increased contrast and in print. Text and status colors need 4.5:1, the [AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html). Control edges and diagram outlines need 3:1, the [minimum for graphics](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Tinted fills and dividers need 1.3:1. The test also checks that the category colors stay apart with red-green color blindness.
 
-<Ref to="styling-contrast" /> lists the ratios on `surface`, computed with the test's formula, and <Ref to="styling-contrast-chart" /> draws them. The smallest margin is `textMuted` on a tinted surface, at 4.82:1.
+Contrast compares the relative luminance of two colors. Each channel of a color, read as a fraction $$s$$ of 255, is first made linear, and the three linear channels are weighted by how bright each looks:
+
+$$
+c = \begin{cases} \dfrac{s}{12.92} & s \le 0.04045 \\ \left(\dfrac{s + 0.055}{1.055}\right)^{2.4} & \text{otherwise} \end{cases}
+$$
+
+$$
+L = 0.2126\,c_R + 0.7152\,c_G + 0.0722\,c_B
+$$
+
+The ratio of the lighter color's luminance to the darker one's ranges from 1 for equal colors to 21 for black on white:
+
+$$
+\text{contrast} = \frac{L_\text{lighter} + 0.05}{L_\text{darker} + 0.05}
+$$
+
+<Ref to="styling-contrast" /> lists the ratios on `surface`. The page computes them with the same formula from the theme file, so they follow any change to the colors.
 
 <Table id="styling-contrast" caption="Contrast on surface, by role and theme.">
 
 | Role | Theme | Contrast | Minimum |
 |---|---|---:|---:|
-| `text` | Dark | 16.42 | 4.5 |
-| `text` | Light | 17.04 | 4.5 |
-| `textBody` | Dark | 11.17 | 4.5 |
-| `textBody` | Light | 12.07 | 4.5 |
-| `textMuted` | Dark | 6.90 | 4.5 |
-| `textMuted` | Light | 6.63 | 4.5 |
-| `accent` | Dark | 7.28 | 4.5 |
-| `accent` | Light | 5.91 | 4.5 |
-| `borderControl` | Dark | 4.57 | 3 |
-| `borderControl` | Light | 3.73 | 3 |
-| `border` | Dark | 1.45 | 1.3 |
-| `border` | Light | 1.46 | 1.3 |
+| `text` | Dark | <Contrast fg="text" theme="dark" /> | 4.5 |
+| `text` | Light | <Contrast fg="text" theme="light" /> | 4.5 |
+| `textBody` | Dark | <Contrast fg="textBody" theme="dark" /> | 4.5 |
+| `textBody` | Light | <Contrast fg="textBody" theme="light" /> | 4.5 |
+| `textMuted` | Dark | <Contrast fg="textMuted" theme="dark" /> | 4.5 |
+| `textMuted` | Light | <Contrast fg="textMuted" theme="light" /> | 4.5 |
+| `accent` | Dark | <Contrast fg="accent" theme="dark" /> | 4.5 |
+| `accent` | Light | <Contrast fg="accent" theme="light" /> | 4.5 |
+| `borderControl` | Dark | <Contrast fg="borderControl" theme="dark" /> | 3 |
+| `borderControl` | Light | <Contrast fg="borderControl" theme="light" /> | 3 |
+| `border` | Dark | <Contrast fg="border" theme="dark" /> | 1.3 |
+| `border` | Light | <Contrast fg="border" theme="light" /> | 1.3 |
 
 </Table>
 
-<Chart id="styling-contrast-chart" caption="Contrast on surface, on a log scale. The rules mark the minimums 1.3, 3, and 4.5." from="#styling-contrast" plot={(Plot, rows) => ({
-  marks: [
-    Plot.ruleX([1.3, 3, 4.5]),
-    Plot.dot(rows, { x: "Contrast", y: "Role", fill: "Theme", r: 5 }),
-  ],
-  x: { type: "log", grid: true },
-  y: { label: null },
-})} />
-
-Increased contrast raises the borders and the secondary text. With it, `borderControl` reaches 6.09:1 in the dark theme and 5.34:1 in the light theme.
+Increased contrast raises the borders and the secondary text. With it, `borderControl` reaches <Contrast fg="borderControl" theme="dark" more />:1 in the dark theme and <Contrast fg="borderControl" theme="light" more />:1 in the light theme.
 
 ## Themes
 
@@ -132,7 +140,7 @@ The `"theme"` setting in `document.json` is `"dark"`, the default, `"light"`, or
 
 ## Typography and scales
 
-Inter is the font of text, the interface, and diagrams, and JetBrains Mono the font of code. Size, weight, and color show the hierarchy, with six font sizes and three weights. The page title scales with the reading column. The other scales hold spaces, which are multiples of 4 px, radii, sizes, layers, strokes, and durations, so that components written apart line up.
+Inter is the font of text, the interface, and diagrams, and JetBrains Mono the font of code. Math uses a math font the system has, STIX Two Math on macOS or Cambria Math on Windows, because stretched brackets and large operators need a font made for them. Size, weight, and color show the hierarchy, with six font sizes and three weights. The page title scales with the reading column. The other scales hold spaces, which are multiples of 4 px, radii, sizes, layers, strokes, and durations, so that components written apart line up.
 
 Diagram labels are 13.5 px, outside the scale, because the diagram compiler [measures text](/diagram-compiler#text-measurement) at this size.
 

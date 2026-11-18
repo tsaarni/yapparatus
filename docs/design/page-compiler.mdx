@@ -4,12 +4,12 @@ The page compiler turns an MDX page into a JavaScript module that the web app ca
 
 ## Pipeline
 
-The page compiler is [a list of Vite plugins](/-/files/yapparatus/src/compiler/pipeline.ts) in `src/compiler/`. Its core is the MDX plugin, [set up with the stages in order](/-/files/yapparatus/src/compiler/page.ts#L26-L43); the others add icons, styles, and React, and [virtual modules](/-/files/yapparatus/src/compiler/virtual-modules.ts) give the web app the document. The `yapparatus()` plugin in [`src/vite/plugin.ts`](/-/files/yapparatus/src/vite/plugin.ts) combines these plugins with the [server](server) and with what only a build needs. Each stage reads or changes the page's syntax tree, which holds its headings, paragraphs, and components. <Ref to="compiler-pipeline" /> shows the stages in order.
+The page compiler is [a list of Vite plugins](/-/files/yapparatus/src/compiler/pipeline.ts) in `src/compiler/`. Its core is the MDX plugin, [set up with the stages in order](/-/files/yapparatus/src/compiler/page.ts#L29-L47); the others add icons, styles, and React, and [virtual modules](/-/files/yapparatus/src/compiler/virtual-modules.ts) give the web app the document. The `yapparatus()` plugin in [`src/vite/plugin.ts`](/-/files/yapparatus/src/vite/plugin.ts) combines these plugins with the [server](server) and with what only a build needs. Each stage reads or changes the page's syntax tree, which holds its headings, paragraphs, and components. <Ref to="compiler-pipeline" /> shows the stages in order.
 
 <Diagram id="compiler-pipeline" caption="The stages of the page compiler, in order. Each color is one form of the page's syntax tree." draw={(d) => {
   const file = d.box("Page file", { id: "page-file", sub: "MDX" })
-  const parse = d.box("Parse", { id: "parse", sub: "MDX, tables, icons", category: "Markdown tree" })
-  const prepare = d.box("To HTML", { id: "to-html", sub: "heading ids, conventions", category: "HTML tree" })
+  const parse = d.box("Parse", { id: "parse", sub: "MDX, tables, math, icons", category: "Markdown tree" })
+  const prepare = d.box("To HTML", { id: "to-html", sub: "math, heading ids, conventions", category: "HTML tree" })
   const files = d.box("Read files", { id: "read-files", sub: "excerpts, chart data", category: "HTML tree" })
   const diagrams = d.box("Diagrams", { id: "diagrams", sub: "run draw", category: "HTML tree" })
   const record = d.box("Record", { id: "record", sub: "outline, source lines", category: "HTML tree" })
@@ -33,7 +33,7 @@ The page compiler is [a list of Vite plugins](/-/files/yapparatus/src/compiler/p
   }
 }}>
   <Step focus="page-file parse">The parser reads the MDX into a Markdown tree, and each icon name becomes an import.</Step>
-  <Step focus="to-html">The tree becomes an HTML tree. Headings get ids, and [Markdown conventions](#markdown-conventions) become props.</Step>
+  <Step focus="to-html">The tree becomes an HTML tree. [Math](#math) becomes MathML, headings get ids, and [Markdown conventions](#markdown-conventions) become props.</Step>
   <Step focus="read-files">Excerpts read lines from files, and charts read and check their data.</Step>
   <Step focus="diagrams">Each draw program runs, and the [compiled diagram](#diagrams) replaces it.</Step>
   <Step focus="record">The outline records what the page contains, and each block is marked with its lines.</Step>
@@ -138,6 +138,10 @@ The conventions stage reads Markdown forms and component children and writes wha
 </Table>
 
 Code marks, such as `// [!code ++]`, are removed before highlighting, so they work in any language, including JSON.
+
+## Math
+
+`remark-math` reads TeX between `$$` marks, inline in a sentence or as a block on lines of its own. A single `$` stays text, so a price needs no escaping. The math stage runs first among the HTML stages and turns each formula into MathML with [Temml](https://temml.org/), so the browser draws it natively and the page loads no math code or style sheet. The web app draws math in a [math font the system has](styling#typography-and-scales). MathML takes the text color of the theme and prints as it is. TeX that does not parse is `MATH_INVALID` at its line, and the page shows the TeX as code.
 
 ## Icons
 

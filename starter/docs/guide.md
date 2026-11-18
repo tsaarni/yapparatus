@@ -72,6 +72,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 ## Code and layout
 
 - Give every fenced code block a language, or `text` for plain text. Keep code you write within 100 columns. Code copied from an existing source, such as a command a tool prints or a file's lines, keeps its own formatting; prefer an `Excerpt` for project files.
+- Write math as TeX between `$$` marks: `$$x^2$$` in a sentence, or on lines of their own for a block. See [math](components.md#math).
 - Mark changed or important lines with `// [!code ++]`, `// [!code --]`, and `// [!code highlight]`. See [code marks](components.md#code-marks).
 - Put alternatives the reader picks one of, such as package managers, in `<Tabs>`, and things the reader compares, such as an old and a new design, in `<Columns>`, each made of labelled `<Panel>`s. Wrap code columns in a `Listing` and drawing columns in a `Figure` to number them. See [tabs and columns](components.md#tabs-and-columns).
 

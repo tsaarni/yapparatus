@@ -91,7 +91,7 @@ test("every theme gives every role a value", () => {
   assert.deepEqual(
     Object.keys(lightTheme).sort(),
     Object.keys(theme)
-      .filter((r) => r !== "sans" && r !== "mono")
+      .filter((r) => r !== "sans" && r !== "mono" && r !== "math")
       .sort(),
   );
 });

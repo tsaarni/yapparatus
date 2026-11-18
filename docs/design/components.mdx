@@ -147,21 +147,7 @@ Print shows the plain figure without step-only elements, and prints the text of 
 
 ## Chart
 
-The web app loads Observable Plot with the first chart on a page and calls the author's `plot` with the checked rows and the chart's width. Only the browser draws a chart, so it reports a chart's problems to the server; see [charts](charts). <Ref to="components-chart" /> shows the line counts of four files of the web app.
-
-<Chart id="components-chart" caption="Lines of code in four files of the web app." plot={(Plot, rows) => ({
-  marks: [Plot.barY(rows, { x: "Module", y: "Lines" }), Plot.ruleY([0])],
-})}>
-
-```csv
-Module,Lines
-shell/app.tsx,445
-prose/code-block.tsx,387
-chart/chart.tsx,369
-components/alternatives.tsx,364
-```
-
-</Chart>
+The web app loads Observable Plot with the first chart on a page and calls the author's `plot` with the checked rows and the chart's width. Only the browser draws a chart, so it reports a chart's problems to the server; see [charts](charts).
 
 ## References and icons
 

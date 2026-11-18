@@ -5,7 +5,11 @@
 
 > A plain quotation stays a quotation.
 
-The migration changes one setting and adds another.
+The migration changes one setting and adds another. Each retry waits $$2^n$$ seconds, and the total wait is
+
+$$
+\sum_{n=0}^{r-1} 2^n = 2^r - 1
+$$
 
 ```ts
 const config = {

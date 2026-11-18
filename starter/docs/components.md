@@ -1,6 +1,6 @@
 # Components
 
-`Figure`, `Chart`, `Diagram`, `Step`, `Table`, `Listing`, `Excerpt`, `Ref`, `Icon`, `FileTree`, `Tabs`, `Columns`, and `Panel` work in MDX pages and chat replies without imports, and so do alerts and code marks. Diagrams and their steps have [their own reference](diagrams.md), and so do [charts](charts.md) and [icons](icons.md).
+`Figure`, `Chart`, `Diagram`, `Step`, `Table`, `Listing`, `Excerpt`, `Ref`, `Icon`, `FileTree`, `Tabs`, `Columns`, and `Panel` work in MDX pages and chat replies without imports, and so do alerts, code marks, and math. Diagrams and their steps have [their own reference](diagrams.md), and so do [charts](charts.md) and [icons](icons.md).
 
 ## Figure
 
@@ -87,6 +87,18 @@ Mark only the lines the text talks about.
 ```
 
 A blockquote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, or `[!CAUTION]` is an alert of that kind. Any other `[!…]` marker is an error. Keep an alert to one or two sentences, and use one only for what the reader must not miss. A blockquote without a marker is a quotation.
+
+## Math
+
+```mdx
+Each retry waits $$2^n$$ seconds, so $$r$$ retries wait
+
+$$
+\sum_{n=0}^{r-1} 2^n = 2^r - 1
+$$
+```
+
+TeX between `$$` marks is math. Inside a sentence it is inline; on lines of its own it is a block, centered on its own line. A single `$` is text, so prices such as $5 need no escaping. The page compiler turns the TeX into MathML, which the browser draws. TeX that does not parse is `MATH_INVALID`, and the page shows its source. Equations are not numbered and cannot be referenced.
 
 ## Tabs and Columns
 
@@ -200,6 +212,7 @@ export function CacheLabel() {
 ```
 
 - Use tokens for every value: `theme` for colors and fonts; `fontSize`, `fontWeight`, `lineHeight`, `letterSpacing`, `space`, `radius`, `sizes`, `layer`, and `duration` for scales; `when.narrow` for a narrow reading column. Do not use literal colors.
+- To compute with a theme's colors, such as a contrast ratio, read the hex values from `palettes`: `palettes.dark.surface`. Styles use `theme`, which follows the reader's theme.
 - Use longhand properties (`borderWidth`, `backgroundColor`). StyleX silently drops shorthands that contain theme variables.
 - Do not import application internals; use `yapparatus` and `yapparatus/theme.stylex`.
 - Do not put a `<Diagram>` in a component. The page compiler compiles diagrams written in pages and replies only.

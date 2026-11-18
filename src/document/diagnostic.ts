@@ -45,6 +45,7 @@ export const diagnosticCodes = {
     meaning: "A code block names no language, or one the highlighter does not know.",
   },
   HEADING_DEPTH: { severity: "error", meaning: "A heading is deeper than ###." },
+  MATH_INVALID: { severity: "error", meaning: "Math between $$ marks is not valid TeX." },
   FILE_TREE_INVALID: {
     severity: "error",
     meaning: "A <FileTree> does not wrap one Markdown list.",

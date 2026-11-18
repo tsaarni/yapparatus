@@ -1,5 +1,11 @@
 import * as stylex from "@stylexjs/stylex";
-import { type HTMLAttributes, type ImgHTMLAttributes, type ReactNode, useContext } from "react";
+import {
+  createElement,
+  type HTMLAttributes,
+  type ImgHTMLAttributes,
+  type ReactNode,
+  useContext,
+} from "react";
 import {
   fontSize,
   fontWeight,
@@ -37,6 +43,16 @@ function Code(props: Props) {
   return <code {...props} {...stylex.props(s.code, s.inlineCode)} />;
 }
 
+/**
+ * Math, compiled to MathML. Block math scrolls sideways when it is wider than the column, so
+ * the page does not.
+ */
+function MathElement(props: Props & { display?: string }) {
+  const block = props.display === "block";
+  // React's JSX types have no MathML elements.
+  return createElement("math", { ...props, ...stylex.props(s.math, block && s.mathBlock) });
+}
+
 function ListElement({ ordered, ...props }: Props & { ordered: boolean }) {
   const { reply } = useContext(ReadingContext);
   const Tag = ordered ? "ol" : "ul";
@@ -53,6 +69,7 @@ export const prose = {
   a: Link,
   pre: Pre,
   code: Code,
+  math: MathElement,
   ul: (props: Props) => <ListElement ordered={false} {...props} />,
   ol: (props: Props) => <ListElement ordered {...props} />,
   img: (props: ImgHTMLAttributes<HTMLImageElement>) => (
@@ -116,6 +133,17 @@ const s = stylex.create({
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: theme.border,
+  },
+  math: {
+    fontFamily: theme.math,
+  },
+  mathBlock: {
+    display: "block math",
+    marginBlock: "0 1.1em",
+    paddingBlock: space.xs,
+    overflowX: "auto",
+    overflowY: "hidden",
+    fontSize: fontSize.lg,
   },
   hr: {
     marginBlock: space.xl3,

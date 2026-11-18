@@ -152,32 +152,6 @@ Two pure directories need more than the standard library. `chart/` has the DOM l
 
 `tsconfig.lib.json` compiles the `yap` command and the `yapparatus/vite` and `yapparatus/agent` entries to `lib/`, which then holds only Node and pure code. The web app is published as source, and the Vite of the project that uses it compiles it. The unit tests in `tests/unit/` follow the directories under `src/`, and each test file is named after the file or subject that it tests.
 
-<Ref to="overview-lines" /> gives the size of each directory, counted with `wc -l`, and <Ref to="overview-lines-chart" /> draws it.
-
-<Table id="overview-lines" caption="Lines of code in src/.">
-
-| Code | Lines |
-|---|---:|
-| `src/web/` | 9136 |
-| `src/diagram/` | 4166 |
-| `src/compiler/` | 2647 |
-| `src/server/` | 1963 |
-| `src/document/` | 582 |
-| `src/chart/` | 405 |
-| `src/vite/` | 260 |
-| `src/protocol/` | 249 |
-| `src/agent/` | 202 |
-
-</Table>
-
-<Chart id="overview-lines-chart" caption="Lines of code in src/." from="#overview-lines" plot={(Plot, rows) => ({
-  marks: [
-    Plot.barX(rows, { y: "Code", x: "Lines", sort: { y: "-x" } }),
-    Plot.ruleX([0]),
-  ],
-  x: { grid: true },
-})} />
-
 ## How to read this document
 
 <Ref to="overview-pages" /> lists the pages, which follow a document from its files to the reader and the agent.

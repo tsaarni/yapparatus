@@ -31,7 +31,7 @@ export interface ContentIssue {
   message: string;
 }
 
-/** Issues found in each compiled file, by absolute path. Replaced on every compile. */
+/** Issues found in each compiled file, by absolute path. The math stage starts them on every compile. */
 export const contentIssues = new Map<string, ContentIssue[]>();
 
 /** Plain text needs no grammar; every other name must be one Shiki knows. */
@@ -39,7 +39,7 @@ const plainLanguages = ["text", "txt", "plain"];
 
 export function markdownConventions() {
   return (tree: Root, file: { path: string }) => {
-    const issues: ContentIssue[] = [];
+    const issues = contentIssues.get(file.path) ?? [];
     // Panels a container has claimed; the tree is visited parents first.
     const claimed = new Set<unknown>();
     visit(tree, (node) => {

@@ -7,6 +7,7 @@ import path from "node:path";
 import type { Options } from "@mdx-js/rollup";
 import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import type { ViteDevServer } from "vite";
 import type { DocumentDirectory } from "./document-directory.ts";
 import { charts } from "./stages/charts.ts";
@@ -15,21 +16,24 @@ import { diagrams, pageFigures } from "./stages/diagrams.ts";
 import { excerpts } from "./stages/excerpts.ts";
 import { codeHighlighting } from "./stages/highlight.ts";
 import { iconImports } from "./stages/icons.ts";
+import { math } from "./stages/math.ts";
 import { pageOutline } from "./stages/outline.ts";
 import { sourceContext } from "./stages/source-context.ts";
 
 /**
  * The stages of a page, in the order they run. Each later stage reads what the earlier ones
- * wrote: the outline needs heading ids and the files that excerpts and charts read, and the
- * highlighter colors the code blocks that excerpts made.
+ * wrote: math comes first, so no later stage reads it as code; the outline needs heading ids
+ * and the files that excerpts and charts read; and the highlighter colors the code blocks that
+ * excerpts made.
  */
 export function pageStages(
   document: DocumentDirectory,
 ): Pick<Options, "remarkPlugins" | "rehypePlugins"> {
   const { root, content, files } = document;
   return {
-    remarkPlugins: [remarkGfm, iconImports],
+    remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }], iconImports],
     rehypePlugins: [
+      math,
       rehypeSlug,
       markdownConventions,
       excerpts(files),

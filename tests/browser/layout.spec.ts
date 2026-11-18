@@ -168,7 +168,7 @@ test("narrow reading keeps contents, typography, and menu inside viewport", asyn
   ).toBeTruthy();
 });
 
-test("markdown conventions: alerts, marked code lines, and file trees", async ({
+test("markdown conventions: alerts, math, marked code lines, and file trees", async ({
   page,
   context,
 }) => {
@@ -182,6 +182,14 @@ test("markdown conventions: alerts, marked code lines, and file trees", async ({
   await expect(alert).toContainText("Back up the database before you migrate.");
   await expect(alert).not.toContainText("[!WARNING]");
   await expect(page.locator("blockquote")).toHaveText("A plain quotation stays a quotation.");
+
+  // Math is MathML: inline in the sentence, and a block on its own line.
+  const inline = page.locator("p math");
+  await expect(inline.locator("msup")).toHaveCount(1);
+  const block = page.locator('math[display="block"]');
+  await expect(block.locator("munderover")).toHaveCount(1);
+  await expect(block).toHaveCSS("display", "block math");
+  await expect(page.locator("article")).not.toContainText("$$");
 
   // Marked lines, with the notation removed; Copy leaves out the removed line.
   const code = page.locator("pre code");

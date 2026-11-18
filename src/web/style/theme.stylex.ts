@@ -127,6 +127,9 @@ const lightMore: Partial<Record<Role, string>> = {
   accentBorder: "#7d8be0",
 };
 
+/** The raw color values of each theme, for document pages that compute with them, such as contrast. */
+export const palettes = { dark, light, darkMore, lightMore };
+
 /** One role in a theme: its screen value, its stronger value, and the light value for print. */
 const role = (
   name: Role,
@@ -182,6 +185,8 @@ export const theme = stylex.defineVars({
   shadowOverlay: darkRole("shadowOverlay"),
   sans: '"Inter Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   mono: '"JetBrains Mono Variable", "SFMono-Regular", Menlo, Consolas, monospace',
+  /** Math fonts the systems have: their stretchy brackets and large operators need one. */
+  math: '"STIX Two Math", "Cambria Math", math',
 });
 
 /** The light theme, applied as a class on the root element. */

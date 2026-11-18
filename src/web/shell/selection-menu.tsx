@@ -19,8 +19,8 @@ import { layer, radius, space, theme, when } from "../style/theme.stylex.ts";
 const live = import.meta.env.DEV;
 
 /**
- * The menu over selected text or code: Comment, in live mode, and Copy link, which copies the
- * address of the words or the lines.
+ * The menu over selected text or code: Copy link, which copies the address of the words or the
+ * lines, and Comment, in live mode. Both are icon buttons.
  */
 export function SelectionMenu({
   menu,
@@ -40,24 +40,6 @@ export function SelectionMenu({
       {...styled("selection-menu", s.selectionMenu)}
       style={{ left: menu.x, top: menu.y }}
     >
-      {live && (
-        <Button
-          variant="ghost"
-          size="small"
-          onMouseDown={(event) => event.preventDefault()}
-          onClick={() => {
-            const range = menu.range;
-            if (range) {
-              const text = page ? referencesFromRange(range, page) : [];
-              onComment([...text, ...fileReferencesFromRange(range)]);
-            }
-            window.getSelection()?.removeAllRanges();
-            dismiss();
-          }}
-        >
-          <Icon name="comment" size={14} /> Comment
-        </Button>
-      )}
       <CopyPassageLink
         link={() => {
           const range = menu.range;
@@ -77,6 +59,26 @@ export function SelectionMenu({
         }}
         dismiss={dismiss}
       />
+      {live && (
+        <Button
+          variant="icon"
+          size="small"
+          aria-label="Comment"
+          title="Comment"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => {
+            const range = menu.range;
+            if (range) {
+              const text = page ? referencesFromRange(range, page) : [];
+              onComment([...text, ...fileReferencesFromRange(range)]);
+            }
+            window.getSelection()?.removeAllRanges();
+            dismiss();
+          }}
+        >
+          <Icon name="comment" size={14} />
+        </Button>
+      )}
     </div>
   );
 }
@@ -93,10 +95,14 @@ function CopyPassageLink({
   dismiss: () => void;
 }) {
   const [copied, copy] = useCopy();
+  const label =
+    copied === "copied" ? "Copied" : copied === "failed" ? "Clipboard not available" : "Copy link";
   return (
     <Button
-      variant="ghost"
+      variant="icon"
       size="small"
+      aria-label={label}
+      title={label}
       onMouseDown={(event) => event.preventDefault()}
       onClick={() => {
         const url = link();
@@ -108,11 +114,6 @@ function CopyPassageLink({
         name={copied === "copied" ? "check" : copied === "failed" ? "close" : "link"}
         size={14}
       />
-      {copied === "copied"
-        ? "Copied"
-        : copied === "failed"
-          ? "Clipboard not available"
-          : "Copy link"}
     </Button>
   );
 }

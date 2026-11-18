@@ -833,6 +833,8 @@ export const lightTheme: Theme<VarGroup<Readonly<{ colorScheme: string; canvas: 
 
 export const lineHeight: { tight: string; snug: string; normal: string; relaxed: string; };
 
+export const palettes: { dark: { colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 27 more ...; shadowOverlay: string; }; light: Record<...>; darkMore: Partial<...>; lightMore: Partial<...>; };
+
 export const radius: { sm: string; md: string; lg: string; full: string; };
 
 export const sizes: { headerHeight: string; sidebarWidth: string; textWidth: string; breakout: string; gutter: string; pageMaxWidth: string; chatWidth: string; control: string; controlSmall: string; };

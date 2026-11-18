@@ -38,29 +38,21 @@ The [page compiler](page-compiler#charts) reads the data and gives each column a
   <Step focus="figure">The chart runs `plot` and draws twice: once to measure, once to show.</Step>
 </Diagram>
 
-<Ref to="charts-lines" /> lists the chart modules with their length and where each runs, and <Ref to="charts-modules" /> draws the same table.
+<Ref to="charts-modules" /> lists the chart modules and where each runs.
 
-<Table id="charts-lines" caption="The modules of charts, measured with wc -l.">
+<Table id="charts-modules" caption="The modules of charts.">
 
-| Module | Lines | Runs in |
-|---|---:|---|
-| `compiler/stages/charts.ts` | 262 | Page compiler |
-| `chart/formats.ts` | 36 | Page compiler |
-| `chart/table.ts` | 195 | Both |
-| `web/chart/chart.tsx` | 368 | Browser |
-| `web/chart/margins.ts` | 75 | Browser |
-| `chart/spec.ts` | 174 | Browser |
-| `web/chart/fonts-ready.ts` | 31 | Browser |
+| Module | Runs in |
+|---|---|
+| `compiler/stages/charts.ts` | Page compiler |
+| `chart/formats.ts` | Page compiler |
+| `chart/table.ts` | Both |
+| `web/chart/chart.tsx` | Browser |
+| `web/chart/margins.ts` | Browser |
+| `chart/spec.ts` | Browser |
+| `web/chart/fonts-ready.ts` | Browser |
 
 </Table>
-
-<Chart id="charts-modules" caption="Lines of code per chart module, by where the module runs." from="#charts-lines" plot={(Plot, rows) => ({
-  marks: [
-    Plot.barX(rows, { y: "Module", x: "Lines", fill: "Runs in" }),
-    Plot.ruleX([0]),
-  ],
-  x: { grid: true },
-})} />
 
 ## Data sources
 
@@ -98,7 +90,7 @@ The chart shows the second drawing with a legend.
 
 The author names the column of categories with `fill` or `stroke`, and the chart sets the colors: the four category colors of [the theme](styling#color), as CSS variables, so a theme switch needs no new drawing. Categories take the colors in the order the rows first use them, as diagram categories do. A fifth category and later ones are muted and reported as `TOO_MANY_CATEGORIES`, a warning.
 
-**[Direction](directions):** a reader can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/charts#charts-modules--Module=web%2Fchart%2Fchart.tsx` or `Lines=100..300`, so it still finds the marks after rows are added or sorted.
+**[Direction](directions):** a reader can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/sales#sales-chart--Month=2026-03` or `Revenue=100..300`, so it still finds the marks after rows are added or sorted.
 
 ## Checks on the marks
 

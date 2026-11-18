@@ -57,30 +57,20 @@ A code is an `error` when the result is not what the author wrote: a reference t
 
 The web app sends codes without a severity, and the server adds it from the registry.
 
-<Ref to="diagnostics-groups" /> counts the codes in the registry by group, and <Ref to="diagnostics-groups-chart" /> draws the same rows. Half of the codes belong to diagrams, and all warnings but one are about how a diagram reads.
+<Ref to="diagnostics-groups" /> lists the groups of the registry.
 
-<Table id="diagnostics-groups" caption="Codes in the registry, by group and severity.">
+<Table id="diagnostics-groups" caption="The groups of codes in the registry.">
 
-| Group | Severity | Codes |
-|---|---|---:|
-| Links, ids, and pages | error | 5 |
-| Replies | error | 2 |
-| Markdown conventions | error | 11 |
-| Charts | error | 6 |
-| Charts | warning | 1 |
-| Diagrams | error | 14 |
-| Diagrams | warning | 14 |
-| Found in the browser | error | 3 |
+| Group | Checked |
+|---|---|
+| Links and ids | By the server, across pages |
+| Replies | In the replies the agent sends |
+| Markdown conventions and components | When a page compiles |
+| Charts | When a page compiles, and in the browser |
+| Diagrams | When a page compiles |
+| Found in the browser | When a page or reply runs in the browser |
 
 </Table>
-
-<Chart id="diagnostics-groups-chart" caption="The 56 codes by registry group: 41 errors and 15 warnings." from="#diagnostics-groups" plot={(Plot, rows) => ({
-  marks: [
-    Plot.barX(rows, { y: "Group", x: "Codes", fill: "Severity", sort: { y: "-x" } }),
-    Plot.ruleX([0]),
-  ],
-  y: { label: null },
-})} />
 
 ## Identity
 
