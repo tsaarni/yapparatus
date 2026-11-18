@@ -1,7 +1,6 @@
 /**
- * The compiled drawing: what the compiler produces and the renderer draws. The page embeds it,
- * so it is kept small: coordinates are rounded to hundredths, and a flag that is false or a
- * value that is the default is left out.
+ * The compiled drawing that the compiler produces and the renderer draws. The page embeds it,
+ * so coordinates are rounded to hundredths and false flags and default values are left out.
  */
 
 import type { Diagnostic, Role, Shape } from "./elements.ts";
@@ -23,6 +22,7 @@ export interface LegendEntry {
   elements: string[];
 }
 
+/** One placed line of text, centered on x unless `align` says otherwise. */
 export interface TextLine {
   text: string;
   x: number;
@@ -37,6 +37,7 @@ export interface TextLine {
   align?: "start";
 }
 
+/** A node, record cell, or text mark with its final rectangle and placed lines. */
 export interface CompiledNode {
   id: string;
   shape: Shape;
@@ -64,6 +65,7 @@ export interface CompiledNode {
   labelRect?: Rect;
 }
 
+/** A frame with its rectangle, operator tab, title, and dividers placed. */
 export interface CompiledFrame {
   id: string;
   rect: Rect;
@@ -80,6 +82,7 @@ export interface CompiledLabel {
   rect: Rect;
 }
 
+/** An edge with its route as points, its arrowheads as polygons, and its labels placed. */
 export interface CompiledEdge {
   id: string;
   role: Role;
@@ -98,6 +101,7 @@ export interface CompiledEdge {
   ariaLabel: string;
 }
 
+/** An enclosure with its boundary rectangle and placed title. */
 export interface CompiledEnclosure {
   id: string;
   role: Role;
@@ -109,6 +113,7 @@ export interface CompiledEnclosure {
   titleRect?: Rect;
 }
 
+/** A whole compiled diagram; `ok` is false when it failed or any diagnostic is an error. */
 export interface CompiledDiagram {
   ok: boolean;
   viewBox: Rect;

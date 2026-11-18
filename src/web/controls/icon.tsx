@@ -1,3 +1,5 @@
+/** The Icon component, which pages use to show an icon from an icon collection. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { ComponentType, SVGProps } from "react";
 
@@ -12,6 +14,7 @@ const styles = stylex.create({
   }),
 });
 
+/** What an author writes on an icon. */
 export interface IconProps {
   /** MDX-only literal collection:name, resolved at build time. */
   name?: string;
@@ -25,6 +28,7 @@ export interface IconProps {
   color?: string;
 }
 
+/** An icon as an inline SVG, hidden from screen readers unless it has a label. */
 export function Icon({ icon: Svg, name, size = 20, label, color = "inherit" }: IconProps) {
   if (!Svg)
     throw new Error(

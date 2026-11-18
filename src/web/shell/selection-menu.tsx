@@ -1,3 +1,5 @@
+/** The menu beside selected text or code, with Copy link and Comment. */
+
 import type { DocumentPage } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { textFragment } from "../../document/address.ts";
@@ -45,14 +47,11 @@ export function SelectionMenu({
           const range = menu.range;
           const item = range && page && referencesFromRange(range, page)[0];
           if (!item || !page) {
-            // Selected code links to its lines in the file, and to its words when it leaves
-            // out some of them, which browsers highlight. The single file links the lines.
             const [code] = range ? selectedCode(range) : [];
             const address = code && codeAddress(hashMode ? { ...code, words: "" } : code);
             return address && new URL(addressHref(address), location.href).href;
           }
           const { fragment } = parseAddress(item.address);
-          // Text fragments need a real URL; the single file can only link the section.
           const directive = hashMode ? "" : textFragment(range.toString());
           const link = `${href(page, fragment)}${fragment ? "" : "#"}${directive}`;
           return new URL(link, location.href).href;

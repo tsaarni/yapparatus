@@ -10,12 +10,11 @@ import { builtFiles } from "../compiler/virtual-modules.ts";
 import { appPrefix } from "../document/file-address.ts";
 import { pageIdOf } from "../document/settings.ts";
 
+/** The build plugin that writes an HTML file for every page and every source file carried. */
 export function pageFiles(document: DocumentDirectory): PluginOption {
   const { root, content } = document;
   let base = "/";
-  /** Each page's chunk and the chunks it imports, other than the entry, by page id. */
   const pageChunks = new Map<string, string[]>();
-  /** Page ids in the order of document.json, or none when the list is missing or broken. */
   const listedPages = (): string[] => {
     try {
       const listed = JSON.parse(readFileSync(path.join(root(), content, "document.json"), "utf8"));
@@ -40,7 +39,6 @@ export function pageFiles(document: DocumentDirectory): PluginOption {
           .split(path.sep)
           .join("/")
           .replace(/\.mdx$/, "");
-        // The chunks it imports, but not the entry, which every page loads already.
         const files = new Set<string>();
         const add = (name: string) => {
           const imported = bundle[name];
@@ -57,8 +55,6 @@ export function pageFiles(document: DocumentDirectory): PluginOption {
       const index = path.join(output.dir, "index.html");
       if (!existsSync(index)) return;
       const html = readFileSync(index, "utf8");
-      // Each page's file fetches that page's code with the app, so the page shows without a
-      // second round trip. The root shows the first page.
       const withPage = (id: string | undefined) => {
         const links = (id ? (pageChunks.get(id) ?? []) : [])
           .map((file) => `<link rel="modulepreload" crossorigin href="${base}${file}">`)

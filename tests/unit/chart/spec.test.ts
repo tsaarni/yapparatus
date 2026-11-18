@@ -1,3 +1,5 @@
+/** Chart plot checks: marks name data columns, no literal colors, categories colored in order. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as Plot from "@observablehq/plot";

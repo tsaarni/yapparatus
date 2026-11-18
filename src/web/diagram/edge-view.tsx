@@ -1,6 +1,5 @@
-/**
- * Edges, enclosures, and frames.
- */
+/** The SVG views of a diagram's edges, enclosures, and frames. */
+
 import * as stylex from "@stylexjs/stylex";
 import type {
   CompiledEdge,
@@ -22,6 +21,7 @@ import {
   targetFor,
 } from "./element.tsx";
 
+/** An edge with its heads and labels; a passive edge, such as a lifeline, is a plain path. */
 export function EdgeView({
   edge,
   flagged,
@@ -101,6 +101,7 @@ export function EdgeView({
   );
 }
 
+/** An enclosure: a rounded box around its members, with its title on a tab. */
 export function EnclosureView({
   enclosure: e,
   state,

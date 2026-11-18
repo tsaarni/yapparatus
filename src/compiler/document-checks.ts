@@ -4,8 +4,7 @@ import { iconName, pageIdOf, type ThemeSetting, themeSettings } from "../documen
 const pageName = /^[a-z0-9]+(-[a-z0-9]+)*(\/[a-z0-9]+(-[a-z0-9]+)*)*$/;
 
 /**
- * Errors in the page files and the `pages` list in `document.json`, as readable messages.
- * `files` are the page ids on disk; `listed` names the page files, with `.mdx`, in reading order.
+ * Errors in the page ids on disk (`files`) and the `pages` list of `document.json` (`listed`).
  * Names start with a letter or digit, so they never reach the application's paths under `/-/`.
  */
 export function checkPages(files: string[], listed: unknown): string[] {

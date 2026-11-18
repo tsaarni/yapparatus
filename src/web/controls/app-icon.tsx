@@ -1,3 +1,5 @@
+/** The icons the app's own controls use, by name. */
+
 import Send from "~icons/lucide/arrow-up";
 import Check from "~icons/lucide/check";
 import Previous from "~icons/lucide/chevron-left";
@@ -65,7 +67,11 @@ const appIcons = {
   tip: Tip,
   warning: Warning,
 };
+
+/** The name of an icon the app's controls use. */
 export type AppIconName = keyof typeof appIcons;
+
+/** One of the app's icons, by name. */
 export function AppIcon({ name, size = 16 }: { name: AppIconName; size?: number }) {
   return <Icon icon={appIcons[name]} size={size} />;
 }

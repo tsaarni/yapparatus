@@ -1,3 +1,5 @@
+/** The links to the previous and next page at the end of each page. */
+
 import { type DocumentPage, pages } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { href } from "../addressing/router.ts";

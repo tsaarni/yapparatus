@@ -17,8 +17,7 @@ import {
 import type { Report } from "./text.ts";
 
 /**
- * Settle ids in dependency order: shapes and containers first, then members, whose ids
- * start with their parent's, then edges, whose derived ids join the ids of their ends.
+ * Settle ids in dependency order: shapes and containers, then members, then edges.
  * Explicit ids are fixed; derived ids get a numeric suffix when they collide.
  */
 export function checkIds(scene: DiagramBuilder, report: Report) {
@@ -36,7 +35,6 @@ export function checkIds(scene: DiagramBuilder, report: Report) {
   };
   const members = scene.nodes.filter((n) => n.member);
   settle([...scene.nodes.filter((n) => !n.member), ...scene.stacks, ...scene.enclosures]);
-  // Own ids are unique in their parent, and parents' ids are now unique.
   for (const m of members) if (m.member) m.id = `${m.member.parent.id}.${m.member.own}`;
   settle(members.map((m) => ({ id: m.id, explicitId: true })));
   for (const edge of scene.edges) edge.deriveId();
@@ -62,6 +60,7 @@ export function checkPlaced(scene: DiagramBuilder, report: Report) {
     );
 }
 
+/** Check the compiled drawing: accent overuse, overlaps, crossings, and enclosure intrusions. */
 export function validate(
   scene: DiagramBuilder,
   nodes: CompiledNode[],
@@ -69,7 +68,6 @@ export function validate(
   enclosures: CompiledEnclosure[],
   report: Report,
 ) {
-  // The accent marks the one element that matters most; on two elements it marks neither.
   const accented = [...nodes, ...edges, ...enclosures]
     .filter((element) => element.role === "accent" && !("passive" in element && element.passive))
     .map((element) => element.id);
@@ -80,21 +78,17 @@ export function validate(
       accented,
     );
 
-  // A start or end label is painted outside the dot, so every check includes it.
   const rects = (n: CompiledNode) => (n.labelRect ? [n.rect, n.labelRect] : [n.rect]);
   const overlapOf = (a: CompiledNode, b: Rect) =>
     rects(a)
       .map((r) => overlap(r, b))
       .find(Boolean);
 
-  // Nodes overlapping each other. Members lie inside their parent, which is checked for them.
   for (let i = 0; i < nodes.length; i++)
     for (let j = i + 1; j < nodes.length; j++) {
       const a = nodes[i] as CompiledNode;
       const b = nodes[j] as CompiledNode;
-      // Step-only elements may share a place; the steps decide whether they appear together.
       if (a.passive || b.passive || (a.stepOnly && b.stepOnly)) continue;
-      // Of members, only marks of one text can collide: two highlights over the same letters.
       const marks = a.shape === "mark" && b.shape === "mark" && a.parent === b.parent;
       if ((a.parent || b.parent) && !marks) continue;
       const o = rects(b)
@@ -108,8 +102,6 @@ export function validate(
         );
     }
 
-  // Edges crossing nodes other than their own endpoints. A member's edge leaves through its
-  // parent, and an edge of a record or text may cross its own members.
   const endpointsOf = (edge: Edge) => {
     const ends = [edge.from, edge.to].flatMap((p) => elementOf(p) ?? []);
     const own = new Set(ends.map((e) => e.id));
@@ -124,15 +116,12 @@ export function validate(
       if (node.shape === "text" || node.shape === "mark" || node.passive) continue;
       if (compiled.stepOnly && node.stepOnly) continue;
       if (node.parent !== undefined) {
-        // A member is checked only for edges of its own parent: from a sibling cell, across
-        // this one. Any other edge that crosses it crosses its parent, which is reported.
         const fromSibling = [edge.from, edge.to].some((p) => {
           const el = elementOf(p);
           return el instanceof Node && el.member?.parent.id === node.parent;
         });
         if (!fromSibling) continue;
       }
-      // An edge may meet its own endpoints, but not cross their labels.
       const hit = own.has(node.id) ? (node.labelRect ? [node.labelRect] : []) : rects(node);
       for (let i = 0; i < compiled.points.length - 1; i++) {
         const a = compiled.points[i] as Vec;
@@ -149,7 +138,6 @@ export function validate(
     }
   });
 
-  // Labels against nodes, other labels, and other edges.
   const labels = edges.flatMap((e) => e.labels.map((l) => ({ edge: e, label: l })));
   for (const { edge, label } of labels) {
     for (const node of nodes) {
@@ -187,12 +175,10 @@ export function validate(
         );
     }
 
-  // Edges running through enclosure titles.
   for (const e of enclosures) {
     if (!e.titleRect) continue;
     for (const edge of edges)
       for (let i = 0; i < edge.points.length - 1; i++)
-        // Keep a little clearance: a line touching the text reads as crossing it.
         if (
           segmentHitsRect(edge.points[i] as Vec, edge.points[i + 1] as Vec, inflate(e.titleRect, 8))
         ) {
@@ -205,7 +191,6 @@ export function validate(
         }
   }
 
-  // Non-members intruding into an enclosure.
   scene.enclosures.forEach((e, k) => {
     const compiled = enclosures[k];
     if (!compiled) return;
@@ -236,6 +221,7 @@ export function groupsOf(scene: DiagramBuilder): Record<string, string[]> {
   return groups;
 }
 
+/** The ids of an enclosure's members, with stacks and nested enclosures expanded. */
 function memberIds(e: Enclosure): string[] {
   const walk = (el: Element): string[] =>
     el instanceof Stack

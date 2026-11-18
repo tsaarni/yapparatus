@@ -1,3 +1,5 @@
+/** The Button control, in the app's variants and sizes. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { ComponentProps } from "react";
 import { focus } from "../style/focus.ts";
@@ -18,6 +20,7 @@ interface ButtonProps extends ComponentProps<"button"> {
   size?: "default" | "small";
 }
 
+/** A button styled as one of the app's variants; its type defaults to "button". */
 export function Button({ variant = "default", size, className = "", ...props }: ButtonProps) {
   return (
     <button
@@ -72,7 +75,7 @@ const s = stylex.create({
   ghost: {
     color: { default: theme.textMuted, ":hover": theme.text },
     backgroundColor: { default: "transparent", ":hover": theme.surfaceHover },
-    // Transparent, not absent: forced-colors mode draws it, so the button keeps an edge.
+    /** Transparent, not absent: forced-colors mode draws it, so the button keeps an edge. */
     borderColor: "transparent",
   },
   icon: {

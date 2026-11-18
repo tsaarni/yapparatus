@@ -1,12 +1,12 @@
 /**
- * A chart's data, read when the page is compiled: from a block of data inside `<Chart>`, or
- * from a file in an external directory. A data format splits the text into cells (see
- * `formats.ts`), and each column then gets one type from all of its cells. Shared by the
- * compiler (Node) and the chart (browser); it imports nothing.
+ * A chart's data, read at compile time from a data block or file, with one type per column.
+ * Shared by the compiler (Node) and the chart (browser); it imports nothing.
  */
 
+/** The type a column gets from all of its cells. */
 export type ColumnType = "number" | "date" | "text";
 
+/** A column of chart data: its header and its type. */
 export interface ChartColumn {
   /** The header as written: the field name in `plot`, and the axis label. */
   name: string;
@@ -14,9 +14,8 @@ export interface ChartColumn {
 }
 
 /**
- * A chart's data, by column. Data written in the page is carried in the page as `data`; a
- * file's chart loads it from its own module, so a large file never weighs on the page. Cells
- * stay JSON: dates as ISO text.
+ * A chart's data, by column. A file's data loads from its own module so it never weighs on
+ * the page. Cells stay JSON: dates as ISO text.
  */
 export interface ChartData {
   columns: ChartColumn[];
@@ -24,6 +23,7 @@ export interface ChartData {
   values: (number | string | null)[][];
 }
 
+/** The number of rows in chart data. */
 export const rowCount = (data: ChartData) => data.values[0]?.length ?? 0;
 
 /** A problem in the data, with the line it is on. */
@@ -48,6 +48,7 @@ const number = /^[-+]?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i;
 /** ISO 8601 dates, by month or day, with an optional time and zone. */
 const date = /^\d{4}-\d{2}(-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?)?$/;
 
+/** The type a single cell's text reads as. */
 function typeOf(cell: string): ColumnType {
   if (number.test(cell)) return "number";
   if (date.test(cell)) return "date";
@@ -55,10 +56,8 @@ function typeOf(cell: string): ColumnType {
 }
 
 /**
- * Give each column one type and convert its cells. A column whose cells are all numbers is a
- * number column, all ISO dates a date column, and anything else text. A column that mixes
- * numbers or dates with other text is a problem, never quietly text: "12 ms" in a column of
- * numbers means the unit belongs in the header.
+ * Give each column one type and convert its cells. A column that mixes numbers or dates with
+ * other text is reported, never quietly text: "12 ms" means the unit belongs in the header.
  */
 export function typeTable(table: RawTable): { data: ChartData; issues: DataIssue[] } {
   const issues: DataIssue[] = [];
@@ -92,7 +91,6 @@ export function typeTable(table: RawTable): { data: ChartData; issues: DataIssue
       .filter((cell) => cell.text);
     const types = new Set(cells.map((cell) => typeOf(cell.text)));
     if (types.size <= 1) return { name, type: types.values().next().value ?? "text" };
-    // The type most cells share is what the column means; the others are the problem.
     const count = (type: ColumnType) => cells.filter((c) => typeOf(c.text) === type).length;
     const meant = (["number", "date", "text"] as const).reduce((a, b) =>
       count(b) > count(a) ? b : a,
@@ -122,9 +120,8 @@ export function typeTable(table: RawTable): { data: ChartData; issues: DataIssue
 }
 
 /**
- * Split delimited text, such as CSV or TSV, into a table, as RFC 4180 reads it: a cell in double quotes may hold
- * the separator, line breaks, and doubled quotes. The first record is the header, and each
- * record keeps the line it starts on. Blank lines are skipped.
+ * Split CSV or TSV text into a table as RFC 4180 reads it, with the first record as header.
+ * Each record keeps the line it starts on, and blank lines are skipped.
  */
 export function parseDelimited(text: string, separator: "," | "\t"): RawTable | DataIssue {
   const records: { cells: string[]; line: number }[] = [];

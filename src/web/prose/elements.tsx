@@ -1,3 +1,5 @@
+/** The HTML elements Markdown compiles to, as pages and replies draw them. */
+
 import * as stylex from "@stylexjs/stylex";
 import {
   createElement,
@@ -32,6 +34,7 @@ function Block(props: Props & { "data-source"?: string; children?: ReactNode }) 
   return <div {...props} {...stylex.props(s.block, wide && s.wideBlock)} />;
 }
 
+/** A paragraph, set larger when the compiler marks it as the page's lead. */
 function Paragraph(props: Props & { "data-lead"?: string }) {
   const { reply } = useContext(ReadingContext);
   const lead = props["data-lead"] === "true" && !reply;
@@ -43,16 +46,13 @@ function Code(props: Props) {
   return <code {...props} {...stylex.props(s.code, s.inlineCode)} />;
 }
 
-/**
- * Math, compiled to MathML. Block math scrolls sideways when it is wider than the column, so
- * the page does not.
- */
+/** Math as MathML. Block math wider than the column scrolls sideways inside it. */
 function MathElement(props: Props & { display?: string }) {
   const block = props.display === "block";
-  // React's JSX types have no MathML elements.
   return createElement("math", { ...props, ...stylex.props(s.math, block && s.mathBlock) });
 }
 
+/** A bulleted or numbered list. */
 function ListElement({ ordered, ...props }: Props & { ordered: boolean }) {
   const { reply } = useContext(ReadingContext);
   const Tag = ordered ? "ol" : "ul";

@@ -26,9 +26,8 @@ export interface Figure {
 }
 
 /**
- * Runs `draw`, compiles the scene, and checks the steps and the width. The result has every
- * diagnostic. `ok` is false when the drawing cannot be shown; step and width problems leave
- * it as the compiler set it.
+ * Runs `draw`, compiles the scene, and checks the steps and the width. Step and width
+ * problems are added as diagnostics and leave `ok` as the compiler set it.
  */
 export function compileFigure(figure: Figure, measure: Measure): CompiledDiagram {
   const diagram = compileDraw(figure.draw, measure);
@@ -58,6 +57,7 @@ export function drawFailed(message: string): CompiledDiagram {
   };
 }
 
+/** Run the author's draw program on a new builder and compile it, or report why it threw. */
 function compileDraw(draw: Figure["draw"], measure: Measure): CompiledDiagram {
   const scene = new DiagramBuilder();
   try {
@@ -81,6 +81,7 @@ function checkWidth(diagram: CompiledDiagram): Diagnostic[] {
   ];
 }
 
+/** Check that steps name known elements, step ids are unique, and stepOnly elements are used. */
 function checkSteps(
   figureSteps: FigureStep[],
   diagram: CompiledDiagram,
@@ -129,7 +130,6 @@ function checkSteps(
       );
     ids.add(step.id);
   }
-  // Step-only elements: each must appear somewhere, and those shown together must not collide.
   const stepOnly = diagram.nodes.filter((n) => n.stepOnly);
   for (const element of [...stepOnly, ...diagram.edges.filter((e) => e.stepOnly)])
     if (!steps.some((step) => step.elements.has(element.id)))

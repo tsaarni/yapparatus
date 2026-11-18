@@ -1,9 +1,6 @@
 /**
- * The chat resource: reads of the chat, which may wait; messages from the reader and the
- * agent; clearing; and the agent's state as the reader sees it. The log itself is in
- * `chat.ts`. An agent's read holds what the agent has to do: the reader messages not
- * answered yet, and the errors it has not been given. The server remembers which reader
- * message it gave the agent last, and the reply answers that one.
+ * The chat resource: reads that may wait, new messages, clearing, and the agent's state as the
+ * reader sees it. The log itself is in `../chat-log.ts`.
  */
 import { existsSync } from "node:fs";
 import type { ServerResponse } from "node:http";
@@ -61,6 +58,7 @@ function refused(error: string, diagnostics: Diagnostic[]): Reply {
   return { status: 422, body };
 }
 
+/** A query parameter as a whole number, or undefined when absent; anything else is a 400. */
 function wholeNumber(value: string | null, name: string): number | undefined {
   if (value === null) return undefined;
   const number = Number(value);
@@ -69,6 +67,7 @@ function wholeNumber(value: string | null, name: string): number | undefined {
   return number;
 }
 
+/** What the chat resource needs: the log, the diagnostics, and where the document is. */
 export interface ChatResourceOptions {
   root: string;
   /** The content folder, relative to the project folder. */
@@ -81,6 +80,7 @@ export interface ChatResourceOptions {
   changed: () => void;
 }
 
+/** Serves `/-/api/chat`, remembers what each agent read was given, and tracks the agent's state. */
 export class ChatResource {
   private readonly options: ChatResourceOptions;
   private readonly guide: string;
@@ -98,8 +98,6 @@ export class ChatResource {
 
   constructor(options: ChatResourceOptions) {
     this.options = options;
-    // Absolute, so an agent working in another folder can open it. A project made from the
-    // starter carries its own copy; this repository uses the starter's.
     const guide = "docs/guide.md";
     const own = path.join(options.root, guide);
     this.guide = existsSync(own)
@@ -139,10 +137,8 @@ export class ChatResource {
   }
 
   /**
-   * One read of the chat. Without an agent: every message, every diagnostic if included, and
-   * the start prompt. For an agent: the reader messages not answered yet, the errors it has
-   * not been given, and the prompt for them, which ends with the next command. What a
-   * non-empty read gives the agent is remembered.
+   * One read of the chat. Without an agent: everything and the start prompt. For an agent: the
+   * unanswered messages and errors not yet given, which are then remembered as given.
    */
   private read(query: Query, agent?: string): Chat {
     const { chat, diagnostics } = this.options;
@@ -177,12 +173,11 @@ export class ChatResource {
         diagnostics.unchecked(),
       );
     if (readers.length) return messagesPrompt(readers, section(), this.guide);
-    // New errors and no new message: the agent tells the reader, if there is one, what it fixed.
     if (fresh.length) return errorsPrompt(section(), this.handed !== undefined);
     return idlePrompt();
   }
 
-  /** Reader messages reached an agent: remember the newest, and when, for `readAt` and the working state. */
+  /** Reader messages reached an agent: remember the newest, and when, for `readAt` and state. */
   private handedOver(readers: ReturnType<ChatLog["readers"]>) {
     const now = new Date().toISOString();
     for (const message of readers)
@@ -200,16 +195,13 @@ export class ChatResource {
   }
 
   /**
-   * An agent's read ended. After an empty read the agent reads again at once, so the
-   * grace bridges the gap. A read that handed over messages or errors starts the agent's work,
-   * and a read closed before its answer means the agent stopped: neither is followed by
-   * another read.
+   * An agent's read ended. After an empty read the agent reads again at once, so a grace time
+   * bridges the gap; after a read that handed work over, or one the agent closed, it does not.
    */
   private readEnded(body: unknown, gone: boolean) {
     const read = body as Partial<Chat> | undefined;
     const handedOver = Boolean(read?.messages?.length || read?.diagnostics?.length);
     this.lastSeen = gone || handedOver ? 0 : Date.now();
-    // An agent that was waiting was not working on anything either.
     if (gone) this.handedAt = 0;
     this.agentChanged();
   }
@@ -269,7 +261,6 @@ export class ChatResource {
       );
       this.waiters.add(open);
       this.agentChanged();
-      // Closed before an answer: the agent was stopped or killed, not between two reads.
       res.on("close", () => {
         if (this.waiters.has(open)) open.done({ status: 499 }, true);
       });
@@ -301,7 +292,6 @@ export class ChatResource {
       this.readEnded(read, false);
       return { status: 200, body: read };
     }
-    // The response closes early when the agent's process ends; stop waiting for it then.
     return this.waitUntilNotEmpty({ query, agent }, wait, res);
   }
 
@@ -318,9 +308,7 @@ export class ChatResource {
 
   /**
    * Store a reply to the newest reader message given to the agent, and those before it.
-   * Messages that arrived while the agent wrote stay unanswered. The reply is checked like a
-   * page; errors in the document are the diagnostics' concern, which the agent reads before it
-   * replies.
+   * Messages that arrived while the agent wrote stay unanswered.
    */
   private async reply(mdx: string): Promise<Reply> {
     const { chat } = this.options;

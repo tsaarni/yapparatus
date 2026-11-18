@@ -1,3 +1,7 @@
+/**
+ * Diagram pictures from /-/api/figures: PNG size, element ids, errors, and pictures after edits.
+ */
+
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
@@ -14,7 +18,6 @@ test("a diagram's picture is a PNG at twice the drawing's size", async ({ page, 
   expect(response.status()).toBe(200);
   expect(response.headers()["content-type"]).toBe("image/png");
   const size = pngSize(await response.body());
-  // The web app draws the same drawing: its view box is the picture's size in units.
   await page.goto("/first-page");
   const viewBox = await page.locator("#fixture-flow svg[data-diagram]").getAttribute("viewBox");
   const [, , width = 0, height = 0] = (viewBox ?? "").split(" ").map(Number);
@@ -27,7 +30,6 @@ test("ids label the elements", async ({ request }) => {
   const whole = await get("");
   const ids = await get("?ids=true");
   expect(ids.equals(whole)).toBe(false);
-  // The same figure, the same size, whatever it shows.
   expect(pngSize(ids)).toEqual(pngSize(whole));
 });
 
@@ -50,13 +52,11 @@ test("the picture is of the page as it is on disk, right after an edit", async (
   const file = path.join(root, "content", "panels.mdx");
   const original = readFileSync(file, "utf8");
   try {
-    // Compiled once, without the figure.
     expect((await request.get("/-/api/figures/panels/added-now")).status()).toBe(404);
     writeFileSync(
       file,
       `${original}\n<Diagram id="added-now" draw={(d) => {\n  d.box("New")\n}} />\n`,
     );
-    // No wait for the file watcher: the server compiles the page it finds changed.
     expect((await request.get("/-/api/figures/panels/added-now")).status()).toBe(200);
   } finally {
     writeFileSync(file, original);
@@ -70,7 +70,6 @@ test("the agent saves a picture in the file it names", async () => {
   );
   expect(saved.stderr).toBe("");
   expect(pngSize(readFileSync(file)).width).toBeGreaterThan(0);
-  // An address that is not a diagram fails with the server's words alone.
   const failed = await runCommand(
     'import { savePicture } from "yapparatus/agent"; await savePicture("/charts#latency", "chart.png");',
   );

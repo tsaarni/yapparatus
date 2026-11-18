@@ -1,3 +1,5 @@
+/** File addresses: folder, path, and lines, and where a file is relative to the project folder. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { languageOf } from "../../../src/compiler/stages/highlight.ts";

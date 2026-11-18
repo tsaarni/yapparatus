@@ -1,3 +1,5 @@
+/** The contents: the document's pages, and the current page's sections. */
+
 import { type DocumentPage, pages, settings } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
@@ -41,6 +43,7 @@ function useCurrentSection(page: DocumentPage | undefined) {
   return current;
 }
 
+/** The contents beside the page or in a drawer, marking the page and section on screen. */
 export function Sidebar({
   page,
   onNavigate,

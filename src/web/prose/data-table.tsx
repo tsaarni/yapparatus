@@ -1,3 +1,5 @@
+/** Tables written in Markdown, which grow into the wide track and scroll beyond it. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { HTMLAttributes, ThHTMLAttributes } from "react";
 import { focus } from "../style/focus.ts";

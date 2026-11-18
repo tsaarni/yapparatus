@@ -1,11 +1,10 @@
 /**
- * The formats a chart reads its data from. A format turns text into a header and rows of cell
- * text, each row with the line it starts on; typing the columns is shared by every format (see
- * `typeTable`). A format is named by the language of a block of data inside `<Chart>` and by
- * the extension of a file, so adding one here is all it takes for both.
+ * The formats a chart reads its data from, named by block language and file extension.
+ * Adding a format here makes it work for both data blocks in `<Chart>` and files.
  */
 import { type DataIssue, parseDelimited, type RawTable } from "./table.ts";
 
+/** A data format: splits text into a header and rows of cell text, before typing. */
 export interface DataFormat {
   /** The block language and the file extension: "csv". */
   name: string;

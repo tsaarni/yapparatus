@@ -1,8 +1,6 @@
 /**
- * How a drawing is painted, as theme token names: the table that the picture writer uses to draw
- * a figure as a standalone SVG. The web app paints the same roles with the styles in
- * `web/diagram/element.tsx`, and a unit test checks that the two agree. The server resolves the
- * token names to the light theme's values and passes them to the picture writer.
+ * How the picture writer paints each role, as theme token names. The web app paints the same
+ * roles in `web/diagram/element.tsx`, and a unit test checks that the two agree.
  */
 import type { Role } from "./elements.ts";
 

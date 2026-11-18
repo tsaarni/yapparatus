@@ -1,3 +1,7 @@
+/**
+ * The Node font measure: font subsets, kerning, weights, sizes, monospace, and missing characters.
+ */
+
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -40,7 +44,6 @@ test("the web app loads the stylesheets the measure reads", () => {
 test("each character is measured with the subset file whose unicode-range has it", () => {
   const { measure } = fontMeasure();
   near(measure("Café", sans(400, 12)), inFile("latin", "Café", 400, 12));
-  // Ł and ź are in latin-ext, ó and d in latin: three runs.
   near(
     measure("Łódź", sans(400, 12)),
     inFile("latin-ext", "Ł", 400, 12) +
@@ -56,7 +59,6 @@ test("each character is measured with the subset file whose unicode-range has it
 
 test("a run without letters is kerned once, as a browser does", () => {
   const { measure } = fontMeasure();
-  // fontkit's default script for "24" lists the kerning lookups twice; Latin lists them once.
   assert.ok(inFile("latin", "24", 400, 11) < inFile("latin", "24", 400, 11, "latn"));
   near(measure("24", sans(400, 11)), inFile("latin", "24", 400, 11, "latn"));
   near(measure("^&", sans(400, 11)), inFile("latin", "^&", 400, 11, "latn"));
@@ -88,7 +90,6 @@ test("characters no font file has are estimated at 1 em and recorded", () => {
   near(width, covered + 3 * 12);
   assert.deepEqual([...first.uncovered], ["→", "漢", "😀"]);
 
-  // Another measure records only what it measured, even when the width is cached.
   const second = fontMeasure();
   second.measure("Plain", sans(400, 12));
   assert.deepEqual([...second.uncovered], []);

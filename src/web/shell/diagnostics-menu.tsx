@@ -1,3 +1,5 @@
+/** The header's diagnostics indicator and the list of errors and warnings it opens. */
+
 import { pages } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
@@ -20,6 +22,7 @@ import {
   theme,
 } from "../style/theme.stylex.ts";
 
+/** The page a diagnostic is about, and the name to show for it. */
 function where(diagnostic: ReportedDiagnostic) {
   const page = pages.find((p) => p.source === diagnostic.source);
   return { page, label: page?.outline.title ?? diagnostic.source ?? "Application" };
@@ -252,7 +255,7 @@ const s = stylex.create({
     fontSize: fontSize.sm,
     lineHeight: lineHeight.normal,
   },
-  // A path or an address has no spaces, so it breaks anywhere and stays out of the buttons.
+  /** A path or an address has no spaces, so it breaks anywhere and stays out of the buttons. */
   itemText: { flexGrow: 1, minWidth: 0, overflowWrap: "anywhere", userSelect: "text" },
   place: {
     marginRight: space.sm,
@@ -272,6 +275,6 @@ const s = stylex.create({
     fontFamily: theme.mono,
     fontSize: fontSize.xs,
   },
-  // The buttons sit on the first line whatever its height, and never shrink.
+  /** The buttons sit on the first line whatever its height, and never shrink. */
   actions: { display: "flex", flexShrink: 0, alignSelf: "start" },
 });

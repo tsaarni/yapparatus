@@ -1,11 +1,11 @@
+/** Where a document lives in the project: its directory, page ids, and directory checks. */
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import type { ExternalFiles } from "./external-files.ts";
 
 /**
- * The document the compiler compiles: the project folder, known once Vite resolves its
- * config, the document directory in it, with `/` between segments, and the files outside it
- * that its pages may show.
+ * The document the compiler compiles: the project folder (known once Vite resolves its config),
+ * the document directory in it with `/` between segments, and the outside files its pages show.
  */
 export interface DocumentDirectory {
   root: () => string;
@@ -29,10 +29,8 @@ export function pageIds(root: string, content: string): string[] {
 }
 
 /**
- * Why `document`, a path with `/` between segments, cannot be a document directory of the project
- * at `root`, or undefined if it can. A document directory holds a document.json, and no other
- * document directory contains it or is inside it: its pages are every MDX file under it, and
- * its chat state mirrors its path.
+ * Why `document` cannot be a document directory of the project at `root`, or undefined if it can.
+ * It must hold a document.json, and no other document directory may contain it or be inside it.
  */
 export function documentError(root: string, document: string): string | undefined {
   const dir = path.join(root, document);

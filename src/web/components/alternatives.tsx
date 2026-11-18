@@ -1,3 +1,5 @@
+/** Tabs and Columns, which show labelled alternative panels one at a time or side by side. */
+
 import * as stylex from "@stylexjs/stylex";
 import {
   type CSSProperties,
@@ -34,7 +36,7 @@ interface PanelProps {
 }
 
 interface ContainerProps {
-  /** The panels' labels, in order. The compiler reads them from the panels; authors never write this. */
+  /** The panels' labels in order, read by the compiler from the panels, never written by hand. */
   labels?: string[];
   children: ReactNode;
 }
@@ -80,16 +82,18 @@ export function Panel({ label, children }: PanelProps) {
         <Flow fill>{children}</Flow>
       </section>
     );
-  // Outside a container, which the compiler reports.
   return <>{children}</>;
 }
 
-// The reader's choices, most recent first. Choosing "pnpm" in one tab set selects "pnpm" in
-// every set that has it, on every page, and the choice is kept for the next visit.
+/**
+ * The reader's choices, most recent first. Choosing "pnpm" in one tab set selects "pnpm" in
+ * every set that has it, on every page, and the choice is kept for the next visit.
+ */
 const storageKey = "yapparatus.tabs";
 const listeners = new Set<() => void>();
 let choices: string[] = readChoices();
 
+/** The stored choices, or none when storage is unavailable or holds something else. */
 function readChoices(): string[] {
   try {
     const value = JSON.parse(localStorage.getItem(storageKey) ?? "[]");
@@ -99,16 +103,16 @@ function readChoices(): string[] {
   }
 }
 
+/** Make a label the most recent choice, store it, and tell every tab set. */
 function choose(label: string) {
   choices = [label, ...choices.filter((c) => c !== label)].slice(0, 20);
   try {
     localStorage.setItem(storageKey, JSON.stringify(choices));
-  } catch {
-    // Storage may be unavailable; the choice still holds for this visit.
-  }
+  } catch {}
   for (const listener of listeners) listener();
 }
 
+/** The reader's choices, rendering again when they change. */
 function useChoices() {
   return useSyncExternalStore(
     (listener) => {
@@ -126,8 +130,6 @@ function useChoices() {
  */
 export function Tabs({ labels = [], children }: ContainerProps) {
   const chosen = useChoices();
-  // Find in page can reveal a hidden panel. That shows it in this set only, without changing
-  // the reader's choice, until the reader chooses again.
   const [found, setFound] = useState<{ label: string; over: string[] }>();
   const selected =
     found?.over === chosen
@@ -201,6 +203,7 @@ export function Tabs({ labels = [], children }: ContainerProps) {
 }
 Tabs.breakout = true;
 
+/** One tab's panel, hidden until found so the browser's find can open it. */
 function TabPanel({
   label,
   id,
@@ -219,8 +222,6 @@ function TabPanel({
   const ref = useRef<HTMLDivElement>(null);
   const found = useRef(onFound);
   found.current = onFound;
-  // A hidden panel stays searchable: find in page reveals it. React renders `hidden`, so no
-  // panel shows for a frame; before paint, it becomes `until-found`, which React has no value for.
   useLayoutEffect(() => {
     if (!active) ref.current?.setAttribute("hidden", "until-found");
   }, [active]);
@@ -239,7 +240,6 @@ function TabPanel({
       hidden={!active}
       {...stylex.props(s.panel)}
     >
-      {/* Paper has no tabs: print shows every panel under its label. */}
       <div aria-hidden="true" {...stylex.props(s.columnLabel, s.printLabel)}>
         {label}
       </div>
@@ -306,7 +306,7 @@ const s = stylex.create({
     cursor: "pointer",
     transitionProperty: "color",
     transitionDuration: duration.fast,
-    // The selected tab's underline sits on the strip's bottom border.
+    /** The selected tab's underline sits on the strip's bottom border. */
     "::after": {
       content: '""',
       position: "absolute",
@@ -342,7 +342,7 @@ const s = stylex.create({
     flexDirection: "column",
     minWidth: 0,
   },
-  // A rule between columns; stacked, between rows.
+  /** A rule between columns; stacked, between rows. */
   columnAfter: {
     paddingLeft: { default: space.xl, [when.narrow]: 0 },
     paddingTop: { default: 0, [when.narrow]: space.xl },

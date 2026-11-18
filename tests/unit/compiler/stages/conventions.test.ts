@@ -1,3 +1,5 @@
+/** The conventions stage: alerts, code languages and marks, heading depth, FileTree, and panels. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compile, run } from "@mdx-js/mdx";
@@ -28,6 +30,7 @@ async function build(source: string, outputFormat: "program" | "function-body" =
 const fence = "```";
 
 let treeEntries: unknown;
+/** Stands in for `<FileTree>` and records the entries the compiler gave it. */
 function StubTree({ entries }: { entries: unknown }) {
   treeEntries = entries;
   return null;
@@ -101,7 +104,6 @@ test("code marks: end-of-line comments, counts, and comment-only lines, in any l
       { 0: "highlight", 1: "highlight", 2: "highlight" },
     ],
   );
-  // The comment alone on its line is gone; the others leave their lines' code.
   assert.equal(blocks[1]?.lines.length, 3);
   assert.doesNotMatch(js, /\[!code/);
 });
@@ -123,7 +125,6 @@ test("FileTree: the list becomes entries; names, comments, folders, and bold", a
     "function-body",
   );
   assert.deepEqual(issues, []);
-  // Render the page and read the entries it gives FileTree.
   const { default: Content } = await run(js, { ...runtime, baseUrl: import.meta.url });
   treeEntries = undefined;
   renderToStaticMarkup(createElement(Content, { components: { FileTree: StubTree } }));
@@ -147,11 +148,13 @@ test("FileTree without a list is reported", async () => {
 });
 
 let containerLabels: unknown;
+/** Stands in for `<Tabs>` and `<Columns>` and records their panel labels. */
 function StubContainer({ labels }: { labels: unknown }) {
   containerLabels = labels;
   return null;
 }
 let figureWide: unknown;
+/** Stands in for `<Figure>` and records whether it is wide. */
 function StubFigure({ wide }: { wide?: boolean }) {
   figureWide = wide;
   return null;

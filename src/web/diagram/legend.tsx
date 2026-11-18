@@ -1,6 +1,7 @@
 /**
  * The legend under a figure: one entry per category, which highlights its elements.
  */
+
 import * as stylex from "@stylexjs/stylex";
 import type { LegendEntry } from "../../diagram/drawing.ts";
 import { Button } from "../controls/button.tsx";
@@ -9,9 +10,8 @@ import { space } from "../style/theme.stylex.ts";
 import { categoryStyle } from "./element.tsx";
 
 /**
- * The legend: one entry per category, with its color and its words. Pointing at an entry,
- * or focusing it, highlights the category's elements, so the reader can find them without
- * telling colors apart.
+ * One entry per category with its color and words. Pointing at or focusing an entry highlights
+ * the category's elements, so the reader can find them without telling colors apart.
  */
 export function Legend({
   legend,

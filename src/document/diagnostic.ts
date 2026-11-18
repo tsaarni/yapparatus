@@ -1,9 +1,8 @@
 /** Problems in the document: their codes, severities, and who found them. */
 
 /**
- * Who found a diagnostic. The server compiles pages, with their diagrams, and checks links and
- * `document.json`; the browser finds what only exists when a page runs: chart layout, render
- * and runtime errors, and replies that fail to show.
+ * Who found a diagnostic. The server compiles pages and checks links and `document.json`; the
+ * browser finds what exists only when a page runs: charts, render and runtime errors, replies.
  */
 export type DiagnosticOrigin =
   | "compile"
@@ -14,16 +13,15 @@ export type DiagnosticOrigin =
   | "runtime"
   | "reply";
 
+/** `error`: the result is not what the author wrote. `warning`: it renders but reads badly. */
 export type Severity = "error" | "warning";
 
 /**
  * Every diagnostic code, with its severity and what it means. A code names what is wrong;
- * checks pass a code and never a severity. `error`: the result is not what the author wrote
- * (a reference to nothing, a duplicate, an invalid form, something that threw). `warning`:
- * it renders as written but reads badly (overlap, overflow, too much).
+ * checks pass a code and never a severity.
  */
 export const diagnosticCodes = {
-  // Links and ids, checked by the server across pages.
+  /** Links and ids, checked by the server across pages. */
   BROKEN_LINK: {
     severity: "error",
     meaning: "A link names a page, anchor, file, or lines that do not exist.",
@@ -32,13 +30,13 @@ export const diagnosticCodes = {
   DUPLICATE_ID: { severity: "error", meaning: "Two things that must be told apart share an id." },
   PAGE_LIST: { severity: "error", meaning: "document.json is invalid or does not list the pages." },
   COMPILE_FAILED: { severity: "error", meaning: "A page or reply is not valid MDX." },
-  // Replies the agent sends.
+  /** Replies the agent sends. */
   UNKNOWN_COMPONENT: {
     severity: "error",
     meaning: "A reply uses a component that does not exist.",
   },
   REPLY_EMPTY: { severity: "error", meaning: "A reply has no text." },
-  // Markdown conventions and components, checked when a page compiles.
+  /** Markdown conventions and components, checked when a page compiles. */
   ALERT_TYPE: { severity: "error", meaning: "An alert names an unknown kind." },
   CODE_LANGUAGE: {
     severity: "error",
@@ -79,7 +77,7 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "An <Excerpt> has an invalid from or attributes.",
   },
-  // Charts.
+  /** Charts. */
   CHART_PLOT: { severity: "error", meaning: "A <Chart> has no plot function." },
   CHART_DATA: { severity: "error", meaning: "A chart's data is missing, unreadable, or mistyped." },
   CHART_OPTION: { severity: "error", meaning: "plot returns or calls something the chart owns." },
@@ -90,7 +88,7 @@ export const diagnosticCodes = {
   CHART_FIELD: { severity: "error", meaning: "A mark names a column its data does not have." },
   CHART_FAILED: { severity: "error", meaning: "Drawing the chart threw." },
   CHART_OVERLAP: { severity: "warning", meaning: "Tick labels on an axis overlap." },
-  // Diagrams.
+  /** Diagrams. */
   DRAW_FAILED: { severity: "error", meaning: "The diagram's draw function threw." },
   DIAGRAM_FAILED: { severity: "error", meaning: "The diagram compiler threw." },
   MARK_UNMATCHED: {
@@ -167,14 +165,16 @@ export const diagnosticCodes = {
   },
   STEP_ONLY_UNUSED: { severity: "warning", meaning: "A stepOnly element is in no step." },
   BUILD_WITHOUT_STEPS: { severity: "warning", meaning: "A diagram has build but no steps." },
-  // Found when a page or reply runs in the browser.
+  /** Found when a page or reply runs in the browser. */
   RENDER_FAILED: { severity: "error", meaning: "A page threw while rendering." },
   RUNTIME_FAILED: { severity: "error", meaning: "Code on a page threw outside rendering." },
   REPLY_FAILED: { severity: "error", meaning: "A reply could not be shown." },
 } as const satisfies Record<string, { severity: Severity; meaning: string }>;
 
+/** A name from `diagnosticCodes`. */
 export type DiagnosticCode = keyof typeof diagnosticCodes;
 
+/** Whether a string, such as one the browser sent, is a known diagnostic code. */
 export function isDiagnosticCode(code: string): code is DiagnosticCode {
   return Object.hasOwn(diagnosticCodes, code);
 }
@@ -191,9 +191,8 @@ export interface Diagnostic {
   /** A figure id, or a reply's message number, inside that source. */
   target?: string;
   /**
-   * What the diagnostic is about, such as a link's target or a diagram's elements. With the code,
-   * source, and target it identifies the diagnostic, so its message may change wording.
-   * Without it, the message identifies it.
+   * What it is about, such as a link's target. With the code, source, and target it identifies
+   * the diagnostic, so the message may change wording; without it, the message identifies it.
    */
   subject?: string;
   /** Diagram element ids involved. */

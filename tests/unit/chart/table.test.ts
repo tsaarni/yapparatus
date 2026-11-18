@@ -1,3 +1,5 @@
+/** Chart tables: column types, units in number columns, headers and rows, and CSV parsing. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseDelimited, type RawTable, rowObjects, typeTable } from "../../../src/chart/table.ts";

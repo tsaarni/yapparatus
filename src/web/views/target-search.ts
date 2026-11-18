@@ -1,11 +1,11 @@
+/** Finding the elements on the page that a reference points at, for Show on page. */
+
 import { elementSeparator, splitAddress } from "../../document/address.ts";
 import type { Reference } from "../../document/reference.ts";
 
 /**
- * The elements on the page that an earlier reference points at, found by its address: the
- * id it names, and the element or the selected words in it. Text and code have no id of their own,
- * so they are the blocks of the item's page that hold the words or code; among several, those
- * at the item's lines, where they are while the page has not changed since.
+ * The elements an earlier reference points at, by the id its address names. Text and code have no
+ * id, so they are the blocks holding the words or code, preferring those at the reference's lines.
  */
 export function findReferenced(item: Reference): Element[] {
   const { anchor, text } = splitAddress(item.address);
@@ -37,7 +37,6 @@ export function findReferenced(item: Reference): Element[] {
             !blocks.some((inner) => inner !== block && block.contains(inner) && holds(inner)),
         )
       : [...new Set(blocks.flatMap((block) => [...block.querySelectorAll("[data-target=code]")]))];
-  // A text item's lines are in its block; a code item's are its code's lines.
   const at = found.filter((element) => {
     const lines =
       item.kind === "code"

@@ -29,7 +29,6 @@ export function StepControls({
   return (
     <div
       {...styled("diagram-steps", styles.steps)}
-      // Comments on the figure record the step the reader had open.
       {...(active === undefined
         ? {}
         : {

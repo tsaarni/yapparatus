@@ -1,3 +1,5 @@
+/** Figure checks: draw errors, steps and their focus, step-only elements, build, and width. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiagramBuilder } from "../../../src/diagram/builder.ts";
@@ -49,7 +51,6 @@ test("a step that focuses a missing element names the elements there are", () =>
       subject: "c",
     },
   ]);
-  // A step problem does not stop the drawing from being shown.
   assert.equal(out.ok, true);
 });
 

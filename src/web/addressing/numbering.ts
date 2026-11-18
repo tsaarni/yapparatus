@@ -11,8 +11,10 @@ import { createLogger } from "../../protocol/log.ts";
 
 const log = createLogger("numbering");
 
+/** Which kinds of things the document numbers, from its settings. */
 export const numbering = numberingOf(settings);
 
+/** The numbers on one page: its chapter, its sections by heading id, and its blocks by id. */
 export interface PageNumbers {
   chapter: string;
   sections: Map<string, string>;
@@ -43,22 +45,28 @@ export function blockLabel(
   return number ? `${kindLabel[kind]} ${number}` : undefined;
 }
 
+/** A place a reference can point to, with the label a reference shows for it. */
 export interface Target {
   page: DocumentPage;
   fragment: string;
-  /** "Figure 3.1", "Section 3.2", "Chapter 3", or the caption, heading, or title without numbering. */
+  /**
+   * "Figure 3.1", "Section 3.2", or "Chapter 3".
+   * Without numbering, the caption, heading, or title.
+   */
   label: string;
 }
 
 const byPage = new Map<DocumentPage, PageNumbers>();
 const targets = new Map<string, Target>();
 
+/** Number every page again from the current outlines. */
 function computeNumbers() {
   byPage.clear();
   targets.clear();
   pages.forEach(numberPage);
 }
 
+/** Number one page's headings and blocks, and record them as reference targets. */
 function numberPage(page: DocumentPage, index: number) {
   const chapter = String(index + 1);
   const sections = new Map<string, string>();
@@ -104,9 +112,9 @@ function numberPage(page: DocumentPage, index: number) {
 }
 
 computeNumbers();
-// A page edited in place can add or remove sections and figures.
 onPagesChanged(computeNumbers);
 
+/** The numbers of a page, or undefined when there is no page. */
 export function numbersOf(page: DocumentPage | undefined): PageNumbers | undefined {
   return page ? byPage.get(page) : undefined;
 }
@@ -127,6 +135,8 @@ export function findTarget(to: string, from: DocumentPage | undefined): Target |
 
 /** The page being rendered, or undefined inside a chat reply. */
 export const PageContext = createContext<DocumentPage | undefined>(undefined);
+
+/** The page being rendered, or undefined inside a chat reply. */
 export function usePage() {
   return useContext(PageContext);
 }

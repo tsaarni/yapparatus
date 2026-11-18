@@ -1,3 +1,5 @@
+/** The web app: header, contents, the page or source file, the chat panel, and their layout. */
+
 import { onPagesChanged, pages, settings } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import {
@@ -51,6 +53,7 @@ type Layout = "wide" | "compact";
 const wideLayout = 1100;
 const smallScreen = window.matchMedia(when.smallScreen.replace("@media ", ""));
 
+/** State kept in session storage, so it survives reloads in this tab. */
 function useStored<T>(key: string, initial: T) {
   const [value, setValue] = useState<T>(() => {
     try {
@@ -70,14 +73,12 @@ function useStored<T>(key: string, initial: T) {
 const whenIdle = (task: () => void) =>
   "requestIdleCallback" in window ? requestIdleCallback(task) : setTimeout(task, 500);
 
+/** The whole app, laid out wide or compact around the page and the chat. */
 export function App() {
-  // The router changes the route when the new page's code has loaded, so the route's page
-  // renders with its content at once.
   const route = useRoute();
   const page = route.page;
   const file = route.file;
   const { chat, diagnostics } = useLive();
-  // Bumped when an edited page is updated in place, so the page and the numbers re-render.
   const [pagesRevision, setPagesRevision] = useState(0);
   useEffect(() => onPagesChanged(() => setPagesRevision((revision) => revision + 1)), []);
   const [open, setOpen] = useStored("yapparatus:open", false);
@@ -109,13 +110,10 @@ export function App() {
       .filter(Boolean)
       .join(" · ");
   }, [page, file]);
-  // After a route change: restore the old position on Back, else go to the anchor or top.
   useLayoutEffect(() => {
     if (route.restore !== undefined) scrollRoot().scrollTo({ top: route.restore });
     else {
       scrollToFragment(route.fragment, false);
-      // Arriving at an address shows where it points. Diagrams render after their fonts
-      // load, so their elements may appear a moment later. The file view shows its own lines.
       if (route.fragment && !route.file)
         whenPresent(
           () => document.getElementById(route.fragment),
@@ -126,7 +124,6 @@ export function App() {
         );
     }
   }, [route]);
-  // While the reader reads, load the next page, so following the pager does not wait.
   useEffect(() => {
     const next = page && pages[pages.indexOf(page) + 1];
     if (next) whenIdle(() => next.load().catch(() => undefined));
@@ -134,8 +131,6 @@ export function App() {
   useEffect(() => {
     const app = appRef.current;
     if (!app) return;
-    // Keys such as Page Down scroll the focused element, and the page scrolls in this one.
-    // A click on the page focuses it again, since it is the nearest focusable element.
     app.focus({ preventScroll: true });
     const observer = new ResizeObserver(([entry]) => {
       const width = entry?.contentRect.width ?? 0;
@@ -170,7 +165,6 @@ export function App() {
     [setReferences, setOpen],
   );
 
-  /** Attach the place a diagnostic is about to the message box, and start the message. */
   function commentOn(diagnostic: ReportedDiagnostic) {
     const target = pages.find((p) => p.source === diagnostic.source);
     if (!target) return;
@@ -180,7 +174,6 @@ export function App() {
         diagnostic.line ? ` on line ${diagnostic.line}` : ""
       }: ${diagnostic.message}`,
     );
-    // A figure's diagnostic names it; a reply's target is its message number.
     const anchor = diagnostic.origin === "reply" ? "" : (diagnostic.target ?? "");
     if (target !== page) navigate(href(target, anchor));
     whenPresent(
@@ -198,9 +191,7 @@ export function App() {
     );
   }
 
-  /** Find the target of an earlier reference by its address, and show it. */
   function showOnPage(item: Reference) {
-    // A source file opens at the item's lines, which the file view highlights.
     const sourceFile = parseFileAddress(item.address);
     if (sourceFile) return navigate(fileHref(sourceFile));
     const { page: target, fragment } = parseAddress(item.address);
@@ -219,8 +210,6 @@ export function App() {
         flash(element);
       },
       () => {
-        // The exact target is gone, usually because the agent rewrote it in answer. Its anchor,
-        // the section around selected text or the figure around an element, is a sure place to look.
         const { anchor } = splitAddress(item.address);
         const around =
           (anchor && document.getElementById(anchor)) ||
@@ -250,7 +239,6 @@ export function App() {
     showOnPage(pendingShow);
   }, [page, pendingShow]);
 
-  // Stable, so typing a message does not re-render the page through this context.
   const handlers = useMemo<TargetHandlers>(
     () => ({
       link: (element) => {
@@ -384,7 +372,7 @@ export function App() {
 }
 
 const s = stylex.create({
-  // The page scrolls here, beside the chat, and not in the window. Print shows it whole.
+  /** The page scrolls here, beside the chat, and not in the window. Print shows it whole. */
   app: {
     height: { default: "100dvh", [when.print]: "auto" },
     overflowY: { default: "auto", [when.print]: "visible" },
@@ -437,7 +425,7 @@ const s = stylex.create({
    */
   article: {
     display: "grid",
-    // The text track takes its full measure first; only the breakout track gives way.
+    /** The text track takes its full measure first; only the breakout track gives way. */
     gridTemplateColumns: `[content-start] min(100%, ${sizes.textWidth}) [content-end] minmax(0, ${sizes.breakout}) [wide-end] minmax(0, 1fr)`,
     color: theme.textBody,
     overflowWrap: "break-word",

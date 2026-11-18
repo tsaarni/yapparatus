@@ -1,3 +1,7 @@
+/**
+ * The diagnostic code registry: every code used in source and documents exists and is described.
+ */
+
 import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -6,6 +10,7 @@ import { diagnosticCodes, isDiagnosticCode } from "../../../src/document/diagnos
 
 const repo = path.join(import.meta.dirname, "../../..");
 
+/** Files under `dir` in the repository with one of the extensions, as paths from the root. */
 function files(dir: string, extensions: string[]): string[] {
   return (readdirSync(path.join(repo, dir), { recursive: true }) as string[])
     .filter((file) => extensions.some((ext) => file.endsWith(ext)))

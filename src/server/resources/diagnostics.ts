@@ -1,7 +1,6 @@
 /**
- * The document's diagnostics: GET /-/api/diagnostics answers with every diagnostic and the
- * unchecked pages once recent edits are checked, with text for the agent. POST adds what a
- * browser found in a page it rendered or in a reply.
+ * The diagnostics resource: GET answers with every diagnostic and the unchecked pages once
+ * recent edits are checked; POST adds what a browser found in a page or a reply.
  */
 import {
   type Diagnostic,
@@ -15,6 +14,7 @@ import { HttpError, isRecord, type Router } from "../router.ts";
 
 const browserOrigins: DiagnosticOrigin[] = ["chart", "render", "runtime", "reply"];
 
+/** Serves `/-/api/diagnostics` from the diagnostic store. */
 export class DiagnosticsResource {
   private readonly store: DiagnosticStore;
 
@@ -31,7 +31,7 @@ export class DiagnosticsResource {
       });
   }
 
-  /** Every diagnostic and the unchecked pages, once recent edits are checked, with text for the agent. */
+  /** Every diagnostic and the unchecked pages, once recent edits are checked, with agent text. */
   private async document(): Promise<DocumentDiagnostics> {
     const { store } = this;
     await store.settle();
@@ -58,11 +58,12 @@ export class DiagnosticsResource {
   }
 }
 
+/** A string field cut to `max` characters, or undefined when it is not a string. */
 function text(value: unknown, max: number): string | undefined {
   return typeof value === "string" ? value.slice(0, max) : undefined;
 }
 
-/** A browser's diagnostics: its own origins, codes from the registry, and no source of their own. */
+/** A browser's diagnostics: browser origins, codes from `diagnosticCodes`, and no source. */
 function parseDiagnostics(input: unknown): Diagnostic[] {
   if (!Array.isArray(input) || input.length > 200)
     throw new HttpError(400, "diagnostics must be a list of at most 200 items.");

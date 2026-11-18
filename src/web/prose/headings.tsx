@@ -1,3 +1,5 @@
+/** The page title and section headings, numbered and made targets. */
+
 import * as stylex from "@stylexjs/stylex";
 import { type HTMLAttributes, useContext } from "react";
 import { numbering, numbersOf, usePage } from "../addressing/numbering.ts";
@@ -24,7 +26,6 @@ export function H1({ children, ...props }: Props) {
   return (
     <hgroup {...stylex.props(s.titleGroup)}>
       {chapter && <p {...stylex.props(s.chapter)}>Chapter {chapter}</p>}
-      {/* The title stands for the whole page: commenting on it adds the page as a reference. */}
       <h1
         {...props}
         {...(reply ? {} : targetProps("page", chapter ? `Chapter ${chapter}` : undefined, title))}
@@ -123,7 +124,7 @@ const s = stylex.create({
     letterSpacing: letterSpacing.snug,
   },
   number: {
-    // With the space after the number, so a double click selects the title word alone.
+    /** With the space after the number, so a double click selects the title word alone. */
     marginRight: "0.35em",
     color: theme.textMuted,
     fontWeight: fontWeight.medium,

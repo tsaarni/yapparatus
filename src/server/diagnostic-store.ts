@@ -1,11 +1,6 @@
 /**
- * Diagnostics: the errors and warnings in the document, for the agent first. The server finds
- * what follows from the source alone: it compiles each page, with its diagrams, and checks
- * links and `document.json` whenever a file changes. A browser reports what only exists when a
- * page runs: chart layout, render and runtime errors, and replies that fail to show. Its
- * findings belong to the revision of the page it rendered and only add: a changed page has a
- * new revision, and the findings of the old one stop counting. A page no browser has rendered
- * since it changed is unchecked, and is never reported as clean.
+ * The document's errors and warnings: the server's own checks of each source, and what browsers
+ * found in the page revision they rendered. A page not rendered since it changed is unchecked.
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
@@ -45,6 +40,7 @@ export function diagnosticKey(d: Diagnostic): string {
   return [d.code, d.source ?? "", d.target ?? "", d.subject ?? d.message].join("|");
 }
 
+/** What the store needs from the server to check sources and announce changes. */
 export interface DiagnosticOptions {
   root: string;
   content: string;
@@ -55,8 +51,9 @@ export interface DiagnosticOptions {
   changed: () => void;
 }
 
+/** Collects diagnostics, settles errors, and tracks which errors the agent was given. */
 export class DiagnosticStore {
-  /** The server's own checks, each replaced as a whole: "pages", "compile:<source>", "links:<source>". */
+  /** The server's checks, each replaced whole: "pages", "compile:<source>", "links:<source>". */
   private checks = new Map<string, Diagnostic[]>();
   /** What browsers found on each page, by revision, oldest revision first, by `diagnosticKey`. */
   private findings = new Map<string, Map<string, Map<string, Diagnostic>>>();
@@ -141,10 +138,8 @@ export class DiagnosticStore {
   }
 
   /**
-   * Pages whose browser checks (charts, render and runtime errors) are out of date: no browser
-   * has rendered their current revision, though one rendered an earlier one or the page
-   * changed since the server started. Each comes with what was found in the revision last
-   * rendered.
+   * Pages no browser has rendered at their current revision, though one rendered an earlier one
+   * or the page changed since the server started, each with what the last rendered one had.
    */
   unchecked(): UncheckedPage[] {
     const pages: UncheckedPage[] = [];
@@ -195,9 +190,8 @@ export class DiagnosticStore {
   }
 
   /**
-   * Wait until the checks of recent edits are done, for at most a few seconds. An agent edits a
-   * file and reads the diagnostics at once, often before the watcher reports the edit. The wait
-   * finds such an edit itself and waits for its checks.
+   * Wait a few seconds at most for the checks of recent edits. An agent often reads before the
+   * watcher reports its edit, so this finds such an edit itself and waits for its checks.
    */
   async settle() {
     if (this.savedSinceCheck()) this.fileChanged();
@@ -207,11 +201,8 @@ export class DiagnosticStore {
   }
 
   /**
-   * Settle the errors that have stayed for the settle time, and forget the fixed ones: gone,
-   * and their page checked again. A settled error that the agent has not been given ends its
-   * wait; the settle time keeps a half-saved file from doing that. A page not checked since it
-   * changed keeps its errors, so a re-render does not make them new. A fixed error is no longer
-   * given, so it is new again if it comes back.
+   * Settle errors that stayed for the settle time, which ends the agent's wait, and forget fixed
+   * ones, so they are new if they come back. Unchecked pages keep their errors.
    */
   private settleErrors(): boolean {
     const now = Date.now();
@@ -255,7 +246,7 @@ export class DiagnosticStore {
     return pageIds(this.root, this.content).map((id) => `${this.content}/${id}.mdx`);
   }
 
-  /** Outlines of the pages `document.json` lists, compiled by the same pipeline as in the browser. */
+  /** Outlines of the pages `document.json` lists, compiled by the browser's pipeline. */
   async outlines(): Promise<Array<{ id: string; outline: PageOutline }>> {
     const { listed } = this.settings();
     const pages: Array<{ id: string; outline: PageOutline }> = [];
@@ -383,7 +374,6 @@ export class DiagnosticStore {
           })),
       );
     }
-    // A removed or renamed page has no checks left to replace its own, so clear them here.
     const sources = new Set(this.pageSources());
     for (const key of [...this.checks.keys()]) {
       const source = /^(?:compile|links):(.+)$/.exec(key)?.[1];
@@ -427,7 +417,6 @@ export class DiagnosticStore {
       const revisions = this.findings.get(source) ?? new Map<string, Map<string, Diagnostic>>();
       this.findings.set(source, revisions);
       const known = revisions.get(revision as string);
-      // The revision rendered last goes last, so it is the one shown as before a change.
       revisions.delete(revision as string);
       items = known ?? new Map();
       revisions.set(revision as string, items);

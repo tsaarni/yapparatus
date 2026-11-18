@@ -1,8 +1,8 @@
 /**
- * Client for the dev server API: the chat, diagnostic reports, and source files. Changes
- * arrive on Vite's hot-update connection. Every function here is a no-op outside live mode,
- * so built pages never touch /-/api.
+ * Client for the dev server API: the chat, diagnostic reports, and source files, with changes
+ * on Vite's hot-update connection. Outside live mode it does nothing, so built pages never call it.
  */
+
 import { useSyncExternalStore } from "react";
 import { createLogger } from "../../protocol/log.ts";
 import {
@@ -19,6 +19,7 @@ const log = createLogger("api");
 const live = import.meta.env.DEV;
 const prefix = `${import.meta.env.BASE_URL.replace(/\/$/, "")}${apiPrefix}`;
 
+/** Send a request to the dev server API, and throw its error message when it fails. */
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   log.debug(method, path);
   let response: Response;
@@ -30,7 +31,6 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
         : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
     });
   } catch {
-    // No response at all: the dev server is stopped or restarting.
     log.warn(method, path, "no answer from the dev server");
     throw new Error("The dev server did not answer. It may be restarting; try again.");
   }
@@ -48,25 +48,22 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
-/* ---------- The chat ---------- */
-
 const id = (value: string) => encodeURIComponent(value);
+
+/** What the reader does to the chat: send a message, and clear the chat. */
 export const commands = {
   send: (input: Omit<Extract<NewMessage, { author: "reader" }>, "author">) =>
     call<{ seq: number }>("POST", "/chat", { author: "reader", ...input }),
   clear: () => call<void>("DELETE", "/chat"),
 };
 
-/* ---------- Diagnostic reports ---------- */
-
 const sent = new Set<string>();
 const queued = new Map<string, DiagnosticReport>();
 let flushTimer: number | undefined;
 
 /**
- * Report what this browser found in one revision of a page, or in a reply. Findings only add,
- * so a report the server already has is not sent again, and reports within a short window
- * are sent together.
+ * Report what this browser found in one revision of a page, or in a reply. A report already
+ * sent is not sent again, and reports within a short window are sent together.
  */
 export function reportDiagnostics(report: DiagnosticReport) {
   if (!live) return;
@@ -76,6 +73,7 @@ export function reportDiagnostics(report: DiagnosticReport) {
   if (flushTimer === undefined) flushTimer = window.setTimeout(flushReports, 150);
 }
 
+/** Send the queued reports, and forget one that fails so it can be sent again. */
 function flushReports() {
   flushTimer = undefined;
   for (const [key, report] of queued) {
@@ -85,8 +83,7 @@ function flushReports() {
   queued.clear();
 }
 
-/* ---------- Live state ---------- */
-
+/** What the dev server keeps the browser current on: the chat and the diagnostics. */
 export interface LiveState {
   chat: Chat;
   diagnostics: ReportedDiagnostic[];
@@ -99,6 +96,7 @@ let state: LiveState = {
 const listeners = new Set<() => void>();
 let connected = false;
 
+/** Merge a change into the live state and tell every listener. */
 function update(next: Partial<LiveState>) {
   state = { ...state, ...next };
   for (const listener of listeners) listener();
@@ -106,6 +104,7 @@ function update(next: Partial<LiveState>) {
 
 const fileListeners = new Set<(address: string) => void>();
 
+/** Handle one kind of update event from the server's hot-update connection. */
 function on<E extends keyof UpdateEvents>(event: E, handle: (data: UpdateEvents[E]) => void) {
   import.meta.hot?.on(event, (data: UpdateEvents[E]) => {
     log.debug(event, data);
@@ -117,7 +116,6 @@ function on<E extends keyof UpdateEvents>(event: E, handle: (data: UpdateEvents[
 function connect() {
   if (!live || connected) return;
   connected = true;
-  // An update that arrives before the first read answers is newer than the read.
   const updated = new Set<keyof LiveState>();
   on("yapparatus:chat", (chat) => {
     updated.add("chat");
@@ -140,6 +138,7 @@ function connect() {
     .catch((error: unknown) => log.warn("could not read the chat:", error));
 }
 
+/** Connect on first use, and call `listener` on every change, for `useSyncExternalStore`. */
 function subscribe(listener: () => void) {
   connect();
   listeners.add(listener);

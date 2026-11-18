@@ -1,7 +1,6 @@
 /**
- * Agents copy the examples in the diagram reference, so every example must draw. Each
- * `js` block is a draw program; each `mdx` block is a `<Diagram>` whose draw program
- * compiles and whose steps focus elements it has.
+ * Every example in the diagram reference draws, since agents copy them; an `mdx` example's
+ * steps focus elements its diagram has.
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";

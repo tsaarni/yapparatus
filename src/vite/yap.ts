@@ -1,9 +1,5 @@
 #!/usr/bin/env node
-/**
- * The `yap` command: serve, build, or preview one document of the project. A `vite.config.ts`
- * in the project directory is loaded too, for Vite options and plugins; the command adds
- * `yapparatus()` itself.
- */
+/** The `yap` command: serve, build, or preview a document with Vite. */
 import { parseArgs } from "node:util";
 import { build, createServer, type InlineConfig, preview } from "vite";
 import { yapparatus } from "./plugin.ts";
@@ -21,6 +17,7 @@ Options:
   --force        Rebuild Vite's dependency cache.
   --single       Build the document as one offline HTML file.`;
 
+/** Print the message and the usage, and exit with an error. */
 function fail(message: string): never {
   process.stderr.write(`${message}\n\n${usage}\n`);
   process.exit(1);
@@ -61,12 +58,15 @@ for (const [option, value] of Object.entries(values)) {
     fail(`--${option} is an option of ${commands.join(" and ")}.`);
 }
 
-/** The configuration every command shares: the plugin for one document, from the project directory. */
+/** The configuration every command shares: the plugin for one document, from the project folder. */
 const config: InlineConfig = {
   root: process.cwd(),
   plugins: yapparatus({ document, singleFile: values.single }),
 };
-// Only on this machine: the chat server trusts local processes. See the Security section of docs/design/server.mdx.
+/**
+ * Listen only on this machine: the chat server trusts local processes.
+ * See the Security section of docs/design/server.mdx.
+ */
 const listen = { host: "127.0.0.1", open: values.open, ...(port === undefined ? {} : { port }) };
 try {
   if (command === "dev") {

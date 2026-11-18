@@ -254,6 +254,9 @@ importers:
         specifier: ^2.3.4
         version: 2.3.4(rollup@4.67.5)(vite@8.3.6(@types/node@26.6.6))
     devDependencies:
+      '@babel/parser':
+        specifier: ^7.29.13
+        version: 7.29.13
       '@biomejs/biome':
         specifier: ^2.6.5
         version: 2.6.5

@@ -1,4 +1,4 @@
-/** The examples in the diagram reference: each `js` block is a draw program, each `mdx` block a `<Diagram>`. */
+/** The diagram reference's examples: `js` blocks are draw programs, `mdx` blocks `<Diagram>`s. */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 

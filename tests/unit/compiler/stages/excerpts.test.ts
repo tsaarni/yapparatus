@@ -1,3 +1,5 @@
+/** Excerpts: a file's lines with their numbers, and how a block's end is found. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compile } from "@mdx-js/mdx";
@@ -30,9 +32,7 @@ test("an excerpt shows its file's lines with their numbers, exactly as written",
     assert.equal(code?.start, 2);
     assert.equal(code?.lines.length, 2);
     assert.deepEqual(code?.marks, { 1: "highlight" });
-    // The file's own text is shown as written, notation included.
     assert.match(textOf(code?.lines[0]), /\[!code highlight\]$/);
-    // Without end, the excerpt is the block its first line opens, closing brace included.
     const block = await compileExcerpt(
       '<Excerpt from="/-/files/app/src/main.ts" start="export function greet(" mark={["const", "return"]} />',
     );

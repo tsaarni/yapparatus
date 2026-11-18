@@ -9,6 +9,7 @@ import { type FileAddress, fileSource, foldersOf } from "../document/file-addres
 /** Larger files are not shown: they would make a page or a build heavy for little use. */
 export const maxFileSize = 1_000_000;
 
+/** A source file read for a page, with its location and lines. */
 export interface SourceFile {
   /** Absolute real path. */
   file: string;
@@ -18,6 +19,7 @@ export interface SourceFile {
   lines: string[];
 }
 
+/** Reads files from the folders `document.json` names, refusing paths that lead outside them. */
 export class ExternalFiles {
   private readonly root: () => string;
   private readonly content: string;

@@ -4,6 +4,7 @@ import { realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+/** The workspace folder under the system's temporary directory. */
 export const root = path.join(realpathSync(os.tmpdir()), "yapparatus-browser");
 
 /** The commands a prompt tells the agent to run, as `-e` code, in order. */

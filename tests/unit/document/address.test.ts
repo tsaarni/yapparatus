@@ -1,3 +1,5 @@
+/** Page addresses with selected words as a text fragment. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { quoteOf, splitAddress, textFragment } from "../../../src/document/address.ts";

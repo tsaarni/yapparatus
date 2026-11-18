@@ -1,3 +1,5 @@
+/** The agent's prompt text for references and for the folders a document shows. */
+
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -74,7 +76,6 @@ test("two folders with the same paths stay apart, in references and in the agent
       references.map((c) => c.source),
       ["app/src/main.ts", "lib/src/main.ts"],
     );
-    // An item cannot claim one folder's address with the other folder's file.
     assert.throws(
       () => acceptReferences(root, "guide", files, [{ ...item("app"), source: "lib/src/main.ts" }]),
       /file the document shows/,
@@ -95,7 +96,6 @@ test("two folders with the same paths stay apart, in references and in the agent
       prompt,
       /- file text, lib\/src\/main\.ts:2, \/-\/files\/lib\/src\/main\.ts#L2: “name”/,
     );
-    // The start prompt names each folder and where it is, from the project folder.
     const start = startPrompt("/project/docs/guide.md", { app: "app", lib: "lib" }, "/project");
     assert.match(start, /- app: app\n- lib: lib/);
     assert.match(start, /Run this from the project directory, \/project,/);

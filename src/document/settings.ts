@@ -1,15 +1,18 @@
 /** The content folder's `document.json`: its fields, and what they mean for the document. */
 
-/** A page's id, its address, from its file in the content folder: "guide/setup.mdx" → "guide/setup". */
+/** A page's id and address, from its file in the content folder: "guide/a.mdx" → "guide/a". */
 export const pageIdOf = (file: string) => file.replace(/\.mdx$/, "");
 
 /** The document's appearance: one fixed theme, or light and dark that the reader can switch. */
 export const themeSettings = ["dark", "light", "auto"] as const;
+
+/** One of `themeSettings`. */
 export type ThemeSetting = (typeof themeSettings)[number];
 
 /** An icon name, as `<Icon>`, `logo`, and `favicon` take it: `collection:icon`. */
 export const iconName = /^[a-z0-9-]+:[a-z0-9-]+$/;
 
+/** Which kinds of thing the document numbers. */
 export interface NumberingSettings {
   /** Number pages as chapters and their sections: 3, 3.1, 3.1.2. */
   sections: boolean;
@@ -23,7 +26,7 @@ export interface NumberingSettings {
 
 /** Reader-facing settings from the content folder's `document.json`. */
 export interface DocumentSettings {
-  /** Page files in the content folder, with `.mdx`, in reading order. Every page is listed exactly once. */
+  /** Page files in the content folder, with `.mdx`, in reading order, each listed once. */
   pages: string[];
   /** Document title in the header and browser tab. Default: the folder name. */
   title?: string;
@@ -49,6 +52,7 @@ export interface DocumentSettings {
   files?: Record<string, string>;
 }
 
+/** The `numbering` setting with every kind filled in; each kind defaults to on. */
 export function numberingOf(settings: DocumentSettings): NumberingSettings {
   const n = settings.numbering ?? true;
   if (typeof n === "boolean") return { sections: n, figures: n, tables: n, listings: n };

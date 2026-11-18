@@ -1,3 +1,5 @@
+/** Charts in the browser: inline, file, and table data, theme colors, and reported mark errors. */
+
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
@@ -10,7 +12,6 @@ test("a chart draws its block of data in theme colors, with a legend, and the pa
   const chart = page.locator("figure", { hasText: "Figure 7.1" });
   const dots = chart.locator("svg [aria-label=dot] circle");
   await expect(dots).toHaveCount(6);
-  // Categories take colors in the order the rows first use them.
   await expect(chart.getByRole("list", { name: "Legend" })).toHaveText(/Search\s*Checkout/);
   const colors = await dots.evaluateAll((all) => all.map((d) => d.getAttribute("fill")));
   expect(new Set(colors).size).toBe(2);
@@ -24,7 +25,6 @@ test("a file's chart keeps its rows out of the page, and redraws when the file c
   page,
   request,
 }) => {
-  // The page module refers to the data module and holds none of the rows.
   const module = await (await request.get("/content/charts.mdx")).text();
   expect(module).toContain("virtual:yapparatus/data:sample/throughput.csv");
   expect(module).not.toContain("8900");

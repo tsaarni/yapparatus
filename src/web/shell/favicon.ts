@@ -1,3 +1,5 @@
+/** The browser tab icon, from the document's favicon. */
+
 import { favicon } from "virtual:yapparatus/document";
 
 /**

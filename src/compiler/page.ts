@@ -21,10 +21,8 @@ import { pageOutline } from "./stages/outline.ts";
 import { sourceContext } from "./stages/source-context.ts";
 
 /**
- * The stages of a page, in the order they run. Each later stage reads what the earlier ones
- * wrote: math comes first, so no later stage reads it as code; the outline needs heading ids
- * and the files that excerpts and charts read; and the highlighter colors the code blocks that
- * excerpts made.
+ * The stages of a page, in the order they run; each later stage reads what earlier ones wrote.
+ * Math runs first so no later stage reads it as code; highlighting runs last, on excerpts too.
  */
 export function pageStages(
   document: DocumentDirectory,
@@ -47,12 +45,8 @@ export function pageStages(
 }
 
 /**
- * Compile a page as its file is on disk, with the same plugins as the browser, in the server's
- * own environment. The browser environment's dependency optimizer must not see these requests:
- * at startup they hold back the first page load. The watcher reports an edit a moment after it
- * is saved, and until then the module is the old one, so a page whose file differs from the
- * text it was compiled from is compiled again. `url` is the page's path from the project, such
- * as `/docs/cache.mdx`.
+ * Compile the page at `url`, such as `/docs/cache.mdx`, as its file is on disk, in the SSR
+ * environment so the browser's dependency optimizer does not see it. A stale module is recompiled.
  */
 export function compilePage(server: ViteDevServer, root: string, url: string) {
   const environment = server.environments.ssr;

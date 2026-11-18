@@ -14,13 +14,15 @@ import { logLevel } from "../protocol/log.ts";
 import { installRestApi } from "../server/rest-api.ts";
 import { pageFiles } from "./page-files.ts";
 
+/** The options of the Vite plugin. */
 export interface YapparatusOptions {
-  /** The document's directory, which holds its document.json and MDX pages, relative to the Vite root. */
+  /** The document's directory, holding its document.json and MDX pages, from the Vite root. */
   document: string;
   /** Inline all application assets. Default: false. */
   singleFile?: boolean;
 }
 
+/** The Vite plugin for one document directory of the project. */
 export function yapparatus(options: YapparatusOptions): PluginOption[] {
   let root = process.cwd();
   const content = options.document
@@ -37,18 +39,11 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
     {
       name: "yapparatus:workspace",
       config: () => ({
-        // Build output is not source; rebuilding must not reload open pages.
-        // Nor is the chat's storage: the server compiles each reply as a temporary file before
-        // accepting it, and Vite reloads the page when a file it compiled is removed.
         server: { watch: { ignored: ["**/dist/**", "**/dist-single/**", "**/.yapparatus/**"] } },
-        // Beside the pages, under the application's prefix, so no page name can collide with it.
-        // Each document builds to its own directory, which mirrors the document's path.
         build: {
           assetsDir: `${appPrefix.slice(1)}/assets`,
           outDir: path.join(options.singleFile ? "dist-single" : "dist", content),
         },
-        // A single file opened from disk has no server to answer page paths.
-        // The browser logs at the same level as the server.
         define: {
           __YAPPARATUS_HASH_ROUTES__: JSON.stringify(!!options.singleFile),
           __YAPPARATUS_LOG__: JSON.stringify(logLevel()),
@@ -56,7 +51,6 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
       }),
       configResolved(config) {
         root = config.root;
-        // The yap command adds the plugin, and a project's vite.config.ts may add it again.
         if (config.plugins.filter((plugin) => plugin.name === "yapparatus:workspace").length > 1)
           throw new Error(
             "yapparatus: the plugin is added twice. The yap command adds it, so remove yapparatus() from vite.config.ts.",
@@ -74,9 +68,6 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
       ? [
           viteSingleFile(),
           {
-            // vite-plugin-singlefile turns off CSS code splitting. Vite then emits the CSS file after
-            // StyleX looks for one to append its rules to, and StyleX writes them to a separate file.
-            // Code splitting is off, so the one chunk still has one CSS file to inline.
             name: "yapparatus:single-file-css",
             enforce: "post",
             config: () => ({ build: { cssCodeSplit: true } }),

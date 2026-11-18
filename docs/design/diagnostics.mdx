@@ -29,11 +29,11 @@ The server finds problems in the source files, and the web app reports those tha
   <Step focus="new-error wait">The error lasts 2 s and is new to the agent, so it ends the agent's wait.</Step>
 </Diagram>
 
-The store is in [`src/server/diagnostic-store.ts`](/-/files/yapparatus/src/server/diagnostic-store.ts), and [`src/server/resources/diagnostics.ts`](/-/files/yapparatus/src/server/resources/diagnostics.ts) answers its requests. The requests that read and report diagnostics are in [the REST API](/rest-api#diagnostics).
+The requests that read and report diagnostics are in [the REST API](/rest-api#diagnostics).
 
 ## Origins
 
-Every diagnostic records which check found it as its [origin](/-/files/yapparatus/src/document/diagnostic.ts#L3-L15).
+Every diagnostic records which check found it as its origin.
 
 After every change, the server checks `document.json` and its page list (origin `pages`), compiles every page (origin `compile`), and checks links and references across pages (origin `link`). Compiling a page also checks its [Markdown conventions](/page-compiler#markdown-conventions), its charts' data, and its [diagrams](/diagram-compiler#checks).
 
@@ -45,11 +45,7 @@ The server also [checks each reply](/server#reply-checks), and returns its error
 
 ## Codes and severity
 
-Every code is in one registry in `src/document/diagnostic.ts`, with its severity and meaning. <Ref to="diagnostics-registry" /> shows its start.
-
-<Listing id="diagnostics-registry" caption="The start of the registry: each code with its severity and meaning.">
-<Excerpt from="/-/files/yapparatus/src/document/diagnostic.ts" start="export const diagnosticCodes = {" end="DUPLICATE_ID:" mark="severity" />
-</Listing>
+Every code is in one registry, `diagnosticCodes`, with its severity and meaning.
 
 A check passes a code and never a severity, so a code has the same severity everywhere. Each problem has one code: any two things that share an id are `DUPLICATE_ID`.
 
@@ -74,11 +70,7 @@ The web app sends codes without a severity, and the server adds it from the regi
 
 ## Identity
 
-A diagnostic is identified by its code, file, target, and subject, as <Ref to="diagnostics-type" /> marks.
-
-<Listing id="diagnostics-type" caption="A diagnostic. The marked fields identify it.">
-<Excerpt from="/-/files/yapparatus/src/document/diagnostic.ts" start="export interface Diagnostic {" mark={["code: DiagnosticCode", "source?: string", "target?: string", "subject?: string"]} />
-</Listing>
+A diagnostic is a `Diagnostic`. It holds its `origin`, `code`, and `message`, and when known the `source` file relative to the project, the `line` in it, a `target`, a `subject`, and the ids of the diagram `elements` involved. A diagnostic is identified by its `code`, `source`, `target`, and `subject`.
 
 The target is a figure id on a page, or a message number in a reply. The subject is what the diagnostic is about, such as a link's target, or else its message. So a diagnostic whose line moves stays the same, and two broken links on one page stay two. The store uses it to drop duplicate reports and to remember which errors the agent has been given.
 

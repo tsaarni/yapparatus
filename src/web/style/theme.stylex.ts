@@ -1,36 +1,31 @@
-import * as stylex from "@stylexjs/stylex";
+/** Design tokens: the colors for dark, light, and print, and the type, space, and size scales. */
 
-/**
- * Design tokens. `theme` holds what a theme changes (colors, shadows, fonts) as CSS
- * variables; the scales below are constants, compiled into the styles that use them.
- * The roles and the reasons for them are in docs/design/styling.mdx, and
- * tests/unit/web/style/theme.test.ts checks the contrast every role must reach.
- */
+import * as stylex from "@stylexjs/stylex";
 
 /** The dark reading theme, which is the default. */
 const dark = {
   /** For native controls, scrollbars, and the browser canvas. */
   colorScheme: "dark",
-  // Surfaces, from back to front.
+  /** Surfaces, from back to front. */
   canvas: "#0a0c11",
   surface: "#10131a",
   surfaceRaised: "#161a23",
   surfaceHover: "#1d222d",
   scrim: "#000000a8",
-  // Borders: dividers, emphasized edges, and controls.
+  /** Borders: dividers, emphasized edges, and controls. */
   border: "#2c3242",
   borderStrong: "#5a647b",
   borderControl: "#737e98",
-  // Text, from strongest to quietest.
+  /** Text, from strongest to quietest. */
   text: "#eef1f7",
   textBody: "#c2c9d6",
   textMuted: "#959eb0",
-  // The accent: links, focus, the current position, primary actions.
+  /** The accent: links, focus, the current position, primary actions. */
   accent: "#8b9bff",
   accentStrong: "#b3bdff",
   accentSurface: "#262d52",
   accentBorder: "#454f8f",
-  // Status hues, each with a surface and a border.
+  /** Status hues, each with a surface and a border. */
   error: "#f59e9e",
   errorSurface: "#44292d",
   errorBorder: "#6b4247",
@@ -38,8 +33,10 @@ const dark = {
   warningSurface: "#3a301b",
   warningBorder: "#5e4d2a",
   success: "#7fd8b4",
-  // Diagram categories: colors a figure assigns, in this order, to the categories its
-  // author names. Ordered so the first two stay apart with red-green color blindness.
+  /**
+   * Diagram categories: colors a figure assigns, in this order, to the categories its
+   * author names. Ordered so the first two stay apart with red-green color blindness.
+   */
   category1: "#c3881e",
   category1Surface: "#3b2f1b",
   category2: "#77b9fe",
@@ -48,14 +45,14 @@ const dark = {
   category3Surface: "#3d2c36",
   category4: "#b86ae3",
   category4Surface: "#3b294d",
-  // The shade under a note's folded corner.
+  /** The shade under a note's folded corner. */
   diagramShade: "#00000040",
-  // Code tokens. Plain code is textBody; comments and punctuation are textMuted.
+  /** Code tokens. Plain code is textBody; comments and punctuation are textMuted. */
   codeKeyword: "#a5b0ff",
   codeString: "#9fd8b4",
   codeFunction: "#f2c98b",
   codeConstant: "#f0a3b8",
-  // Elevation: one shadow for menus and notices, one for panels over the page.
+  /** Elevation: one shadow for menus and notices, one for panels over the page. */
   shadowRaised: "0 12px 32px #00000080",
   shadowOverlay: "0 24px 64px #0000008c",
 };
@@ -127,7 +124,7 @@ const lightMore: Partial<Record<Role, string>> = {
   accentBorder: "#7d8be0",
 };
 
-/** The raw color values of each theme, for document pages that compute with them, such as contrast. */
+/** Each theme's raw color values, for document pages that compute with them, such as contrast. */
 export const palettes = { dark, light, darkMore, lightMore };
 
 /** One role in a theme: its screen value, its stronger value, and the light value for print. */
@@ -244,12 +241,14 @@ export const fontSize = stylex.defineConsts({
   xxl: "clamp(28px, 5cqi - 2px, 32px)",
 });
 
+/** Font weights. */
 export const fontWeight = stylex.defineConsts({
   regular: "400",
   medium: "500",
   semibold: "600",
 });
 
+/** Line heights, from titles to reading text. */
 export const lineHeight = stylex.defineConsts({
   /** Titles and single-line controls. */
   tight: "1.2",
@@ -261,6 +260,7 @@ export const lineHeight = stylex.defineConsts({
   relaxed: "1.7",
 });
 
+/** Letter spacing for headings and uppercase labels. */
 export const letterSpacing = stylex.defineConsts({
   /** Large headings. */
   tight: "-0.02em",
@@ -284,6 +284,7 @@ export const space = stylex.defineConsts({
   xl5: "96px",
 });
 
+/** Corner radii, by the size of what they round. */
 export const radius = stylex.defineConsts({
   /** Inline code, highlights. */
   sm: "4px",
@@ -294,6 +295,7 @@ export const radius = stylex.defineConsts({
   full: "999px",
 });
 
+/** Sizes of the layout and controls: header, sidebar, text column, page, chat, and buttons. */
 export const sizes = stylex.defineConsts({
   headerHeight: "56px",
   sidebarWidth: "272px",

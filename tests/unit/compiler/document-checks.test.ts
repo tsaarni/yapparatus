@@ -1,3 +1,5 @@
+/** Checks of `document.json`: its page list and its theme setting. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkPages, checkTheme } from "../../../src/compiler/document-checks.ts";

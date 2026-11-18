@@ -1,6 +1,7 @@
 /**
  * Shapes: boxes, cylinders, records and their cells, marks, notes, and their badges and pins.
  */
+
 import * as stylex from "@stylexjs/stylex";
 import type { CompiledNode, ElementState } from "../../diagram/drawing.ts";
 import { type Rect, union } from "../../diagram/geometry.ts";
@@ -20,6 +21,7 @@ import {
 
 const m = defaultMetrics;
 
+/** A node: its shape, text lines, and warning badge, or a bar or nothing for those shapes. */
 export function NodeView({
   node,
   flagged,
@@ -29,13 +31,10 @@ export function NodeView({
 }: {
   node: CompiledNode;
   flagged: boolean;
-  /** The prefix of this figure's clip paths, which keep cell fills inside their record. */
   clip: string;
   target?: Target;
   state?: ElementState;
 }) {
-  // A record with cells is drawn in two layers: this body, then its outline over the cells.
-  // A cell's warning badge is drawn over that outline, with the pins.
   const layered = (node.shape === "record" && node.rules !== undefined) || node.shape === "cell";
   const r = node.rect;
   if (node.shape === "space") return null;
@@ -180,7 +179,6 @@ export function RecordOutline({
       {node.divider !== undefined && (
         <path d={shape.rule(node.rect, node.divider)} {...stylex.props(styles.rule)} />
       )}
-      {/* Hairlines under the ruler, beside the row offsets, and between cells. */}
       {node.rules && <path d={shape.segments(node.rules)} {...stylex.props(styles.rule)} />}
       {node.role === "warning" && <WarningBadge node={node} />}
       {flagged && (
@@ -190,6 +188,7 @@ export function RecordOutline({
   );
 }
 
+/** The outline of a node's shape, drawn in its role's ink and fill. */
 function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
   const r = node.rect;
   const { x, y, width: w, height: h } = r;
@@ -237,7 +236,6 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
       );
     case "record":
       if (node.rules !== undefined)
-        // The body of a record with cells: its fill, and the shape its cells are clipped to.
         return (
           <>
             <clipPath id={`${clip}-${node.id}`}>
@@ -262,9 +260,6 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
         </>
       );
     case "cell": {
-      // A plain cell paints nothing; a cell with a role or category is filled. Its record
-      // draws the dividers and the outline over it, and clips it to its rounded corners.
-      // Inside, a ring shows while the cell is pointed at or a step focuses it.
       const filled = node.role !== "default" || node.category !== undefined;
       return (
         <g clipPath={node.parent ? `url(#${clip}-${node.parent})` : undefined}>

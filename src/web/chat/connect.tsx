@@ -1,3 +1,5 @@
+/** The prompt to copy into an agent, shown above the message box while no agent is connected. */
+
 import * as stylex from "@stylexjs/stylex";
 import { AppIcon as Icon } from "../controls/app-icon.tsx";
 import { Button } from "../controls/button.tsx";

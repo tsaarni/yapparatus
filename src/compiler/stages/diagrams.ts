@@ -1,8 +1,6 @@
 /**
- * `<Diagram>` drawings, compiled when the page is compiled. Each diagram's `draw` program runs
- * here, in the server process, and the drawing is measured with the web app's font files and
- * checked with its steps. The drawing replaces `draw` as the `drawing` prop, so the browser
- * only draws it, and its problems are compile diagnostics of the page.
+ * `<Diagram>` drawings, compiled with the page: `draw` runs in the server and the measured, checked
+ * drawing replaces it as the `drawing` prop, so the browser only draws it.
  */
 import vm from "node:vm";
 import type { Root } from "hast";
@@ -37,15 +35,15 @@ const cache = new Map<string, Compiled>();
 const cacheSize = 500;
 
 /**
- * The figures of each compiled file, by absolute path: the text the file was compiled from,
- * each diagram with an id, and the ids of its charts. The server draws a diagram's picture
- * from here, and compiles the file again when its text on disk is newer.
+ * The figures of each compiled file by path: its source text, diagrams by id, and chart ids.
+ * The server draws pictures from here and recompiles the file when its text on disk differs.
  */
 export const pageFigures = new Map<
   string,
   { source: string; diagrams: Map<string, CompiledDiagram>; charts: Set<string> }
 >();
 
+/** The stage that compiles each `<Diagram>` and records the page's figures. */
 export function diagrams() {
   return (tree: Root, file: { path: string; value: unknown }) => {
     const issues = contentIssues.get(file.path) ?? [];
@@ -69,11 +67,11 @@ export function diagrams() {
   };
 }
 
+/** Compile one `<Diagram>`, report its problems, and set its `drawing` prop. */
 function diagram(jsx: Jsx, issues: ContentIssue[]): CompiledDiagram {
   const line = jsx.position?.start.line ?? 0;
   const id = attribute(jsx, "id")?.value;
   const target = typeof id === "string" ? id : undefined;
-  // A figure with an id is found by it, and the server reads its lines from the page as it is now.
   const report = (issue: Omit<ContentIssue, "line" | "target">, at?: number) =>
     issues.push({
       ...issue,
@@ -95,7 +93,6 @@ function diagram(jsx: Jsx, issues: ContentIssue[]): CompiledDiagram {
             "<Diagram> needs draw={(d) => { … }}: a function that builds the drawing.",
           ),
         };
-  // The source text of `draw` starts on the line of its opening brace.
   const first =
     start?.type === "ExpressionStatement" && expression
       ? (start.expression.loc?.start.line ?? line) - leadingLines(expression.value)
@@ -119,6 +116,7 @@ function diagram(jsx: Jsx, issues: ContentIssue[]): CompiledDiagram {
   return result.drawing;
 }
 
+/** The JSX attribute of an element with a name, if the author wrote one. */
 function attribute(jsx: Jsx, name: string): MdxJsxAttribute | undefined {
   const found = jsx.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
   return found?.type === "mdxJsxAttribute" ? found : undefined;
@@ -174,11 +172,11 @@ function readSteps(
   });
 }
 
+/** Compile a draw program with its steps, reusing the cached drawing of an unchanged diagram. */
 function compileDiagram(source: string, steps: FigureStep[], build: boolean): Compiled {
   const key = JSON.stringify([source, steps, build]);
   const known = cache.get(key);
   if (known) {
-    // The most recently used go last, so the oldest go first.
     cache.delete(key);
     cache.set(key, known);
     return known;
@@ -193,15 +191,12 @@ function compileDiagram(source: string, steps: FigureStep[], build: boolean): Co
 }
 
 /**
- * Evaluate `draw` in this process and compile the figure. `draw` stands alone: it runs in its
- * own context, which has the standard JavaScript globals and none of Node's, such as `process`.
- * A name it does not define is therefore not defined, and the error says so. The context only
- * keeps out names: it does not protect the server from the code.
+ * Evaluate `draw` in its own context, with JavaScript's globals and none of Node's, and compile it.
+ * The context only keeps out names; it does not protect the server from the code.
  */
 function run(source: string, steps: FigureStep[], build: boolean): Compiled {
   let draw: unknown;
   try {
-    // On one line, so the lines of `source` keep their numbers.
     draw = vm.runInContext(`"use strict";(${source})`, vm.createContext(), { filename: drawFile });
   } catch (error) {
     return { drawing: drawFailed(explain(error)), ...lineOf(error) };

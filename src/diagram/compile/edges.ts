@@ -24,16 +24,19 @@ const curveLegs = 16;
 /** How far a self-loop reaches out from its node. */
 const loopSize = 28;
 
+/** How a message names an edge end: a node's label, else the element's id, else "a point". */
 function endpointName(p: PointLike): string {
   const el = elementOf(p);
   if (!el) return "a point";
   return el instanceof Node ? el.label || el.id : el.id;
 }
 
+/** Drop consecutive points that coincide. */
 function dedupe(points: Vec[]): Vec[] {
   return points.filter((p, i) => i === 0 || distance(p, points[i - 1] as Vec) > 0.01);
 }
 
+/** The edge compiler over a layout: `compileEdge` gives an edge's route, heads, and labels. */
 export function createEdges(
   m: Metrics,
   measure: Measure,
@@ -82,7 +85,6 @@ export function createEdges(
     return { ...base, labels, ariaLabel: text ? `${text}, ${ends}` : `Connection ${ends}` };
   }
 
-  /** The vertices of a straight or routed edge, with element endpoints snapped. */
   function routed(edge: Edge, fromEl?: Element, toEl?: Element): Vec[] {
     const raw = (p: PointLike) => evalPoint(toExpr(p));
     let start = raw(edge.from);
@@ -101,16 +103,11 @@ export function createEdges(
     }
     if (fromEl) start = snap(fromEl, bounds(fromEl), start, middle[0] ?? end, r);
     if (toEl) end = snap(toEl, bounds(toEl), end, middle[middle.length - 1] ?? start, r);
-    // Elbow corners depend on snapped endpoints when an element endpoint is used.
     if (r === "hv" && middle[0]) middle[0] = { x: end.x, y: start.y };
     if (r === "vh" && middle[0]) middle[0] = { x: start.x, y: end.y };
     return [start, ...middle, end];
   }
 
-  /**
-   * A quadratic curve that bows `bend` units to the left of the direction of travel,
-   * sampled into short legs. The label sits at the apex, outside the curve.
-   */
   function curve(edge: Edge, fromEl?: Element, toEl?: Element) {
     const a = evalPoint(toExpr(edge.from));
     const b = evalPoint(toExpr(edge.to));
@@ -143,7 +140,6 @@ export function createEdges(
     return { points, label: { segment: curveLegs / 2, at: 0, side }, radius: 0 };
   }
 
-  /** A self-loop: out of one side, around, and back into the same side. */
   function loop(rect: Rect, side: Side) {
     const base = anchorOf(rect, side);
     const out = {
@@ -169,10 +165,6 @@ export function createEdges(
     };
   }
 
-  /**
-   * Snap an element endpoint to its outline. A straight edge leaves along the ray
-   * toward its neighbour point; routed edges leave from the side facing their first leg.
-   */
   function snap(el: Element, rect: Rect, center: Vec, toward: Vec, route: Edge["route"]): Vec {
     if (route === "straight") {
       const shape = el instanceof Node ? el.shape : "box";
@@ -204,9 +196,7 @@ export function createEdges(
     const ux = (tip.x - prev.x) / len;
     const uy = (tip.y - prev.y) / len;
     const hl = Math.min(m.headLength, len * 0.6);
-    // Shorten the line so its stroke ends inside the head instead of poking through the tip.
     const base = { x: tip.x - ux * hl, y: tip.y - uy * hl };
-    // Filled heads hide the line end; open heads meet the line at their tip.
     const keep = open ? 0.08 : 0.55;
     const end = { x: tip.x - ux * hl * keep, y: tip.y - uy * hl * keep };
     if (at === "end") points[n - 1] = end;
@@ -215,14 +205,12 @@ export function createEdges(
     const left = { x: base.x - uy * hw, y: base.y + ux * hw };
     const right = { x: base.x + uy * hw, y: base.y - ux * hw };
     if (open) return [left, tip, right];
-    // A "stealth" head: the back is notched toward the tip.
     const notch = { x: tip.x - ux * hl * 0.72, y: tip.y - uy * hl * 0.72 };
     return [tip, left, notch, right];
   }
 
   function placeLabel(edge: Edge, points: Vec[], l: LabelOptions): CompiledLabel {
     const texts = l.text.split("\n");
-    // Diagnostics quote the label on one line.
     const quoted = texts.join(" ");
     const legs = points.length - 1;
     let segment = l.segment;
@@ -268,8 +256,6 @@ export function createEdges(
         center = { x: p.x + gap + width / 2, y: p.y };
         break;
     }
-    // On a single-leg edge, the leg is the gap between its two ends: a label running
-    // along it must fit inside, clear of both. Bent routes rely on the overlap checks.
     const along = vertical ? height : width;
     const leg = distance(a, b);
     if (legs === 1 && (side === "above" || side === "below") !== vertical && along + 12 > leg)

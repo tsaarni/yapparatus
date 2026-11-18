@@ -1,3 +1,5 @@
+/** The Chart component, which draws a figure with Observable Plot from data the page names. */
+
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
@@ -20,12 +22,16 @@ import { fontSize, radius, sizes, space, theme } from "../style/theme.stylex.ts"
 import { useFontsReady } from "./fonts-ready.ts";
 import { fitMargins, type Margins, type PlotDrawing } from "./margins.ts";
 
+/** The props an author writes on a chart, and those the compiler adds. */
 export interface ChartProps {
-  /** Returns the marks: `(Plot, rows) => ({ marks: [Plot.lineY(rows, { x: "Month", y: "Sales" })] })`. */
+  /**
+   * Returns the marks:
+   * `(Plot, rows) => ({ marks: [Plot.lineY(rows, { x: "Month", y: "Sales" })] })`.
+   */
   plot: PlotFunction;
-  /** The data written inside the chart or in the table it names, read by the compiler. Never written by hand. */
+  /** The data inside the chart or in the table it names, added by the compiler, never by hand. */
   data?: ChartData;
-  /** A table on the page, "#requests", or a file, "/-/files/bench/results.csv", to read the data from. */
+  /** The table, "#requests", or file, "/-/files/bench/results.csv", to read the data from. */
   from?: string;
   /** Loads a file's data, from a module the compiler makes. Never written by hand. */
   load?: () => Promise<{ default: ChartData }>;
@@ -72,10 +78,8 @@ function useWidth() {
 }
 
 /**
- * The chart's data: data written in the page at once, and a file's when the chart comes near
- * the screen, so a long page with large files opens without loading them. Printing loads them
- * all. While editing, a file's data also loads when the browser is idle, so every chart gets
- * checked.
+ * The chart's data: data in the page at once, and a file's when the chart nears the screen,
+ * before printing, or while editing once the browser is idle, so every chart gets checked.
  */
 function useData(
   data: ChartData | undefined,
@@ -83,7 +87,6 @@ function useData(
   host: { current: HTMLElement | null },
 ) {
   const [loaded, setLoaded] = useState<{ data?: ChartData; error?: string }>({});
-  // The module id carries the file's version: a new one loads again.
   const version = load?.toString();
   // biome-ignore lint/correctness/useExhaustiveDependencies: The version stands for `load`.
   useEffect(() => {
@@ -99,8 +102,6 @@ function useData(
         (error) => live && setLoaded({ error: String(error?.message ?? error) }),
       );
     };
-    // The page scrolls in its own element, which clips the chart before the window's margin
-    // applies, so the margin is set on that element.
     const observer = new IntersectionObserver(
       (entries) => entries.some((e) => e.isIntersecting) && start(),
       { root: element.closest("[data-scroll-root]"), rootMargin: "800px 0px" },
@@ -129,9 +130,8 @@ const lastValid = new Map<string, Drawn>();
 const swatches = () => [s.swatch1, s.swatch2, s.swatch3, s.swatch4];
 
 /**
- * A chart drawn by Observable Plot from data the page names: a block of data inside the
- * chart, or a file with `from`. The author writes the marks; the chart sets its
- * size, fonts, margins, and colors, and reports problems instead of repairing them.
+ * A chart drawn by Observable Plot from data inside it or named by `from`. The author writes the
+ * marks; the chart sets size, fonts, margins, and colors, and reports problems it cannot fix.
  */
 export function Chart({ plot, data: written, load, id, caption, description }: ChartProps) {
   const Plot = usePlotLibrary();
@@ -140,7 +140,6 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
   const [host, width] = useWidth();
   const { data, error } = useData(written, load, host);
   const [preview, setPreview] = useState<string>();
-  // `plot` is a new function on every render, but a pure one: its source text identifies it.
   const source = plot.toString();
   const rows = useMemo(() => (data ? rowObjects(data) : []), [data]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: The source text stands for `plot`.
@@ -149,7 +148,6 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
     [Plot, fonts, width, source, data, rows],
   );
   const key = id ?? caption;
-  // While editing, keep showing the last valid drawing above the errors.
   if (result?.svg && key) lastValid.set(key, result);
   const fallback = dev && result && !result.svg && key ? lastValid.get(key) : undefined;
   const drawn = result?.svg ? result : fallback;
@@ -160,14 +158,12 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
       ? [{ code: "CHART_DATA", message: `The data could not load: ${error}` }]
       : (result?.problems ?? []);
 
-  // The drawing is a DOM element Plot made; it replaces the last one in place.
   const canvas = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const element = canvas.current;
     if (!element) return;
     element.replaceChildren(...(drawn?.svg ? [drawn.svg] : []));
   }, [drawn]);
-  // Pointing at a legend entry fades the marks of the other categories.
   useEffect(() => {
     if (!drawn?.svg) return;
     for (const mark of drawn.svg.querySelectorAll<SVGElement>("[fill], [stroke]")) {
@@ -234,9 +230,8 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
 Chart.breakout = true;
 
 /**
- * Draw the chart twice: once to measure, and once with what the measurement found. The first
- * drawing gives the categories, which take their colors in order of first use, and the labels'
- * extent, which sets the margins so no label is cut off. Labels that overlap are reported.
+ * Draw the chart twice: the first drawing gives the categories' color order and the labels'
+ * extent, which sets the margins of the second. Overlapping labels are reported.
  */
 function draw(
   Plot: PlotLibrary,
@@ -304,6 +299,7 @@ function draw(
   }
 }
 
+/** The problem for an error thrown while drawing. */
 function thrown(error: unknown): ChartProblem {
   return {
     code: "CHART_FAILED",
@@ -337,7 +333,7 @@ function overlaps(svg: Element): ChartProblem[] {
 }
 
 const s = stylex.create({
-  // A chart has no natural size: it takes the wide track, and shrinks with the reading column.
+  /** A chart has no natural size: it takes the wide track, and shrinks with the reading column. */
   chart: {
     width: `calc(${sizes.textWidth} + ${sizes.breakout} - 2 * ${space.xl} - 2px)`,
     maxWidth: "100%",

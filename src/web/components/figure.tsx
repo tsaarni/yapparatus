@@ -1,3 +1,5 @@
+/** Figure, Table, and Listing: framed and titled blocks that pages number and link to. */
+
 import * as stylex from "@stylexjs/stylex";
 import { type HTMLAttributes, type ReactNode, useContext } from "react";
 import { blockLabel, usePage } from "../addressing/numbering.ts";
@@ -21,10 +23,11 @@ import {
   when,
 } from "../style/theme.stylex.ts";
 
+/** What an author writes on a figure, and the width the compiler sets. */
 export interface FigureProps extends HTMLAttributes<HTMLElement> {
   caption?: string;
   description?: string;
-  /** The figure takes the whole width, as when it holds columns. The compiler sets it; authors never write it. */
+  /** The figure takes the whole width, as when it holds columns. Set by the compiler. */
   wide?: boolean;
   children: ReactNode;
 }
@@ -61,8 +64,6 @@ export function FigureFrame({
       placement={titled ? "inline" : "corner"}
     />
   );
-  // A diagram or chart inside a figure, such as one panel of a comparison: the enclosing
-  // figure draws the frame and the caption.
   if (inFigure)
     return (
       <div {...styled(`figure-nested ${props.className ?? ""}`, s.figureNested)}>
@@ -83,7 +84,6 @@ export function FigureFrame({
         ...targetHost,
       )}
     >
-      {/* Without a caption, the actions have no row of their own and float in the corner. */}
       {!titled && actions}
       <section
         {...styled("figure-scroll", s.scroll, focus.ring)}
@@ -94,8 +94,6 @@ export function FigureFrame({
         <InFigureContext.Provider value={true}>{children}</InFigureContext.Provider>
       </section>
       {titled ? (
-        // The actions sit at the end of the caption line, never over the drawing. The footer
-        // belongs to the caption too: a figcaption must be the figure's last child.
         <figcaption {...stylex.props(s.caption)}>
           <div {...stylex.props(s.captionLine)}>
             <span {...stylex.props(s.captionText)}>
@@ -124,14 +122,8 @@ interface TitledProps {
 }
 
 /**
- * A titled table: wrap a Markdown table. The title goes above the table, as in print.
- *
- *   <Table id="routes" caption="The API routes.">
- *
- *   | Route | Meaning |
- *   |---|---|
- *
- *   </Table>
+ * A titled table: wrap a Markdown table in `<Table id="routes" caption="The API routes.">`.
+ * The title goes above the table, as in print.
  */
 export function Table(props: TitledProps) {
   return <Titled kind="table" {...props} />;
@@ -144,6 +136,7 @@ export function Listing(props: TitledProps) {
 }
 Listing.breakout = true;
 
+/** A table or listing with a numbered title above it. */
 function Titled({
   kind,
   id,
@@ -196,12 +189,12 @@ const s = stylex.create({
     borderStyle: "solid",
     borderColor: theme.border,
     backgroundColor: theme.surface,
-    // Labels and tabs paint their halo in the figure color.
+    /** Labels and tabs paint their halo in the figure color. */
     "--figure-bg": theme.surface,
     scrollMarginTop: `calc(${sizes.headerHeight} + ${space.xl})`,
     breakInside: "avoid",
   },
-  /** Holding columns, a figure or listing takes the whole width so each column gets a fair share. */
+  /** Holding columns, a figure or listing takes the whole width so each column gets its share. */
   figureWide: {
     width: "100%",
   },
@@ -240,11 +233,11 @@ const s = stylex.create({
   captionActions: {
     flexShrink: 0,
     marginLeft: "auto",
-    // Center the buttons on the first line of text.
+    /** Center the buttons on the first line of text. */
     marginTop: `calc((1lh - ${sizes.controlSmall}) / 2)`,
   },
   label: {
-    // With the space after the label, so a double click selects the caption word alone.
+    /** With the space after the label, so a double click selects the caption word alone. */
     marginRight: "0.25em",
     color: theme.text,
     fontWeight: fontWeight.semibold,

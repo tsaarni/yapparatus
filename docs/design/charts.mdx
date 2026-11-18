@@ -1,6 +1,6 @@
 # Charts
 
-A chart is a figure that [Observable Plot](https://observablehq.com/plot/), a JavaScript charting library, draws from data. This page follows a chart's data from the page or a file to the drawing. Authors read [the chart reference](/-/files/yapparatus/starter/docs/charts.md).
+A chart is a figure that [Observable Plot](https://observablehq.com/plot/), a JavaScript charting library, draws from data. This page follows a chart's data from the page or a file to the drawing. Authors read the chart reference of the authoring guide.
 
 ## Overview
 
@@ -38,21 +38,7 @@ The [page compiler](page-compiler#charts) reads the data and gives each column a
   <Step focus="figure">The chart runs `plot` and draws twice: once to measure, once to show.</Step>
 </Diagram>
 
-<Ref to="charts-modules" /> lists the chart modules and where each runs.
-
-<Table id="charts-modules" caption="The modules of charts.">
-
-| Module | Runs in |
-|---|---|
-| `compiler/stages/charts.ts` | Page compiler |
-| `chart/formats.ts` | Page compiler |
-| `chart/table.ts` | Both |
-| `web/chart/chart.tsx` | Browser |
-| `web/chart/margins.ts` | Browser |
-| `chart/spec.ts` | Browser |
-| `web/chart/fonts-ready.ts` | Browser |
-
-</Table>
+The page compiler reads the CSV and TSV formats, gives the columns their types, and checks them. The browser draws the chart, measures its margins, waits for the fonts, and checks the calls to Plot. The typed data is the one form that both sides use.
 
 ## Data sources
 
@@ -67,11 +53,7 @@ Each source gives a header and rows of cell text, each row with its line. The ce
 3. Each column is a number column when every cell is a plain number, a date column when every cell is an ISO date such as `2026-01-31`, and text otherwise. Empty cells do not count.
 4. A column that mixes types is reported at the first cell that differs from most cells.
 
-Each problem is `CHART_DATA`. <Ref to="charts-data-type" /> shows the typed data: one array per column, with `null` for an empty cell and dates as text, so the data is plain JSON.
-
-<Listing id="charts-data-type" caption="A chart's data, by column, as the page or the data module carries it.">
-<Excerpt from="/-/files/yapparatus/src/chart/table.ts" start="export interface ChartData {" />
-</Listing>
+Each problem is `CHART_DATA`. The typed data, `ChartData`, holds the columns, each with its name as written in the header and its type, and one array of cells per column, in column order. An empty cell is `null` and a date is ISO text, so the data is plain JSON. The chart turns it into one object per row before it calls `plot`, with each date as a `Date`.
 
 ## The data module
 

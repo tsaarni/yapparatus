@@ -2,13 +2,14 @@
  * Measurements the compiler and the renderer share: fonts, metrics, and shape sizes.
  */
 
+/** A font as the measurer sees it: CSS family, size in units, and weight. */
 export interface FontSpec {
   family: string;
   size: number;
   weight: number;
 }
 
-/** Text measurement is injected: the server measures with the font files, tests use a fixed advance. */
+/** Text width, injected: the server measures with the font files, tests use a fixed advance. */
 export type Measure = (text: string, font: FontSpec) => number;
 
 /**
@@ -39,6 +40,7 @@ export interface Metrics {
   margin: number;
 }
 
+/** The fonts and sizes every diagram is compiled with. */
 export const defaultMetrics: Metrics = {
   sans: '"Inter Variable", sans-serif',
   mono: '"JetBrains Mono Variable", "SFMono-Regular", Menlo, monospace',

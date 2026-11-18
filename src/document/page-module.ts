@@ -22,6 +22,8 @@ export const pageComponents = [
 
 /** Kinds of numbered, titled blocks. Each kind has its own sequence per chapter. */
 export const numberedKinds = ["figure", "table", "listing"] as const;
+
+/** One of `numberedKinds`. */
 export type NumberedKind = (typeof numberedKinds)[number];
 
 /** What a page contains, extracted at compile time and exported as `outline`. */
@@ -47,9 +49,8 @@ export interface PageOutline {
 export type CodeMark = "highlight" | "add" | "remove";
 
 /**
- * Highlighted code, as everything that shows code carries it: code blocks and excerpts on
- * pages and in replies, and the file view. Each token style is written once in `styles`, and
- * each line is a list of its tokens.
+ * Highlighted code, as code blocks, excerpts, and the file view carry it. Each token style is
+ * written once in `styles`, and each line is a list of its tokens.
  */
 export interface HighlightedCode {
   /** The Shiki language, or "text". */
@@ -79,4 +80,6 @@ export interface FileTreeEntry {
 
 /** The kinds of GitHub alert, as `> [!NOTE]` writes them. */
 export const alertKinds = ["note", "tip", "important", "warning", "caution"] as const;
+
+/** One of `alertKinds`. */
 export type AlertKind = (typeof alertKinds)[number];

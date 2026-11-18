@@ -1,11 +1,8 @@
 /**
- * Targets: everything a reader can link to or comment on.
- *
- * A target is an element with `data-target` (its kind), `data-label` ("Table 6.3"),
- * `data-title` (caption or heading), and, when it can be linked, a real `id`. Sections,
- * figures, tables, listings, code blocks, and diagram elements all follow this contract, so
- * linking, commenting, and locating work the same way for each.
+ * Targets, the elements a reader can link to or comment on: each has `data-target` (its kind),
+ * optional `data-label` and `data-title`, and an `id` when it can be linked.
  */
+
 import * as stylex from "@stylexjs/stylex";
 import { createContext, type ReactNode, useContext } from "react";
 import type { TargetKind } from "../../document/reference.ts";
@@ -15,6 +12,7 @@ import { useCopy } from "../controls/clipboard.ts";
 import { styled } from "../style/styled.ts";
 import { duration, layer, radius, space, theme, when } from "../style/theme.stylex.ts";
 
+/** What the Link and Comment buttons on a target do. */
 export interface TargetHandlers {
   /** Add the target containing this element to the message. Absent outside live mode. */
   comment?: (element: Element) => void;
@@ -22,6 +20,7 @@ export interface TargetHandlers {
   link: (element: Element) => string | undefined;
 }
 
+/** The target handlers for the page; without them no Link or Comment buttons show. */
 export const TargetContext = createContext<TargetHandlers | undefined>(undefined);
 
 /** The attributes that make an element a target. */
@@ -43,9 +42,7 @@ export function TargetActions({
   placement = "corner",
   children,
 }: {
-  /** What the target is called, for the buttons' accessible names: "Table 6.3". */
   name: string;
-  /** Whether the target has a stable id to link to. */
   linkable?: boolean;
   placement?: "corner" | "inline";
   children?: ReactNode;
@@ -105,8 +102,10 @@ const s = stylex.create({
     display: { default: "inline-flex", [when.print]: "none" },
     alignItems: "center",
     gap: space.xxs,
-    // Hidden until the target is hovered or something inside it has focus; always
-    // visible where there is no hover.
+    /**
+     * Hidden until the target is hovered or something inside it has focus; always
+     * visible where there is no hover.
+     */
     opacity: {
       default: 0,
       [stylex.when.ancestor(":hover")]: 1,
@@ -136,4 +135,6 @@ const s = stylex.create({
 
 /** Styles for a target container: anchors the actions and marks it for hover. */
 const hostStyles = stylex.create({ host: { position: "relative" } });
+
+/** Styles to spread on an element that holds a target and its actions. */
 export const targetHost = [hostStyles.host, stylex.defaultMarker()] as const;

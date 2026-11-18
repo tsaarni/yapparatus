@@ -1,9 +1,8 @@
 /**
- * Line numbers in source file code are links, as on GitHub. In the file view, a click selects
- * the line and a shift-click extends the selection to a range; the address gets `#L11-L14`,
- * and the lines become a text selection, so the selection menu offers Copy link and Comment. In an
- * excerpt, a click opens the file at that line.
+ * Line numbers in source file code, which act as links as on GitHub: in the file view a click or
+ * shift-click selects lines as `#L11-L14`, and in an excerpt a click opens the file at that line.
  */
+
 import type { MouseEvent } from "react";
 import type { LineRange } from "../../document/file-address.ts";
 import { fileHref, navigate } from "../addressing/router.ts";
@@ -18,7 +17,6 @@ function lineNumberAt(event: MouseEvent): HTMLElement | undefined {
   if (!line) return;
   const style = getComputedStyle(line);
   const number = getComputedStyle(line, "::before");
-  // A wrapped line's number hangs into its padding with a negative margin.
   const end =
     line.getBoundingClientRect().left +
     Number.parseFloat(style.borderLeftWidth) +
@@ -33,6 +31,7 @@ export function pressLineNumber(event: MouseEvent) {
   if (lineNumberAt(event)) event.preventDefault();
 }
 
+/** Select the clicked line or, with Shift, a range; in an excerpt, open the file at that line. */
 export function clickLineNumber(event: MouseEvent, code: SourceFileCode) {
   const line = lineNumberAt(event);
   const region = line?.closest("[data-file]");

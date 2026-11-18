@@ -1,10 +1,10 @@
 # Components
 
-This page describes how the web app renders the built-in components, with a live example of each. How authors write them is in [the authoring reference](/-/files/yapparatus/starter/docs/components.md).
+This page describes how the web app renders the built-in components, with a live example of each. How authors write them is in the component reference of the authoring guide.
 
 ## Overview
 
-Pages and replies use the built-in components without imports, because [the registry](/-/files/yapparatus/src/web/registry.ts) passes them to every page. <Ref to="components-inventory" /> lists them with the counter that numbers them and the buttons they show. <Ref to="components-file-tree" /> shows where their code is.
+Pages and replies use the built-in components without imports, because the registry of built-in components passes them to every page. <Ref to="components-inventory" /> lists them with the counter that numbers them and the buttons they show.
 
 <Table id="components-inventory" caption="The built-in components.">
 
@@ -56,11 +56,7 @@ const retry = {
 };
 ```
 
-An excerpt shows the line numbers of its file outside the text, so a selection or a copy takes only the code. With `wrap`, a long line breaks under its own text. A `Table` or `Listing` shows its title above its content, as <Ref to="components-excerpt" /> does.
-
-<Listing id="components-excerpt" caption="The registry of built-in components, as an excerpt with one marked line.">
-<Excerpt from="/-/files/yapparatus/src/web/registry.ts" start="export const components =" mark="Excerpt" />
-</Listing>
+An excerpt shows the line numbers of its file outside the text, so a selection or a copy takes only the code. With `wrap`, a long line breaks under its own text. A `Table` or `Listing` shows its title above its content.
 
 ## Figures
 
@@ -159,21 +155,15 @@ The page compiler turns each `Icon` into an import of its one SVG file; see [ico
 
 The page compiler reads the Markdown list inside a `FileTree` into entries. The web app shows them as nested lists with a folder or file icon, the name, and the comment, as <Ref to="components-file-tree" /> does.
 
-<Figure id="components-file-tree" caption="Where the built-in components are.">
+<Figure id="components-file-tree" caption="A project with one document directory.">
 <FileTree>
 
-- src/
-  - web/
-    - registry.ts
-    - prose/ Markdown elements, alerts, code blocks
-    - **components/** figures, tables, listings, excerpts, file trees, tabs and columns
-    - controls/
-      - icon.tsx
-    - diagram/
-      - diagram.tsx
-      - …
-    - chart/
-      - chart.tsx
+- my-document/
+  - **content/** a document directory
+    - document.json
+    - overview.mdx
+    - …
+  - .yapparatus/ the chat log and builds
 
 </FileTree>
 </Figure>
@@ -205,16 +195,16 @@ pnpm build content
 
 ## Custom components
 
-A document can import its own React components from `.tsx` files next to its pages. It styles itself with StyleX and the tokens from `yapparatus/theme.stylex`, as [the color swatch](/-/files/yapparatus/docs/design/swatch.tsx) in [color](styling#color) does. Replies have no imports, so they cannot use custom components. A `Diagram` inside a custom component fails, because the page compiler compiles only diagrams written in a page or a reply.
+A document can import its own React components from TSX files next to its pages. It styles itself with StyleX and the tokens from `yapparatus/theme.stylex`, as the color swatch in [color](styling#color) does. Replies have no imports, so they cannot use custom components. A `Diagram` inside a custom component fails, because the page compiler compiles only diagrams written in a page or a reply.
 
 ## Adding a component
 
 A new built-in component is added in one change, in these places:
 
-1. [The registry](/-/files/yapparatus/src/web/registry.ts), so pages and replies can use it without an import.
-2. [The list of page components](/-/files/yapparatus/src/document/page-module.ts#L6-L21) that the reply check accepts.
-3. The component list in [the start prompt](/-/files/yapparatus/src/server/prompt.ts).
-4. The authoring guide and [`starter/docs/components.md`](/-/files/yapparatus/starter/docs/components.md).
+1. The registry, so pages and replies can use it without an import.
+2. The list of page components that the reply check accepts.
+3. The component list in [the start prompt](agent-library#prompts).
+4. The authoring guide and its component reference.
 5. This page: a row in <Ref to="components-inventory" />, a section, and a live example.
 
 A component that takes structured content gets a stage of the page compiler that reads it from Markdown, as `FileTree` has, because agents write Markdown reliably and the compiler can check it. A component that declares itself wide may use the breakout track; see [page layout](web-app#page-layout).

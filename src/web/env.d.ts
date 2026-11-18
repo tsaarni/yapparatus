@@ -1,3 +1,5 @@
+/** Types for the web app's build-time globals and the virtual modules the Vite plugin serves. */
+
 /// <reference types="unplugin-icons/types/react" />
 
 /** True in the single-file build, which uses #/page URLs because it has no server. */

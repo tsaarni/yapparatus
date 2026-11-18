@@ -1,3 +1,5 @@
+/** The chat message box, with the references the next message is about. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { Reference } from "../../document/reference.ts";
 import { AppIcon as Icon } from "../controls/app-icon.tsx";
@@ -38,7 +40,6 @@ export function Composer({
   sending: boolean;
   onSubmit: () => void;
   full: boolean;
-  /** The start prompt, shown while no agent is connected. */
   prompt: string | undefined;
 }) {
   return (
@@ -80,8 +81,6 @@ export function Composer({
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={(event) => {
-              // Enter sends and Shift+Enter starts a new line. Enter that confirms an input
-              // method's composition, as when typing Japanese, does neither.
               if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
                 event.preventDefault();
                 onSubmit();

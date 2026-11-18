@@ -1,6 +1,6 @@
 # Overview
 
-This document describes how Yapparatus works, for the people and agents who change its code. To write a document with Yapparatus, read [the authoring guide](/-/files/yapparatus/starter/docs/guide.md).
+This document describes how Yapparatus works, for the people and agents who change its code. To write a document with Yapparatus, read the authoring guide.
 
 ## What Yapparatus does
 
@@ -97,45 +97,45 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
   <Step focus="reply chat-update">The agent sends a reply. The server [checks it](server#reply-checks) and saves it, and the chat panel shows it.</Step>
 </Diagram>
 
-## Where the code is
+## Runtimes
 
-Each directory under `src/` has one runtime. Pure code uses neither the DOM nor Node, so the server, the agent library, and the web app can all import it. Node code runs in the server's process or the agent's process. Browser code runs in the web app. <Ref to="overview-directories" /> lists the directories, their runtimes, and the directories that each may import.
+Each part of Yapparatus has one runtime. Pure code uses neither the DOM nor Node, so the server, the agent library, and the web app can all import it. Node code runs in the server's process or the agent's process. Browser code runs in the web app. <Ref to="overview-parts" /> lists the parts, their runtimes, and the parts that each may import.
 
-<Table id="overview-directories" caption="The directories under src/, their runtimes, and what each may import.">
+<Table id="overview-parts" caption="The parts of Yapparatus, their runtimes, and what each may import.">
 
-| Directory | Runtime | May import | Holds |
+| Part | Runtime | May import | Holds |
 |---|---|---|---|
-| `document/` | Pure | Nothing | [Pages, addresses](documents), references, and diagnostics |
-| `protocol/` | Pure | `document/` | The types of the [REST API](rest-api), and the logger |
-| `diagram/` | Pure | `document/` | The [diagram compiler](diagram-compiler) |
-| `chart/` | Pure | `document/` | The [chart](charts) data and specification checks |
-| `compiler/` | Node | The pure directories | The [page compiler](page-compiler) and its [stages](page-compiler#pipeline), reading [external files](documents#external-files), and the checks of `document.json` and of links |
-| `server/` | Node | `compiler/` and the pure directories | The [server](server) |
-| `agent/` | Node | `protocol/` and `document/` | The [agent library](agent-library) |
-| `vite/` | Node | `compiler/`, `server/`, and the pure directories | The `yapparatus()` plugin, which combines the compiler and the server, and the [`yap` command](server#starting) |
-| `web/` | Browser | The pure directories | The [web app](web-app) |
+| Document | Pure | Nothing | [Pages, addresses](documents), references, and diagnostics |
+| Protocol | Pure | Document | The types of the [REST API](rest-api), and the logger |
+| Diagram | Pure | Document | The [diagram compiler](diagram-compiler) |
+| Chart | Pure | Document | The [chart](charts) data and specification checks |
+| Compiler | Node | The pure parts | The [page compiler](page-compiler) and its [stages](page-compiler#pipeline), reading [external files](documents#external-files), and the checks of `document.json` and of links |
+| Server | Node | Compiler and the pure parts | The [server](server) |
+| Agent | Node | Protocol and document | The [agent library](agent-library) |
+| Vite | Node | Compiler, server, and the pure parts | The `yapparatus()` plugin, which combines the compiler and the server, and the [`yap` command](server#starting) |
+| Web | Browser | The pure parts | The [web app](web-app) |
 
 </Table>
 
 <Ref to="overview-imports" /> draws the same rule. The web app and the server share only pure code, and so do the server and the agent library.
 
-<Diagram id="overview-imports" caption="What each directory under src/ may import." description="The browser directory web and the Node directories vite, server, compiler, and agent above the pure directories diagram, chart, protocol, and document, with an arrow for each import the rule allows" draw={(d) => {
-  const dir = (name, runtime) => d.box(`${name}/`, { id: name, mono: true, category: runtime })
-  const web = dir("web", "Browser")
-  const vite = dir("vite", "Node")
-  const server = dir("server", "Node")
-  const compiler = dir("compiler", "Node")
-  const agent = dir("agent", "Node")
-  const diagram = dir("diagram", "Pure")
-  const chart = dir("chart", "Pure")
-  const protocol = dir("protocol", "Pure")
-  const doc = dir("document", "Pure")
+<Diagram id="overview-imports" caption="What each part may import." description="The browser part Web and the Node parts Vite, Server, Compiler, and Agent above the pure parts Diagram, Chart, Protocol, and Document, with an arrow for each import the rule allows" draw={(d) => {
+  const part = (name, runtime) => d.box(name[0].toUpperCase() + name.slice(1), { id: name, category: runtime })
+  const web = part("web", "Browser")
+  const vite = part("vite", "Node")
+  const server = part("server", "Node")
+  const compiler = part("compiler", "Node")
+  const agent = part("agent", "Node")
+  const diagram = part("diagram", "Pure")
+  const chart = part("chart", "Pure")
+  const protocol = part("protocol", "Pure")
+  const doc = part("document", "Pure")
   d.equalSize([web, vite, server, compiler, agent, diagram, chart, protocol, doc])
   const upper = d.row([web, vite, server, compiler, agent], { gap: 56 })
   const lower = d.row([diagram, chart, protocol], { gap: 56 })
   d.place(lower, { below: upper, gap: 104 })
   d.place(doc, { below: chart, gap: 64 })
-  const pure = d.enclose([lower, doc], { id: "pure-directories", title: "Pure directories", titleAt: "bottomLeft" })
+  const pure = d.enclose([lower, doc], { id: "pure-parts", title: "Pure parts", titleAt: "bottomLeft" })
   d.arrow(vite, server)
   d.arrow(server, compiler)
   d.arrow(vite, compiler, { bend: 40 })
@@ -146,11 +146,11 @@ Each directory under `src/` has one runtime. Pure code uses neither the DOM nor 
   for (const from of [diagram, chart, protocol]) d.arrow(from, doc)
 }} />
 
-Each directory has a `tsconfig.json` that makes it a TypeScript project, with the library and types of its runtime and a reference to each directory it may import. The pure projects have neither the DOM library nor Node's types, the Node projects have Node's types, and `web/` has the DOM library and Vite's client types. [`tsconfig.base.json`](/-/files/yapparatus/tsconfig.base.json) holds the options that the projects share, and the root [`tsconfig.json`](/-/files/yapparatus/tsconfig.json) checks the tests and scripts against every project. `pnpm verify` builds the projects with `tsc -b`, so an import from a directory that a project does not reference is an error, and so is a name from another runtime, such as `document` in `diagram/`.
+The type checker enforces the rule. Each part is a TypeScript project with the library and types of its runtime and a reference to each part it may import. The pure parts have neither the DOM library nor Node's types, the Node parts have Node's types, and the web app has the DOM library and Vite's client types. An import from a part that a project does not reference is an error, and so is a name from another runtime, such as `document` in the diagram compiler.
 
-Two pure directories need more than the standard library. `chart/` has the DOM library, because the types of Observable Plot, which [the chart specification](/-/files/yapparatus/src/chart/spec.ts) uses, name DOM types. The logger in `protocol/` runs in both runtimes, and [its declarations](/-/files/yapparatus/src/protocol/runtime.d.ts) give it the console methods that both runtimes have and the level that Vite's `define` gives the browser. The web app declares the [document module](page-compiler#the-document-module), the other virtual modules, and the single-file build's constant in [its own declarations](/-/files/yapparatus/src/web/env.d.ts).
+Two pure parts need more than the standard library. The chart part has the DOM library, because the types of Observable Plot, which the chart specification uses, name DOM types. The logger runs in both runtimes, so its declarations give it the console methods that both runtimes have and the level that Vite's `define` gives the browser. The web app declares the [document module](page-compiler#the-document-module), the other virtual modules, and the single-file build's constant.
 
-`tsconfig.lib.json` compiles the `yap` command and the `yapparatus/vite` and `yapparatus/agent` entries to `lib/`, which then holds only Node and pure code. The web app is published as source, and the Vite of the project that uses it compiles it. The unit tests in `tests/unit/` follow the directories under `src/`, and each test file is named after the file or subject that it tests.
+The `yap` command and the `yapparatus/vite` and `yapparatus/agent` entries are compiled to JavaScript before they are published, so the compiled package holds only Node and pure code. The web app is published as source, and the Vite of the project that uses it compiles it.
 
 ## How to read this document
 

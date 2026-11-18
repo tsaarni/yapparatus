@@ -1,10 +1,6 @@
 /**
- * Checks the StyleX rules that the compiler does not enforce, across every `stylex.create`
- * and `stylex.keyframes` call in src/:
- *
- * - No shorthands StyleX drops when they hold theme variables: `border*`, `background`,
- *   and `outline`. Write the longhands.
- * - No literal colors. Colors come from the theme, in src/web/style/theme.stylex.ts.
+ * Checks every `stylex.create` and `stylex.keyframes` call in src/ for literal colors and for
+ * `border*`, `background`, and `outline` shorthands, which StyleX drops with theme variables.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -13,6 +9,7 @@ const shorthand =
   /(?<![\w-])(border(?:Top|Right|Bottom|Left|Block|Inline)?|background|outline)\s*:/g;
 const color = /#[0-9a-fA-F]{3,8}\b|\b(?:rgba?|hsla?|oklch)\(/g;
 
+/** The TypeScript files under a directory, except `.stylex.ts` files. */
 function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const file = path.join(dir, entry.name);
@@ -54,5 +51,5 @@ for (const file of files("src")) {
 }
 if (problems.length) {
   console.error(problems.join("\n"));
-  process.exit(1);
+  process.exitCode = 1;
 }

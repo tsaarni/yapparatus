@@ -18,16 +18,13 @@ export type TargetKind =
 
 /**
  * One thing the reader commented on: an address, and the lines of its source when the reader
- * commented. The compiler embeds the source lines in the page; the browser sends them back,
- * and the server keeps the reference as sent. The page the reader sees is the file on disk,
- * because the page reloads when its file changes.
+ * commented. The compiler embeds the lines in the page; the server keeps them as sent.
  */
 export interface Reference {
   kind: TargetKind;
   /**
-   * "/page", "/page#id", "/page#figure--element", or for selected words the figure, table, listing,
-   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
-   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
+   * "/page", "/page#id", "/page#figure--element", "/page#section:~:text=start,end" for selected
+   * words, or "/-/files/app/x.go#L4-L9" for a source file or its lines.
    */
   address: string;
   /** The page's or source file's file, relative to the project folder. */

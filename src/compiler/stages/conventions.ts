@@ -1,17 +1,21 @@
 /**
- * Markdown conventions the compiler turns into components, and the rules it checks: GitHub
- * alerts, file trees, panels, figures, code block languages, and heading depth. Problems are recorded per file,
- * and the dev server reports them with the page's other compile diagnostics.
+ * Markdown conventions turned into components (alerts, file trees, panels, figures) and checks of
+ * code block languages and heading depth. Problems are recorded per file for the dev server.
  */
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
-import type { MdxJsxAttribute, MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
+import type {
+  MdxJsxAttribute,
+  MdxJsxFlowElementHast,
+  MdxJsxTextElementHast,
+} from "mdast-util-mdx-jsx";
 import { bundledLanguages } from "shiki";
 import { visit } from "unist-util-visit";
 import type { DiagnosticCode } from "../../document/diagnostic.ts";
 import { alertKinds, type CodeMark, type FileTreeEntry } from "../../document/page-module.ts";
 
+/** A problem the compiler found in a page, reported with its compile diagnostics. */
 export interface ContentIssue {
   code: DiagnosticCode;
   /**
@@ -31,16 +35,19 @@ export interface ContentIssue {
   message: string;
 }
 
-/** Issues found in each compiled file, by absolute path. The math stage starts them on every compile. */
+/**
+ * Issues found in each compiled file, by absolute path.
+ * The math stage starts them on every compile.
+ */
 export const contentIssues = new Map<string, ContentIssue[]>();
 
 /** Plain text needs no grammar; every other name must be one Shiki knows. */
 const plainLanguages = ["text", "txt", "plain"];
 
+/** The stage that applies the Markdown conventions and records their problems. */
 export function markdownConventions() {
   return (tree: Root, file: { path: string }) => {
     const issues = contentIssues.get(file.path) ?? [];
-    // Panels a container has claimed; the tree is visited parents first.
     const claimed = new Set<unknown>();
     visit(tree, (node) => {
       const line = node.position?.start.line ?? 0;
@@ -75,15 +82,11 @@ export function markdownConventions() {
   };
 }
 
+/** Check that a code block names a language Shiki knows, or plain text. */
 function codeLanguage(pre: Element, line: number, issues: ContentIssue[]) {
   const code = pre.children.find((c): c is Element => c.type === "element" && c.tagName === "code");
   if (!code) return;
-  const classes = Array.isArray(code.properties.className) ? code.properties.className : [];
-  const language = classes
-    .map(String)
-    .find((c) => c.startsWith("language-"))
-    ?.slice("language-".length);
-  // A block without a language is told apart by its first line.
+  const language = codeLanguageOf(code);
   const first = textOf(code).trim().split("\n")[0]?.slice(0, 60);
   if (!language)
     issues.push({
@@ -125,15 +128,23 @@ function alert(quote: Element, line: number, issues: ContentIssue[]) {
   }
   quote.properties.dataAlert = kind;
   text.value = text.value.slice(marker[0].length);
-  // The marker alone on its line leaves an empty paragraph, or a line break to drop.
   if (!text.value) first.children.shift();
   if (first.children[0]?.type === "element" && first.children[0].tagName === "br")
     first.children.shift();
   if (!first.children.length) quote.children.splice(quote.children.indexOf(first), 1);
 }
 
+/** A `<code>` element's language, from its `language-*` class. */
+export function codeLanguageOf(code: Element): string | undefined {
+  const classes = Array.isArray(code.properties.className) ? code.properties.className : [];
+  return classes
+    .map(String)
+    .find((c) => c.startsWith("language-"))
+    ?.slice("language-".length);
+}
+
 /** An attribute's value, when it is written as a string. */
-function literal(jsx: MdxJsxFlowElementHast, name: string) {
+export function literal(jsx: MdxJsxFlowElementHast | MdxJsxTextElementHast, name: string) {
   const attr = jsx.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
   return attr?.type === "mdxJsxAttribute" && typeof attr.value === "string"
     ? attr.value
@@ -173,8 +184,6 @@ function panels(
   claimed: Set<unknown>,
 ) {
   const name = jsx.name ?? "";
-  // Each issue's subject tells it apart from others in the same file: the stray text, the
-  // panel's label or position, or the container's labels.
   const report = (code: DiagnosticCode, message: string, subject: string, at = line) =>
     issues.push({ code, line: at, subject, message });
   const content = jsx.children.filter((c) => !(c.type === "text" && !c.value.trim()));
@@ -290,6 +299,7 @@ function fileTree(jsx: MdxJsxFlowElementHast, line: number, issues: ContentIssue
   jsx.attributes.push(compiledAttribute("entries", listEntries(list)));
 }
 
+/** The file tree entries of a Markdown list's items. */
 function listEntries(list: Element): FileTreeEntry[] {
   return list.children
     .filter((c): c is Element => c.type === "element" && c.tagName === "li")
@@ -304,7 +314,6 @@ function listEntry(item: Element): FileTreeEntry {
   const nested = item.children.find(
     (c): c is Element => c.type === "element" && c.tagName === "ul",
   );
-  // A loose list wraps the item's text in a paragraph.
   const inline: ElementContent[] = item.children.flatMap((c) =>
     c === nested ? [] : c.type === "element" && c.tagName === "p" ? c.children : [c],
   );
@@ -329,11 +338,8 @@ function listEntry(item: Element): FileTreeEntry {
 const markOf: Record<string, CodeMark> = { highlight: "highlight", "++": "add", "--": "remove" };
 
 /**
- * `[!code highlight]`, `[!code ++]`, and `[!code --]` in a comment at the end of a line mark it;
- * `:3` marks three lines from there. A comment alone on its line marks the lines after it. The
- * comment is removed before highlighting, so it works in any language, even one without
- * comments, such as JSON. Code read from a file is shown exactly as written: its marks come
- * from the excerpt's `mark` attribute.
+ * A `[!code highlight|++|--]` comment at a line's end marks it, `:3` three lines; alone on its line
+ * it marks the lines after it. It is removed before highlighting, so it works in any language.
  */
 const notation =
   /[ \t]*(?:\/\/|#|--|;|%|\/\*|<!--)[ \t]*\[!code (highlight|\+\+|--)(?::(\d+))?\][ \t]*(?:\*\/|-->)?[ \t]*$/;
@@ -348,6 +354,7 @@ export interface MarkedCode {
   marks: Record<number, CodeMark>;
 }
 
+/** Code written on a page with its mark comments removed and their marks collected. */
 export function codeMarks(code: string): MarkedCode {
   const lines: string[] = [];
   const written: number[] = [];

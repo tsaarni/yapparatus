@@ -1,3 +1,5 @@
+/** Blockquotes, and the note, tip, important, warning, and caution alerts written as them. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { HTMLAttributes } from "react";
 import type { AlertKind } from "../../document/page-module.ts";

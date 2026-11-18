@@ -2,6 +2,7 @@
  * What every drawn element shares: its state in a step, its role and category colors, its text
  * lines, and its address as a link and a button.
  */
+
 import * as stylex from "@stylexjs/stylex";
 import type { ElementState, TextLine } from "../../diagram/drawing.ts";
 import type { Role } from "../../diagram/elements.ts";
@@ -28,6 +29,7 @@ export function interactive(
   };
 }
 
+/** The attributes that make a diagram element a target. */
 export type Target = ReturnType<typeof interactive>;
 
 /** Focused elements are drawn heavier; others fade; elements not yet built are hidden. */
@@ -80,6 +82,7 @@ export function Line({ line, halo = false }: { line: TextLine; halo?: boolean })
   );
 }
 
+/** An element's text lines, as the compiler measured them. */
 export function Lines({ lines }: { lines: TextLine[] }) {
   // biome-ignore lint/suspicious/noArrayIndexKey: Lines are positional.
   return lines.map((line, i) => <Line key={i} line={line} />);
@@ -118,6 +121,7 @@ export function categoryStyle(slot: number | undefined): stylex.StyleXStyles | n
   }
 }
 
+/** The styles every kind of diagram element shares. */
 export const elementStyles = stylex.create({
   /**
    * Elements that can be pointed at. Hover draws the element heavier, keeping its color; keyboard
@@ -157,7 +161,7 @@ export const elementStyles = stylex.create({
     opacity: 0,
     pointerEvents: "none",
   },
-  // Roles. Every kind of element reads the same properties, so a role means the same everywhere.
+  /** Roles. Every kind of element reads the same properties, so a role looks the same anywhere. */
   roleDefault: {
     "--ink": theme.borderControl,
     "--fill": theme.surfaceRaised,
@@ -168,7 +172,7 @@ export const elementStyles = stylex.create({
     "--ink": theme.accent,
     "--fill": theme.accentSurface,
     "--label": theme.text,
-    // The accent is also heavier, so it stands out without its color.
+    /** The accent is also heavier, so it stands out without its color. */
     "--weight": stroke.strong,
   },
   roleWarning: {
@@ -177,7 +181,7 @@ export const elementStyles = stylex.create({
     "--label": theme.text,
     "--weight": stroke.line,
   },
-  // Category colors: they replace a role's hue and keep its weight, badge, and dashes.
+  /** Category colors: they replace a role's hue and keep its weight, badge, and dashes. */
   category1: { "--ink": theme.category1, "--fill": theme.category1Surface },
   category2: { "--ink": theme.category2, "--fill": theme.category2Surface },
   category3: { "--ink": theme.category3, "--fill": theme.category3Surface },

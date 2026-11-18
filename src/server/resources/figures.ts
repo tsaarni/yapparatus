@@ -1,8 +1,6 @@
 /**
- * Pictures of diagrams: GET /-/api/figures/{page}/{figure} answers with a PNG of the figure as
- * the web app draws it in the light theme, or with its element ids, so that an agent can look at
- * what it drew. The page compiler keeps each page's drawings; this resource draws one
- * as an SVG with text as outlines, and rasterizes it without a browser.
+ * Pictures of diagrams: GET /-/api/figures/{page}/{figure} answers with a PNG of the figure in
+ * the light theme, optionally with element ids, so an agent can look at what it drew.
  */
 import { existsSync } from "node:fs";
 import path from "node:path";
@@ -29,13 +27,13 @@ export function renderPicture(drawing: CompiledDiagram, options: { ids: boolean 
   const { svg } = pictureOf(drawing, options, fonts, lightPaint);
   return new Resvg(svg, {
     fitTo: { mode: "zoom", value: pictureScale },
-    // Text is drawn as outlines, so no font is needed.
     font: { loadSystemFonts: false },
   })
     .render()
     .asPng();
 }
 
+/** Serves `/-/api/figures`, compiling a page first when its drawings are out of date. */
 export class FiguresResource {
   private readonly root: string;
   private readonly content: string;

@@ -7,9 +7,11 @@ import type { AnchorName, Side } from "./geometry.ts";
 
 export type { AnchorName, Side };
 
-/** What an element is for: the one to look at, a risk, a quiet element, or one outside the system. */
+/** What an element is for: the one to look at, a risk, a quiet one, or one outside the system. */
 export type Role = "default" | "accent" | "muted" | "warning" | "external";
+/** Cross-axis alignment of a stack's children or a placed element with its reference. */
 export type Align = "start" | "center" | "end";
+/** A corner of an element, such as where an enclosure holds its title. */
 export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
 
 /** A problem in a diagram. Its severity is its code's, in `diagnosticCodes`. */
@@ -22,8 +24,7 @@ export interface Diagnostic {
   subject?: string;
 }
 
-/* ---------- Points ---------- */
-
+/** How a point is derived, resolved to coordinates at compile time. */
 export type PointExpr =
   | { k: "anchor"; el: Element; name: AnchorName }
   | { k: "port"; el: Element; side: Side; t: number }
@@ -44,10 +45,10 @@ export class Point {
   }
 }
 
+/** Anything an edge or placement accepts as a point: a point, an element's center, or [x, y]. */
 export type PointLike = Point | Element | [number, number];
 
-/* ---------- Elements ---------- */
-
+/** A placeable element: an id, and named anchors and ports on its outline. */
 abstract class Element {
   /** Explicit ids are fixed; derived ids get a numeric suffix when they collide. */
   id: string;
@@ -95,6 +96,7 @@ abstract class Element {
 
 export type { Element };
 
+/** The shape of a node, which sets how it is measured and drawn. */
 export type Shape =
   | "box"
   | "cylinder"
@@ -114,6 +116,7 @@ export type Shape =
   /** Internal: empty space that reserves room, such as under a sequence's lifelines. */
   | "space";
 
+/** Options of a node shape such as `box` or `cylinder`. */
 export interface NodeOptions {
   /** Stable identity for links, steps, and diagnostics. Default: derived from the label. */
   id?: string;
@@ -158,6 +161,7 @@ export interface MemberOptions {
   pin?: number;
 }
 
+/** Options of one record cell. */
 export interface CellOptions extends MemberOptions {
   /** Grid columns the cell covers. Default: 1. Whole rows make it taller: 64 of 32 is two rows. */
   span?: number;
@@ -169,6 +173,7 @@ export interface CellOptions extends MemberOptions {
  */
 export type Cell = string | [label: string, span: number] | [label: string, options: CellOptions];
 
+/** Options of a record: a title over a grid of cells. */
 export interface RecordOptions extends Omit<NodeOptions, "sub"> {
   title?: string;
   /** Column names over the cells, separated by tabs like the cells: `"name\ttype"`. */
@@ -182,9 +187,10 @@ export interface RecordOptions extends Omit<NodeOptions, "sub"> {
   ruler?: { top?: (column: number) => string | number; left?: (row: number) => string | number };
 }
 
-/** A highlighted span of a text: a substring that occurs once, or lines (`"2"`, `"2-4"`, from 1). */
+/** A highlighted span of a text: a substring that occurs once, or lines from 1 (`"2"`, `"2-4"`). */
 export type Mark = MemberOptions & ({ text: string } | { lines: string });
 
+/** Options of a text node, with its marked spans. */
 export interface TextOptions extends NodeOptions {
   /** Named spans or lines, each a member: `t.element("path")`. A string is the text to mark. */
   marks?: Record<string, string | Mark>;
@@ -204,13 +210,15 @@ export interface NodeInternals {
   follows?: Edge;
 }
 
-/** Where a member sits in its parent, and its own id there. */
+/** Where a member sits in its parent: a cell with its span, or a mark with its text or lines. */
 export type Place =
   | { kind: "cell"; span: number }
   | { kind: "mark"; text: string }
   | { kind: "mark"; lines: string };
+/** A member's place, its parent, its own id there, and its badge number. */
 export type Member = Place & { parent: Node; own: string; pin?: number };
 
+/** A drawn shape with a label, such as a box, a record, or a text, and its members. */
 export class Node extends Element {
   readonly shape: Shape;
   readonly label: string;
@@ -243,8 +251,7 @@ export class Node extends Element {
   /** Set by the builder: where a missing member is reported. */
   report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
   /**
-   * A member, by its own id: a record cell, such as `users.element("team-id")`, or a text mark.
-   * It is an element like any other: edges attach to it, steps focus it, and it takes a category.
+   * A member by its own id, such as `users.element("team-id")`, usable like any element.
    * A missing member is reported, and the parent stands in for it.
    */
   element(id: string): Node {
@@ -259,6 +266,7 @@ export class Node extends Element {
   }
 }
 
+/** Options of a row or column. */
 export interface StackOptions {
   id?: string;
   gap?: number;
@@ -280,6 +288,7 @@ export class Stack extends Element {
   }
 }
 
+/** Options of an enclosure. */
 export interface EncloseOptions {
   id?: string;
   title?: string;
@@ -305,8 +314,7 @@ export class Enclosure extends Element {
   }
 }
 
-/* ---------- Edges ---------- */
-
+/** How an edge travels between its ends. */
 export type Route =
   | "straight"
   /** Horizontal first leg, then vertical. */
@@ -319,8 +327,10 @@ export type Route =
   /** Vertical, then horizontal along this y, then vertical. */
   | { viaY: number | Point };
 
+/** The side of an edge leg, or of a terminal's dot, where a label sits. */
 export type LabelSide = "above" | "below" | "left" | "right";
 
+/** An edge label and where on the route it sits. */
 export interface LabelOptions {
   text: string;
   /** Zero-based leg of the route. Default: the longest leg. */
@@ -332,8 +342,10 @@ export interface LabelOptions {
   gap?: number;
 }
 
+/** Which ends of an edge get arrowheads. */
 export type Ends = "->" | "<-" | "<->" | "--";
 
+/** Options of an edge. */
 export interface EdgeOptions {
   id?: string;
   label?: string | LabelOptions;
@@ -364,6 +376,7 @@ export interface EdgeInternals {
   derivedId?: string;
 }
 
+/** A line between two points or elements, with its route, style, and labels. */
 export class Edge {
   /** Explicit ids are fixed; derived ids get a numeric suffix when they collide. */
   id: string;
@@ -412,8 +425,7 @@ export class Edge {
   }
 }
 
-/* ---------- Frames ---------- */
-
+/** Options of a frame, such as a sequence diagram's `alt` or `loop` fragment. */
 export interface FrameOptions {
   id?: string;
   /** Tab label in the top-left corner, such as "alt" or "loop". */
@@ -438,8 +450,7 @@ export class Frame {
   }
 }
 
-/* ---------- Placement ---------- */
-
+/** Where an element is put: next to a reference element, or with an anchor at a point. */
 export type Placement =
   | {
       kind: "relative";
@@ -450,6 +461,7 @@ export type Placement =
     }
   | { kind: "at"; at: PointLike; anchor: AnchorName };
 
+/** Options of `place()`: one reference direction, or `at` a point. */
 export interface PlaceOptions {
   below?: Element;
   above?: Element;
@@ -464,6 +476,7 @@ export interface PlaceOptions {
   anchor?: AnchorName;
 }
 
+/** The expression of a point; an element stands for its center. */
 export function toExpr(p: PointLike): PointExpr {
   if (p instanceof Point) return p.expr;
   if (Array.isArray(p)) return { k: "abs", x: p[0], y: p[1] };
@@ -484,11 +497,13 @@ export function elementOf(p: PointLike): Element | undefined {
   return e.k === "anchor" || e.k === "port" ? e.el : undefined;
 }
 
+/** The name a derived edge id uses for an end: its element's id, or its coordinates. */
 function refName(p: PointLike): string {
   if (Array.isArray(p)) return `${p[0]},${p[1]}`;
   return elementOf(p)?.id ?? "point";
 }
 
+/** An id from a label: lowercase letters and digits joined by dashes, or "node". */
 export function slug(text: string): string {
   return (
     text

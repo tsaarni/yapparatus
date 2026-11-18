@@ -1,5 +1,5 @@
 /**
- * The font file measure in src/compiler/font-measure.ts must give the widths the web app's canvas gives,
+ * The font measure in src/compiler/font-measure.ts gives the widths the web app's canvas gives,
  * so a diagram compiled in Node has the layout the browser would compute.
  */
 import { expect, test } from "@playwright/test";
@@ -25,7 +25,6 @@ const hard = [
   "Ty",
   "WAVE Tyrant Võ",
   "0123456789",
-  // Runs without letters: see the comment on the script in src/compiler/font-measure.ts.
   "24",
   "1,024",
   "^&",
@@ -96,8 +95,6 @@ test("font file widths match the web app's canvas measurement", async ({ page })
   console.log(`${rows.length} texts; largest difference ${largest.label}`);
   expect(rows.filter((row) => !(Math.abs(row.diff) < 0.5)).map((row) => row.label)).toEqual([]);
 
-  // No font file has "→": a browser draws it with a system font, so its width is an estimate
-  // that the measure reports.
   const estimated = fontMeasure();
   for (const [i, item] of arrow.entries()) {
     const row = compare(item, estimated.measure(item.text, item.font), corpus.length + i);

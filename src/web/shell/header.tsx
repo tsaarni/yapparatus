@@ -1,3 +1,5 @@
+/** The header bar across the top of the app. */
+
 import {
   contentDir,
   type DocumentPage,
@@ -35,6 +37,7 @@ const live = import.meta.env.DEV;
 /** The document's name: its `title` setting, or the name of its directory. */
 export const documentTitle = settings.title ?? humanize(contentDir.split("/").at(-1) ?? contentDir);
 
+/** A directory name as a title: dashes and underscores become spaces, first letter capitalized. */
 function humanize(name: string) {
   const words = name.replace(/[-_]+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
@@ -56,14 +59,12 @@ export function Header({
   setOpen,
 }: {
   wide: boolean;
-  /** Whether the contents drawer is open, in the compact layout. */
   drawer: boolean;
   setDrawer: (drawer: boolean) => void;
   page: DocumentPage | undefined;
   file: FileAddress | undefined;
   diagnostics: ReportedDiagnostic[];
   commentOn: (diagnostic: ReportedDiagnostic) => void;
-  /** Whether the chat is open. */
   open: boolean;
   setOpen: (open: boolean) => void;
 }) {
@@ -84,8 +85,6 @@ export function Header({
           )}
           <a href={pages[0] ? href(pages[0]) : "/"} {...stylex.props(s.home, focus.ring)}>
             {Logo && (
-              // As tall as the two-line lockup beside it, from the subtitle's cap height to
-              // the title's baseline.
               <span {...styled("logo", s.mark)}>
                 <Logo width={28} height={28} aria-hidden="true" focusable="false" />
               </span>

@@ -4,8 +4,10 @@ import { createLogger } from "../protocol/log.ts";
 
 const log = createLogger("http");
 
+/** The HTTP methods the API uses. */
 export type Method = "GET" | "POST" | "DELETE";
 
+/** What a route handler gets: the path params, the query, and the parsed body. */
 export interface ApiRequest {
   params: Record<string, string>;
   query: URLSearchParams;
@@ -15,6 +17,7 @@ export interface ApiRequest {
   res: ServerResponse;
 }
 
+/** What a route handler answers with. */
 export interface Reply {
   status: number;
   headers?: Record<string, string>;
@@ -24,8 +27,10 @@ export interface Reply {
   content?: { type: string; data: Uint8Array };
 }
 
+/** Answers one route. */
 type Handler = (request: ApiRequest) => Reply | Promise<Reply>;
 
+/** An error a handler throws to answer with that status and `{ error: message }`. */
 export class HttpError extends Error {
   readonly status: number;
   constructor(status: number, message: string) {
@@ -34,10 +39,12 @@ export class HttpError extends Error {
   }
 }
 
+/** Whether a value is a plain JSON object. */
 export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** The request body as text; over 512 KB is a 413. */
 async function readBody(req: IncomingMessage): Promise<string> {
   let data = "";
   for await (const chunk of req) {
@@ -47,6 +54,7 @@ async function readBody(req: IncomingMessage): Promise<string> {
   return data;
 }
 
+/** A JSON object body, or `{}` when empty; anything else is a 400. */
 function parseJson(data: string): Record<string, unknown> {
   if (!data) return {};
   let parsed: unknown;
@@ -59,10 +67,11 @@ function parseJson(data: string): Record<string, unknown> {
   return parsed;
 }
 
+/** Matches requests to handlers by method and path, and writes their replies. */
 export class Router {
   private routes: Array<{ method: Method; pattern: RegExp; keys: string[]; handle: Handler }> = [];
 
-  /** Register a route. Path segments like ":id" become params; a trailing ":rest*" takes the rest. */
+  /** Register a route. Segments like ":id" become params; a trailing ":rest*" takes the rest. */
   on(method: Method, path: string, handle: Handler): this {
     const keys: string[] = [];
     const source = path.replace(/:(\w+)(\*)?/g, (_m, key: string, rest?: string) => {

@@ -1,10 +1,6 @@
 /**
- * Text measurement in Node, from the font files the web app loads, with the widths a browser's
- * canvas `measureText` gives. The diagram compiler on the server measures all diagram text with it.
- *
- * The web app loads its fonts from Fontsource stylesheets that split each family into subset
- * files, each with a `unicode-range`. This module reads the same stylesheets and picks the
- * file for each character as a browser does, so the two cannot drift.
+ * Diagram text measurement in Node with the widths a browser's canvas `measureText` gives.
+ * It reads the web app's Fontsource stylesheets and picks subset files as a browser does.
  */
 import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -78,7 +74,6 @@ interface Run {
 function runsOf(text: string, spec: FontSpec): Run[] {
   const family = familyFaces(spec.family);
   const runs: Run[] = [];
-  // Canvas and SVG text draw every ASCII whitespace character as a space.
   for (const char of text.replace(/[\t\n\f\r]/g, " ")) {
     const face = faceFor(family, char);
     const last = runs.at(-1);
@@ -88,6 +83,7 @@ function runsOf(text: string, spec: FontSpec): Run[] {
   return runs;
 }
 
+/** Width of text in a font, with the characters no font file has. */
 function measureText(text: string, spec: FontSpec): Width {
   const uncovered: string[] = [];
   let width = 0;
@@ -102,15 +98,12 @@ function measureText(text: string, spec: FontSpec): Width {
 }
 
 /**
- * Text as glyph outlines: SVG path data in pixels, for text that starts at `x` with its central
- * baseline at `y`, as SVG text with `dominant-baseline: central` is drawn. The glyphs are shaped
- * as `fontMeasure` measures them, so the text is exactly as wide. A character that no font file
- * has is drawn as an empty box.
+ * Text as SVG path data starting at `x` with its central baseline at `y`, shaped as `fontMeasure`
+ * measures it so it is exactly as wide. A character no font file has is drawn as an empty box.
  */
 export function textOutline(text: string, spec: FontSpec, x: number, y: number): string {
   const primary = faceFor(familyFaces(spec.family), " ");
   const metrics = primary ? instance(primary, spec.weight, spec.size) : undefined;
-  // The central baseline is halfway between the primary font's ascent and descent.
   const baseline = metrics
     ? y + ((metrics.ascent + metrics.descent) / 2 / metrics.unitsPerEm) * spec.size
     : y + spec.size * 0.35;
@@ -161,12 +154,8 @@ function faceFor(family: Face[], char: string): Face | undefined {
 const scriptCharacter = /[^\p{Script=Common}\p{Script=Inherited}]/u;
 
 /**
- * Width of a run of text that one face draws: shaped with kerning and default features.
- *
- * fontkit shapes a run without letters, such as "24", with the font's default script. The
- * Fontsource files list that script's kerning lookups twice, and fontkit applies each listed
- * lookup, so it kerns such runs twice. A browser's HarfBuzz merges repeated lookups. The Latin
- * script lists the same kerning once, so such runs are shaped as Latin.
+ * Width of a run of text that one face draws, shaped with kerning and default features.
+ * Runs without letters are shaped as Latin: fontkit would kern them twice in the default script.
  */
 function advance(face: Face, text: string, spec: FontSpec): number {
   const font = instance(face, spec.weight, spec.size);
@@ -201,6 +190,7 @@ function instance(face: Face, weight: number, size: number): fontkit.Font {
   return font;
 }
 
+/** The font file at a path, opened once. */
 function fontFile(file: string): fontkit.Font {
   let font = fonts.get(file);
   if (!font) {
@@ -222,6 +212,7 @@ function familyFaces(family: string): Face[] {
   return found;
 }
 
+/** The faces of every family in `fontStylesheets`, by family name. */
 function readFaces(): Map<string, Face[]> {
   const require = createRequire(import.meta.url);
   const byFamily = new Map<string, Face[]>();

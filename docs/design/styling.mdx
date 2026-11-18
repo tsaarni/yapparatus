@@ -7,64 +7,21 @@ This page explains how the web app, its components, and its figures are styled: 
 
 ## Overview
 
-The web app is styled with [StyleX](https://stylexjs.com/), which compiles the styles of each component to atomic CSS at build time, so the style sheet grows only with the number of distinct values. Each component keeps its styles in its own file, next to its markup. Every value that a style uses, such as a color, a space, or a duration, is a token: a named, typed value defined once in [the theme file](/-/files/yapparatus/src/web/style/theme.stylex.ts). <Ref to="styling-files" /> shows where the styles are.
-
-<Figure id="styling-files" caption="The files that hold the styles.">
-
-<FileTree>
-
-- src/
-  - web/
-    - style/
-      - **theme.stylex.ts** every token
-      - styled.ts the class name helper
-      - focus.ts the focus ring
-      - styles.css a reset and the reduced-motion rule
-    - controls/
-      - button.tsx the button
-    - prose/ Markdown elements, for pages and replies
-    - shell/
-      - appearance.ts applies the theme
-    - diagram/
-      - element.tsx the styles that every diagram element shares
-    - …
-  - diagram/
-    - paint.ts the theme tokens of each role and category, for pictures
-    - …
-  - server/
-    - theme-values.ts the light theme's values, for pictures
-    - …
-- scripts/
-  - check-styles.ts the style check of `pnpm verify`
-- tests/unit/
-  - web/style/theme.test.ts the contrast checks
-  - diagram/paint.test.ts the role styles agree with the picture's table
-
-</FileTree>
-
-</Figure>
+The web app is styled with [StyleX](https://stylexjs.com/), which compiles the styles of each component to atomic CSS at build time, so the style sheet grows only with the number of distinct values. Each component keeps its styles next to its markup. Every value that a style uses, such as a color, a space, or a duration, is a token: a named, typed value defined once in the theme.
 
 Authors' own components import the same tokens from `yapparatus/theme.stylex`; see [custom components](/components#custom-components). `palettes` gives the hex values of each theme for a component that computes with them, as [the contrast table](#contrast) does.
 
 ## Tokens
 
-The colors, shadows, and font stacks change with the theme, so they are CSS variables. The scales, such as font sizes and spaces, are the same in every theme, so StyleX writes their values into each rule. Each color has a value for the screen, a light value for print, and a stronger value for increased contrast, which <Ref to="styling-role" /> combines into one.
+The colors, shadows, and font stacks change with the theme, so they are CSS variables. The scales, such as font sizes and spaces, are the same in every theme, so StyleX writes their values into each rule. Each color has a value for the screen, a light value for print, and a stronger value for increased contrast, and its role combines the three.
 
-<Listing id="styling-role" caption="One role, with its screen, print, and increased-contrast values.">
-<Excerpt from="/-/files/yapparatus/src/web/style/theme.stylex.ts" start="/** One role in a theme:" end="const lightRole" />
-</Listing>
-
-Conditions, such as a narrow reading column, are tokens too, as <Ref to="styling-conditions" /> shows.
-
-<Listing id="styling-conditions" caption="The conditions.">
-<Excerpt from="/-/files/yapparatus/src/web/style/theme.stylex.ts" start="export const when =" mark="narrow" />
-</Listing>
+Conditions, such as a narrow reading column, are tokens too, in the group `when`.
 
 The narrow condition is a container query on the reading column, which narrows both when the window shrinks and when the reader widens the chat. The chat panel uses a media query, because on a phone it covers the window. See [page layout](/web-app#page-layout).
 
-The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run. [The picture's table](/-/files/yapparatus/src/diagram/paint.ts) names the theme tokens that each role and category paints with, and [the server](/-/files/yapparatus/src/server/theme-values.ts) reads the theme file as plain values and resolves the tokens to the light theme's values. [A unit test](/-/files/yapparatus/tests/unit/diagram/paint.test.ts) checks that the table names the same tokens as the role styles in `element.tsx`. Pictures, tests, and the web app then use the same colors.
+The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run. The picture's paint table names the theme tokens that each role and category paints with, and the server reads the theme as plain values and resolves the tokens to the light theme's values. A unit test checks that the paint table names the same tokens as the role styles of the web app's diagram elements. Pictures, tests, and the web app then use the same colors.
 
-A new value goes into a scale in the theme file, with a comment on what it is for. A new color role needs a dark and a light value and a contrast rule in the test.
+A new value goes into a scale in the theme, with a comment on what it is for. A new color role needs a dark and a light value and a contrast rule in the theme test.
 
 ## Color
 
@@ -93,7 +50,7 @@ Surfaces step away from the background in lightness: `canvas`, `surface`, `surfa
 
 ## Contrast
 
-[The theme test](/-/files/yapparatus/tests/unit/web/style/theme.test.ts) computes the WCAG contrast of each pair of roles drawn together, in the dark and light themes, each with increased contrast and in print. Text and status colors need 4.5:1, the [AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html). Control edges and diagram outlines need 3:1, the [minimum for graphics](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Tinted fills and dividers need 1.3:1. The test also checks that the category colors stay apart with red-green color blindness.
+The theme test computes the WCAG contrast of each pair of roles drawn together, in the dark and light themes, each with increased contrast and in print. Text and status colors need 4.5:1, the [AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html). Control edges and diagram outlines need 3:1, the [minimum for graphics](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Tinted fills and dividers need 1.3:1. The test also checks that the category colors stay apart with red-green color blindness.
 
 Contrast compares the relative luminance of two colors. Each channel of a color, read as a fraction $$s$$ of 255, is first made linear, and the three linear channels are weighted by how bright each looks:
 
@@ -111,7 +68,7 @@ $$
 \text{contrast} = \frac{L_\text{lighter} + 0.05}{L_\text{darker} + 0.05}
 $$
 
-<Ref to="styling-contrast" /> lists the ratios on `surface`. The page computes them with the same formula from the theme file, so they follow any change to the colors.
+<Ref to="styling-contrast" /> lists the ratios on `surface`. The page computes them with the same formula from the theme, so they follow any change to the colors.
 
 <Table id="styling-contrast" caption="Contrast on surface, by role and theme.">
 
@@ -150,15 +107,15 @@ The web app shows feedback where the reader acted. A copy button confirms on its
 
 ## Accessibility and print
 
-Keyboard focus shows a 2 px ring, which stays visible as an outline in forced-colors mode. Reduced motion makes every transition instant, with one rule in [the base style sheet](/-/files/yapparatus/src/web/style/styles.css). StyleX puts its own rules in cascade layers, so this rule wins over all of them.
+Keyboard focus shows a 2 px ring, which stays visible as an outline in forced-colors mode. Reduced motion makes every transition instant, with one rule in the base style sheet. StyleX puts its own rules in cascade layers, so this rule wins over all of them.
 
 Print uses the light theme, because browsers leave out backgrounds and a dark theme would print light text on white. The header, the contents, and the chat are hidden, every tab prints with its label, and a diagram prints with its steps as a numbered list.
 
 ## Style rules
 
-`pnpm verify` runs [the style check](/-/files/yapparatus/scripts/check-styles.ts), which rejects two things that StyleX accepts. One is shorthand properties, such as `border`: StyleX silently drops a shorthand that holds a theme variable, so styles write longhands such as `borderWidth`. The other is literal colors, such as hex values.
+`pnpm verify` runs a style check, which rejects two things that StyleX accepts. One is shorthand properties, such as `border`: StyleX silently drops a shorthand that holds a theme variable, so styles write longhands such as `borderWidth`. The other is literal colors, such as hex values.
 
-Two more rules are kept by convention. A component that needs a class name, for tests and debugging, sets it with `styled("name", ...styles)` from [`styled.ts`](/-/files/yapparatus/src/web/style/styled.ts), because spreading StyleX's props after a `className` replaces it. Each element carries its own style: a figure does not style the elements inside it.
+Two more rules are kept by convention. A component that needs a class name, for tests and debugging, sets it with `styled("name", ...styles)`, because spreading StyleX's props after a `className` replaces it. Each element carries its own style: a figure does not style the elements inside it.
 
 ## Icons
 

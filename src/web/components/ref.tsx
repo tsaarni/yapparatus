@@ -1,3 +1,5 @@
+/** The Ref component, a cross-reference whose text follows the document's numbering. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { elementSeparator } from "../../document/address.ts";
@@ -9,13 +11,14 @@ import { theme } from "../style/theme.stylex.ts";
 
 const log = createLogger("components");
 
+/** What an author writes on a cross-reference. */
 export interface RefProps {
   /**
-   * A figure, table, or listing id, a heading id on this page, or an address on any page:
-   * "/page" or "/page#id". `figure--element` points at a diagram element or step; it opens that step.
+   * A figure, table, or listing id, a heading id on this page, "/page", or "/page#id".
+   * `figure--element` points at a diagram element or step, and opens that step.
    */
   to: string;
-  /** Link text. Default: "Figure 3.1", "Section 3.2", "Chapter 3", or the caption, heading, or title. */
+  /** Link text. Default: the target's label, such as "Figure 3.1", or its caption or heading. */
   children?: ReactNode;
 }
 

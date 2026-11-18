@@ -1,3 +1,7 @@
+/**
+ * Which directories are document directories: they hold a `document.json` and no nested document.
+ */
+
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";

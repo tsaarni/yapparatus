@@ -1,3 +1,5 @@
+/** Links in pages and replies, resolved against the page they are written in. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { AnchorHTMLAttributes } from "react";
 import { usePage } from "../addressing/numbering.ts";

@@ -1,3 +1,5 @@
+/** The components MDX pages and chat replies use without imports. */
+
 import type { pageComponents } from "../document/page-module.ts";
 import { Chart } from "./chart/chart.tsx";
 import { Columns, Panel, Tabs } from "./components/alternatives.tsx";

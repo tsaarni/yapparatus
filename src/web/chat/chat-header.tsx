@@ -1,3 +1,5 @@
+/** The chat panel header: the agent's presence and the Clear, Full width, and Close buttons. */
+
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
 import type { AgentState } from "../../protocol/rest-api.ts";
@@ -27,7 +29,6 @@ export function ChatHeader({
   onError,
 }: {
   agent: AgentState;
-  /** How many messages the chat holds. */
   count: number;
   full: boolean;
   setFull: (full: boolean) => void;
@@ -94,7 +95,6 @@ function ConfirmClear({ onClear, onCancel }: { onClear: () => void; onCancel: ()
       aria-describedby="confirm-clear-text"
       tabIndex={-1}
       {...styled("confirm-clear", s.confirm)}
-      // Safari does not focus a clicked button; keep focus here so the click is not a blur.
       onMouseDown={(event) => event.preventDefault()}
       onKeyDown={(event) => {
         if (event.key === "Escape") onCancel();

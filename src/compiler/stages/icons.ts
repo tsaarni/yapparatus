@@ -1,3 +1,5 @@
+/** The stage that turns `<Icon name>` into SVG component imports. */
+
 import type { Root } from "mdast";
 import { visit } from "unist-util-visit";
 import { iconName } from "../../document/settings.ts";

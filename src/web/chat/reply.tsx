@@ -1,3 +1,5 @@
+/** An agent's reply, loaded as an MDX module and rendered with the document's components. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { MDXProps } from "mdx/types";
 import {
@@ -37,6 +39,7 @@ function reportReply(message: AgentMessage, error: string) {
   });
 }
 
+/** Shows a reply's render error in its place and reports it. */
 class ReplyBoundary extends Component<
   { message: AgentMessage; children: ReactNode },
   { error: string }
@@ -63,7 +66,6 @@ class ReplyBoundary extends Component<
 export function Reply({ message }: { message: AgentMessage }) {
   const [Body, setBody] = useState<ComponentType<MDXProps>>();
   const [error, setError] = useState("");
-  // Chat events replace message objects, but a reply never changes: load it once.
   // biome-ignore lint/correctness/useExhaustiveDependencies: Keyed by the reply's number.
   useEffect(() => {
     let active = true;
@@ -87,7 +89,6 @@ export function Reply({ message }: { message: AgentMessage }) {
         Could not load the reply: {error}
       </p>
     );
-  // The typing dots stay until the reply can be shown, which then fades in once.
   if (!Body) return <Typing label="The reply is loading" />;
   return (
     <div {...stylex.props(s.replyBody)}>
@@ -96,7 +97,6 @@ export function Reply({ message }: { message: AgentMessage }) {
           <ReadingContext.Provider
             value={{
               reply: true,
-              // Reply content gets its own ids, so they never collide with the page's.
               idPrefix: `reply-${message.seq}-`,
             }}
           >

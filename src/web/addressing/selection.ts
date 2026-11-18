@@ -44,6 +44,7 @@ function sectionOf(block: Element): HTMLElement | undefined {
   return found;
 }
 
+/** The page file and lines the compiler recorded on a block. */
 function sourceOf(block: HTMLElement) {
   const { source, startLine, endLine } = block.dataset;
   if (!source || !startLine || !endLine) return;
@@ -82,6 +83,7 @@ function sectionEnd(heading: HTMLElement, block: HTMLElement): number {
   return Math.max(...[...blocks].map((b) => Number(b.dataset.endLine)));
 }
 
+/** Text with white space collapsed, cut to the excerpt length. */
 function excerpt(text: string) {
   const clean = text.replace(/\s+/g, " ").trim();
   return clean.length > excerptLength ? `${clean.slice(0, excerptLength)}…` : clean;
@@ -89,8 +91,7 @@ function excerpt(text: string) {
 
 /**
  * A reference for a whole target: a page, section, figure, table, listing, code, or diagram
- * element. Its lines are its block's. A section runs to the next heading of its level, and a code
- * block is its code's lines, which are fewer than its block's when it is inside a list or panel.
+ * element. A section runs to the next heading of its level; code covers only its code's lines.
  */
 export function referenceFromTarget(element: Element, page: DocumentPage): Reference | undefined {
   const target = element.closest<HTMLElement>("[data-target]");
@@ -133,10 +134,8 @@ function clip(range: Range, node: Node): Range {
 }
 
 /**
- * One text item per source range the selection touches: each block, list item, or table row,
- * addressed by the figure, table, listing, or section it is in, with the selected words as a
- * text fragment. In a page's code block,
- * the item's lines are the code lines selected.
+ * One text reference per block, list item, or table row the selection touches, addressed by
+ * what it is in, with the selected words as a text fragment.
  */
 export function referencesFromRange(range: Range, page: DocumentPage): Reference[] {
   const article = document.querySelector("main article");
@@ -145,7 +144,6 @@ export function referencesFromRange(range: Range, page: DocumentPage): Reference
   const walker = document.createTreeWalker(article, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node; node = walker.nextNode()) {
     if (!range.intersectsNode(node) || node.parentElement?.closest(".target-actions")) continue;
-    // Source code becomes lines of its file; see `fileReferencesFromRange`.
     if (node.parentElement?.closest("[data-file]")) continue;
     const inside = clip(range, node);
     const block = blockOf(node);
@@ -177,8 +175,6 @@ export function referencesFromRange(range: Range, page: DocumentPage): Reference
     ];
   });
 }
-
-/* ---------- Source files ---------- */
 
 /** The file a source file's code block shows, without lines. */
 function fileOf(region: HTMLElement): FileAddress | undefined {
@@ -265,6 +261,7 @@ export function referenceFromDiagram(
   return element ? referenceFromTarget(element, page) : undefined;
 }
 
+/** The selected range and the viewport position where the selection menu shows. */
 export interface SelectionMenu {
   range: Range;
   x: number;
@@ -313,7 +310,6 @@ export function useSelectionMenu(enabled: boolean) {
       let y = anchor.bottom + 8;
       const panel = document.querySelector(".chat");
       const availableRight = panel ? panel.getBoundingClientRect().left : window.innerWidth;
-      // Beside the end of prose, where it covers nothing; under code, whose lines it would cover.
       const container = range.commonAncestorContainer;
       const inCode = (container instanceof Element ? container : container.parentElement)?.closest(
         "[data-file]",

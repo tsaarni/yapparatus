@@ -1,3 +1,5 @@
+/** The published `yapparatus` entry: the types and components a project's own code uses. */
+
 export type { ChartSpec, PlotFunction, Row } from "../chart/spec.ts";
 export type { ChartColumn, ChartData, ColumnType } from "../chart/table.ts";
 export type { DiagramBuilder } from "../diagram/builder.ts";

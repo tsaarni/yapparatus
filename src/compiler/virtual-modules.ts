@@ -1,7 +1,6 @@
 /**
- * The modules the web app imports that no file holds: the document, with every page's outline,
- * the source files a build carries, each file's view, and the app's entry page, which every
- * page address serves.
+ * The modules the web app imports that no file holds: the document with every page's outline,
+ * the source files a build carries, each file's view, and the entry page every address serves.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
@@ -31,12 +30,12 @@ const fileModule = "virtual:yapparatus/file:";
 
 /** The web app's entry, as the page names it. From `src/` and from `lib/` alike. */
 const appEntry = `${appPrefix}/main.tsx`;
+/** The web app's entry file on disk, which the shared React and StyleX resolve from. */
 export const appSource = fileURLToPath(new URL("../../src/web/main.tsx", import.meta.url));
 
 /**
- * A virtual module's resolved id, which ends in `.js` before any query. File and data modules
- * end with the file's name, and plugins that claim modules by extension, such as Vite's JSON
- * and CSS plugins, would otherwise compile `package.json` or `styles.css` as their own.
+ * A virtual module's resolved id, ending in `.js` before any query, so plugins that claim modules
+ * by extension, such as Vite's JSON and CSS plugins, leave file modules like `package.json` alone.
  */
 const resolvedId = (id: string) => `\0${id.replace(/(?=\?|$)/, ".js")}`;
 /** The virtual id a resolved id stands for, or undefined for any other module. */
@@ -72,21 +71,15 @@ export function builtFiles(document: DocumentDirectory): FileAddress[] {
   return [...named.values()];
 }
 
+/** The plugin that resolves and loads the virtual modules and serves the entry page. */
 export function virtualModules(document: DocumentDirectory): PluginOption {
   const { root, content, files: sourceFiles } = document;
   let building = false;
-  /** The dev server, which compiles pages for their outlines; undefined in a build. */
   let devServer: ViteDevServer | undefined;
-  /** The text of document.json that the document module was last loaded from. */
   let loadedSettings: string | undefined;
-  /** Is `file` a page, or a file that a page reads, so that page outlines depend on it? */
   const feedsOutline = (file: string) =>
     (file.endsWith(".mdx") && file.startsWith(path.join(root(), content) + path.sep)) ||
     [...excerptFiles.values()].some((read) => read.has(file));
-  /**
-   * A page's outline, compiled by the same pipeline as the page. A page that does not compile
-   * has an empty outline, so the web app lists it and shows its error when it is opened.
-   */
   const outlineOf = async (
     id: string,
     compile: (url: string) => Promise<string | undefined>,
@@ -107,14 +100,11 @@ export function virtualModules(document: DocumentDirectory): PluginOption {
       return empty;
     }
   };
-  /** The first paint, before the web app runs, uses the document's color scheme. */
   const page = () => {
     let theme: ThemeSetting = "dark";
     try {
       theme = JSON.parse(readFileSync(path.join(root(), content, "document.json"), "utf8")).theme;
-    } catch {
-      // A missing or broken document.json is reported when the document module loads.
-    }
+    } catch {}
     return indexHtml(theme ?? "dark");
   };
   const indexFile = () => path.join(root(), "index.html");
@@ -152,12 +142,9 @@ export function virtualModules(document: DocumentDirectory): PluginOption {
         if (!address || !source || "error" in source)
           return this.error(`yapparatus: cannot read ${id}.`);
         this.addWatchFile(source.file);
-        // JSON text in a string literal: V8 parses it faster than the same object literal.
         const view = JSON.stringify(await fileView(address, source));
         return `export default JSON.parse(${JSON.stringify(view)});`;
       }
-      // A chart's data, loaded when the chart nears the screen. Its id carries the file's
-      // version, so a changed file is a new module, and a build gives it its own chunk.
       if (id.startsWith(dataModule)) {
         const name = id.slice(dataModule.length).split("?")[0] ?? "";
         const address = parseFileAddress(`/-/files/${name}`);
@@ -194,9 +181,6 @@ export function virtualModules(document: DocumentDirectory): PluginOption {
       if (errors.length) this.error(`Pages in ${content}/: ${errors.join(" ")}`);
       const ids = (settings.pages as string[]).map(pageIdOf);
       const files = ids.map((id) => `/${content}/${id}.mdx`);
-      // Every outline is here, so the contents, numbers, and references need no page's code.
-      // The dev server compiles pages in its own environment, as its checks do; a build
-      // loads each page module, which it bundles anyway.
       const server = devServer;
       const compile = server
         ? async (url: string) => {
@@ -211,12 +195,6 @@ export function virtualModules(document: DocumentDirectory): PluginOption {
       const outlines = Object.fromEntries(
         await Promise.all(ids.map(async (id) => [id, await outlineOf(id, compile)] as const)),
       );
-      // Generated so the glob pattern and the accepted files are literal, as Vite requires.
-      // A page's code loads when the page is first shown, as its own chunk in a build.
-      // An edited page updates its entry in place and notifies listeners, instead of
-      // reloading the app: page modules export `outline`, so React cannot refresh them alone.
-      // The logo is a component and the favicon its SVG text, from the same icon collections
-      // as pages use, so only the named icons are bundled.
       const icon = (name: unknown) => JSON.stringify(`~icons/${String(name).replace(":", "/")}`);
       return [
         settings.logo
@@ -261,8 +239,6 @@ export function virtualModules(document: DocumentDirectory): PluginOption {
         `  });`,
       ].join("\n");
     },
-    // The document module holds every outline. It is outside a page's hot update, which
-    // it accepts, but a reload must compile it again with the new outline.
     hotUpdate({ file }) {
       if (this.environment.name !== "client" || !feedsOutline(file)) return;
       const graph = this.environment.moduleGraph;
@@ -271,16 +247,11 @@ export function virtualModules(document: DocumentDirectory): PluginOption {
     },
     configureServer(server) {
       devServer = server;
-      // After Vite's own middlewares: every page address, and every source file's, is the
-      // web app. Other paths with an extension are missing assets.
       return () =>
         server.middlewares.use(async (req, res, next) => {
           const url = (req.url ?? "/").split(/[?#]/)[0] ?? "/";
-          // Vite's fallback has already rewritten page addresses to /index.html.
           const isPage = url === "/index.html" || !path.posix.extname(url);
           if (req.method !== "GET" || !isPage || url.startsWith(apiPrefix)) return next();
-          // The watcher reports an edit of document.json a moment late, or not at all in an
-          // ignored folder. A page load finds the edit itself, so the app gets the new settings.
           const settingsFile = path.join(root(), content, "document.json");
           const settings = existsSync(settingsFile)
             ? readFileSync(settingsFile, "utf8")

@@ -18,6 +18,7 @@ const measure: Measure = (text) => text.length * 7;
 /** Each text as a marker path, so tests can find where text is drawn. */
 const outline = (text: string, _font: unknown, x: number, y: number) => `M${x} ${y}h${text.length}`;
 
+/** Compile a figure, which must have no errors, and write its picture in the light theme. */
 function draw(figure: Figure, options: PictureOptions = {}) {
   const drawing = compileFigure(figure, measure);
   assert.equal(drawing.ok, true, JSON.stringify(drawing.diagnostics));
@@ -110,18 +111,14 @@ test("the picture is well formed and draws every shape the figure has", () => {
     "frame",
   ])
     assert.ok(shapes.has(shape), `no ${shape}`);
-  // Colors are written into the picture: the accent ink, a category fill, the warning badge.
   assert.match(svg, new RegExp(`stroke="${lightColors.accent}"`));
   assert.match(svg, new RegExp(`fill="${lightColors.category1Surface}"`));
   assert.match(svg, new RegExp(`fill="${lightColors.warning}"`));
-  // A dashed edge, the record's clip path for its cells, and the lifelines.
   assert.match(svg, /stroke-dasharray="5 4"/);
   assert.match(svg, /<clipPath id="clip0">/);
   assert.match(svg, /clip-path="url\(#clip0\)"/);
   assert.match(svg, /stroke-dasharray="2 3"/);
-  // The edge label's two lines, each with a halo behind it.
   assert.match(svg, /stroke-width="5"[^>]*\/><path d="M[\d.]+ [\d.]+h3"/);
-  // Categories get a legend under the drawing, which makes the picture taller.
   assert.match(svg, /<g data-layer="legend">/);
   assert.ok(
     height > compileFigure({ draw: everything, steps: [], build: false }, measure).viewBox.height,
@@ -162,7 +159,6 @@ test("the id overlay labels each element and outlines the elements diagnostics n
   assert.doesNotMatch(plain, /data-layer="ids"/);
   const { svg } = draw(overlap, { ids: true });
   const layer = /<g data-layer="ids">(.*?)<\/g>/s.exec(svg)?.[1] ?? "";
-  // One label per element, in the error color: each id's text is drawn.
   assert.equal([...layer.matchAll(new RegExp(`fill="${lightColors.error}"`, "g"))].length, 2);
   assert.match(svg, new RegExp(`stroke="${lightColors.warning}"[^>]*stroke-dasharray="2 3"`));
 });
@@ -173,6 +169,5 @@ test("text is drawn as outlines from the web app's font files", () => {
   const drawing = compileFigure(figure, fontWidth);
   const { svg } = pictureOf(drawing, {}, { measure: fontWidth, outline: textOutline }, lightPaint);
   assert.doesNotMatch(svg, /<text/);
-  // The label is glyph outlines: a path with curves.
   assert.match(svg, /<path d="M[^"]*Q[^"]*" fill="#11141b"\/>/);
 });

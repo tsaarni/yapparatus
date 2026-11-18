@@ -10,6 +10,7 @@ function anchorOf(fragment: string): string {
   return fragment.split(":~:")[0] ?? "";
 }
 
+/** A broken link, reference, or duplicate id, at a line of a page. */
 export interface LinkDiagnostic {
   page: string;
   line: number;
@@ -98,7 +99,6 @@ export function checkLinks(
         });
     }
     for (const { to: written, line } of page.outline.refs) {
-      // A diagram element or step is checked by its figure; the diagram checks the rest.
       const [to = ""] = written.split(elementSeparator);
       const [slug = "", fragment = ""] = to.slice(1).split("#");
       const exists = to.startsWith("/")

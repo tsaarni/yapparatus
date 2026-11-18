@@ -1,9 +1,6 @@
 /**
- * Sequence diagrams, composed from the diagram primitives.
- *
- * The author lists participants and steps in time order. The builder places participants
- * in a row, draws lifelines, derives activation bars from calls and replies, attaches each
- * message to the right bar edge, and draws notes and fragments (alt, loop, opt) as frames.
+ * Sequence diagrams from the diagram primitives: participants in a row with lifelines, and
+ * activation bars derived from calls and replies, with notes and fragments drawn as frames.
  */
 import type { DiagramBuilder } from "./builder.ts";
 import {
@@ -20,6 +17,7 @@ import {
 /** Elements a fragment or a whole sequence holds, for steps that focus it. */
 type Members = Array<Element | Edge | Frame>;
 
+/** A message from one participant to another, in time order. */
 export interface SequenceMessage {
   from: Node;
   to: Node;
@@ -35,6 +33,7 @@ export interface SequenceMessage {
   category?: string;
 }
 
+/** A note over one participant or spanning two. */
 export interface SequenceNote {
   note: string;
   /** One participant, or two to span between them. */
@@ -42,6 +41,7 @@ export interface SequenceNote {
   id?: string;
 }
 
+/** A framed group of steps, such as an alt with its else branches or a loop. */
 export interface SequenceFragment {
   /** The operator in the tab: alt, opt, loop, par, critical… */
   fragment: string;
@@ -53,8 +53,10 @@ export interface SequenceFragment {
   id?: string;
 }
 
+/** One step of a sequence: a message, a note, or a fragment. */
 export type SequenceStep = SequenceMessage | SequenceNote | SequenceFragment;
 
+/** Options of a sequence diagram. */
 export interface SequenceOptions {
   id?: string;
   /** Space between participants. Default: 40. */
@@ -76,6 +78,7 @@ interface Bar {
 const barHalf = 5;
 const nest = 6;
 
+/** Draw a sequence diagram into the builder and return the column that holds it all. */
 export function sequence(
   d: DiagramBuilder,
   participants: Node[],
@@ -106,7 +109,6 @@ export function sequence(
   };
   const all: Members = [...participants];
 
-  // Lay out rows in time order and collect what happens on each.
   type Event =
     | { kind: "message"; m: SequenceMessage; y: number; n: number; within: Members[] }
     | { kind: "note"; s: SequenceNote; y: number; within: Members[] };
@@ -180,7 +182,6 @@ export function sequence(
   walk(steps, 0, []);
   const bottom = y + step * 0.1;
 
-  // A call is answered when the receiver later replies to the caller.
   const answered = new Set<Event>();
   events.forEach((e, i) => {
     if (e.kind !== "message" || e.m.reply || e.m.async || e.m.from === e.m.to) return;
@@ -196,7 +197,6 @@ export function sequence(
       }
   });
 
-  // Activation bars: a call opens a bar on the receiver; its reply closes it.
   const stacks = new Map<Node, Bar[]>(participants.map((n) => [n, []]));
   const bars: Array<{ owner: Node; bar: Bar }> = [];
   const lastSeen = new Map<Node, number>();
@@ -205,7 +205,6 @@ export function sequence(
       lastSeen.set(e.m.from, e.y);
       lastSeen.set(e.m.to, e.y);
     }
-  // Bars opened while handling the current message; its edge is theirs.
   let opened: Bar[] = [];
   const open = (owner: Node, start: number) => {
     const stack = stacks.get(owner) ?? [];
@@ -297,7 +296,6 @@ export function sequence(
     } else {
       const bar = open(to, e.y);
       if (!answered.has(e)) {
-        // Nobody replies: a short activation for the work the call starts.
         bar.end = e.y + step * 0.55;
         stacks.get(to)?.pop();
       }
@@ -317,7 +315,6 @@ export function sequence(
       ),
     );
   }
-  // Bars nobody closed end shortly after their participant's last message.
   for (const { owner, bar } of bars)
     bar.end ??= Math.max(bar.start + step * 0.5, (lastSeen.get(owner) ?? bar.start) + step * 0.35);
 
@@ -348,7 +345,6 @@ export function sequence(
   });
   for (const make of frames) make();
 
-  // One placeable element: the participants over the space their lifelines take.
   const space = new Node(
     "space",
     "",

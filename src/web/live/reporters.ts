@@ -1,9 +1,6 @@
 /**
- * Diagnostics the browser finds and reports to the server. The browser reports what only
- * exists when a page runs: chart layout, render and runtime errors, and replies that fail to
- * show. Each report is about the revision of the page it rendered, so it never has to take
- * anything back: a changed page has a new revision. The server checks the source, diagrams
- * included, itself and tells the agent about both.
+ * Diagnostics only a running page finds, such as chart layout and runtime errors, reported to
+ * the server against the page revision rendered, so a changed page never has to take one back.
  */
 
 import { pages } from "virtual:yapparatus/document";
@@ -19,8 +16,7 @@ const runtimeLimit = 20;
 
 /**
  * Report this tab's uncaught errors against the revision of the page on screen, so they stop
- * counting when the page changes. On a source file's view they are only logged.
- * Call once at startup in live mode.
+ * counting when the page changes. Call once at startup.
  */
 export function installGlobalReporters() {
   if (!live) return;

@@ -1,3 +1,5 @@
+/** `styled`, which applies StyleX styles while keeping a semantic class name. */
+
 import * as stylex from "@stylexjs/stylex";
 
 /** Keep semantic class names as test and debugging hooks, separate from visual styles. */

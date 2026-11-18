@@ -1,3 +1,5 @@
+/** The diagram compiler: layout, placement, edges, labels, sizing, enclosures, and diagnostics. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
@@ -24,7 +26,6 @@ test("row places children with boundary gaps and centered cross-axis alignment",
 
 test("the drawing keeps hundredths and leaves out false flags and centered alignment", () => {
   const d = new DiagramBuilder();
-  // An advance with many decimals, as real font measurement gives.
   const precise: Measure = (text) => text.length * 7.123456;
   const a = d.box("Alpha", { sub: "first" });
   const b = d.box("Beta");
@@ -146,7 +147,6 @@ test("\\n in an edge label starts a new line; the rect covers every line", () =>
 });
 
 test("a multi-line label is checked with its full height and quoted on one line", () => {
-  // A node above the middle of the edge: clear of one line of label, not of three.
   const overlaps = (text: string) => {
     const d = new DiagramBuilder();
     const x = d.box("X");
@@ -248,19 +248,15 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
   const done = out.edges.find((e) => e.id === "done");
   const [bBar] = barOf("b");
   assert.ok(bBar && call && done);
-  // B's bar runs from the call to the reply.
   assert.ok(Math.abs(bBar.rect.y - (call.points[0]?.y ?? 0)) < 1);
   assert.ok(Math.abs(bBar.rect.y + bBar.rect.height - (done.points[0]?.y ?? 0)) < 1);
-  // The unanswered "store" call gives C a short bar; the async "notify" gives it none.
   assert.equal(barOf("c").length, 1);
   assert.ok((barOf("c")[0]?.rect.height ?? 99) < 44);
-  // Replies are dashed with open heads; the fragment becomes a frame with its tab.
   assert.equal(done.dashed, true);
   assert.equal(done.head, "open");
   const frame = out.frames[0];
   assert.equal(frame?.tab?.line.text, "loop");
   assert.equal(frame?.title?.text, "[retry]");
-  // The tab is measured: it fits its text, and the title starts after it.
   assert.ok(frame?.tab && frame.title);
   assert.ok(frame.tab.rect.width >= measure("loop", { family: "", size: 11, weight: 600 }) + 8);
   assert.ok(frame.title.x >= frame.tab.rect.x + frame.tab.rect.width);
@@ -411,7 +407,6 @@ test("text marks are elements over their substring; unmatched marks are reported
     ["req.nope", "req.twice", "req.far"],
   );
   assert.match(unmatched[1]?.message ?? "", /occurs \d+ times/);
-  // In centered text, a mark follows its line's start.
   const two = node("c.two");
   const c = node("c")?.rect;
   assert.ok(two && c);
@@ -568,7 +563,6 @@ test("categories: colors in order of first use, a legend, and a group for steps"
   const node = (id: string) => out.nodes.find((n) => n.id === id);
   assert.equal(node("orders")?.category, 1);
   assert.equal(node("batch-job")?.category, 2);
-  // Storage has no color of its own: it is neutral until given a category.
   assert.equal(node("database")?.category, undefined);
   assert.equal(node("database")?.role, "default");
   assert.deepEqual(
@@ -613,14 +607,12 @@ test("start and end labels sit beside the dot without moving it, and are checked
   const dot = node("clicked");
   const box = node("step")?.rect;
   assert.ok(dot?.labelRect && box);
-  // The dot alone is centered in the column; its label hangs to the right.
   assert.equal(dot.rect.x + dot.rect.width / 2, box.x + box.width / 2);
   assert.equal(dot.labelRect.x, dot.rect.x + dot.rect.width + 8);
   assert.equal(dot.lines[0]?.text, "Clicked");
   assert.ok(out.viewBox.x + out.viewBox.width >= dot.labelRect.x + dot.labelRect.width);
   assert.ok(node("end-3"), "an unlabeled end keeps its numbered id");
 
-  // An edge that leaves through its own label is reported.
   const e = new DiagramBuilder();
   const s = e.start("Go", { side: "below" });
   const b = e.box("Next");
@@ -671,12 +663,10 @@ test("an edge leaves a wide cell through the side its line crosses first", () =>
   const d = new DiagramBuilder();
   const rec = d.record([["Options", 32]], { columns: 32, width: 420, id: "tcp" });
   const note = d.note("Up to 40 bytes", { id: "note" });
-  // Far to the right, but below: the line from the cell's center leaves through its bottom.
   d.place(note, { below: rec, gap: 40, align: "end" });
   d.arrow(note, rec.element("options"));
   const out = compile(d, measure);
   const cell = out.nodes.find((n) => n.id === "tcp.options")?.rect;
-  // The head's first point is its tip, where the edge meets the cell.
   const tip = out.edges[0]?.heads[0]?.[0];
   assert.ok(cell && tip);
   assert.deepEqual(tip, { x: cell.x + cell.width / 2, y: cell.y + cell.height });

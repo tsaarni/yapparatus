@@ -12,6 +12,8 @@ Rules for agents working on this project.
 
 Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtures/`. Follow the design documents when changing the web app, the diagram compiler, or the server. When a change settles a design question, update the design document in the same change; when it changes what authors write, update the guide too.
 
+Design documents state the design that the code implements. They name the design's concepts, data shapes, and API, and never the code: no links to source files, no file paths, no excerpts.
+
 ## Engineering
 
 - **No backwards compatibility.** Change any API, format, or address when a better design appears; update every caller and document in the same change.
@@ -53,3 +55,4 @@ File names:
 ## Writing
 
 - **Write simple, direct technical English.** No filler words, marketing tone, em dashes in prose, or dramatic contrasts such as "not X, but Y". This covers code comments, commit messages, and READMEs; document pages also follow [the guide's writing rules](starter/docs/guide.md#writing).
+- **Comments are short doc comments on files and declarations.** Each file starts with a `/** */` comment on what it holds, and each top-level function and class and each exported type and const has one. A comment has at most 2 lines and 100 columns, and no comment goes inside a function: name the code so it needs none. `pnpm verify` runs `scripts/check-comments.ts`, which enforces this.

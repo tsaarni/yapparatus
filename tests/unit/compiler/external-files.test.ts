@@ -1,3 +1,5 @@
+/** Reading source files: only files inside a named external directory. */
+
 import assert from "node:assert/strict";
 import { symlinkSync } from "node:fs";
 import path from "node:path";

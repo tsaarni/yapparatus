@@ -24,11 +24,14 @@ export interface ChartData {
 }
 
 export interface ChartProps {
-  /** Returns the marks: `(Plot, rows) => ({ marks: [Plot.lineY(rows, { x: "Month", y: "Sales" })] })`. */
+  /**
+   * Returns the marks:
+   * `(Plot, rows) => ({ marks: [Plot.lineY(rows, { x: "Month", y: "Sales" })] })`.
+   */
   plot: PlotFunction;
-  /** The data written inside the chart or in the table it names, read by the compiler. Never written by hand. */
+  /** The data inside the chart or in the table it names, added by the compiler, never by hand. */
   data?: ChartData;
-  /** A table on the page, "#requests", or a file, "/-/files/bench/results.csv", to read the data from. */
+  /** The table, "#requests", or file, "/-/files/bench/results.csv", to read the data from. */
   from?: string;
   /** Loads a file's data, from a module the compiler makes. Never written by hand. */
   load?: () => Promise<{ default: ChartData }>;
@@ -168,9 +171,8 @@ export class DiagramBuilder {
     return node;
   }
   /**
-   * A member's id is its parent's, then its own, such as `users.team-id`. Its own comes from
-   * the first tab-separated column of its label, and is unique in the parent. The parent's
-   * element is joined in later, when the parent's id is final.
+   * A member's id is its parent's, then its own from the first tab-separated column of its
+   * label, such as `users.team-id`. The parent's part is joined in once it is final.
    */
   private member(parent: Node, label: string, options: MemberOptions, place: Place) {
     const { id, pin, ...rest } = options;
@@ -346,7 +348,7 @@ export interface DiagramProps {
 }
 
 export interface DocumentSettings {
-  /** Page files in the content folder, with `.mdx`, in reading order. Every page is listed exactly once. */
+  /** Page files in the content folder, with `.mdx`, in reading order, each listed once. */
   pages: string[];
   /** Document title in the header and browser tab. Default: the folder name. */
   title?: string;
@@ -430,7 +432,7 @@ export const Figure: { (props: FigureProps): Element; breakout: boolean; };
 export interface FigureProps extends HTMLAttributes<HTMLElement> {
   caption?: string;
   description?: string;
-  /** The figure takes the whole width, as when it holds columns. The compiler sets it; authors never write it. */
+  /** The figure takes the whole width, as when it holds columns. Set by the compiler. */
   wide?: boolean;
   children: ReactNode;
 }
@@ -551,9 +553,8 @@ export const Ref: ({ to, children }: RefProps) => Element;
 export interface Reference {
   kind: TargetKind;
   /**
-   * "/page", "/page#id", "/page#figure--element", or for selected words the figure, table, listing,
-   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
-   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
+   * "/page", "/page#id", "/page#figure--element", "/page#section:~:text=start,end" for selected
+   * words, or "/-/files/app/x.go#L4-L9" for a source file or its lines.
    */
   address: string;
   /** The page's or source file's file, relative to the project folder. */
@@ -566,11 +567,11 @@ export interface Reference {
 
 export interface RefProps {
   /**
-   * A figure, table, or listing id, a heading id on this page, or an address on any page:
-   * "/page" or "/page#id". `figure--element` points at a diagram element or step; it opens that step.
+   * A figure, table, or listing id, a heading id on this page, "/page", or "/page#id".
+   * `figure--element` points at a diagram element or step, and opens that step.
    */
   to: string;
-  /** Link text. Default: "Figure 3.1", "Section 3.2", "Chapter 3", or the caption, heading, or title. */
+  /** Link text. Default: the target's label, such as "Figure 3.1", or its caption or heading. */
   children?: ReactNode;
 }
 
@@ -655,9 +656,8 @@ export interface StepProps {
    */
   id?: string;
   /**
-   * Ids of the elements this step is about, separated by spaces. A container (an enclosure,
-   * row, column, sequence, or fragment) stands for everything in it. Plain text: the page
-   * compiler checks it.
+   * Ids of the elements this step is about, separated by spaces, in plain text the page compiler
+   * checks. A container, such as an enclosure, row, or sequence, stands for everything in it.
    */
   focus?: string;
   /** One or two sentences. */
@@ -693,7 +693,7 @@ export interface AgentMessage {
   author: "agent";
   /** The newest reader message the reply answers; earlier ones are answered too. */
   inReplyTo: number;
-  /** When the server first handed message `inReplyTo` to an agent; absent if the server restarted. */
+  /** When the server first handed `inReplyTo` to an agent; absent if the server restarted. */
   readAt?: string;
   /** The reply's MDX module, which the browser imports to show it. */
   module: string;
@@ -729,9 +729,8 @@ export interface Diagnostic {
   /** A figure id, or a reply's message number, inside that source. */
   target?: string;
   /**
-   * What the diagnostic is about, such as a link's target or a diagram's elements. With the code,
-   * source, and target it identifies the diagnostic, so its message may change wording.
-   * Without it, the message identifies it.
+   * What it is about, such as a link's target. With the code, source, and target it identifies
+   * the diagnostic, so the message may change wording; without it, the message identifies it.
    */
   subject?: string;
   /** Diagram element ids involved. */
@@ -757,9 +756,8 @@ export interface ReaderMessage {
 export interface Reference {
   kind: TargetKind;
   /**
-   * "/page", "/page#id", "/page#figure--element", or for selected words the figure, table, listing,
-   * or section they are in, with a text fragment: "/page#section:~:text=start,end". For a
-   * source file, "/-/files/app/x.go", or with its lines, "/-/files/app/x.go#L4-L9".
+   * "/page", "/page#id", "/page#figure--element", "/page#section:~:text=start,end" for selected
+   * words, or "/-/files/app/x.go#L4-L9" for a source file or its lines.
    */
   address: string;
   /** The page's or source file's file, relative to the project folder. */
@@ -772,7 +770,7 @@ export interface Reference {
 
 export interface ReportedDiagnostic extends Diagnostic {
   severity: Severity;
-  /** The figure's last line, when `line` is a figure's first. The server reads both from the page. */
+  /** The figure's last line, when `line` is its first; the server reads both from the page. */
   endLine?: number;
   /** The page address to link: "/page" or "/page#figure". */
   address?: string;
@@ -807,7 +805,7 @@ export class YapparatusError extends Error {
 export const yapparatus: (options: YapparatusOptions) => PluginOption[];
 
 export interface YapparatusOptions {
-  /** The document's directory, which holds its document.json and MDX pages, relative to the Vite root. */
+  /** The document's directory, holding its document.json and MDX pages, from the Vite root. */
   document: string;
   /** Inline all application assets. Default: false. */
   singleFile?: boolean;
@@ -829,7 +827,7 @@ export const layer: { raised: number; header: number; chat: number; scrim: numbe
 
 export const letterSpacing: { tight: string; snug: string; caps: string; };
 
-export const lightTheme: Theme<VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 29 more ...; mono: string; }>, symbol>, symbol>;
+export const lightTheme: Theme<VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 30 more ...; math: string; }>, symbol>, symbol>;
 
 export const lineHeight: { tight: string; snug: string; normal: string; relaxed: string; };
 
@@ -843,7 +841,7 @@ export const space: { xxs: string; xs: string; sm: string; md: string; lg: strin
 
 export const stroke: { hairline: string; line: string; strong: string; boost: string; };
 
-export const theme: VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 29 more ...; mono: string; }>, symbol>;
+export const theme: VarGroup<Readonly<{ colorScheme: string; canvas: string; surface: string; surfaceRaised: string; surfaceHover: string; scrim: string; border: string; borderStrong: string; borderControl: string; text: string; ... 30 more ...; math: string; }>, symbol>;
 
 export const when: { narrow: string; smallScreen: string; noHover: string; forcedColors: string; print: string; };
 ```

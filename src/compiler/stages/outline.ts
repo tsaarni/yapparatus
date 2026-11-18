@@ -1,11 +1,12 @@
+/** The stage that records a page's outline: title, headings, numbered blocks, anchors, links. */
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
-import type { MdxJsxFlowElementHast, MdxJsxTextElementHast } from "mdast-util-mdx-jsx";
+import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
 import type { NumberedKind, PageOutline } from "../../document/page-module.ts";
 import { pageRevision } from "../revision.ts";
-import { contentIssues } from "./conventions.ts";
+import { contentIssues, literal } from "./conventions.ts";
 import { excerptFiles } from "./excerpts.ts";
 
 /** Which MDX components are numbered blocks, and of which kind. */
@@ -17,13 +18,6 @@ const numberedComponents: Record<string, NumberedKind> = {
   Listing: "listing",
 };
 
-function literal(node: MdxJsxFlowElementHast | MdxJsxTextElementHast, name: string) {
-  const attr = node.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
-  return attr?.type === "mdxJsxAttribute" && typeof attr.value === "string"
-    ? attr.value
-    : undefined;
-}
-
 /** The lines of a component with an id, such as a figure, in its page's source. */
 export interface Place {
   start: number;
@@ -31,9 +25,8 @@ export interface Place {
 }
 
 /**
- * Outlines, the capitalized components, and where each component with an id is, for each
- * compiled file, by absolute path. The dev server reads them to check an agent's reply with
- * the same pipeline that compiles pages, and to say where a diagnostic about a figure is.
+ * Each compiled file's outline, capitalized components, and lines of components with ids, by path.
+ * The dev server reads them to check an agent's reply and to place diagnostics about figures.
  */
 export const compiled = new Map<
   string,
@@ -41,14 +34,12 @@ export const compiled = new Map<
 >();
 
 /**
- * Record the page's sections and figures and export them as `outline`, so the web app can
- * number them and resolve cross-references across pages. Runs after heading ids exist.
+ * Export the page's sections and figures as `outline`, for numbering and cross-references.
  * `isPage` tells document pages, which must have one `#` title, from chat replies, which have none.
  */
 export function pageOutline(isPage: (file: string) => boolean) {
   return (tree: Root, file: { path: string; value: unknown }) => {
     const outline: PageOutline = {
-      // Excerpts and charts ran first, so the files the page reads are known.
       revision: pageRevision(String(file.value), excerptFiles.get(file.path) ?? []),
       title: "",
       headings: [],
@@ -58,11 +49,9 @@ export function pageOutline(isPage: (file: string) => boolean) {
       refs: [],
     };
     const titles: string[] = [];
-    /** Each heading's and numbered block's anchor, with its kind and line, in page order. */
     const anchored: Array<{ kind: string; id: string; line: number }> = [];
     const components = new Set<string>();
     const places: Record<string, Place> = {};
-    /** The heading the walk is under, so each link knows its section. */
     let section: string | undefined;
     const link = (href: string, line: number) =>
       outline.links.push({ href, line, ...(section ? { section } : {}) });
@@ -117,7 +106,6 @@ export function pageOutline(isPage: (file: string) => boolean) {
     outline.title = titles[0] ?? "";
     compiled.set(file.path, { outline, components: [...components], places });
 
-    // Two anchors with one id: links and references go to the first. The page still renders.
     const ids = new Map<string, string>();
     const issues = contentIssues.get(file.path) ?? [];
     contentIssues.set(file.path, issues);

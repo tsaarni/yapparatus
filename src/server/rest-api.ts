@@ -1,7 +1,6 @@
 /**
- * The dev server's API under /-/api. Each resource is its own module; this file only wires
- * them together, connects them to Vite's file watcher, sends changes to the browser on Vite's
- * hot-update connection, and tells agents where the server is.
+ * The dev server's API under /-/api: wires the resources together, connects them to Vite's file
+ * watcher and hot-update connection, and tells agents where the server is.
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import type { AddressInfo } from "node:net";
@@ -20,13 +19,11 @@ import { Router } from "./router.ts";
 
 const log = createLogger("server");
 
+/** Mount the /-/api resources on a Vite dev server for the document in `content`. */
 export function installRestApi(server: ViteDevServer, content: string, files: ExternalFiles) {
   const root = server.config.root;
-  // Each document keeps its chat state under its own path; one server runs at a time.
   const state = `.yapparatus/${content}`;
 
-  // Changes within a short window collapse into the latest of each, so a burst of edits sends
-  // the browser one update.
   const pending = new Map<string, () => void>();
   let flushTimer: NodeJS.Timeout | undefined;
   const send = <E extends keyof UpdateEvents>(
@@ -43,7 +40,6 @@ export function installRestApi(server: ViteDevServer, content: string, files: Ex
     }, 50);
   };
 
-  // Each module reports that it changed; this file decides who hears about it.
   const chatChanged = () => send("yapparatus:chat", () => resource.whole());
   const diagnostics: DiagnosticStore = new DiagnosticStore({
     root,
@@ -89,16 +85,12 @@ export function installRestApi(server: ViteDevServer, content: string, files: Ex
     if (file.startsWith(path.join(root, ".yapparatus") + path.sep)) return;
     diagnostics.fileChanged();
     const address = fileResource.addressOf(file);
-    // Keyed by address: two files saved together are two updates.
     if (address) send("yapparatus:file", () => address, `file:${address}`);
   };
   server.watcher.on("add", onFile);
   server.watcher.on("change", onFile);
   server.watcher.on("unlink", onFile);
 
-  // The agent library finds the server, and the document it serves, through this file in the
-  // project folder.
-  // The newest server writes it; a server removes it on close only if it is still its own.
   const serverFile = path.join(root, ".yapparatus", "server.json");
   let written = "";
   const announce = () => {
@@ -111,7 +103,6 @@ export function installRestApi(server: ViteDevServer, content: string, files: Ex
     writeFileSync(serverFile, written);
     log.info(`API at ${JSON.parse(written).url}${apiPrefix}, announced in ${serverFile}`);
   };
-  // A restart after a config change reuses the listening server.
   const start = () => {
     announce();
     void diagnostics.checkSources();

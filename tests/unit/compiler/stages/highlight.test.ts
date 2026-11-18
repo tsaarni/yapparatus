@@ -1,3 +1,5 @@
+/** Highlighting: page line numbers for code blocks, and the whole file for the file view. */
+
 import assert from "node:assert/strict";
 import { writeFileSync } from "node:fs";
 import path from "node:path";
@@ -35,7 +37,6 @@ test("each line of a page's code block carries its line in the page, without a n
       ),
     );
     const [code] = await codeBlocks(js);
-    // The comment alone on line 6 is removed; the code lines keep their lines in the page.
     assert.deepEqual(code?.pageLines, [7, 8]);
     assert.deepEqual(code?.marks, { 0: "highlight" });
     assert.equal(code?.start, undefined);

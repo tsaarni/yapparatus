@@ -30,7 +30,7 @@ This page describes what a document is on disk and how everything in it is named
 
 ## Projects and document directories
 
-A project is the directory where the server runs, made from [the starter](/-/files/yapparatus/starter/README.md). A document directory holds a `document.json` and the pages of one document, such as `content/` in the starter or `docs/design/` in this repository.
+A project is the directory where the server runs, made from the starter. A document directory holds a `document.json` and the pages of one document, such as `content/` in the starter or `docs/design/` in this repository.
 
 The server shows one document at a time, named by its path in the project, as in `yap dev docs/design`. A document's pages are every MDX file under its directory, so the server refuses to start when another document directory is inside it or contains it.
 
@@ -40,7 +40,7 @@ The project has one `.yapparatus/server.json`, where the running server writes i
 
 ## document.json
 
-`document.json` holds the settings of one document: its title, page list, theme, icons, numbering, and external directories. [The authoring guide](/-/files/yapparatus/starter/docs/guide.md#L44-L53) lists the fields.
+`document.json` holds the settings of one document: its title, page list, theme, icons, numbering, and external directories. The authoring guide lists the fields.
 
 `"pages"` is the only required field. It lists the page files in reading order. The server compares it with the MDX files on disk and reports each difference and each invalid field as a `PAGE_LIST` diagnostic. It reads the file again when it changes, so a fix needs no restart. See [the document module](page-compiler#the-document-module).
 
@@ -69,7 +69,7 @@ An address names something that the reader can open, link to, or attach to a mes
 
 </Table>
 
-<Ref to="documents-address-segments" /> takes two real addresses of this document apart: [an element](/overview#overview-system--agent) and [words in a line of a file](/-/files/yapparatus/src/document/reference.ts#L32:~:text=address).
+<Ref to="documents-address-segments" /> takes two addresses apart: [an element](/overview#overview-system--agent) of this document, and words in a line of a file in an external directory named `app`.
 
 <Diagram id="documents-address-segments" caption="The segments of an element address and of a file address." description="Two addresses in monospace text, each segment marked and named by a note" draw={(d) => {
   const element = d.text("/overview#overview-system--agent", {
@@ -77,15 +77,15 @@ An address names something that the reader can open, link to, or attach to a mes
     id: "element-address",
     marks: { page: "/overview", figure: "#overview-system", element: "--agent" },
   })
-  const file = d.text("/-/files/yapparatus/src/document/reference.ts#L32:~:text=address", {
+  const file = d.text("/-/files/app/src/server.ts#L40:~:text=listen", {
     mono: true,
     id: "file-address",
     marks: {
       prefix: "/-/files",
-      directory: "yapparatus",
-      path: "src/document/reference.ts",
-      lines: "#L32",
-      words: ":~:text=address",
+      directory: "app",
+      path: "src/server.ts",
+      lines: "#L40",
+      words: ":~:text=listen",
     },
   })
   const page = d.note("Page")
@@ -141,13 +141,9 @@ A file also has a path relative to the project, such as `../../contour/internal/
 
 ## References
 
-A reference is one address that the reader attached to a message, with the file and lines it came from. A message has a list of references. The reader adds them as [commenting on the page](web-app#commenting-on-the-page) describes. <Ref to="documents-reference" /> shows a reference.
+A reference is one address that the reader attached to a message, with the file and lines it came from. A message has a list of references. The reader adds them as [commenting on the page](web-app#commenting-on-the-page) describes. Its type is `Reference`.
 
-<Listing id="documents-reference" caption="A reference, in src/document/reference.ts.">
-<Excerpt from="/-/files/yapparatus/src/document/reference.ts" start="export interface Reference {" />
-</Listing>
-
-`kind` says what the reader attached, and `address` names it. `source` is the page file or external file, relative to the project, and `startLine` and `endLine` are the lines in it. The page compiler records which lines every block came from (see [source marks](page-compiler#outline-and-source-marks)), and the web app copies them into the reference. If the file has changed since, the address and its words tell the agent where to look. <Ref to="documents-kinds" /> lists the kinds.
+`kind` says what the reader attached, and `address` names it. `source` is the page file or external file, relative to the project, and `startLine` and `endLine` are the lines in it. For a diagram element, `step` holds the step that the reader had open, with its text. The page compiler records which lines every block came from (see [source marks](page-compiler#outline-and-source-marks)), and the web app copies them into the reference. If the file has changed since, the address and its words tell the agent where to look. <Ref to="documents-kinds" /> lists the kinds.
 
 <Table id="documents-kinds" caption="The kinds of reference.">
 
@@ -175,25 +171,6 @@ A [build](page-compiler#builds) keeps the same addresses. The website build writ
 The single HTML file has no server, so the address goes after `#`: `/server#agent-state` becomes `#/server#agent-state`. A website build opened from disk uses this form too. A browser does not look for a text fragment after a `#`, so in the single file Copy link leaves out the words.
 
 **[Direction](directions):** the single file writes words with `~text=`, as in `#/rest-api#chat~text=log`. Browsers ignore it, and the web app finds the words itself, as Show on page does.
-
-## Where the code is
-
-<Table id="documents-code" caption="The files that implement documents and addresses.">
-
-| File | What it holds |
-|---|---|
-| [`src/document/settings.ts`](/-/files/yapparatus/src/document/settings.ts) | The fields of `document.json` |
-| [`src/document/address.ts`](/-/files/yapparatus/src/document/address.ts) | Page addresses, links, text fragments |
-| [`src/compiler/document-directory.ts`](/-/files/yapparatus/src/compiler/document-directory.ts) | Document directory check |
-| [`src/document/file-address.ts`](/-/files/yapparatus/src/document/file-address.ts) | File addresses, lines, and the `files` check |
-| [`src/compiler/external-files.ts`](/-/files/yapparatus/src/compiler/external-files.ts) | Reading external files |
-| [`src/document/reference.ts`](/-/files/yapparatus/src/document/reference.ts) | The reference |
-| [`src/compiler/document-checks.ts`](/-/files/yapparatus/src/compiler/document-checks.ts) | Page list and `document.json` checks |
-| [`src/compiler/link-checks.ts`](/-/files/yapparatus/src/compiler/link-checks.ts) | Link and reference checks |
-| [`src/web/addressing/selection.ts`](/-/files/yapparatus/src/web/addressing/selection.ts) | References from a selection |
-| [`src/server/chat-log.ts`](/-/files/yapparatus/src/server/chat-log.ts) | Reference check |
-
-</Table>
 
 ## Sources
 

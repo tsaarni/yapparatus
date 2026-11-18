@@ -1,9 +1,13 @@
+/**
+ * The theme file: theme-color, a value for every role, contrast, and distinct diagram categories.
+ */
+
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { loadThemes } from "../../../../src/server/theme-values.ts";
 
-/** The contrast every theme must reach, checked on the real theme file. */
+/** The dark and light themes' roles, from the real theme file. */
 const { theme, lightTheme } = await loadThemes();
 
 /** Each theme, in each condition its values change for: [roles, condition]. */
@@ -17,6 +21,7 @@ const modes = {
 } as const;
 type Mode = keyof typeof modes;
 
+/** A role's color in a mode, falling back to its default value. */
 function color(role: string, mode: Mode): string {
   const [roles, condition] = modes[mode];
   const value = roles[role];
@@ -25,6 +30,7 @@ function color(role: string, mode: Mode): string {
   return value[condition] ?? value.default ?? "";
 }
 
+/** The WCAG relative luminance of a `#rrggbb` color. */
 function luminance(hex: string) {
   const [r, g, b] = [1, 3, 5].map((i) => {
     const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
@@ -82,7 +88,6 @@ for (const mode of Object.keys(modes) as Mode[])
   });
 
 test("the HTML's theme-color is the canvas, so the first paint matches", () => {
-  // The page is a template in the virtual modules.
   const html = readFileSync("src/compiler/virtual-modules.ts", "utf8");
   assert.match(html, new RegExp(`name="theme-color" content="${color("canvas", "dark")}"`));
 });
@@ -96,13 +101,14 @@ test("every theme gives every role a value", () => {
   );
 });
 
-/* Color vision: OKLab distance, normally and as seen with the two common red-green deficiencies. */
+/** A `#rrggbb` color as linear RGB. */
 function linear(hex: string) {
   return [1, 3, 5].map((i) => {
     const c = Number.parseInt(hex.slice(i, i + 2), 16) / 255;
     return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
   }) as [number, number, number];
 }
+/** Linear RGB as OKLab. */
 function oklab([r, g, b]: [number, number, number]) {
   const [l, m, s] = [
     0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b,
@@ -125,6 +131,7 @@ const deficiencies = {
     0.152286, 1.052583, -0.204868, 0.114503, 0.786281, 0.099216, -0.003882, -0.048116, 1.051998,
   ],
 };
+/** A color in OKLab as a viewer with the deficiency matrix `m` sees it. */
 function seen(hex: string, m: number[]) {
   const [r, g, b] = linear(hex);
   return oklab(

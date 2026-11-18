@@ -1,6 +1,6 @@
 /**
  * The chat's log: reader messages with the references they carry, and agent replies, checked
- * before they are stored. Reads of the chat, with waiting and prompts, are in `chat-resource.ts`.
+ * before they are stored. Reads of the chat, with waiting and prompts, are in `resources/chat.ts`.
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -42,6 +42,7 @@ const kinds: TargetKind[] = [
   "lines",
 ];
 
+/** A string field of a reference, at most `max` long, or undefined; anything else is a 400. */
 function optionalText(value: unknown, max: number): string | undefined {
   if (value === undefined) return undefined;
   if (typeof value !== "string" || value.length > max)
@@ -115,11 +116,12 @@ function acceptFileReference(files: ExternalFiles, item: Record<string, unknown>
   };
 }
 
+/** What the chat log needs from the server: where to store, compile, and check replies. */
 export interface ChatOptions {
   root: string;
   server: ViteDevServer;
   content: string;
-  /** The document's chat state directory, from the project folder: `.yapparatus/<directory>`, with `/` between segments. */
+  /** The chat state directory, from the project folder: `.yapparatus/<directory>`, with `/`. */
   state: string;
   /** The source files the document shows. */
   files: ExternalFiles;
@@ -130,10 +132,8 @@ export interface ChatOptions {
 }
 
 /**
- * The chat: an append-only log of reader messages and agent replies, stored in
- * `<state>/chat.jsonl`, with each reply's MDX in `<state>/chat/<id>.mdx`. Messages are numbered
- * by their place in the log, so the numbers start again after the chat is cleared. A reply's
- * file has a random name, so a new reply never reuses the module of a deleted one.
+ * The chat: an append-only log in `<state>/chat.jsonl`, each reply's MDX in a randomly named
+ * `<state>/chat/<id>.mdx` so a new reply never reuses a deleted one's module.
  */
 export class ChatLog {
   private entries: Message[] = [];
@@ -160,7 +160,6 @@ export class ChatLog {
             this.entries.push(record);
           else log.warn(`${this.file}: skipped a reply without inReplyTo`);
         } catch {
-          // A line cut short by a crash while appending; the messages before it are whole.
           log.warn(`${this.file}: skipped a line that is not JSON`);
         }
       }
@@ -232,9 +231,8 @@ export class ChatLog {
   }
 
   /**
-   * Compile a reply like a page, with its diagrams, and check its components and links, with
-   * the codes pages use. Returns the errors: a reply is not stored with any. Warnings, such as
-   * an overlap in a diagram, do not keep it out.
+   * Compile a reply like a page and check its components and links, with the codes pages use.
+   * Returns the errors, which keep the reply out; warnings do not.
    */
   private async check(file: string, url: string): Promise<Diagnostic[]> {
     try {
@@ -265,7 +263,6 @@ export class ChatLog {
         subject: name,
         message: `<${name}> is not a component. Use ${pageComponents.join(", ")}.`,
       }));
-    // A warning does not keep a reply out; a figure's issue without a line is at the figure.
     for (const issue of contentIssues.get(file) ?? []) {
       if (diagnosticCodes[issue.code].severity !== "error") continue;
       const line = issue.line ?? (issue.target ? entry.places[issue.target]?.start : undefined);

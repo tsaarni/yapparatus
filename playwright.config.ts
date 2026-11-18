@@ -1,4 +1,7 @@
+/** Playwright configuration for the browser tests, served by scripts/test-server.ts. */
 import { defineConfig, devices } from "@playwright/test";
+
+/** Runs the browser tests one at a time in Chromium against the test server. */
 export default defineConfig({
   testDir: "tests/browser",
   fullyParallel: false,

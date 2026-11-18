@@ -1,16 +1,6 @@
 /**
- * The wire protocol between the dev server, the web app, and the agent library.
- *
- * Resources under /-/api, named after what the document is made of:
- *   GET    /chat?author=reader&include=diagnostics&wait=S           the chat, or what is new for the agent
- *   POST   /chat                                                    add a message
- *   DELETE /chat                                                    clear the chat
- *   GET    /diagnostics                                             the document's problems
- *   POST   /diagnostics                                             what a browser found
- *   GET    /files/{directory}/{path}                                a source file
- *   GET    /figures/{page}/{figure}?ids=true                        a diagram's picture, as PNG
- * An agent's reads of the chat carry its id in the `Yapparatus-Agent` header.
- * Changes reach the browser on Vite's hot-update connection, as the events in `UpdateEvents`.
+ * The wire protocol between the dev server, the web app, and the agent library: the bodies of
+ * the `chat`, `diagnostics`, `files`, and `figures` resources, and the hot-update events.
  */
 
 import type { Diagnostic, Severity } from "../document/diagnostic.ts";
@@ -32,8 +22,6 @@ export interface ServerFile {
   url: string;
 }
 
-/* ---------- Chat ---------- */
-
 /**
  * A message the reader wrote in the browser. Its references are only what the reader attached:
  * no references means a message about the document in general.
@@ -52,38 +40,33 @@ export interface AgentMessage {
   author: "agent";
   /** The newest reader message the reply answers; earlier ones are answered too. */
   inReplyTo: number;
-  /** When the server first handed message `inReplyTo` to an agent; absent if the server restarted. */
+  /** When the server first handed `inReplyTo` to an agent; absent if the server restarted. */
   readAt?: string;
   /** The reply's MDX module, which the browser imports to show it. */
   module: string;
   createdAt: string;
 }
 
+/** A message in the chat, from the reader or the agent. */
 export type Message = ReaderMessage | AgentMessage;
 
 /**
- * Body of POST /-/api/chat. The author says which checks apply: a reader message
- * carries what the reader selected; an agent reply is MDX, compiled and checked first. A
- * reply answers the reader messages that the agent's last read returned.
+ * Body of POST /-/api/chat. A reader message carries what the reader selected; an agent reply
+ * is MDX, checked first, and answers the reader messages the agent's last read returned.
  */
 export type NewMessage =
   | { author: "reader"; text: string; references: Reference[] }
   | { author: "agent"; mdx: string };
 
 /**
- * "waiting": an agent is connected: a waiting read is open, or an empty read or a
- * reply ended a moment ago. "working": no agent is connected, and the last one read messages
- * it has not replied to, within the last 10 minutes. "away": neither, so the reader sees how
- * to connect one. The server cannot see an agent between its requests.
+ * "waiting": a read is open or just ended. "working": the last agent read messages it has not
+ * replied to within 10 minutes. "away": neither, so the reader sees how to connect one.
  */
 export type AgentState = "waiting" | "working" | "away";
 
 /**
- * Body of GET /-/api/chat. A read without the agent header is the whole chat since it was last
- * cleared, every diagnostic with `include=diagnostics`, and the start prompt. An agent's read
- * holds what the agent has to do: the reader messages not answered yet (only the reader's with
- * `author=reader`) and, with `include=diagnostics`, the errors the agent has not been given.
- * `wait` holds an agent's read until there is something.
+ * Body of GET /-/api/chat. Without the agent header it is the whole chat and the start prompt;
+ * an agent's read holds only what it has to do: unanswered messages and errors not yet given.
  */
 export interface Chat {
   messages: Message[];
@@ -99,14 +82,9 @@ export interface Chat {
   prompt: string;
 }
 
-/* ---------- Diagnostics ---------- */
-
 /**
- * Body of POST /-/api/diagnostics: what a browser found when it rendered one revision of a
- * page, or a reply. Findings only add: they count while the page is at that revision, and a
- * change to the page gives it a new one. A report with no diagnostics says the revision was
- * rendered and nothing was found, which marks the page as checked. A reply never changes, so
- * its report has no revision. The server fills in each diagnostic's `source`.
+ * Body of POST /-/api/diagnostics: what a browser found rendering one revision of a page, or a
+ * reply. Findings count while the page is at that revision; an empty report marks it checked.
  */
 export interface DiagnosticReport {
   /** The page's file, or the reply's module file, relative to the project folder. */
@@ -118,13 +96,13 @@ export interface DiagnosticReport {
 /** A diagnostic as the server lists it: its severity, and where it is now. */
 export interface ReportedDiagnostic extends Diagnostic {
   severity: Severity;
-  /** The figure's last line, when `line` is a figure's first. The server reads both from the page. */
+  /** The figure's last line, when `line` is its first; the server reads both from the page. */
   endLine?: number;
   /** The page address to link: "/page" or "/page#figure". */
   address?: string;
 }
 
-/** A page no browser has rendered since it changed, and what was found in its last checked revision. */
+/** A page no browser has rendered since it changed, and what its last checked revision had. */
 export interface UncheckedPage {
   source: string;
   /** "/page" */
@@ -151,8 +129,6 @@ export interface ReplyRefusal {
   diagnostics: Diagnostic[];
 }
 
-/* ---------- Source files ---------- */
-
 /**
  * Body of GET /-/api/files/{directory}/{path}: a source file, highlighted like the code on
  * pages. Builds carry the same object.
@@ -165,8 +141,6 @@ export interface SourceFileView {
   /** The whole file, numbered from line 1. */
   code: HighlightedCode;
 }
-
-/* ---------- Updates ---------- */
 
 /**
  * What the server sends the browser on Vite's hot-update connection when something changes.

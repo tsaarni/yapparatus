@@ -1,3 +1,5 @@
+/** How references read in the chat, and the list of them under a sent message. */
+
 import { pages } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { elementSeparator, quoteOf, splitAddress } from "../../document/address.ts";
@@ -37,7 +39,6 @@ export function describeReference(item: Reference) {
   }
   const { page: id, anchor } = splitAddress(item.address);
   const page = pages.find((p) => p.id === id);
-  // Labels and numbers are the reader's view of the address, computed now, never stored.
   const [owner = "", element] = anchor.split(elementSeparator);
   const label = owner ? findTarget(owner, page)?.label : undefined;
   const heading = page?.outline?.headings.find((h) => h.id === anchor)?.text;

@@ -1,3 +1,5 @@
+/** Helpers that read the highlighted code blocks out of a compiled page. */
+
 import { run } from "@mdx-js/mdx";
 import { createElement, type ReactNode } from "react";
 import * as runtime from "react/jsx-runtime";

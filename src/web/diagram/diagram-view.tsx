@@ -1,6 +1,7 @@
 /**
  * The SVG of a compiled diagram: its elements in drawing order, and the debug layer.
  */
+
 import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEvent, MouseEvent } from "react";
 import type { CompiledDiagram, ElementState } from "../../diagram/drawing.ts";
@@ -14,6 +15,7 @@ import { CellWarning, NodeView, Pin, RecordOutline } from "./node-view.tsx";
 
 const dev = import.meta.env.DEV;
 
+/** A compiled diagram as SVG, with each element's state and the handlers for stepping. */
 export function DiagramView({
   diagram,
   title,
@@ -34,7 +36,6 @@ export function DiagramView({
   figure: string | undefined;
   stateOf: (element: string) => ElementState;
   stepped: (element: string) => boolean;
-  /** Delegated from the elements: open the step an element belongs to, and step with the keyboard. */
   onClick?: (event: MouseEvent) => void;
   onKeyDown?: (event: KeyboardEvent) => void;
 }) {
@@ -58,10 +59,8 @@ export function DiagramView({
     state: stateOf(id),
     target: interactive(id, label, figure, dev || stepped(id)),
   });
-  // Decorations fade and hide with their edge, but never take the accent themselves.
   const decoration = (state: ElementState) => (state && state !== "focus" ? { state } : {});
   const anyStepped = [...diagram.nodes, ...diagram.edges].some((p) => stepped(p.id));
-  // Clip paths are named per figure: several figures can have a record with the same id.
   const clip = `clip${marker.replace(/[^a-zA-Z0-9]/g, "")}`;
   return (
     <svg
@@ -69,7 +68,6 @@ export function DiagramView({
       viewBox={`${vb.x} ${vb.y} ${vb.width} ${vb.height}`}
       width={vb.width}
       height={vb.height}
-      // An image hides its elements from assistive technology; interactive elements need a group.
       role={dev || anyStepped ? "group" : "img"}
       onClick={onClick}
       onKeyDown={onKeyDown}
@@ -100,8 +98,6 @@ export function DiagramView({
             : element(node.id, node.label))}
         />
       ))}
-      {/* Over every shape: records' outlines, which cover their cells' fills, then cells'
-          warning badges and pins. */}
       {diagram.nodes
         .filter((node) => node.rules)
         .map((node) => (
@@ -146,6 +142,7 @@ export function DiagramView({
   );
 }
 
+/** Node bounds and ids, route vertices, and label boxes, drawn over the diagram for debugging. */
 function DebugLayer({ diagram }: { diagram: CompiledDiagram }) {
   return (
     // biome-ignore lint/a11y/noAriaHiddenOnFocusable: The debug layer has no focusable content.

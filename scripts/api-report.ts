@@ -1,15 +1,16 @@
+/** Writes the exported signatures of each package entry to etc/api-report.md, or `--check`s it. */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { API, SymbolFlags } from "typescript/unstable/sync";
 
-// TypeScript 7's compiler service replaces the old in-process compiler API.
+/** TypeScript 7's compiler service replaces the old in-process compiler API. */
 const api = new API({ cwd: process.cwd() });
 try {
   const pkg = JSON.parse(readFileSync("package.json", "utf8")) as {
     name: string;
     exports: Record<string, string | { default: string }>;
   };
-  // Compiled entry points are reported from their source, in the project of their directory.
+  /** Compiled entry points are reported from their source, in the project of their directory. */
   const entries = Object.entries(pkg.exports)
     .map(([entry, exported]) => {
       const file = typeof exported === "string" ? exported : exported.default;

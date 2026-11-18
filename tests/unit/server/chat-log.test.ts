@@ -1,3 +1,5 @@
+/** References in the chat log: kept as sent, checked, and pointing at source file lines. */
+
 import assert from "node:assert/strict";
 import { symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -56,7 +58,6 @@ test("lines of a source file are references", () =>
     };
     const [accepted] = acceptReferences(root, "content", files, [item]);
     assert.deepEqual(accepted, item);
-    // The address, the source, and the lines must agree.
     assert.throws(
       () => acceptReferences(root, "content", files, [{ ...item, source: "secret.txt" }]),
       /file the document shows/,

@@ -42,6 +42,7 @@ export function quoteOf(address: string): string | undefined {
   return text && (text.end ? `${text.start} … ${text.end}` : text.start);
 }
 
+/** Where a link leads: a page and fragment, a source file, another site, or nowhere. */
 export type Resolved =
   | { page: string; fragment: string }
   | { file: FileAddress }
@@ -49,9 +50,8 @@ export type Resolved =
   | undefined;
 
 /**
- * Resolve a link written in a page to a page id and fragment, or to a source file. Accepts
- * "#anchor", "key-ideas", "key-ideas#anchor", "/key-ideas", "key-ideas.mdx",
- * "./key-ideas.mdx#x", and "/-/files/app/main.go#L10-L20".
+ * Resolve a link written in a page to a page id and fragment, or to a source file: "#anchor",
+ * "key-ideas#anchor", "/key-ideas", "./key-ideas.mdx#x", "/-/files/app/main.go#L10-L20".
  */
 export function resolveLink(raw: string, from: string | undefined, ids: string[]): Resolved {
   if (/^[a-z][a-z0-9+.-]*:|^\/\//i.test(raw)) return "external";
@@ -72,6 +72,7 @@ export function resolveLink(raw: string, from: string | undefined, ids: string[]
   return page === undefined ? undefined : { page, fragment };
 }
 
+/** A slash-separated path with "." and ".." segments applied and empty segments dropped. */
 function normalize(path: string) {
   const out: string[] = [];
   for (const segment of path.split("/")) {

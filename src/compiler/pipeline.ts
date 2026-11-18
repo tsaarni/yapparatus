@@ -31,12 +31,11 @@ const sharedEntries = [
 /** Is yapparatus a dependency of the project at `root`, rather than the project itself? */
 const installedIn = (root: string) => existsSync(path.join(root, "node_modules", "yapparatus"));
 
+/** The plugins for a document: shared runtime, MDX pages, StyleX, icons, and the web app. */
 export function pipeline(document: DocumentDirectory): PluginOption[] {
   const iconCollections: Record<string, CustomCollectionIconLoader> = {};
   return [
     {
-      // Compiled pages and custom components import React and StyleX. A project depends only on
-      // yapparatus, so these resolve from here, to the same copies the web app uses.
       name: "yapparatus:runtime",
       enforce: "pre",
       resolveId(id, importer, options) {
@@ -47,21 +46,15 @@ export function pipeline(document: DocumentDirectory): PluginOption[] {
     {
       name: "yapparatus:pages",
       config: (user) => ({
-        // The web app is source, compiled with the document's pages and styles.
         optimizeDeps: {
-          // Scanned at startup, so the first page load does not discover and reload.
           entries: [appSource],
           exclude: ["yapparatus"],
-          // An installed yapparatus's dependencies are pre-bundled through it, since the project
-          // may not depend on them.
           include: installedIn(path.resolve(user.root ?? process.cwd()))
             ? sharedEntries.map((entry) => `yapparatus > ${entry}`)
             : [],
         },
       }),
       configResolved(config) {
-        // The React plugin asks for React by its plain name, which a project that installed
-        // yapparatus need not have; the same entries resolve through yapparatus.
         if (installedIn(config.root)) {
           const include = config.optimizeDeps.include ?? [];
           config.optimizeDeps.include = include.filter((entry) => !sharedEntries.includes(entry));
@@ -71,7 +64,6 @@ export function pipeline(document: DocumentDirectory): PluginOption[] {
           FileSystemHMRIconLoader(path.join(config.root, "icons"), "local"),
         );
       },
-      // A page re-renders when a file it excerpts changes: the file is one of its imports.
       transform(_code, id) {
         for (const file of excerptFiles.get(id.split("?")[0] ?? id) ?? []) this.addWatchFile(file);
       },
@@ -88,11 +80,8 @@ export function pipeline(document: DocumentDirectory): PluginOption[] {
       autoInstall: false,
       scale: 1,
       customCollections: iconCollections,
-      // The installed collections are yapparatus's dependencies, not the project's.
       collectionsNodeResolvePath: fileURLToPath(new URL("../..", import.meta.url)),
     }),
-    // Not for pages: their updates go to the page list, which swaps them in place. Fast Refresh
-    // would refuse them for exporting `outline` and reload the app.
     react({ include: /\.(js|jsx|ts|tsx)$/ }),
   ];
 }

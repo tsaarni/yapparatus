@@ -4,7 +4,7 @@ The server has an HTTP API under `/-/api`, which the web app and the agent libra
 
 ## Conventions
 
-<Ref to="api-requests" /> lists every request. The types of the bodies are in [the REST API types](/-/files/yapparatus/src/protocol/rest-api.ts), which use the document's types in `src/document/`.
+<Ref to="api-requests" /> lists every request. Bodies are JSON, and their types are built from the document's types, such as `Reference` and `Diagnostic`.
 
 <Table id="api-requests" caption="The requests under /-/api.">
 
@@ -389,22 +389,22 @@ The server shortens long text and drops unknown fields. It returns `400` when th
 `GET /-/api/files/{directory}/{path}` reads a whole external file. The path is the file's address, `/-/files/{directory}/{path}`, under `/-/api`. The server highlights the file and then [watches it](server#external-files).
 
 ```http
-GET /-/api/files/yapparatus/src/server/router.ts HTTP/1.1
+GET /-/api/files/app/src/server.ts HTTP/1.1
 ```
 
 ```jsonc
 {
   // The file's address in the document.
-  "address": "/-/files/yapparatus/src/server/router.ts",
+  "address": "/-/files/app/src/server.ts",
   // The file, relative to the project directory.
-  "source": "src/server/router.ts",
+  "source": "../app/src/server.ts",
   // The whole file as highlighted code, numbered from line 1.
   "code": {
     "language": "ts",
     // Each token style once.
     "styles": ["color:var(--shiki-token-comment)", "color:var(--shiki-token-keyword)", …],
     // Each line's tokens: a style's index, then the token's text.
-    "lines": [[0, "/** A small router for the /-/api resources, …"], [1, "import", 1, " type", …], …],
+    "lines": [[0, "/** The HTTP server of the app, …"], [1, "import", 1, " type", …], …],
     "start": 1
   }
 }
@@ -451,5 +451,3 @@ The server sends changes to the web app on Vite's hot-update connection, as the 
 | `yapparatus:file` | The address of an external file, as a JSON string | A file that the server served changes on disk |
 
 </Table>
-
-The events are typed in [the REST API types](/-/files/yapparatus/src/protocol/rest-api.ts#L169-L182).

@@ -1,7 +1,5 @@
-/**
- * The `<Diagram>` component: draws the drawing the page compiler made from `draw`, and runs
- * its steps.
- */
+/** The `<Diagram>` component: draws the compiled drawing and runs its steps. */
+
 import {
   Children,
   isValidElement,
@@ -58,6 +56,7 @@ export interface CompiledDiagramProps extends Omit<DiagramProps, "draw"> {
   drawing: CompiledDiagram;
 }
 
+/** What an author writes on a diagram step. */
 export interface StepProps {
   /**
    * An address for the step: `/page#figure--id`. Unique among the figure's elements and steps.
@@ -65,9 +64,8 @@ export interface StepProps {
    */
   id?: string;
   /**
-   * Ids of the elements this step is about, separated by spaces. A container (an enclosure,
-   * row, column, sequence, or fragment) stands for everything in it. Plain text: the page
-   * compiler checks it.
+   * Ids of the elements this step is about, separated by spaces, in plain text the page compiler
+   * checks. A container, such as an enclosure, row, or sequence, stands for everything in it.
    */
   focus?: string;
   /** One or two sentences. */
@@ -78,13 +76,16 @@ export interface StepProps {
 export function Step(_props: StepProps) {
   return null;
 }
-/** Marks Step by a property, not by identity: hot reload replaces the function. */
 Step.diagramStep = true;
 
 const dev = import.meta.env.DEV;
 
 const lastValid = new Map<string, CompiledDiagram>();
 
+/**
+ * A compiled diagram in a figure, with its steps, legend, and in development its diagnostics.
+ * The step a link names opens, and while editing a broken diagram shows its last valid drawing.
+ */
 export function Diagram({
   drawing,
   id,
@@ -100,7 +101,6 @@ export function Diagram({
     throw new Error(
       "<Diagram> has no drawing. The page compiler compiles a <Diagram> written in a page or a reply, not one inside a component.",
     );
-  // While editing, keep showing the last valid drawing above the errors.
   const key = id ?? caption;
   if (drawing.ok && key) lastValid.set(key, drawing);
   const fallback = dev && !drawing.ok && key ? lastValid.get(key) : undefined;
@@ -113,7 +113,6 @@ export function Diagram({
   const stepsOf = (element: string) =>
     steps.flatMap((step, i) => (step.elements.has(element) ? [i] : []));
   const [active, setActive] = useState<number | undefined>(undefined);
-  // Elements a legend entry highlights while the reader points at it or focuses it.
   const [preview, setPreview] = useState<string[]>();
   const view: StepView = {
     steps: steps.map((step) => step.elements),
@@ -124,7 +123,6 @@ export function Diagram({
   };
   const stateOf = (element: string): ElementState => elementState(element, view);
 
-  // A link to a step, or to an element, opens that step, or the first step about the element.
   const route = useRoute();
   const prefix = `${figure}${elementSeparator}`;
   const fragment =
@@ -134,11 +132,9 @@ export function Diagram({
   useEffect(() => {
     if (!route || linked === undefined) return;
     setActive(linked);
-    // A step has no element of its own to scroll to; show its figure.
     if (byId >= 0 && figure) document.getElementById(figure)?.scrollIntoView({ block: "center" });
   }, [route, linked, byId, figure]);
 
-  // In a figure that scrolls sideways, bring the focused elements into view.
   useEffect(() => {
     if (active !== undefined) revealFocused(marker);
   }, [active, marker]);
@@ -150,7 +146,6 @@ export function Diagram({
     target instanceof Element
       ? target.closest<SVGElement>("[data-element-id]")?.dataset.elementId
       : undefined;
-  // Clicking an element again moves on to the next step about it, so a reader can follow its arc.
   const openElement = (element: string | undefined) => {
     const about = element === undefined ? [] : stepsOf(element);
     const next = about.find((i) => active === undefined || i > active) ?? about[0];
@@ -209,8 +204,7 @@ export function Diagram({
 
 Diagram.breakout = true;
 
-/* ---------- steps ---------- */
-
+/** The `<Step>` children's ids, focused element ids, and content, in order. */
 function collectSteps(children: ReactNode): Omit<StepItem, "elements">[] {
   return Children.toArray(children).flatMap((child) => {
     if (!isValidElement<StepProps>(child)) return [];

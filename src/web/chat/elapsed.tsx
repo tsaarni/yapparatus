@@ -1,3 +1,5 @@
+/** How long the agent has taken on a message, as text and as a live counter. */
+
 import { useEffect, useState } from "react";
 import { styled } from "../style/styled.ts";
 

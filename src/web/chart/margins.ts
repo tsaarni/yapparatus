@@ -2,6 +2,7 @@
  * Chart margins that fit every label, measured from a first drawing: the chart draws again with
  * them so no label is cut off.
  */
+
 /** Room kept between a label and the figure's edge, or another label. */
 const labelClearance = 4;
 
@@ -10,6 +11,7 @@ export type PlotDrawing = SVGSVGElement & {
   scale: (name: string) => { domain?: unknown[]; range?: number[] } | undefined;
 };
 
+/** Space in pixels around a chart's plot area, as Plot's margin options take it. */
 export interface Margins {
   top: number;
   right: number;
@@ -31,11 +33,10 @@ function marginsOf(svg: PlotDrawing): Margins {
 }
 
 const rectOf = (element: Element) => element.getBoundingClientRect();
+
 /**
- * Margins wide enough for every label, from a first drawing: grown by how far labels reach
- * past the edge, and on an axis label's side by how far it comes closer to the tick labels
- * than the clearance, since Plot sets an axis label into the margin. Undefined when Plot's
- * own margins fit.
+ * Margins wide enough for every label, from a first drawing: grown by how far labels reach past
+ * the edge or crowd the tick labels. Undefined when Plot's own margins fit.
  */
 export function fitMargins(svg: PlotDrawing): Margins | undefined {
   const frame = rectOf(svg);
@@ -48,7 +49,6 @@ export function fitMargins(svg: PlotDrawing): Margins | undefined {
     over.top = Math.max(over.top, frame.top - r.top);
     over.bottom = Math.max(over.bottom, r.bottom - frame.bottom);
   }
-  // An axis label needs a clear band beyond its tick labels, even where it falls between two.
   for (const axis of ["x", "y", "fx", "fy"]) {
     const label = svg.querySelector(`[aria-label="${axis}-axis label"] text`);
     const ticks = [...svg.querySelectorAll(`[aria-label="${axis}-axis tick label"] text`)].map(

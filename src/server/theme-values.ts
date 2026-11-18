@@ -1,7 +1,6 @@
 /**
- * The light theme's values for pictures. The theme file is read when this module loads. StyleX's
- * functions throw outside its compiler, so the file is loaded with a stub in which they return
- * their input.
+ * The light theme's values for pictures, read when this module loads. StyleX's functions throw
+ * outside its compiler, so the theme file is loaded with a stub that returns their input.
  */
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -9,16 +8,16 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { colorTokens, type DashToken, type Paint, type StrokeToken } from "../diagram/paint.ts";
 
-// The same path from src/server/ and from the compiled lib/server/.
+/** The same path from src/server/ and from the compiled lib/server/. */
 const themeFile = fileURLToPath(new URL("../../src/web/style/theme.stylex.ts", import.meta.url));
 
 type Value = string | Record<string, string>;
+/** Theme roles by name: one value, or values by condition such as print. */
 export type Roles = Record<string, Value>;
 
 /**
- * The theme file's values: each role's screen, print, and increased-contrast values, and each
- * constant. The file is copied out of the package first, because Node strips types only from
- * files outside node_modules.
+ * The theme file's roles and constants. The file is copied out of the package first, because
+ * Node strips types only from files outside node_modules.
  */
 export async function loadThemes(): Promise<{
   theme: Roles;

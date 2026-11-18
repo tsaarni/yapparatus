@@ -1,3 +1,5 @@
+/** The page view: a page's content with its contexts, or Page not found. */
+
 import { contentDir, type DocumentPage, pages } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { memo } from "react";
@@ -24,7 +26,6 @@ export const PageView = memo(function PageView({
 }: {
   page: DocumentPage | undefined;
   handlers: TargetHandlers;
-  /** Changes when a page is updated in place, so the memoized content renders again. */
   revision: number;
 }) {
   return (
@@ -57,6 +58,7 @@ function PageBody({ page }: { page: DocumentPage }) {
   return <Page components={components} />;
 }
 
+/** Shown when the address names no page, with a link to the first page. */
 function NotFound() {
   return (
     <div {...stylex.props(s.notFound)}>

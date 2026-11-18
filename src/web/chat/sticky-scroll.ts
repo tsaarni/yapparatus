@@ -1,13 +1,12 @@
+/** Scrolling for the chat thread, which follows new messages while at the bottom. */
+
 import { type RefObject, useCallback, useEffect, useRef } from "react";
 
 const scrollKey = "yapparatus:chat-scroll";
 
 /**
- * Scroll like a messaging app. At the bottom, the thread stays at the bottom as messages
- * arrive and replies finish rendering; scrolled up, nothing moves it. The position survives
- * remounts and reloads. Returns a function that jumps to the bottom and keeps following,
- * for sending: the new message may render before the scroll event says the thread is at the
- * bottom, and the thread must follow it anyway.
+ * Keep the thread at the bottom while it is there, and its position across reloads. Returns a
+ * function that jumps to the bottom and follows, for sending before the scroll event arrives.
  */
 export function useStickyScroll(thread: RefObject<HTMLDivElement | null>): () => void {
   const toBottom = useRef(() => {});
@@ -21,8 +20,6 @@ export function useStickyScroll(thread: RefObject<HTMLDivElement | null>): () =>
       saved = JSON.parse(sessionStorage.getItem(scrollKey) ?? "") ?? saved;
     } catch {}
     let stick = saved.bottom;
-    // Messages arrive after mounting, so a saved position is applied once the thread is tall
-    // enough to have it.
     let restore: number | undefined = stick ? undefined : saved.top;
     const follow = () => {
       if (stick) element.scrollTop = element.scrollHeight;
@@ -32,10 +29,6 @@ export function useStickyScroll(thread: RefObject<HTMLDivElement | null>): () =>
       }
     };
     follow();
-    // Only the reader leaves the bottom. The browser also scrolls when the content or the
-    // thread changes size, such as when the message box shrinks after sending, and its scroll
-    // event can arrive after newer content rendered: read as the reader's, it would stop the
-    // thread from following the reply or the typing dots.
     let readerAt = Number.NEGATIVE_INFINITY;
     const reader = () => {
       readerAt = performance.now();

@@ -1,3 +1,5 @@
+/** The React contexts that tell prose where it is shown: a page, a reply, a figure, or a file. */
+
 import { createContext, useContext } from "react";
 import type { FileAddress } from "../../document/file-address.ts";
 
@@ -32,4 +34,6 @@ export interface SourceFileCode {
   /** Long lines wrap under their own number instead of scrolling. */
   wrap: boolean;
 }
+
+/** The source file the code blocks inside show, or undefined for a page's own code. */
 export const SourceFileContext = createContext<SourceFileCode | undefined>(undefined);

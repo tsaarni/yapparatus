@@ -1,9 +1,8 @@
 /**
- * The file view: a source file the document shows, at `/-/files/<folder>/<path>`, highlighted
- * like code on a page, with its line numbers. `#L40-L72` highlights lines and scrolls to them.
- * The view lists the page sections that link to or excerpt the file, so a reader can go from
- * code to the text that explains it.
+ * The file view at `/-/files/<folder>/<path>`: a source file highlighted with line numbers, and
+ * the page sections that link to or excerpt it. `#L40-L72` highlights lines and scrolls to them.
  */
+
 import { type DocumentPage, pages } from "virtual:yapparatus/document";
 import { files as builtFiles } from "virtual:yapparatus/files";
 import * as stylex from "@stylexjs/stylex";
@@ -45,6 +44,7 @@ async function load(file: FileAddress): Promise<SourceFileView> {
   return (await entry()).default;
 }
 
+/** A source file, loaded again when it changes, with Link and Comment buttons on its title. */
 export function FileView({
   file,
   fragment,
@@ -52,7 +52,6 @@ export function FileView({
 }: {
   file: FileAddress;
   fragment: string;
-  /** Add references to the message. Absent outside live mode. */
   onComment?: (items: Reference[]) => void;
 }) {
   const address = fileAddress(file);
@@ -75,7 +74,6 @@ export function FileView({
       current = false;
     };
   }, [address, revision]);
-  // Arriving at lines shows them. Lines picked on screen stay where they are.
   useLayoutEffect(() => {
     if (!view || "error" in view || !selected) return;
     const first = document.querySelector(
@@ -165,6 +163,7 @@ function Mentions({ file }: { file: FileAddress }) {
   );
 }
 
+/** The page sections that link to or excerpt a file, once each. */
 function mentionsOf(file: FileAddress) {
   const seen = new Set<string>();
   const found: Array<{ page: DocumentPage; section?: string; heading?: string }> = [];

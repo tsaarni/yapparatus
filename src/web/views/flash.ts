@@ -1,3 +1,5 @@
+/** The brief outline that marks a target the reader arrived at. */
+
 import * as stylex from "@stylexjs/stylex";
 import { flashElement } from "../diagram/element.tsx";
 import { radius, space, theme } from "../style/theme.stylex.ts";

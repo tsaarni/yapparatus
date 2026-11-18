@@ -56,8 +56,7 @@ export const pictureErrors = {
 
 /**
  * One line per diagnostic, the same everywhere the agent reads one:
- * "- error CODE file:lines, /page#figure, elements a, b: message". A reply being checked has no
- * file yet, so its problems name only the line.
+ * "- error CODE file:lines, /page#figure, elements a, b: message". A reply names only the line.
  */
 function describeDiagnostic(d: Diagnostic | ReportedDiagnostic, fresh = false): string {
   const { endLine, address } = d as ReportedDiagnostic;
@@ -75,11 +74,8 @@ function describeDiagnostic(d: Diagnostic | ReportedDiagnostic, fresh = false): 
 }
 
 /**
- * The document's errors and warnings, new errors marked, and the pages whose browser checks
- * (charts, render and runtime errors) are out of date because no browser has rendered them
- * since they changed, with what was found before the change. Only a browser checks them, and
- * the agent may have none: the reader's browser checks a page when the reader opens the
- * reply's link to it. Diagrams are checked when the page compiles.
+ * The document's errors and warnings, new errors first, and the pages no browser has rendered
+ * since they changed, with what was found before. The reader's browser checks those pages.
  */
 export function diagnosticsSection(
   diagnostics: ReportedDiagnostic[],
@@ -128,7 +124,7 @@ const kindName: Record<Reference["kind"], string> = {
 };
 
 /**
- * One line per reference: what, its lines in the source, its address, and the reader's words or step.
+ * One line per reference: what, its source lines, its address, and the reader's words or step.
  * A page or a whole file has no lines: the agent reads the file.
  */
 function describeReference(item: Reference): string {
@@ -139,7 +135,6 @@ function describeReference(item: Reference): string {
       ? source
       : `${source}:${start}${end > start ? `-${end}` : ""}`;
   const quote = quoteOf(item.address);
-  // Words selected inside lines of code are text in a source file, as words on a page are text.
   const kind = item.kind === "lines" && quote ? "file text" : kindName[item.kind];
   return [
     `- ${kind}, ${lines}, /${page}${anchor ? `#${anchor}` : ""}`,
@@ -196,6 +191,7 @@ export function errorsPrompt(diagnostics: string, canReply: boolean): string {
   ].join("\n\n");
 }
 
+/** What an agent's waiting read says when it ends with nothing new. */
 export function idlePrompt(): string {
   return `Nothing new. Wait again:\n\n${waitCommand()}`;
 }
@@ -212,6 +208,7 @@ function foldersSection(folders: Record<string, string>): string {
     .join("\n")}`;
 }
 
+/** The text a person gives an agent to connect it to the document, and how to work in it. */
 export function startPrompt(guide: string, folders: Record<string, string>, root: string): string {
   return [
     `You are connected to a Yapparatus document. In the browser, a reader comments on it and sends you messages. You act on each by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, TeX between $$ marks is math, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when you edit a page: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses).`,
@@ -225,6 +222,7 @@ export function startPrompt(guide: string, folders: Record<string, string>, root
     .join("\n\n");
 }
 
+/** Why the server refused a reply: its errors, and to send it again fixed. */
 export function rejectedReply(errors: Diagnostic[]): string {
   return [
     "The reply was not sent:",
@@ -233,9 +231,10 @@ export function rejectedReply(errors: Diagnostic[]): string {
   ].join("\n\n");
 }
 
-/** A reply with no reader message to answer: none was given to the agent, or the chat was cleared. */
+/** A reply with no reader message to answer: none was given to the agent, or the chat cleared. */
 export function nothingToAnswer(): string {
   return `There is no reader message to answer. Wait for one:\n\n${waitCommand()}`;
 }
 
+/** The error an older agent gets when a newer agent takes over the chat. */
 export const takenOver = "Another agent took over the chat. Stop waiting.";

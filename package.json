@@ -24,7 +24,7 @@
     "build": "pnpm build:lib && node lib/vite/yap.js build",
     "build:single": "pnpm build:lib && node lib/vite/yap.js build --single",
     "preview": "pnpm build:lib && node lib/vite/yap.js preview",
-    "verify": "biome check . && tsc -b && node scripts/check-styles.ts",
+    "verify": "biome check . && tsc -b && node scripts/check-styles.ts && node scripts/check-comments.ts",
     "format": "biome check --write .",
     "test": "pnpm build:lib && playwright test",
     "test:unit": "node --experimental-strip-types --test \"tests/unit/**/*.test.ts\"",
@@ -68,6 +68,7 @@
     "vite-plugin-singlefile": "^2.3.4"
   },
   "devDependencies": {
+    "@babel/parser": "^7.29.13",
     "@biomejs/biome": "^2.6.5",
     "@mdx-js/mdx": "3.1.1",
     "@playwright/test": "^1.65.0",

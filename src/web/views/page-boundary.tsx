@@ -1,3 +1,5 @@
+/** The error boundary around a page, which also reports each revision's render to the server. */
+
 import * as stylex from "@stylexjs/stylex";
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { createLogger } from "../../protocol/log.ts";
@@ -7,9 +9,8 @@ import { fontSize, fontWeight, radius, space, theme } from "../style/theme.style
 const log = createLogger("diagnostics");
 
 /**
- * Catches a page that fails to render, shows the error, and reports it. Each render at a new
- * revision is reported, even without errors, so the server knows the page was checked.
- * Children's effects run first, so the page's charts have reported by then.
+ * Shows and reports a page that fails to render. Each new revision is reported, even without
+ * errors, so the server knows it was checked; children's effects, such as charts', run first.
  */
 export class PageBoundary extends Component<
   { source: string | undefined; revision: string | undefined; children: ReactNode },
@@ -39,7 +40,6 @@ export class PageBoundary extends Component<
   }
   componentDidUpdate(previous: { revision: string | undefined }) {
     if (previous.revision === this.props.revision) return;
-    // A new revision may fix the error; render it again.
     if (this.state.error) this.setState({ error: undefined });
     else this.report();
   }

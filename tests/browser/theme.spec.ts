@@ -1,3 +1,7 @@
+/**
+ * The theme setting: auto follows the system and lets the reader choose; a fixed theme does not.
+ */
+
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, type Page, test } from "@playwright/test";
@@ -53,7 +57,6 @@ test("auto: the system decides, and the reader can choose light or dark", async 
     await expect(button).toHaveAccessibleName("Theme: Dark. Switch to System");
     expect(await canvas(page)).toBe(dark);
 
-    // The choice is remembered, and it outranks the system.
     await page.reload();
     await expect(button).toHaveAccessibleName("Theme: Dark. Switch to System");
     expect(await canvas(page)).toBe(dark);
@@ -70,7 +73,6 @@ test("a fixed theme ignores the system and offers no choice", async ({ page }) =
     expect(await colorScheme(page)).toBe("light");
     await expect(page.locator(".theme-switch")).toHaveCount(0);
   });
-  // The default is the dark theme, also fixed.
   await page.emulateMedia({ colorScheme: "light" });
   expect(await canvas(page)).toBe(dark);
   expect(await colorScheme(page)).toBe("dark");

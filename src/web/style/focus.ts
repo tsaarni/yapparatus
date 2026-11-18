@@ -1,3 +1,5 @@
+/** The keyboard focus ring shared by every focusable element. */
+
 import * as stylex from "@stylexjs/stylex";
 import { theme } from "./theme.stylex.ts";
 

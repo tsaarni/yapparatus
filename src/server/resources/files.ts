@@ -12,6 +12,7 @@ import { HttpError, type Router } from "../router.ts";
 
 const log = createLogger("files");
 
+/** Serves `/-/api/files` and watches each file it served. */
 export class FilesResource {
   /** Files served so far, by absolute path, with their address. */
   private served = new Map<string, string>();

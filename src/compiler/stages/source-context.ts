@@ -1,3 +1,4 @@
+/** The stage that tags rendered blocks with their source file and lines, for reader selections. */
 import { realpathSync } from "node:fs";
 import path from "node:path";
 import type { Element, Root, RootContent } from "hast";
@@ -26,9 +27,6 @@ export function sourceContext(getRoot: () => string) {
     visit(tree, "element", (node: Element) => {
       if (innerBlocks.has(node.tagName) && node.position)
         Object.assign(node.properties, range(node.position.start.line, node.position.end.line));
-      // A fenced code block's code starts on the line after the fence. The highlighter numbers
-      // its lines from there; see `sourceLines`. An excerpt's block is made by the compiler and
-      // has no position: its lines are the file's.
       const code = node.tagName === "pre" ? node.children[0] : undefined;
       if (node.position && code?.type === "element" && code.tagName === "code")
         code.data = {

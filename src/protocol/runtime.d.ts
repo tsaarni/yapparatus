@@ -1,7 +1,6 @@
 /**
- * What `log.ts` reads from the runtime it runs in. The pure directories have neither the DOM
- * library nor Node's types, so this declares only what both runtimes provide, in the shape both
- * agree on.
+ * What `log.ts` reads from the runtime it runs in. Pure directories have neither the DOM library
+ * nor Node's types, so this declares only what both runtimes provide.
  */
 
 /** The console methods the logger calls; the DOM library and Node's types declare the same. */

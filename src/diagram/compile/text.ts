@@ -32,6 +32,7 @@ export interface Content {
   height: number;
 }
 
+/** The text functions that layout and the node compiler share. */
 export type Text = ReturnType<typeof createText>;
 
 /** Where a line of text is anchored: at its start, or at its middle. */
@@ -58,6 +59,7 @@ export function textLine(
   };
 }
 
+/** Break text into lines at spaces so each fits the width; one line if the width is infinite. */
 function wrap(text: string, font: FontSpec, width: number, measure: Measure): string[] {
   if (!Number.isFinite(width) || measure(text, font) <= width) return [text];
   const lines: string[] = [];
@@ -73,6 +75,7 @@ function wrap(text: string, font: FontSpec, width: number, measure: Measure): st
   return lines;
 }
 
+/** Text measuring for one compile, with each node's measured content cached. */
 export function createText(m: Metrics, measure: Measure, report: Report) {
   const content = new Map<Node, Content>();
   const fonts = fontsOf(m);
@@ -133,7 +136,6 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
     return node.shape === "cylinder" ? cylinderCap(width) : 0;
   }
 
-  /** One line of text at a point, in a font the renderer draws as measured. */
   function textAt(
     text: string,
     x: number,
@@ -145,7 +147,6 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
     return textLine(text, x, y, { ...font, mono: font.family === m.mono }, muted, align);
   }
 
-  /** The font of a text's label, which its marks repeat over their highlight. */
   function textFont(node: Node): FontSpec {
     return {
       family: node.options.mono ? m.mono : m.sans,

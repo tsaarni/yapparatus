@@ -1,3 +1,5 @@
+/** Link checks: page addresses, file names, anchors, and links to source files and lines. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { checkLinks } from "../../../src/compiler/link-checks.ts";
@@ -66,7 +68,6 @@ test("links resolve by address, file name, and anchor; broken ones are reported"
             { href: "setup#missing", line: 4 },
             { href: "nowhere", line: 5 },
             { href: "#flow--api", line: 6 },
-            // Words after an anchor name a place in it; the anchor is what is checked.
             { href: "/setup#routes:~:text=api", line: 15 },
             { href: "/setup#gone:~:text=api", line: 16 },
           ],

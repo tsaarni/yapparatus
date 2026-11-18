@@ -5,7 +5,9 @@
 import type * as PlotModule from "@observablehq/plot";
 import type { DiagnosticCode } from "../document/diagnostic.ts";
 
+/** The Observable Plot module that `plot` receives. */
 export type PlotLibrary = typeof PlotModule;
+/** A data row as `plot` receives it, keyed by column name. */
 export type Row = Record<string, number | string | Date | null>;
 
 /** What `plot` returns: the marks, and the options of the position scales. */
@@ -18,8 +20,10 @@ export interface ChartSpec {
   r?: PlotModule.ScaleOptions;
 }
 
+/** The author's `plot` function: builds marks from the Plot library and the rows. */
 export type PlotFunction = (Plot: PlotLibrary, rows: Row[]) => ChartSpec;
 
+/** A problem found in what `plot` calls or returns, reported as a diagnostic. */
 export interface ChartProblem {
   code: DiagnosticCode;
   /** What the problem is about, so two problems in one chart stay apart. */
@@ -77,9 +81,8 @@ function fieldsOf(data: unknown): Set<string> | undefined {
 const list = (names: Iterable<string>) => [...names].map((n) => `"${n}"`).join(", ");
 
 /**
- * The Plot library as `plot` sees it. Each function checks the options it is given: a text
- * value of a field option must name a column of the mark's data, and `fill` and `stroke`
- * take a column, never a literal color, because the theme picks colors.
+ * The Plot library as `plot` sees it: each function checks that field options name a column
+ * of the mark's data, and that `fill` and `stroke` take a column, since the theme picks colors.
  */
 export function chartLibrary(Plot: PlotLibrary, problems: ChartProblem[]): PlotLibrary {
   const library: Record<string, unknown> = {};
@@ -104,6 +107,7 @@ export function chartLibrary(Plot: PlotLibrary, problems: ChartProblem[]): PlotL
   return library as PlotLibrary;
 }
 
+/** Report field options that name no column, and literal `fill` or `stroke` colors. */
 function checkOptions(
   name: string,
   options: Record<string, unknown>,
@@ -114,7 +118,6 @@ function checkOptions(
     const value = options[key];
     if (typeof value !== "string" || fields?.has(value)) continue;
     if (colorOptions.has(key) && isColor(value)) {
-      // A transform passes its options on to the mark, which would report them again.
       const reported = problems.some((p) => p.message.includes(`sets ${key}: "${value}"`));
       if (!neutral.has(value.toLowerCase()) && !reported)
         problems.push({
@@ -133,7 +136,7 @@ function checkOptions(
   }
 }
 
-/** Problems with what `plot` returned: anything but marks and position scales is the chart's own. */
+/** Problems with what `plot` returned: anything but marks and position scales is the chart's. */
 export function checkSpec(spec: unknown): ChartProblem[] {
   if (!isPlain(spec) || !Array.isArray(spec.marks))
     return [

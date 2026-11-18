@@ -1,7 +1,6 @@
 /**
- * The picture writer paints roles from the table in `diagram/paint.ts`; the web app paints them
- * with the role styles in `web/diagram/element.tsx`. The two must agree, so a picture shows what
- * the web app shows.
+ * The paint table in `diagram/paint.ts` agrees with the role styles in `web/diagram/element.tsx`,
+ * so a picture shows what the web app shows.
  */
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -16,7 +15,7 @@ import {
 } from "../../../src/diagram/paint.ts";
 import type { dash, stroke, theme } from "../../../src/web/style/theme.stylex.ts";
 
-// Every token the table names is a theme role or constant.
+/** Every token the table names is a theme role or constant. */
 type Within<T extends K, K> = T;
 type _Colors = Within<ColorToken, keyof typeof theme>;
 type _Strokes = Within<StrokeToken, keyof typeof stroke>;

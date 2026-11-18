@@ -33,6 +33,7 @@ import {
 } from "./elements.ts";
 import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
 
+/** The scene an author's diagram function builds: its elements, relations, and diagnostics. */
 export class DiagramBuilder {
   readonly nodes: Node[] = [];
   readonly stacks: Stack[] = [];
@@ -118,9 +119,8 @@ export class DiagramBuilder {
     return node;
   }
   /**
-   * A member's id is its parent's, then its own, such as `users.team-id`. Its own comes from
-   * the first tab-separated column of its label, and is unique in the parent. The parent's
-   * element is joined in later, when the parent's id is final.
+   * A member's id is its parent's, then its own from the first tab-separated column of its
+   * label, such as `users.team-id`. The parent's part is joined in once it is final.
    */
   private member(parent: Node, label: string, options: MemberOptions, place: Place) {
     const { id, pin, ...rest } = options;

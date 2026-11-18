@@ -28,8 +28,10 @@ export class CycleError extends Error {
   }
 }
 
+/** The layout functions the node and edge compilers read positions and sizes from. */
 export type Layout = ReturnType<typeof createLayout>;
 
+/** Lay out a scene: memoized sizes, positions, and points that resolve on first use. */
 export function createLayout(
   scene: DiagramBuilder,
   m: Metrics,
@@ -38,10 +40,8 @@ export function createLayout(
   text: Text,
 ) {
   const { measureNode, capHeight, tabWidth } = text;
-  // `bounds` is a hoisted function declaration, so records can call it once layout runs.
   const records = createRecords(m, measure, report, text, bounds);
   const { grid, member } = records;
-  // Each result is computed once; `resolving` holds the chain being computed, to find cycles.
   const known = new Set<Element>([...scene.nodes, ...scene.stacks, ...scene.enclosures]);
   const sizes = new Map<Element, { width: number; height: number }>();
   const positions = new Map<Element, Vec>();
@@ -63,8 +63,6 @@ export function createLayout(
   function requireKnown(el: Element) {
     if (!known.has(el)) throw new Error(`${el.id} belongs to a different diagram.`);
   }
-
-  /* ----- sizes ----- */
 
   function intrinsicSize(node: Node) {
     const o = node.options;
@@ -151,8 +149,6 @@ export function createLayout(
     });
   }
 
-  /* ----- positions: the top-left of each layout box ----- */
-
   function position(el: Element): Vec {
     requireKnown(el);
     const cached = positions.get(el);
@@ -227,7 +223,6 @@ export function createLayout(
     return { ...position(el), ...size(el) };
   }
 
-  /** Painted extent: layout bounds plus what is drawn outside them, such as a dot's label. */
   function ink(el: Element): Rect {
     const r = bounds(el);
     if (el instanceof Node) {
@@ -238,7 +233,6 @@ export function createLayout(
     return r;
   }
 
-  /** The label of a start or end dot sits beside it, on the chosen side. */
   function terminalLabel(node: Node, rect: Rect): Rect | undefined {
     if ((node.shape !== "dot" && node.shape !== "ring") || !node.label) return undefined;
     const c = measureNode(node);
@@ -283,7 +277,6 @@ export function createLayout(
     return guard(`bounds(${e.id})`, () => {
       const inner = union(e.members.map(ink)) ?? { x: 0, y: 0, width: 0, height: 0 };
       const pad = e.options.padding ?? 20;
-      // The title is a tab on the border; half of it reaches inside.
       const titleBand = e.options.title ? tab.height / 2 + 4 : 0;
       const titleWidth = e.options.title ? tabWidth(e.options.title) + 28 : 0;
       const width = Math.max(inner.width + 2 * pad, titleWidth);
@@ -297,8 +290,6 @@ export function createLayout(
       return r;
     });
   }
-
-  /* ----- points ----- */
 
   function evalPoint(e: PointExpr): Vec {
     switch (e.k) {

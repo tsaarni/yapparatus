@@ -1,3 +1,5 @@
+/** The messages in the chat thread, from the reader and from the agent. */
+
 import * as stylex from "@stylexjs/stylex";
 import { memo } from "react";
 import type { Reference } from "../../document/reference.ts";
@@ -71,8 +73,6 @@ const AgentView = memo(function AgentView({
   message: AgentMessage;
   sent: string | undefined;
 }) {
-  // From the message it answers to the reply, as the counter showed while it worked. When
-  // the server saw the agent read it, the tooltip tells waiting from working.
   const at = (iso: string) => new Date(iso).getTime();
   const replied = at(message.createdAt);
   const took = sent ? lasted(replied - at(sent)) : undefined;

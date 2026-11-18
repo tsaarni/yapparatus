@@ -1,15 +1,15 @@
+/** Content hashes that tell when a page or a file has changed. */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 
+/** The SHA-256 hex hash of a text. */
 export function revision(source: string): string {
   return createHash("sha256").update(source).digest("hex");
 }
 
 /**
- * A page's revision: its text and every file it reads, such as excerpts and chart data. The
- * compiler writes it into the page, and the server computes it from the files on disk, so
- * findings a browser reports for a revision stop counting when any of these files change.
- * Without files it is the text's own revision.
+ * A page's revision: a hash of its text and every file it reads, such as excerpts and chart data.
+ * Findings a browser reports for a revision stop counting when any of these files change.
  */
 export function pageRevision(text: string, files: Iterable<string>): string {
   const hash = createHash("sha256").update(text);

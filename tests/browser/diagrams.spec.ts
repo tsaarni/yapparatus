@@ -1,3 +1,5 @@
+/** Diagrams: every form draws, the server checks unopened pages, and broken replies are refused. */
+
 import { readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
@@ -17,8 +19,6 @@ async function checkDocument(): Promise<DocumentDiagnostics> {
   return JSON.parse(checked.stdout) as DocumentDiagnostics;
 }
 
-// The diagram reference's unit test compiles every form with a fake text measure. The page
-// compiler measures with the web app's font files, and the browser draws what it compiled.
 test("every diagram form compiles without diagnostics and draws in the browser", async ({
   page,
 }) => {
@@ -70,7 +70,6 @@ test("the server checks a diagram on a page no browser has open", async ({ page 
       `- warning NODE_OVERLAP content/second-page.mdx:${start}-${end}, /second-page#broken-flow, elements alpha, gamma:`,
     );
 
-    // A draw program uses only its own values; an outside name is named, at its line.
     writeFileSync(
       file,
       `${original.trimEnd()}\n\nexport const label = "Alpha"\n\n<Diagram id="broken-flow" draw={(d) => {\n  d.box(label)\n}} />\n`,
@@ -82,7 +81,6 @@ test("the server checks a diagram on a page no browser has open", async ({ page 
       `- error DRAW_FAILED content/second-page.mdx:${at}, /second-page#broken-flow: draw uses label, which it does not define.`,
     );
 
-    // The browser draws what the server compiled: the figure lists the same diagnostics.
     writeFileSync(file, `${original.trimEnd()}\n\n${broken}`);
     await page.goto("/second-page#broken-flow");
     const list = page.getByRole("list", { name: "Diagram diagnostics" });
@@ -103,7 +101,6 @@ test("a reply with a broken diagram is refused; one with only warnings is not", 
     data: { author: "reader", text: "Draw it.", references: [] },
   });
   expect(created.status()).toBe(201);
-  // A reply answers the message an agent read, so read it as one, as the agent library does.
   const read = await request.get("/-/api/chat?author=reader", {
     headers: { [agentHeader]: "diagrams" },
   });
@@ -125,7 +122,6 @@ test("a reply with a broken diagram is refused; one with only warnings is not", 
   expect(error).toMatch(/^- error STEP_NOT_TEXT line 7: Step 1 has focus=\{…\}/m);
   expect(error).toMatch(/^- error PLACEMENT_CYCLE line 3, elements alpha: /m);
 
-  // An overlap is a warning: the reply is stored.
   const sent = await send(`A drawing:
 
 <Diagram draw={(d) => {

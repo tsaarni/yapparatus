@@ -1,9 +1,6 @@
 /**
- * `<Chart>` data, read when the page is compiled. A chart holds one block of data, such as
- * ```csv, names a `<Table>` on its page with `from="#id"`, or names a file with `from`. A block
- * or a table is small and already in the page, so it becomes the `data` prop. A file can be
- * large, so the page only refers to it: `load` imports the data from its own module. All are
- * checked here, and an edit to the file updates the page.
+ * `<Chart>` data, read and checked at compile time. A data block or page table becomes the `data`
+ * prop; a file, which can be large, is loaded from its own module through the `load` prop.
  */
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
@@ -21,7 +18,7 @@ import {
 import { type FileAddress, parseFileAddress } from "../../document/file-address.ts";
 import type { ExternalFiles, SourceFile } from "../external-files.ts";
 import { revision } from "../revision.ts";
-import { contentIssues } from "./conventions.ts";
+import { codeLanguageOf, contentIssues } from "./conventions.ts";
 import { excerptFiles } from "./excerpts.ts";
 
 /** A JavaScript expression in the syntax tree, as MDX stores a prop's value. */
@@ -39,6 +36,7 @@ function readData(
   return "message" in table ? table : typeTable(table);
 }
 
+/** A chart's data file, read and typed. */
 export interface ChartFile {
   source: SourceFile;
   data: ChartData;
@@ -71,6 +69,7 @@ export function dataModuleCode(data: ChartData) {
   return `export default JSON.parse(${JSON.stringify(JSON.stringify(data))});`;
 }
 
+/** The JSX attribute of an element with a name, if the author wrote one. */
 function attribute(node: MdxJsxFlowElementHast, name: string) {
   return node.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
 }
@@ -79,12 +78,11 @@ function attribute(node: MdxJsxFlowElementHast, name: string) {
 function blockOf(node: Element) {
   const code = node.tagName === "pre" ? node.children[0] : undefined;
   if (code?.type !== "element" || code.tagName !== "code") return;
-  const classes = code.properties.className;
-  const language = (Array.isArray(classes) ? classes : [])
-    .map(String)
-    .find((c) => c.startsWith("language-"))
-    ?.slice("language-".length);
-  return { language, text: textOf(code), line: (node.position?.start.line ?? 0) + 1 };
+  return {
+    language: codeLanguageOf(code),
+    text: textOf(code),
+    line: (node.position?.start.line ?? 0) + 1,
+  };
 }
 
 const elements = (nodes: ElementContent[], tag: string) =>
@@ -122,6 +120,7 @@ function pageTables(tree: Root) {
   return tables;
 }
 
+/** The stage that reads each `<Chart>`'s data into its `data` or `load` prop. */
 export function charts(files: ExternalFiles) {
   return () => (tree: Root, file: { path: string }) => {
     const issues = contentIssues.get(file.path) ?? [];
@@ -149,7 +148,6 @@ export function charts(files: ExternalFiles) {
             ? null
             : undefined;
       const content = node.children.filter((c) => !(c.type === "text" && !c.value.trim()));
-      // The data is read here and goes to the chart as a prop; the page never shows it.
       node.children = [];
       if (from === undefined) {
         const block =
@@ -222,7 +220,6 @@ export function charts(files: ExternalFiles) {
       for (const problem of read.issues)
         issue(problem.subject, `<Chart> in ${from}, line ${problem.line}: ${problem.message}`);
       if (!rowCount(read.data)) issue("data", "<Chart> has no rows of data.");
-      // The page checks the file's columns, so it depends on the file.
       const watched = excerptFiles.get(file.path) ?? new Set<string>();
       watched.add(read.source.file);
       excerptFiles.set(file.path, watched);

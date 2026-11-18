@@ -9,6 +9,7 @@ import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "../m
 import type { Layout } from "./layout.ts";
 import { type Align, type Content, type Text, textLine } from "./text.ts";
 
+/** The compilers for nodes, frames, and enclosures over a finished layout. */
 export function createNodes(
   m: Metrics,
   measure: Measure,
@@ -70,7 +71,6 @@ export function createNodes(
       }
       default: {
         const cap = capHeight(node, rect.width);
-        // Code keeps its lines' start; other text is centered.
         const code = node.shape === "text" && node.options.mono;
         lines = stackLines(
           c.lines,
@@ -92,7 +92,6 @@ export function createNodes(
       ...(node.options.stepOnly ? { stepOnly: true } : {}),
       ...(node.follows ? { follows: node.follows.id } : {}),
       ...(divider !== undefined ? { divider } : {}),
-      // A record with cells always has rules, even none: it is drawn under and over its cells.
       ...(rules && node.members.length ? { rules } : {}),
       ...(node.member ? { parent: node.member.parent.id } : {}),
       ...(node.member?.pin !== undefined ? { pin: node.member.pin } : {}),
@@ -100,7 +99,6 @@ export function createNodes(
     };
   }
 
-  /** A title tab sitting on the border at one corner. */
   function titleGeometry(title: string, rect: Rect, corner: Corner = "topLeft") {
     const width = tabWidth(title);
     const x = corner.endsWith("Right") ? rect.x + rect.width - 14 - width : rect.x + 14;
@@ -109,7 +107,6 @@ export function createNodes(
     return { title: textAt(title, x + tab.pad, y, fonts.tab, true), titleRect };
   }
 
-  /** A fragment's operator tab: text, padding, and a slanted lower-right corner. */
   function fragmentTab(text: string, x: number, y: number) {
     const width = measure(text, fonts.tab) + fragment.padX + fragment.slant + fragment.padX / 2;
     return {
@@ -164,7 +161,6 @@ export function createNodes(
     };
   }
 
-  /** An enclosure's compiled form: its rectangle and its title tab. */
   function compileEnclosure(e: Enclosure): CompiledEnclosure {
     const rect = enclosureRect(e);
     return {

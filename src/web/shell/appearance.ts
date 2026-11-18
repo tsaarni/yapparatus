@@ -1,13 +1,14 @@
 /**
- * The theme on screen. `document.json` fixes it to "dark" or "light", or sets "auto": the
- * system's setting decides, and the reader may choose light or dark instead. The choice is
- * kept in this browser. Print always uses the light theme, through the theme's own rules.
+ * The theme on screen: "dark" or "light" from `document.json`, or with "auto" the system's
+ * setting unless the reader chooses, which this browser keeps. Print always uses light.
  */
+
 import { settings } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useState } from "react";
 import { lightTheme } from "../style/theme.stylex.ts";
 
+/** The reader's theme choice; "system" follows the system's setting. */
 export type ThemeChoice = "system" | "light" | "dark";
 
 const setting = settings.theme ?? "dark";
@@ -18,6 +19,7 @@ const storageKey = "yapparatus:theme";
 const systemLight = window.matchMedia("(prefers-color-scheme: light)");
 const lightClasses = (stylex.props(lightTheme).className ?? "").split(" ").filter(Boolean);
 
+/** The choice kept in this browser, or "system" when there is none. */
 function storedChoice(): ThemeChoice {
   try {
     const stored = localStorage.getItem(storageKey);
@@ -27,6 +29,7 @@ function storedChoice(): ThemeChoice {
   }
 }
 
+/** Show the theme for a choice, and set the browser's theme color to match. */
 function apply(choice: ThemeChoice) {
   const theme =
     setting !== "auto"
@@ -38,7 +41,6 @@ function apply(choice: ThemeChoice) {
         : choice;
   const root = document.documentElement;
   for (const name of lightClasses) root.classList.toggle(name, theme === "light");
-  // The browser's own interface around the page follows the canvas.
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute("content", getComputedStyle(root).backgroundColor);
@@ -57,9 +59,7 @@ export function useThemeChoice() {
     try {
       if (choice === "system") localStorage.removeItem(storageKey);
       else localStorage.setItem(storageKey, choice);
-    } catch {
-      // Without storage, the choice lasts until the page is closed.
-    }
+    } catch {}
     if (choice !== "system") return;
     const follow = () => apply("system");
     systemLight.addEventListener("change", follow);

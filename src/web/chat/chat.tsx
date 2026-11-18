@@ -1,3 +1,5 @@
+/** The chat panel: the messages with the agent, a typing indicator, and the message box. */
+
 import * as stylex from "@stylexjs/stylex";
 import { type Ref, useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { Reference } from "../../document/reference.ts";
@@ -22,6 +24,7 @@ import { useStickyScroll } from "./sticky-scroll.ts";
 import { TurnHeader } from "./turn-header.tsx";
 import { Typing } from "./typing.tsx";
 
+/** The chat read from the server, and the panel state the app keeps around it. */
 export interface ChatProps {
   chat: ChatRead;
   /** What the next message is about: the pills above the message box. */
@@ -37,6 +40,7 @@ export interface ChatProps {
   panelRef: Ref<HTMLElement>;
 }
 
+/** The chat panel beside the page. */
 export function Chat(props: ChatProps) {
   const { chat, references, setReferences, onError, draft, setDraft } = props;
   const [sending, setSending] = useState(false);
@@ -48,7 +52,6 @@ export function Chat(props: ChatProps) {
   const unread = newestReader > chat.repliedTo;
 
   const scrollToBottom = useStickyScroll(thread);
-  // The parent passes a new function on each render; the list gets one that stays the same.
   const showOnPage = useRef(props.onShowOnPage);
   useLayoutEffect(() => {
     showOnPage.current = props.onShowOnPage;
@@ -60,7 +63,6 @@ export function Chat(props: ChatProps) {
     setSending(true);
     try {
       await commands.send({ text: draft, references });
-      // Sending shows the newest message, wherever the reader had scrolled.
       scrollToBottom();
       setDraft("");
       setReferences(() => []);
@@ -76,7 +78,6 @@ export function Chat(props: ChatProps) {
       ref={props.panelRef}
       aria-label="Chat"
       {...styled("chat", s.panel, props.full && s.panelFull)}
-      // Inline, so it also wins over a width set by dragging the panel edge.
       style={props.full ? { width: "100vw" } : undefined}
     >
       <ChatHeader

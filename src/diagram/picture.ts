@@ -1,8 +1,6 @@
 /**
- * A compiled drawing as a standalone SVG picture, for an agent that looks at a figure. It draws
- * what the web app draws, in the same order as `web/diagram/diagram-view.tsx`, with the paint
- * values it is given written into it and text as glyph outlines, so a rasterizer needs no fonts
- * and no styles.
+ * A compiled drawing as a standalone SVG picture for an agent, drawn like the web app draws it.
+ * Paint values are written in and text is glyph outlines, so a rasterizer needs no fonts or styles.
  */
 
 import { type Align, textLine } from "./compile/text.ts";
@@ -27,11 +25,13 @@ export interface PictureFonts {
   outline: TextOutline;
 }
 
+/** Options of `pictureOf`. */
 export interface PictureOptions {
   /** Draw each element's id beside it, and outline the elements that diagnostics name. */
   ids?: boolean;
 }
 
+/** A drawn picture: the SVG text and its size. */
 export interface Picture {
   svg: string;
   /** The picture's size in CSS pixels: the drawing, and the legend under it. */
@@ -77,6 +77,7 @@ interface Ink {
   weight: number;
 }
 
+/** The ink of an element under the given paint values. */
 function inkOf(element: { role: string; category?: number }, paint: Paint): Ink {
   const { colors: color, stroke } = paint;
   const role =
@@ -102,17 +103,14 @@ export function pictureOf(
   paint: Paint,
 ): Picture {
   const { colors: color, stroke, dash } = paint;
-  /** The figure's own color, behind the drawing and in the halos. */
   const background = color.surface;
   if (!diagram.ok) throw new Error("The drawing did not compile, so it has no picture.");
   const stepOnly = stepOnlyElements(diagram);
   const shown = (id: string) => !stepOnly.has(id);
   const flagged = new Set(options.ids ? diagram.diagnostics.flatMap((d) => d.ids) : []);
 
-  /** A text line's outlines in a color, with a halo in the figure's color when asked. */
   const text = (line: TextLine, fill: string, halo = false) => {
     const font = { family: line.mono ? m.mono : m.sans, size: line.size, weight: line.weight };
-    // SVG text collapses runs of white space and drops it at the ends, as HTML does.
     const words = line.text.replace(/\s+/g, " ").trim();
     const x = line.align === "start" ? line.x : line.x - fonts.measure(words, font) / 2;
     const d = fonts.outline(words, font, x, line.y);
@@ -124,7 +122,6 @@ export function pictureOf(
   };
   const lines = (node: CompiledNode, label: string) =>
     node.lines.map((line) => text(line, line.muted ? color.textMuted : label)).join("");
-  /** An element's group, tagged with its id for tests and tools. An element not shown has none. */
   const group = (visible: boolean, body: string, tag: Record<string, string> = {}) => {
     if (!visible || !body) return "";
     const data = Object.fromEntries(Object.entries(tag).map(([k, v]) => [`data-${k}`, v]));
@@ -151,7 +148,6 @@ export function pictureOf(
       `<path${attrs({ d: shape.badgeMark(c), fill: "none", stroke: color.canvas, "stroke-width": 1.8, "stroke-linecap": "round" })}/>`
     );
   };
-  // Each record with cells clips its cells' fills to its rounded corners.
   const clips = new Map(
     diagram.nodes.filter((node) => node.rules).map((node, i) => [node.id, `clip${i}`]),
   );
@@ -175,7 +171,6 @@ export function pictureOf(
       }
       case "actor": {
         const { head, body } = shape.actor(r);
-        // The web app draws a stick figure solid, even for an external element.
         const figure = {
           ...style,
           fill: "none",
@@ -203,7 +198,6 @@ export function pictureOf(
         );
       }
       case "record": {
-        // A record with cells: its fill here, and its outline over the cells later.
         if (node.rules !== undefined) return rect(r, corner.shape, { fill: k.fill });
         const divider =
           node.divider === undefined
@@ -212,7 +206,6 @@ export function pictureOf(
         return rect(r, corner.shape, style) + divider;
       }
       case "cell": {
-        // A cell with a role or category is filled, inside its record's rounded corners.
         if (node.role === "default" && node.category === undefined) return "";
         const clip = node.parent ? clips.get(node.parent) : undefined;
         return `<g${attrs({ "clip-path": clip ? `url(#${clip})` : undefined })}>${rect(r, 0, { fill: k.fill })}</g>`;
@@ -230,7 +223,6 @@ export function pictureOf(
 
   const nodeOf = (node: CompiledNode): string => {
     if (node.shape === "space") return "";
-    // A decoration is shown with its edge.
     const visible = node.passive ? !node.follows || shown(node.follows) : shown(node.id);
     const tag = { "element-id": node.id, shape: node.shape };
     if (node.shape === "bar")
@@ -252,7 +244,6 @@ export function pictureOf(
     return group(visible, body, tag);
   };
 
-  /** A record's outline over its cells, its title divider, and the hairlines between cells. */
   const recordOutline = (node: CompiledNode): string => {
     const k = inkOf(node, paint);
     const rule = { stroke: k.ink, "stroke-width": stroke.hairline };
@@ -375,9 +366,8 @@ export function pictureOf(
 }
 
 /**
- * Each element's id beside it, small and in the error color, with a halo: nodes above their
- * top-left corner, cells inside theirs, edges under the middle of their longest segment, and
- * enclosures and frames inside their top-right corner.
+ * Each element's id beside it, small and in the error color with a halo, placed where it
+ * covers the least: above nodes, inside cells, under edges, inside enclosures and frames.
  */
 function idLayer(
   diagram: CompiledDiagram,
@@ -392,7 +382,6 @@ function idLayer(
   for (const node of diagram.nodes) {
     if (node.passive || node.shape === "space") continue;
     const r = node.rect;
-    // A cell's id goes inside it, since its neighbors touch it; any other element's above it.
     out.push(
       node.shape === "cell" ? tag(node.id, r.x + 3, r.y + 7) : tag(node.id, r.x + 2, r.y - 6),
     );

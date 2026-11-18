@@ -1,3 +1,5 @@
+/** The header button that switches the theme. */
+
 import { AppIcon as Icon } from "../controls/app-icon.tsx";
 import { Button } from "../controls/button.tsx";
 import { type ThemeChoice, useThemeChoice } from "./appearance.ts";

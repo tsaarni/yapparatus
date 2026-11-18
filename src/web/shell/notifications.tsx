@@ -1,3 +1,5 @@
+/** Notices and errors shown at the bottom of the screen. */
+
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "../controls/button.tsx";
@@ -37,7 +39,6 @@ export function Notifications({
  */
 function Notice({ text, onDismiss }: { text: string; onDismiss: () => void }) {
   const [held, setHeld] = useState(false);
-  // The parent passes a new function each render; the timer must not restart with it.
   const dismiss = useRef(onDismiss);
   dismiss.current = onDismiss;
   useEffect(() => {

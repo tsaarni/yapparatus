@@ -1,4 +1,9 @@
+/**
+ * Reading layout at wide and narrow widths, Markdown conventions, print, categories, and panels.
+ */
+
 import { expect, test } from "@playwright/test";
+import { selectContents, selectionMenu } from "./selection.ts";
 
 test("reading layout: contents, text column, wide figures, and resized chat", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -7,14 +12,12 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
   await page.evaluate(() => document.fonts.load('17px "Inter Variable"'));
   await expect(page.locator(".app")).toHaveAttribute("data-layout", "wide");
 
-  // The header shows document.json's subtitle and logo; the tab shows its favicon and subtitle.
   const masthead = page.locator(".masthead");
   await expect(masthead.locator(".subtitle")).toHaveText("Fixture");
   await expect(masthead.locator(".logo svg")).toHaveAttribute("width", "28");
   await expect(page).toHaveTitle("First page · Fixture document · Fixture");
   await expect(page.locator('link[rel="icon"]')).toHaveAttribute("href", /^data:image\/svg\+xml,/);
 
-  // Contents show every chapter, with the current page's sections under it.
   const contents = page.getByRole("navigation", { name: "Pages" });
   await expect(contents.getByRole("link", { name: "1 First page" })).toHaveAttribute(
     "aria-current",
@@ -22,7 +25,6 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
   );
   await expect(contents.getByRole("link", { name: "Wide figure" })).toBeVisible();
 
-  // Numbering: chapter, sections, and figures; a Ref shows the current number.
   await expect(page.getByText("Chapter 1")).toBeVisible();
   await expect(page.locator("h2#wide-figure")).toContainText("1.2");
   await expect(page.locator("figure#wide-flow figcaption")).toContainText("Figure 1.2");
@@ -39,7 +41,6 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
     "/second-page#details",
   );
 
-  // Tables count separately from figures, with the title above the table.
   const table = page.locator("figure#fixture-table");
   await expect(table.locator("figcaption")).toContainText("Table 1.1");
   expect(await table.evaluate((figure) => figure.firstElementChild?.tagName.toLowerCase())).toBe(
@@ -50,7 +51,6 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
     "/first-page#fixture-table",
   );
 
-  // The text column keeps its reading width; a wide drawing keeps its natural size.
   const geometry = await page.evaluate(() => {
     const box = (selector: string) => {
       const element = document.querySelector(selector);
@@ -75,11 +75,9 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
   expect(geometry.figure).toBeGreaterThan(geometry.paragraph + 100);
   expect(geometry.drawn).toBeCloseTo(geometry.natural, 0);
   expect(geometry.overflow).toBe(false);
-  // Code grows to fit its longest line instead of wrapping or scrolling.
   expect(geometry.code).toBeGreaterThan(geometry.paragraph);
   expect(geometry.codeScrolls).toBe(false);
 
-  // Links by page name, file name, and anchor; Back returns to the previous page.
   await page.getByRole("link", { name: "its anchor" }).click();
   await expect(page).toHaveURL(/\/second-page#details$/);
   await expect(page.getByRole("heading", { name: "Second page" })).toBeVisible();
@@ -91,21 +89,14 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
   await expect(page.getByRole("heading", { name: "Page not found" })).toBeVisible();
   await page.goto("/");
 
-  // Selection menu stays below the title.
-  await page.locator("article [data-lead]").evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-  });
-  const menu = page.getByRole("toolbar", { name: "Selection actions" });
+  await selectContents(page.locator("article [data-lead]"));
+  const menu = selectionMenu(page);
   await expect(menu).toBeVisible();
   const popup = await menu.boundingBox();
   const heading = await page.locator("article h1").boundingBox();
   expect(popup && heading && popup.y >= heading.y + heading.height).toBeTruthy();
   await page.keyboard.press("Escape");
 
-  // The chat takes space from the page, and the page adapts.
   await page.locator(".masthead").getByRole("button", { name: "Chat", exact: true }).click();
   await page.locator(".chat").evaluate((element) => {
     (element as HTMLElement).style.width = "600px";
@@ -143,20 +134,14 @@ test("narrow reading keeps contents, typography, and menu inside viewport", asyn
   await expect(contents).toHaveCount(0);
   await page.goto("/");
 
-  // Reading type follows the reading column's width, not the window's.
   const fontSize = (selector: string) =>
     page
       .locator(selector)
       .evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
   expect(await fontSize("article h1")).toBe(28);
   expect(await fontSize("article [data-lead]")).toBe(16);
-  await page.locator("article [data-lead]").evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-  });
-  const menu = page.getByRole("toolbar", { name: "Selection actions" });
+  await selectContents(page.locator("article [data-lead]"));
+  const menu = selectionMenu(page);
   await expect(menu).toBeVisible();
   const popup = await menu.boundingBox();
   expect(
@@ -175,7 +160,6 @@ test("markdown conventions: alerts, math, marked code lines, and file trees", as
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   await page.goto("/markdown");
 
-  // An alert is a note with its kind as the title; a plain quote stays a quote.
   const alert = page.getByRole("note");
   await expect(alert).toHaveCount(1);
   await expect(alert).toContainText("Warning");
@@ -183,7 +167,6 @@ test("markdown conventions: alerts, math, marked code lines, and file trees", as
   await expect(alert).not.toContainText("[!WARNING]");
   await expect(page.locator("blockquote")).toHaveText("A plain quotation stays a quotation.");
 
-  // Math is MathML: inline in the sentence, and a block on its own line.
   const inline = page.locator("p math");
   await expect(inline.locator("msup")).toHaveCount(1);
   const block = page.locator('math[display="block"]');
@@ -191,7 +174,6 @@ test("markdown conventions: alerts, math, marked code lines, and file trees", as
   await expect(block).toHaveCSS("display", "block math");
   await expect(page.locator("article")).not.toContainText("$$");
 
-  // Marked lines, with the notation removed; Copy leaves out the removed line.
   const code = page.locator("pre code");
   await expect(code.locator("[data-mark]")).toHaveCount(3);
   await expect(code).not.toContainText("[!code");
@@ -200,14 +182,12 @@ test("markdown conventions: alerts, math, marked code lines, and file trees", as
   expect(copied).toContain("retries: 5,");
   expect(copied).not.toContain("retries: 3,");
 
-  // The file tree shows folders with a slash, the highlighted entry, and its comment.
   const tree = page.locator(".file-tree").first();
   await expect(tree).toContainText("src/");
   await expect(tree).toContainText("migrate.ts");
   await expect(tree).toContainText("runs the migration");
   await expect(tree).toContainText("package.json");
   await expect(tree).toHaveCSS("border-top-width", "1px");
-  // Inside a figure, the figure draws the only frame.
   const framed = page.locator("#tree-figure .file-tree");
   await expect(framed).toContainText("guide.mdx");
   await expect(framed).toHaveCSS("border-top-width", "0px");
@@ -245,19 +225,16 @@ test("diagram categories: colors, a legend, and highlighting from the legend or 
   const element = (id: string) => figure.locator(`[data-element-id="${id}"]`);
   const ink = (id: string) =>
     element(id).evaluate((element) => getComputedStyle(element).getPropertyValue("--ink"));
-  // Elements in one category share a color; elements without one stay neutral.
   expect(await ink("orders")).toBe(await ink("payments"));
   expect(await ink("orders")).not.toBe(await ink("batch-job"));
   expect(await ink("database")).not.toBe(await ink("orders"));
 
-  // Pointing at a legend entry highlights its elements and fades the others.
   await legend.getByRole("button", { name: "To be removed" }).hover();
   await expect(element("batch-job")).toHaveAttribute("data-state", "focus");
   await expect(element("orders")).toHaveAttribute("data-state", "dim");
   await page.mouse.move(0, 0);
   await expect(element("orders")).not.toHaveAttribute("data-state");
 
-  // A step focuses a whole category by its id.
   await figure.getByRole("button", { name: "Start steps" }).click();
   await expect(element("orders")).toHaveAttribute("data-state", "focus");
   await expect(element("payments")).toHaveAttribute("data-state", "focus");
@@ -267,7 +244,6 @@ test("diagram categories: colors, a legend, and highlighting from the legend or 
 test("tabs follow their label, and columns line up side by side", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 1000 });
   await page.goto("/panels");
-  // A hidden panel is `until-found`, so it stays in the page for find; the shown one is not hidden.
   const shown = "[role=tabpanel]:not([hidden])";
   const sets = page.locator(".tabs");
   await expect(sets).toHaveCount(2);
@@ -276,7 +252,6 @@ test("tabs follow their label, and columns line up side by side", async ({ page 
   await expect(install.locator(shown)).toContainText("pnpm add");
   await expect(start.locator(shown)).toContainText("pnpm dev");
 
-  // Choosing a tab chooses the tab with that label in every set, and the choice is kept.
   await install.getByRole("tab", { name: "npm", exact: true }).click();
   await expect(install.getByRole("tab", { name: "npm", exact: true })).toHaveAttribute(
     "aria-selected",
@@ -286,19 +261,16 @@ test("tabs follow their label, and columns line up side by side", async ({ page 
   await page.reload();
   await expect(page.locator(".tabs").nth(1).locator(shown)).toContainText("npm run dev");
 
-  // The arrow keys move between tabs, as the WAI-ARIA tabs pattern says.
   await page.locator(".tabs").nth(0).getByRole("tab", { name: "npm", exact: true }).focus();
   await page.keyboard.press("ArrowRight");
   await expect(page.locator(".tabs").nth(1).locator(shown)).toContainText("pnpm dev");
 
-  // Find in page reveals a hidden panel in its own set, without changing the choice.
   const hidden = page.locator(".tabs").nth(0).locator("[role=tabpanel][hidden]");
   await expect(hidden).toHaveAttribute("hidden", "until-found");
   await hidden.evaluate((panel) => panel.dispatchEvent(new Event("beforematch")));
   await expect(page.locator(".tabs").nth(0).locator(shown)).toContainText("npm install");
   await expect(page.locator(".tabs").nth(1).locator(shown)).toContainText("pnpm dev");
 
-  // Columns in a listing: numbered, side by side, and their code blocks end on one line.
   const listing = page.locator("#retry");
   await expect(listing).toContainText("Listing 8.1");
   const frames = listing.locator("section pre");
@@ -310,7 +282,6 @@ test("tabs follow their label, and columns line up side by side", async ({ page 
   expect(after?.left).toBeGreaterThan((before?.right ?? 0) - 1);
   expect(Math.round(before?.bottom ?? 0)).toBe(Math.round(after?.bottom ?? 0));
 
-  // Print shows every panel under its label; a narrow page stacks the columns.
   await page.emulateMedia({ media: "print" });
   await expect(page.locator(".tabs").nth(0)).toContainText("pnpm add");
   await expect(page.locator(".tabs").nth(0)).toContainText("npm install");

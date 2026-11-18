@@ -1,3 +1,5 @@
+/** Code blocks: highlighted code with a language or file bar, line numbers, and a Copy button. */
+
 import * as stylex from "@stylexjs/stylex";
 import {
   type CSSProperties,
@@ -51,8 +53,6 @@ export function CodeBlock({
   );
   const language = code.language;
   const languageName = language !== "text" ? (languageNames[language] ?? language) : "";
-  // A bare code block is its own target; inside a Listing, the listing is. The file view's
-  // code is the file, which its title stands for.
   const target = !inTarget && !reply && !sourceFile?.whole;
   const excerpt = sourceFile && !sourceFile.whole ? sourceFile.file : undefined;
   return (
@@ -161,10 +161,8 @@ function styleObject(style: string): CSSProperties {
 }
 
 /**
- * The lines of a code block, separated by newlines, each a span of its tokens. Every line has
- * the same box, so tab stops line up across lines. A marked line gets its mark's background
- * and gutter. A line of a source file shows its number in the file beside it; a line the
- * reader picked in the file view is highlighted.
+ * The lines of a code block, each a span of its tokens with the same box, so tab stops line up.
+ * Marked and picked lines get a background and gutter; a source file's lines get their numbers.
  */
 function codeLines(code: HighlightedCode, selected: LineRange | undefined, wrap: boolean) {
   const styles = code.styles.map((style) => (style ? styleObject(style) : undefined));
@@ -339,10 +337,10 @@ const s = stylex.create({
     fontSize: "0.875em",
     fontVariantLigatures: "none",
   },
-  // A line spans the block, from edge to edge of the padding, with a gutter that a mark colors.
-  // It takes the block's line height, not the smaller code text's, so marked lines in a row
-  // join into one band. Every line has this box: a tab stop is measured from the line's box,
-  // so a marked line with its own box would shift tab-indented text.
+  /**
+   * A line spans the block with a gutter a mark colors, at the block's line height so marked lines
+   * join into one band. Every line has this box, since tab stops are measured from it.
+   */
   line: {
     display: "inline-block",
     verticalAlign: "top",

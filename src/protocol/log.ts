@@ -1,15 +1,12 @@
 /**
- * Diagnostic logging for the dev server, the web app, and the agent library.
- *
- * One setting, the `YAPPARATUS_LOG` environment variable, picks the level everywhere:
- * `debug`, `info`, `warn` (the default), `error`, or `silent`. Node reads it at startup; the
- * browser gets the dev server's or build's value through Vite's `define`.
- *
- * In Node every line goes to stderr: the agent library's stdout carries the prompt.
+ * Logging for the dev server, the web app, and the agent library, at the level `YAPPARATUS_LOG`
+ * sets everywhere. In Node every line goes to stderr, since the agent's stdout carries the prompt.
  */
 
+/** The `YAPPARATUS_LOG` values, from most to least output; `warn` is the default. */
 export type LogLevel = "debug" | "info" | "warn" | "error" | "silent";
 
+/** Writes a line at one level, or drops it when the level is below the configured one. */
 export interface Logger {
   debug(...args: unknown[]): void;
   info(...args: unknown[]): void;
@@ -42,7 +39,6 @@ export function createLogger(scope: string): Logger {
     (level: Exclude<LogLevel, "silent">) =>
     (...args: unknown[]) => {
       if (levels[level] < threshold) return;
-      // The browser console filters by method; Node's console.debug and info would go to stdout.
       if (browser) console[level](prefix, ...args);
       else console.error(new Date().toISOString(), level.toUpperCase(), prefix, ...args);
     };

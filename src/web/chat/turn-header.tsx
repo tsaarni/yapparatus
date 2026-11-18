@@ -1,7 +1,10 @@
+/** The header line of a chat turn: the author, details, and the time. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { fontSize, fontWeight, space, theme } from "../style/theme.stylex.ts";
 
+/** The local time of day, as hours and minutes. */
 function time(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }

@@ -1,3 +1,5 @@
+/** The FileTree component, which shows a folder layout written as a Markdown list. */
+
 import * as stylex from "@stylexjs/stylex";
 import { useContext } from "react";
 import type { FileTreeEntry } from "../../document/page-module.ts";
@@ -29,6 +31,7 @@ export function FileTree({ entries = [] }: { entries?: FileTreeEntry[] }) {
 
 FileTree.breakout = true;
 
+/** One level of the tree: its files and folders, each folder with its own level inside. */
 function TreeLevel({ entries, nested }: { entries: FileTreeEntry[]; nested?: boolean }) {
   return (
     <ul {...stylex.props(s.treeLevel, nested && s.treeNested)}>
@@ -44,7 +47,6 @@ function TreeLevel({ entries, nested }: { entries: FileTreeEntry[]; nested?: boo
                 size={15}
               />
             </span>
-            {/* The comment follows the name, or wraps under it as a whole when it does not fit. */}
             <span {...stylex.props(s.treeText)}>
               {entry.kind === "more" ? (
                 <span {...stylex.props(s.visuallyHidden)}>More entries</span>
@@ -101,7 +103,7 @@ const s = stylex.create({
     padding: 0,
     listStyleType: "none",
   },
-  // A nested level indents under its folder's icon, with a guide line through its middle.
+  /** A nested level indents under its folder's icon, with a guide line through its middle. */
   treeNested: {
     marginLeft: "7px",
     paddingLeft: space.lg,

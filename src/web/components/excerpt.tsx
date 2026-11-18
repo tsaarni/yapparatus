@@ -1,9 +1,12 @@
+/** The Excerpt component, which shows lines of a source file in a page. */
+
 import * as stylex from "@stylexjs/stylex";
 import type { ReactNode } from "react";
 import { parseFileAddress } from "../../document/file-address.ts";
 import { SourceFileContext } from "../prose/contexts.ts";
 import { fontSize, theme } from "../style/theme.stylex.ts";
 
+/** What an author writes on an excerpt, and the code the compiler adds. */
 export interface ExcerptProps {
   /** The file, as an address without lines: "/-/files/app/main.go". */
   from: string;

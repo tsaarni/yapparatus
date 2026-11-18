@@ -1,7 +1,6 @@
 /**
- * Source files a document shows: their addresses, and where they are on disk. A document names
- * folders in `document.json` under `"files"`, such as `{ "contour": "../contour" }`, and its
- * pages point into them with `/-/files/contour/internal/dag/builder.go#L40-L72`.
+ * Source files a document shows: their addresses, such as `/-/files/contour/dag.go#L40-L72`,
+ * and where they are on disk, from the folders under `"files"` in `document.json`.
  */
 
 /**
@@ -10,8 +9,10 @@
  */
 export const appPrefix = "/-";
 
+/** The start of every source file address: `/-/files/<folder>/<path>`. */
 export const filesPrefix = `${appPrefix}/files`;
 
+/** Lines in a source file, numbered from 1, both ends included. */
 export interface LineRange {
   start: number;
   end: number;
@@ -29,8 +30,7 @@ export const folderName = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
  * "/-/files/contour/x.go#L40-L72" → the folder, the path, and the lines. Undefined for anything
- * else, including paths that leave the folder. Selected words may follow the lines as a text
- * fragment, "#L41:~:text=retry", as on pages; `quoteOf` reads them.
+ * else, including paths that leave the folder. A text fragment may follow, as `quoteOf` reads.
  */
 export function parseFileAddress(address: string): FileAddress | undefined {
   if (!address.startsWith(`${filesPrefix}/`)) return;
@@ -55,6 +55,7 @@ export function parseLines(fragment: string): LineRange | undefined {
   return start >= 1 && end >= start ? { start, end } : undefined;
 }
 
+/** The lines as a URL fragment without "#": "L40-L72" or "L40". */
 export function linesFragment(lines: LineRange): string {
   return lines.end > lines.start ? `L${lines.start}-L${lines.end}` : `L${lines.start}`;
 }

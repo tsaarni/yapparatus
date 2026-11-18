@@ -46,11 +46,6 @@ export function createRecords(
   const fonts = fontsOf(m);
   const { measureNode, textAt, textFont } = text;
 
-  /**
-   * A record's cells fill `columns` grid columns left to right, each spanning `span` of
-   * them. A cell is always a rectangle: it fits the rest of its row, or it starts a row and
-   * covers whole rows. One column is as wide as the widest cell needs per column it spans.
-   */
   function grid(node: Node): GridLayout {
     const cached = grids.get(node);
     if (cached) return cached;
@@ -59,7 +54,6 @@ export function createRecords(
     const columns = Math.max(1, Math.round(o.columns ?? 1));
     const font = { family: o.mono ? m.mono : m.sans, size: m.smallSize, weight: m.textWeight };
     const cells = node.members;
-    // Tab-separated columns of text line up across all cells and the header.
     const header = o.header !== undefined ? [o.header] : [];
     const segments = [...header, ...cells.map((c) => c.label)].map((t) =>
       t.split("\t").map((x) => measure(x, font)),
@@ -71,7 +65,6 @@ export function createRecords(
     }
     const textWidth = (s: number[] = []) =>
       (stops[s.length - 1] as number) + (s[s.length - 1] ?? 0) + 2 * r.cellPad;
-    // Place each cell: in the rest of its row, or over whole rows from the start of one.
     let row = 0;
     let col = 0;
     const placed = cells.map((cell) => {
@@ -118,7 +111,6 @@ export function createRecords(
         columns,
     );
     const unit = o.width !== undefined ? (o.width - gutter) / columns : needed;
-    // Column labels are centered on their columns; two that touch cannot be read apart.
     const shown = ruler.top.flatMap((t, i) => (t ? [{ i, w: measure(t, fonts.ruler) }] : []));
     const crowded = shown.some((a, k) => {
       const b = shown[k - 1];
@@ -155,10 +147,6 @@ export function createRecords(
     return g;
   }
 
-  /**
-   * The columns and cells at the record's final width. A record can be wider than its grid
-   * needs, as with `equalWidth`; its columns then share the extra width.
-   */
   function fitted(g: GridLayout, width: number): { unit: number; cells: Rect[] } {
     const unit = Math.max(g.unit, (width - g.left) / g.columns);
     const k = g.unit > 0 ? unit / g.unit : 1;
@@ -168,7 +156,6 @@ export function createRecords(
     };
   }
 
-  /** One row of tab-separated text, its columns at the record's tab stops. */
   function tabbed(text: string, g: GridLayout, x: number, y: number, muted: boolean): TextLine[] {
     return text
       .split("\t")
@@ -177,7 +164,6 @@ export function createRecords(
       );
   }
 
-  /** A member's place: a cell in its record, or a mark's span in its text. */
   function member(node: Node): { rect: Rect; lines: TextLine[] } {
     const cached = memberRects.get(node);
     if (cached) return cached;
@@ -200,8 +186,6 @@ export function createRecords(
     };
     const rect = { ...r, x: outer.x + r.x, y: outer.y + r.y };
     const cy = rect.y + rect.height / 2;
-    // On a grid of several columns, as in a packet header, a field's name is centered. In a
-    // table, it starts the row, and tabs align its columns with the others.
     const segs = node.label.split("\t");
     const centered = (record.options.columns ?? 1) > 1 && segs.length === 1;
     const lines = centered
@@ -220,14 +204,12 @@ export function createRecords(
     return { rect, lines };
   }
 
-  /** A mark: a substring that occurs once in the text, or whole lines of it. */
   function mark(node: Node, place: Extract<Member, { kind: "mark" }>, outer: Rect) {
     const text = place.parent;
     const c = measureNode(text);
     const font = textFont(text);
     const lh = font.size * m.lineHeight;
     const top = outer.y + outer.height / 2 - c.height / 2;
-    // Where a line starts: at the left in code, centered otherwise.
     const startOf = (width: number) =>
       text.options.mono ? outer.x : outer.x + (outer.width - width) / 2;
     const unmatched = (why: string) => {
@@ -277,7 +259,6 @@ export function createRecords(
     return { rect, lines: [textAt(place.text, x, rect.y + lh / 2, font)] };
   }
 
-  /** A record's header, ruler labels, and the lines under its title and between its cells. */
   function recordLines(node: Node, rect: Rect) {
     const g = grid(node);
     const fit = fitted(g, rect.width);
@@ -297,8 +278,6 @@ export function createRecords(
       lines.push(...tabbed(node.options.header, g, left, y + g.headerBand / 2, true));
       rules.push(across(y + g.headerBand));
     }
-    // Hairlines between cells: each cell draws the right and bottom sides it shares
-    // with another. The outline draws the outer sides, over the cells' fills.
     for (const p of fit.cells) {
       const x = rect.x + p.x;
       const y = rect.y + p.y;
@@ -334,17 +313,11 @@ export function createRecords(
     return { lines, rules, ...(divider !== undefined ? { divider } : {}) };
   }
 
-  /**
-   * Where an edge toward `toward` leaves a cell: the middle of a side on the record's outline,
-   * so the edge crosses no other cell: a table row's left or right, an array slot's top or
-   * bottom. Of those, the side a line toward the other end crosses first, as for any shape.
-   */
   function cellSide(cell: Node, rect: Rect, toward: Vec): Vec {
     const outline = outlineSides(cell, rect);
     return anchorOf(rect, sideToward(rect, toward, outline.length ? outline : undefined));
   }
 
-  /** The sides of a cell that lie on its record's outline, under any title or ruler. */
   function outlineSides(cell: Node, rect: Rect): Side[] {
     const record = cell.member?.parent;
     const outer = record ? bounds(record) : rect;

@@ -19,6 +19,7 @@ import { languageOf } from "./highlight.ts";
 /** Files each compiled page or reply reads excerpts from, by the page's absolute path. */
 export const excerptFiles = new Map<string, Set<string>>();
 
+/** A string attribute's value: undefined if absent, null if not a plain string. */
 function literal(node: MdxJsxFlowElementHast, name: string) {
   const attr = node.attributes.find((a) => a.type === "mdxJsxAttribute" && a.name === name);
   if (!attr) return undefined;
@@ -44,12 +45,8 @@ const closes = /^[}\])]/;
 const opens = /[{([:]\s*$/;
 
 /**
- * The lines an excerpt shows. `start` is the one line that contains its text. `end` is the
- * first line from there that contains its text; without it, the excerpt is the block the start
- * line opens: the lines indented deeper than it, and the closing line at its own indentation.
- * A closing line that opens again, such as `) {` or `} else {`, continues the block, and so
- * does an opening `{` on the line after the start. Lines that start with `#`, such as C
- * preprocessor lines, are written in column 0 inside a block, so they do not end it.
+ * The lines an excerpt shows: from the one line containing `start` to the first containing `end`,
+ * or without `end`, the block the start line opens, by indentation, through its closing line.
  */
 export function excerptRange(
   lines: string[],
@@ -88,11 +85,8 @@ export function excerptRange(
 }
 
 /**
- * Fill each `<Excerpt>` with the lines it names, as a code block in the file's language, and
- * write the lines it found into `from`, so the bar links to them. A file that cannot be read
- * leaves the excerpt empty; the link check reports it. Problems in the tag itself, including
- * text the file no longer contains, are content issues with the page's line. Runs after the
- * Markdown conventions.
+ * Fill each `<Excerpt>` with its lines as a code block and write the lines found into `from`.
+ * An unreadable file leaves it empty for the link check to report; tag problems are content issues.
  */
 export function excerpts(files: ExternalFiles) {
   return () => (tree: Root, file: { path: string }) => {

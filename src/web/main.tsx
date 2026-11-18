@@ -1,3 +1,5 @@
+/** The web app's entry: installs the theme, reporters, and favicon, and renders the app. */
+
 import * as stylex from "@stylexjs/stylex";
 import { createRoot, type Root } from "react-dom/client";
 import "@fontsource-variable/inter/standard.css";
@@ -40,11 +42,13 @@ installFavicon();
 
 const container = document.getElementById("root");
 if (container) {
-  // Hot updates re-execute this module; reuse the root instead of creating a second one.
+  /** Hot updates re-execute this module; reuse the root instead of creating a second one. */
   const root = (import.meta.hot?.data.root as Root | undefined) ?? createRoot(container);
   if (import.meta.hot) import.meta.hot.data.root = root;
-  // The app renders when the page at the address has loaded, so the first paint has the page.
-  // A build preloads that page's code with the app.
+  /**
+   * The app renders when the page at the address has loaded, so the first paint has the page.
+   * A build preloads that page's code with the app.
+   */
   const page = currentPage();
   void (page ? page.load().catch(() => undefined) : Promise.resolve()).then(() =>
     root.render(<App />),

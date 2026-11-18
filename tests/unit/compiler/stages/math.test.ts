@@ -1,3 +1,5 @@
+/** The math stage: TeX between dollar marks becomes MathML, and invalid TeX is reported. */
+
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { compile, run } from "@mdx-js/mdx";

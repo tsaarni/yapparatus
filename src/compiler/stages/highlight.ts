@@ -18,7 +18,7 @@ import { type FileAddress, fileAddress, parseLines } from "../../document/file-a
 import type { CodeMark, HighlightedCode } from "../../document/page-module.ts";
 import type { SourceFileView } from "../../protocol/rest-api.ts";
 import type { SourceFile } from "../external-files.ts";
-import { codeMarks } from "./conventions.ts";
+import { codeLanguageOf, codeMarks } from "./conventions.ts";
 
 /** Code colors come from CSS variables, so they follow the theme. */
 const codeTheme = createCssVariablesTheme({ name: "yapparatus", variablePrefix: "--shiki-" });
@@ -53,8 +53,6 @@ export async function highlight(
     styles,
     lines: tokens.map((line) => {
       const runs: Array<number | string> = [];
-      // Whitespace joins the token after it, as in Shiki's HTML, unless that token draws a
-      // line under or through its text.
       let space = "";
       line.forEach((token, i) => {
         const joins = !((token.fontStyle ?? 0) & underOrThrough);
@@ -74,17 +72,11 @@ export async function highlight(
 }
 
 /**
- * Where a block's code comes from travels in its meta: `page start=N` for code written on a
- * page, whose first line is line N of the page, and `excerpt start=N mark=L3,L5-L7` for lines
- * of a file, whose first line is line N of the file.
+ * A block's code, highlighted. Its meta says where it comes from: `page start=N` for code on a
+ * page, or `excerpt start=N mark=L3,L5-L7` for lines of a file, N being its first line there.
  */
 function codeOf(element: Element): Promise<HighlightedCode> {
-  const classes = Array.isArray(element.properties.className) ? element.properties.className : [];
-  const language =
-    classes
-      .map(String)
-      .find((c) => c.startsWith("language-"))
-      ?.slice("language-".length) ?? "text";
+  const language = codeLanguageOf(element) ?? "text";
   const meta = String((element.data as { meta?: unknown } | undefined)?.meta ?? "");
   const text = textOf(element).replace(/\n$/, "");
   if (meta.startsWith("excerpt")) {
@@ -98,7 +90,6 @@ function codeOf(element: Element): Promise<HighlightedCode> {
     });
     return highlight(text, language, { start, ...marked(marks) });
   }
-  // Code written on a page may mark lines with comments; the comments are not shown.
   const { lines, written, marks } = codeMarks(text);
   const page = /^page start=(\d+)/.exec(meta);
   return highlight(lines.join("\n"), language, {

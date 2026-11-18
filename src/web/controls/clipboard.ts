@@ -1,3 +1,5 @@
+/** Copying text to the clipboard from a button. */
+
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** What a copy button shows: its label, a moment of "copied", or a moment of "failed". */
@@ -16,9 +18,7 @@ export function useCopy() {
     try {
       await navigator.clipboard.writeText(text);
       copied = true;
-    } catch {
-      // No clipboard (an insecure origin) or permission refused: the button says so.
-    }
+    } catch {}
     setState(copied ? "copied" : "failed");
     window.clearTimeout(timer.current);
     timer.current = window.setTimeout(() => setState("idle"), 1400);

@@ -1,11 +1,6 @@
 /**
- * The agent's side of the chat. An agent calls these from short commands run with Node:
- *
- *   node --input-type=module-typescript -e 'import { waitForMessage } from "yapparatus/agent";
- *     console.log((await waitForMessage()).prompt);'
- *
- * The library only transports. Every prompt and error comes from the server, which also
- * writes the next command to run; the library writes only transport errors.
+ * The agent's side of the chat, called from short `node -e` commands.
+ * It only transports: prompts and errors come from the server, except transport errors.
  */
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -53,8 +48,6 @@ export class YapparatusError extends Error {
   }
 }
 
-// A command that does not catch an error ends with the server's text alone, not Node's frames
-// around it. Other errors keep their stack. Errors the command catches are not affected.
 process.on("uncaughtException", (error) => {
   process.stderr.write(
     `${error instanceof YapparatusError ? error.message : (error.stack ?? String(error))}\n`,
@@ -62,10 +55,7 @@ process.on("uncaughtException", (error) => {
   process.exit(1);
 });
 
-/**
- * The running server, from `.yapparatus/server.json` in this folder or the nearest above: its
- * address.
- */
+/** The running server's address, from `.yapparatus/server.json` here or in the nearest parent. */
 function findServer(): ServerFile {
   for (let dir = process.cwd(); ; dir = path.dirname(dir)) {
     const file = path.join(dir, ".yapparatus", "server.json");
@@ -81,6 +71,7 @@ function findServer(): ServerFile {
   }
 }
 
+/** Fetch a server resource, turning no answer within `timeout` seconds into a YapparatusError. */
 async function call(url: string, init: RequestInit, timeout: number): Promise<Response> {
   log.debug(init.method ?? "GET", url);
   try {
@@ -98,6 +89,7 @@ async function call(url: string, init: RequestInit, timeout: number): Promise<Re
   }
 }
 
+/** The YapparatusError for a failed response, with the server's message and diagnostics. */
 async function failure(response: Response): Promise<YapparatusError> {
   const body = (await response.json().catch(() => ({}))) as Partial<ReplyRefusal>;
   return new YapparatusError(
@@ -112,10 +104,8 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const reconnectFor = 30_000;
 
 /**
- * Wait until there is something for the agent: reader messages not answered yet, or errors in
- * the document that the agent has not been given. Resolves with them and the prompt to read,
- * which ends with the next command. The server remembers what it gave the agent, so calling
- * it again without replying gives the same messages.
+ * Wait for unanswered reader messages or document errors the agent has not been given.
+ * Resolves with them and the prompt to read; calling again without replying gives the same.
  */
 export async function waitForMessage(): Promise<Chat> {
   const query = new URLSearchParams({
@@ -124,7 +114,6 @@ export async function waitForMessage(): Promise<Chat> {
     wait: String(requestWait),
   });
   const url = `${findServer().url}${apiPrefix}/chat?${query}`;
-  // One agent for the whole wait: its reads are one long wait, and a newer one takes over.
   const headers = { [agentHeader]: randomUUID() };
   let unreachableSince: number | undefined;
   for (;;) {
@@ -132,7 +121,6 @@ export async function waitForMessage(): Promise<Chat> {
     try {
       response = await call(url, { headers }, requestWait);
     } catch (error) {
-      // A restarting dev server drops waiting requests; a stopped one stays away.
       unreachableSince ??= Date.now();
       if (Date.now() - unreachableSince >= reconnectFor) throw error;
       log.info("server did not answer; retrying in 1 s");
@@ -147,10 +135,8 @@ export async function waitForMessage(): Promise<Chat> {
 }
 
 /**
- * Send the agent's reply to the reader messages that the last wait returned. Check the
- * document first if you edited pages. The MDX is read from stdin: inline with a quoted
- * heredoc, or from a file with `< reply.mdx`. The server compiles it and checks its
- * components and links first; a refused reply rejects with what to fix.
+ * Send the reply MDX from stdin to the reader messages the last wait returned.
+ * The server checks it first; a refused reply rejects with what to fix.
  */
 export async function sendReply(): Promise<void> {
   if (process.stdin.isTTY)
@@ -171,10 +157,8 @@ export async function sendReply(): Promise<void> {
 }
 
 /**
- * The document's errors and warnings, once the checks of recent edits are done. Resolves with
- * them, the pages no browser has checked since they changed with what was found before, and
- * the prompt to read. The errors it returns are given to the agent, so a later wait does not
- * return them again. Run it after editing pages, before replying, or without a chat at all.
+ * The document's errors and warnings once checks of recent edits finish, with unchecked pages.
+ * The errors count as given to the agent, so a later wait does not return them again.
  */
 export async function checkDocument(): Promise<DocumentDiagnostics> {
   const response = await call(`${findServer().url}${apiPrefix}/diagnostics`, {}, requestWait);
@@ -183,10 +167,8 @@ export async function checkDocument(): Promise<DocumentDiagnostics> {
 }
 
 /**
- * Save a diagram's picture as the reader sees it in the light theme, as a PNG file to open as
- * an image. The address is the figure's, `/page#figure`. The file is where the picture is
- * written; the caller chooses it and removes it. `ids` labels each element with its id and
- * outlines the elements that diagnostics name.
+ * Save the diagram at `/page#figure` as a light-theme PNG at `file`, which the caller removes.
+ * `ids` labels each element with its id and outlines the elements that diagnostics name.
  */
 export async function savePicture(
   address: string,

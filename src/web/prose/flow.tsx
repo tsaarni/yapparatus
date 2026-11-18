@@ -1,3 +1,5 @@
+/** Flow, the layout of blocks inside a panel, and the flag that lets a block use the wide track. */
+
 import * as stylex from "@stylexjs/stylex";
 import { Children, isValidElement, type ReactNode } from "react";
 import { sizes, space } from "../style/theme.stylex.ts";
@@ -14,10 +16,8 @@ export function isBreakout(children: ReactNode): boolean {
 }
 
 /**
- * The blocks of a panel, top to bottom. Text keeps the reading measure, and wide blocks such
- * as code and figures may grow beyond it, as on the page. Wide blocks bring their own margin;
- * text that comes first gets the same distance from what is above. With `fill`, the last
- * block takes the remaining height, so code blocks side by side end on one line.
+ * The blocks of a panel, top to bottom: text keeps the reading measure, wide blocks grow beyond it.
+ * With `fill`, the last block takes the rest of the height, so code side by side ends level.
  */
 export function Flow({ children, fill }: { children: ReactNode; fill?: boolean }) {
   const blocks = Children.toArray(children);

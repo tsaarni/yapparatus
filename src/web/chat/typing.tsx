@@ -1,8 +1,10 @@
+/** The typing indicator shown while the agent has the reader's message. */
+
 import * as stylex from "@stylexjs/stylex";
 import { styled } from "../style/styled.ts";
 import { radius, space, theme } from "../style/theme.stylex.ts";
 
-/** Three dots that rise in turn while an agent has the message or works on it, as in a messaging app. */
+/** Three dots that rise in turn while an agent has the message or works on it. */
 export function Typing({ label }: { label: string }) {
   return (
     <p role="status" aria-label={label} title={label} {...styled("working", s.typing)}>

@@ -1,15 +1,22 @@
+/** The chat and its agent: the REST API, waiting reads, replies, references, and diagnostics. */
+
 import { spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { type APIRequestContext, expect, test } from "@playwright/test";
 import { pageRevision } from "../../src/compiler/revision.ts";
-import type { Reference } from "../../src/document/reference.ts";
 import {
   agentHeader,
   type Chat,
   type DiagnosticReport,
   type DocumentDiagnostics,
 } from "../../src/protocol/rest-api.ts";
+import {
+  commentOnSelection,
+  selectContents,
+  selectionMenu,
+  storedReferences,
+} from "./selection.ts";
 import { commands, replyCommand, root, runCommand } from "./workspace.ts";
 
 /** A page with no excerpts or charts, so its revision is its text's. */
@@ -73,7 +80,6 @@ Backticks \`stay\` and $HOME is not expanded.
 test("an agent that stops while waiting is away at once", async ({ page }) => {
   await page.goto("/");
   await page.locator(".chat-action").click();
-  // First in this file, so no earlier read leaves an agent counted as waiting.
   await expect(page.locator(".presence")).toHaveText("Agent not connected");
   const agent = spawn(
     process.execPath,
@@ -99,19 +105,10 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "First page" })).toBeVisible();
 
-  // The reader selects a paragraph and a diagram element, and sends a message.
   const target = page.locator("main article p").filter({ hasText: "The target paragraph" });
   await target.scrollIntoViewIfNeeded();
-  await target.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-  });
-  await page
-    .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Comment", exact: true })
-    .click();
+  await selectContents(target);
+  await commentOnSelection(page);
   await page.locator("article [data-element-id=fixture-edge] text").click();
   await expect(page.locator(".references > div")).toHaveCount(2);
   await page
@@ -122,7 +119,6 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   await expect(page.locator(".presence")).toHaveText("Agent not connected");
   await expect(page.locator(".connect")).toBeVisible();
 
-  // The agent connects with the start prompt and gets the message with its references.
   const state = (await (await request.get("/-/api/chat")).json()) as Chat;
   const [start] = commands(state.prompt);
   const first = await runCommand(start ?? "");
@@ -141,7 +137,6 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   const replyAndWait = replyCommand(first.stdout);
   expect(replyAndWait).toContain("await sendReply();");
 
-  // Replies are checked before they are accepted.
   const broken = await runCommand(replyAndWait, "<Figure>\n\n{oops\n");
   expect(broken.code).not.toBe(0);
   expect(broken.stderr).toContain("The reply was not sent:");
@@ -151,7 +146,6 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   expect(unknown.stderr).toContain(
     '- error BROKEN_LINK line 3: No page matches the link "nowhere"',
   );
-  // A refused reply carries the same problems as data, for code that catches the error.
   const caught = await runCommand(
     'import { sendReply } from "yapparatus/agent"; try { await sendReply(); } catch (error) { console.log(JSON.stringify(error.diagnostics)); }',
     "See [nowhere](nowhere).\n",
@@ -162,9 +156,7 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   const empty = await runCommand(replyAndWait, "");
   expect(empty.stderr).toContain("- error REPLY_EMPTY: The reply is empty");
 
-  // A marker on the window shows that page edits and replies arrive without a reload.
   await page.evaluate(() => Object.assign(window, { notReloaded: true }));
-  // The agent edits the page: it updates in place, numbers and all.
   const sourcePath = path.join(root, "content/first-page.mdx");
   writeFileSync(
     sourcePath,
@@ -174,7 +166,6 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   );
   await expect(page.locator("main article")).toContainText("can change");
   await expect(page.locator("main article h2").last()).toHaveText(/^1\.\d+\s*Added by the agent$/);
-  // It replies and waits for the next message in the same run.
   const next = runCommand(replyAndWait, reply);
   await expect(page.getByRole("heading", { name: "The fallback read" })).toBeVisible();
   await page.waitForTimeout(500);
@@ -190,8 +181,6 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   );
   await expect(page.locator("main article")).toContainText("can change");
 
-  // The reader can always send; the waiting command returns with the new message.
-  // Shift+Enter starts a new line; Enter sends.
   const message = page.getByLabel("Message", { exact: true });
   await message.fill("And make the diagram");
   await message.press("Shift+Enter");
@@ -204,17 +193,14 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   expect(second.stdout).toContain("And make the diagram\nshow it too.");
   expect(second.stdout).not.toContain("How does the miss edge relate");
   expect(second.stdout).toContain("await sendReply();");
-  // The agent read the message and has no wait open, so it is not connected at once.
   await expect(page.locator(".working")).toHaveAttribute(
     "aria-label",
     "The agent is working on your message",
     { timeout: 2000 },
   );
   await expect(page.locator(".presence")).toHaveText("Agent working, not connected");
-  // The header counts how long the agent has been working.
   await expect(page.locator(".elapsed")).toHaveText(/^\d+ s$/);
 
-  // Show on page finds the original paragraph, and links in the reply work.
   await page
     .getByRole("button", { name: /^Show .* on the page$/ })
     .first()
@@ -229,7 +215,6 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   expect(saved.repliedTo).toBe(1);
   const [sent, replied] = saved.messages;
   const selection = sent?.author === "reader" ? sent.references[0] : undefined;
-  // The item is the address with the selected words, and the source range as the page had it.
   expect(selection?.address).toMatch(/^\/first-page#[a-z-]+:~:text=The%20target%20paragraph/);
   expect(selection && Object.keys(selection).sort()).toEqual([
     "address",
@@ -239,7 +224,6 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
     "startLine",
   ]);
   expect(replied?.author === "agent" && replied.readAt).toBeTruthy();
-  // The log is one JSON line per message, with no copy of the page.
   const log = readFileSync(path.join(root, ".yapparatus/content/chat.jsonl"), "utf8")
     .trim()
     .split("\n");
@@ -257,27 +241,22 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
   expect(wrongMethod.headers().allow).toBe("GET, POST, DELETE");
   expect((await request.get("/-/api/nothing")).status()).toBe(404);
 
-  // A browser reports what it found in a revision of a page; the list shows it with its address.
   const diagnostic = {
     origin: "runtime",
     code: "RUNTIME_FAILED",
     message: "A deliberate test error.",
   } as const;
   expect((await report(request, [diagnostic])).status()).toBe(204);
-  // An error wakes the agent once it has stayed for a moment, so a flicker never does.
   await new Promise((resolve) => setTimeout(resolve, 2500));
   expect((await report(request, [{} as typeof diagnostic])).status()).toBe(400);
-  // Codes come from the registry, and the registry decides severity: reports carry none.
   const unknownCode = await report(request, [
     { ...diagnostic, code: "MADE_UP" as typeof diagnostic.code },
   ]);
   expect(unknownCode.status()).toBe(400);
   expect(((await unknownCode.json()) as { error: string }).error).toContain("MADE_UP");
-  // The server's own checks are not the browser's to report.
   expect((await report(request, [{ ...diagnostic, origin: "link" as "runtime" }])).status()).toBe(
     400,
   );
-  // Reports are about a page at a revision, or a reply.
   const post = (data: unknown) => request.post("/-/api/diagnostics", { data });
   expect((await post({ source: testPage, diagnostics: [] })).status()).toBe(400);
   expect(
@@ -293,7 +272,6 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
     }),
   );
 
-  // Reading the diagnostics gave the agent this error, so an agent's read does not repeat it.
   const seq = await readerMessage(request, "Any errors?");
   const read = await agentRead(request, "a");
   expect(read.status()).toBe(200);
@@ -304,7 +282,6 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
     "- error RUNTIME_FAILED content/first-page.mdx, /first-page: A deliberate test error.",
   );
   expect(chat.prompt).toContain("No references: a message about the document in general.");
-  // Unanswered messages stay in every read until the agent replies.
   const again = (await (await agentRead(request, "a")).json()) as Chat;
   expect(again.messages.map((m) => m.seq)).toContain(seq);
   const sent = await request.post("/-/api/chat", { data: { author: "agent", mdx: "None." } });
@@ -313,7 +290,6 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
   expect(idle.messages).toEqual([]);
   expect(idle.diagnostics).toEqual([]);
   expect(idle.prompt).toContain("Nothing new. Wait again");
-  // A new error ends a waiting read, with how to fix it and tell the reader.
   const waiting = request.get("/-/api/chat?author=reader&include=diagnostics&wait=20", {
     headers: { [agentHeader]: "a" },
   });
@@ -329,15 +305,12 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
   expect(woken.prompt).toContain(
     "await sendReply(); console.log((await waitForMessage()).prompt);",
   );
-  // Each new error is in one read only.
   const past = (await (await agentRead(request, "a")).json()) as Chat;
   expect(past.diagnostics).toEqual([]);
-  // The newest agent wins.
   expect((await agentRead(request, "b")).status()).toBe(200);
   const old = await agentRead(request, "a");
   expect(old.status()).toBe(409);
   expect(((await old.json()) as { error: string }).error).toContain("took over");
-  // Reading the diagnostics lists them with their severity and takes over no one.
   const checked = await request.get("/-/api/diagnostics");
   expect(checked.status()).toBe(200);
   const document = (await checked.json()) as DocumentDiagnostics;
@@ -359,7 +332,6 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
   });
   expect(notJson.status()).toBe(415);
 
-  // A finding about a figure names its lines in the page as it is now, and its address.
   await report(request, [
     {
       origin: "chart",
@@ -377,8 +349,6 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
     `- warning CHART_OVERLAP content/first-page.mdx:${start}-${end}, /first-page#fixture-flow: A test overlap.`,
   );
 
-  // A changed page has a new revision: the old findings stop counting, and until a browser
-  // renders it, the page is unchecked and shows what was found before.
   changePage();
   const changed = (await (await request.get("/-/api/diagnostics")).json()) as DocumentDiagnostics;
   expect(changed.diagnostics.filter((d) => d.code === "RUNTIME_FAILED")).toEqual([]);
@@ -409,14 +379,12 @@ test("clearing the chat deletes it, starts numbering again, and refuses a late r
   const replyFiles = before.messages.flatMap((m) => (m.author === "agent" ? [m.module] : []));
   expect(replyFiles.length).toBeGreaterThan(0);
   await answerAll(request);
-  // An agent waits from before the chat is cleared.
   const waiting = runCommand(
     'import { waitForMessage } from "yapparatus/agent"; console.log((await waitForMessage()).prompt);',
   );
   await page.goto("/");
   await page.locator(".chat-action").click();
   await expect(page.locator(".presence")).toHaveText("Agent connected");
-  // The header asks first; Escape keeps the chat.
   await page.getByRole("button", { name: "Clear chat" }).click();
   const confirm = page.getByRole("alertdialog", { name: "Clear the chat" });
   await expect(confirm.getByRole("button", { name: "Cancel" })).toBeFocused();
@@ -426,16 +394,13 @@ test("clearing the chat deletes it, starts numbering again, and refuses a late r
   await page.getByRole("button", { name: "Clear chat" }).click();
   await confirm.getByRole("button", { name: "Clear", exact: true }).click();
   await expect(page.locator(".reader-message, .agent-message")).toHaveCount(0);
-  // Everything is gone from disk.
   for (const module of replyFiles) expect(existsSync(path.join(root, module))).toBe(false);
   expect(readFileSync(path.join(root, ".yapparatus/content/chat.jsonl"), "utf8")).toBe("");
-  // A reply to a message from before the chat was cleared has nothing to answer.
   const stale = await runCommand(
     'import { sendReply } from "yapparatus/agent"; await sendReply();',
     "Too late.",
   );
   expect(stale.stderr).toContain("There is no reader message to answer.");
-  // The waiting agent gets the next message, and numbering starts again.
   await page.getByLabel("Message", { exact: true }).fill("A fresh start.");
   await page.getByLabel("Message", { exact: true }).press("Enter");
   const told = await waiting;
@@ -456,14 +421,8 @@ test("whole targets: comment on a table, link a section, deep-link a diagram ele
   await page.getByRole("button", { name: /^Copy link to Section 1\.1$/ }).click();
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toMatch(/\/first-page#[a-z-]+$/);
-  // Copying a selected passage confirms on the button, then the menu closes; no notice.
-  await page.locator("article [data-lead]").evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-  });
-  const menu = page.getByRole("toolbar", { name: "Selection actions" });
+  await selectContents(page.locator("article [data-lead]"));
+  const menu = selectionMenu(page);
   await menu.getByRole("button", { name: "Copy link" }).click();
   await expect(menu.getByRole("button", { name: "Copied" })).toBeVisible();
   await expect(menu).toHaveCount(0);
@@ -472,11 +431,9 @@ test("whole targets: comment on a table, link a section, deep-link a diagram ele
   await page.goto("/first-page#fixture-flow--fixture-edge");
   await expect(page.locator("#fixture-flow--fixture-edge")).toBeInViewport();
 
-  // The page title stands for the whole page.
   await page.getByRole("button", { name: "Comment on Chapter 1" }).click();
   await expect(page.locator(".references")).toContainText("Chapter 1 · First page");
 
-  // A word inside a paragraph becomes a text fragment on its section's address.
   await page.goto("/");
   await page
     .locator("article p")
@@ -490,59 +447,26 @@ test("whole targets: comment on a table, link a section, deep-link a diagram ele
       window.getSelection()?.removeAllRanges();
       window.getSelection()?.addRange(range);
     });
-  await page
-    .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Comment", exact: true })
-    .click();
-  const word = (
-    await page.evaluate(
-      () => JSON.parse(sessionStorage.getItem("yapparatus:references") ?? "[]") as Reference[],
-    )
-  ).at(-1);
+  await commentOnSelection(page);
+  const word = (await storedReferences(page)).at(-1);
   expect(word?.address).toMatch(/^\/first-page#[a-z-]+:~:text=paragraph$/);
 
-  // A selection in a table row points at that row's line, not the whole table.
   const cell = page.locator("main article td").filter({ hasText: /^one$/ });
   await cell.scrollIntoViewIfNeeded();
-  await cell.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-  });
-  await page
-    .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Comment", exact: true })
-    .click();
-  const row = (
-    await page.evaluate(
-      () => JSON.parse(sessionStorage.getItem("yapparatus:references") ?? "[]") as Reference[],
-    )
-  ).at(-1);
+  await selectContents(cell);
+  await commentOnSelection(page);
+  const row = (await storedReferences(page)).at(-1);
   const rowLine =
     readFileSync(path.join(root, "content/first-page.mdx"), "utf8")
       .split("\n")
       .indexOf("| one | 1 |") + 1;
   expect([row?.startLine, row?.endLine]).toEqual([rowLine, rowLine]);
 
-  // A selection in a page's code block points at the code line selected.
   const codeLine = page.locator("main article [data-source-line]").filter({ hasText: "longer" });
   await codeLine.scrollIntoViewIfNeeded();
-  await codeLine.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    window.getSelection()?.removeAllRanges();
-    window.getSelection()?.addRange(range);
-  });
-  await page
-    .getByRole("toolbar", { name: "Selection actions" })
-    .getByRole("button", { name: "Comment", exact: true })
-    .click();
-  const code = (
-    await page.evaluate(
-      () => JSON.parse(sessionStorage.getItem("yapparatus:references") ?? "[]") as Reference[],
-    )
-  ).at(-1);
+  await selectContents(codeLine);
+  await commentOnSelection(page);
+  const code = (await storedReferences(page)).at(-1);
   const longerLine =
     readFileSync(path.join(root, "content/first-page.mdx"), "utf8")
       .split("\n")
@@ -555,7 +479,6 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
   page,
   request,
 }) => {
-  // The agent waits; no browser has the page open.
   await answerAll(request);
   const waiting = runCommand(
     'import { waitForMessage } from "yapparatus/agent"; console.log((await waitForMessage()).prompt);',
@@ -563,7 +486,6 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
   await expect
     .poll(async () => ((await (await request.get("/-/api/chat")).json()) as Chat).agent)
     .toBe("waiting");
-  // An edit breaks a link and adds a heading too deep. The server finds both and ends the wait.
   const file = path.join(root, "content/second-page.mdx");
   const original = readFileSync(file, "utf8");
   writeFileSync(file, `${original.trimEnd()}\n\nSee [gone](nowhere).\n\n#### Too deep\n`);
@@ -576,10 +498,8 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
     `- new error BROKEN_LINK content/second-page.mdx:${brokenLine}, /second-page:`,
   );
   expect(told.stdout).toContain(`HEADING_DEPTH content/second-page.mdx:${deepLine}, /second-page:`);
-  // Only a browser checks diagrams: the reply links each change, and opening it checks the page.
   expect(told.stdout).toContain("link each change in your reply");
   expect(told.stdout).toMatch(/^- \/second-page$/m);
-  // checkDocument() waits for the checks of an edit it has not seen yet.
   writeFileSync(file, `${original.trimEnd()}\n\nSee [elsewhere](nowhere-else).\n`);
   const checked = await runCommand(
     'import { checkDocument } from "yapparatus/agent"; console.log((await checkDocument()).prompt);',
@@ -588,9 +508,7 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
   expect(checked.stdout).toMatch(
     /^- error BROKEN_LINK content\/second-page\.mdx:\d+, \/second-page: .*nowhere-else/m,
   );
-  // The same pages, to link in the reply.
   expect(checked.stdout).toMatch(/^- \/second-page$/m);
-  // The fix clears it.
   writeFileSync(file, original);
   await expect
     .poll(async () =>
@@ -599,7 +517,6 @@ test("diagnostics: the server checks unopened pages, wakes the agent, and tracks
       ).diagnostics.map((d) => d.code),
     )
     .not.toContain("BROKEN_LINK");
-  // Showing the page in a browser marks it as checked.
   await page.goto("/second-page");
   await expect(page.locator("main article h1")).toBeVisible();
   await readerMessage(request, "Checked?");
@@ -640,7 +557,6 @@ test("the header lists diagnostics, and Comment attaches where one is", async ({
     "Please fix this error: CHART_FAILED: A test chart fails.",
   );
   await expect(page.locator(".references")).toContainText("Chapter 1 · First page");
-  // The page changes, the open tab renders the new revision, and the finding is gone.
   changePage();
   await expect(page.getByRole("button", { name: "1 error" })).toHaveCount(0);
 });
@@ -672,8 +588,6 @@ test("a reply is a chat message: errors in the document do not hold it back", as
 }) => {
   await readerMessage(request, "Fix it.");
   await agentRead(request, "gate");
-  // While the agent works, an error appears. The agent reads the diagnostics before it
-  // replies; the server does not refuse the reply.
   await report(request, [
     { origin: "runtime", code: "RUNTIME_FAILED", message: "Broken by an edit." },
   ]);

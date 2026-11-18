@@ -1,11 +1,6 @@
 /**
- * A small router for document pages and the source files they show.
- *
- * Path mode (live and static site): /key-ideas#fingerprint, /-/files/app/main.go#L4-L9
- * Hash mode (single HTML file, which has no server): #/key-ideas#fingerprint
- *
- * A page's path is its id: the file name inside the content folder, without `.mdx`. Fragments are
- * heading or figure anchors, exactly as written in the page, or a file's lines.
+ * Router for document pages and source files: paths such as /key-ideas#fingerprint on a site,
+ * and hash routes such as #/key-ideas#fingerprint in a single HTML file, which has no server.
  */
 
 import { type DocumentPage, pages } from "virtual:yapparatus/document";
@@ -13,9 +8,13 @@ import { useSyncExternalStore } from "react";
 import { resolveLink, splitAddress } from "../../document/address.ts";
 import { type FileAddress, fileAddress, parseFileAddress } from "../../document/file-address.ts";
 
+/** The site's base path without a trailing slash. */
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+
+/** Routes live in the URL hash, for a single HTML file opened without a server. */
 export const hashMode = __YAPPARATUS_HASH_ROUTES__ || location.protocol === "file:";
 
+/** What the current address shows: a page or a source file, and where in it. */
 export interface Route {
   /** The page, or undefined when the address names no page. */
   page: DocumentPage | undefined;
@@ -72,6 +71,7 @@ function pageAt(slug: string): DocumentPage | undefined {
   return slug ? pages.find((p) => p.id === slug) : pages[0];
 }
 
+/** The route a URL names, with the scroll position to restore after back or forward. */
 function routeAt(url: URL, restore?: number): Route {
   const { slug, fragment } = parse(url);
   const file = parseFileAddress(`/${slug}`);
@@ -89,6 +89,7 @@ const ready = (page: DocumentPage) => page.module !== undefined || page.error !=
 let route = routeAt(new URL(location.href));
 const listeners = new Set<() => void>();
 
+/** Call `notify` on every route change, for `useSyncExternalStore`. */
 function subscribe(notify: () => void) {
   listeners.add(notify);
   return () => listeners.delete(notify);
@@ -101,12 +102,8 @@ function savedScroll(state: unknown): number | undefined {
 }
 
 /**
- * Every navigation to an address the app shows, by a link, `navigate`, Back, or Forward,
- * stays in the app. A new page is shown once its code has loaded, so the old page stays
- * until then, and the new one renders with its content. The latest navigation wins.
- *
- * The page scrolls in its own element, and the browser resets and restores only the window's
- * scroll position. The web app therefore scrolls the page itself, after the route changes.
+ * Keep navigations to addresses the app shows in the app, showing the new page once its code
+ * has loaded. The page scrolls in its own element, so the app restores scrolling itself.
  */
 function intercept(event: NavigateEvent) {
   if (!event.canIntercept || event.downloadRequest !== null || event.formData) return;
@@ -115,11 +112,9 @@ function intercept(event: NavigateEvent) {
   if (!routed(url)) return;
   const options = { scroll: "manual", focusReset: "manual" } as const;
   if (event.navigationType !== "traverse" && url.href === location.href) {
-    // The same address again: scroll to its anchor, in the same history entry.
     event.intercept({ ...options, handler: async () => scrollToFragment(route.fragment) });
     return;
   }
-  // Remember the position for Back and Forward to the entry the reader leaves.
   navigation.updateCurrentEntry({ state: { scroll: scrollRoot().scrollTop } });
   const restore =
     event.navigationType === "traverse" ? savedScroll(event.destination.getState()) : undefined;
@@ -135,13 +130,14 @@ function intercept(event: NavigateEvent) {
   });
 }
 
-// Without the Navigation API, links load each page from the server.
+/** Without the Navigation API, links load each page from the server. */
 const navigationApi = "navigation" in window;
 if (navigationApi) {
   navigation.addEventListener("navigate", intercept);
   import.meta.hot?.dispose(() => navigation.removeEventListener("navigate", intercept));
 }
 
+/** The current route, rendering again when it changes. */
 export function useRoute(): Route {
   return useSyncExternalStore(subscribe, () => route);
 }
@@ -191,9 +187,8 @@ export function canonicalize() {
 }
 
 /**
- * Turn a link written in a page into a real address. Accepts:
- * "#anchor", "key-ideas", "key-ideas#anchor", "/key-ideas", "02-key-ideas.mdx", "./02-key-ideas.mdx#anchor".
- * Other links are returned unchanged.
+ * Turn a link written in a page, such as "#anchor", "key-ideas#anchor", or "./02-key-ideas.mdx",
+ * into a real address. Other links are returned unchanged.
  */
 export function resolveHref(raw: string | undefined, from: DocumentPage | undefined): string {
   if (!raw) return "";
@@ -223,7 +218,6 @@ export function prefetchLinks(event: Event) {
 /** Scroll to an anchor, or to the top when there is none. */
 export function scrollToFragment(fragment: string, smooth = true) {
   const target = fragment ? document.getElementById(fragment) : undefined;
-  // Diagram elements are SVG and ignore scroll margins; center them instead.
   const block = target instanceof SVGElement ? "center" : "start";
   if (target) target.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block });
   else if (!fragment) scrollRoot().scrollTo({ top: 0 });

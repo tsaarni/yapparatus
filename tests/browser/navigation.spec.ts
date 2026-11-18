@@ -1,3 +1,5 @@
+/** Navigation: pages load on demand, anchors work, Back restores position, the latest wins. */
+
 import { expect, type Page, test } from "@playwright/test";
 
 /** Follow an in-app link to `address`, as a link written in a page would. */
@@ -25,7 +27,6 @@ test("a page's code loads when it is opened, and its anchor is shown once it has
   await expect(page.getByRole("heading", { name: "First page", level: 1 })).toBeVisible();
   expect(requested.some((url) => url.endsWith("/diagrams.mdx"))).toBe(false);
 
-  // The diagrams page loads slowly. Until it has loaded, the old page stays on screen.
   let release = () => {};
   const held = new Promise<void>((resolve) => {
     release = resolve;

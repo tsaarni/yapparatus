@@ -1,10 +1,12 @@
 /** Plain geometry in SVG user units: x grows rightward, y grows downward. */
 
+/** A point or a direction. */
 export interface Vec {
   x: number;
   y: number;
 }
 
+/** An axis-aligned rectangle from its top-left corner. */
 export interface Rect {
   x: number;
   y: number;
@@ -12,8 +14,10 @@ export interface Rect {
   height: number;
 }
 
+/** A side of a rectangle, where ports sit and edges attach. */
 export type Side = "top" | "bottom" | "left" | "right";
 
+/** The named points on a rectangle that elements expose, such as `el.topLeft`. */
 export const ANCHORS = [
   "center",
   "top",
@@ -25,8 +29,10 @@ export const ANCHORS = [
   "bottomLeft",
   "bottomRight",
 ] as const;
+/** The name of one of the `ANCHORS`. */
 export type AnchorName = (typeof ANCHORS)[number];
 
+/** The coordinates of a named anchor on a rectangle. */
 export function anchorOf(rect: Rect, name: AnchorName): Vec {
   const { x, y, width: w, height: h } = rect;
   const cx = x + w / 2;
@@ -68,6 +74,7 @@ export function portOf(rect: Rect, side: Side, t: number): Vec {
   }
 }
 
+/** The smallest rectangle that covers every given one, or undefined for none. */
 export function union(rects: Rect[]): Rect | undefined {
   if (rects.length === 0) return;
   let x0 = Number.POSITIVE_INFINITY;
@@ -83,6 +90,7 @@ export function union(rects: Rect[]): Rect | undefined {
   return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
+/** Grow a rectangle by dx on the left and right and dy on the top and bottom; negative shrinks. */
 export function inflate(r: Rect, dx: number, dy = dx): Rect {
   return { x: r.x - dx, y: r.y - dy, width: r.width + 2 * dx, height: r.height + 2 * dy };
 }
@@ -94,6 +102,7 @@ export function overlap(a: Rect, b: Rect): { width: number; height: number } | u
   return width > 0.5 && height > 0.5 ? { width, height } : undefined;
 }
 
+/** Whether `inner` lies inside `outer`, with half a unit of tolerance. */
 export function contains(outer: Rect, inner: Rect): boolean {
   return (
     inner.x >= outer.x - 0.5 &&
@@ -130,7 +139,6 @@ export function segmentHitsRect(a: Vec, b: Vec, rect: Rect): boolean {
   return t1 - t0 > 1e-6;
 }
 
-/** Where a ray from the rectangle's center toward `toward` leaves the rectangle. */
 /**
  * The side of `rect` that a line from its center toward `toward` crosses first, of `allowed`.
  * A wide rectangle therefore takes its bottom for a point below it, even one far to the side.
@@ -143,9 +151,6 @@ export function sideToward(
   const c = anchorOf(rect, "center");
   const dx = toward.x - c.x;
   const dy = toward.y - c.y;
-  // The line reaches a side after half the rectangle's size divided by its progress toward
-  // that side, so the side with the most progress per unit of half-size comes first. Scaled by
-  // both half-sizes, the comparison needs no division and holds for flat rectangles too.
   const w = rect.width / 2;
   const h = rect.height / 2;
   const progress = { left: -dx * h, right: dx * h, top: -dy * w, bottom: dy * w };
@@ -166,10 +171,12 @@ export function boundaryToward(rect: Rect, toward: Vec): Vec {
   return { x: c.x + dx * s, y: c.y + dy * s };
 }
 
+/** The straight-line distance between two points. */
 export function distance(a: Vec, b: Vec): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+/** Round to hundredths, the precision a compiled drawing keeps. */
 export function round(n: number): number {
   return Math.round(n * 100) / 100;
 }

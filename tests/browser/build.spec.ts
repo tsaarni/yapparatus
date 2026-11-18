@@ -1,3 +1,5 @@
+/** Static and single-file builds: reading without the chat, steps, source files, and chart data. */
+
 import {
   cpSync,
   mkdirSync,
@@ -20,6 +22,7 @@ let root: string;
 let server: PreviewServer;
 const privateSentinel = "PRIVATE_CHAT_SENTINEL_1703";
 
+/** The fixture diagram is drawn from its compiled form, with no links and no diagnostics. */
 async function expectCompiledDiagram(page: Page) {
   const diagram = page.getByRole("img", { name: "Fixture flow." });
   await expect(diagram).toBeVisible();
@@ -96,7 +99,6 @@ test("static reading retains navigation without the chat or its records", async 
     const output = readFileSync(path.join(root, "dist/content/-/assets", entry), "utf8");
     expect(output).not.toContain(privateSentinel);
   }
-  // Each page's file preloads that page's code with the app; the root preloads the first page.
   const preloads = (file: string) =>
     [
       ...readFileSync(path.join(root, "dist/content", file), "utf8").matchAll(
@@ -110,7 +112,6 @@ test("static reading retains navigation without the chat or its records", async 
   expect(preloads("404.html")).toEqual([]);
   for (const file of [...preloads("index.html"), ...preloads("second-page/index.html")])
     expect(readdirSync(path.join(root, "dist/content/-/assets"))).toContain(file);
-  // Every page has its own file, so a deep link works on any static host.
   await page.goto("http://127.0.0.1:4174/second-page#details");
   await expect(page.getByRole("heading", { name: "Second page" })).toBeVisible();
   await expect(page.locator("h2#details")).toBeInViewport();
@@ -123,7 +124,6 @@ test("diagram steps: controls, build reveal, groups, step-only elements, and lin
   await page.goto("http://127.0.0.1:4174/second-page");
   const figure = page.locator("figure#step-flow");
   const element = (id: string) => figure.locator(`[data-element-id="${id}"]`);
-  // Without a step, the whole figure shows except step-only elements.
   await expect(figure.getByText("3 steps")).toBeVisible();
   await expect(element("go")).toHaveAttribute("role", "button");
   await expect(element("finish")).toHaveCSS("opacity", "1");
@@ -135,16 +135,13 @@ test("diagram steps: controls, build reveal, groups, step-only elements, and lin
   await figure.getByRole("button", { name: "Next step" }).click();
   await expect(element("hint")).toHaveCSS("opacity", "0");
   await expect(element("start")).toHaveCSS("opacity", "0.35");
-  // A container focuses everything in it.
   await figure.getByRole("button", { name: "Next step" }).click();
   await expect(element("start")).toHaveAttribute("data-state", "focus");
   await expect(element("finish")).toHaveAttribute("data-state", "focus");
-  // Clicking an element opens the next step about it, wrapping around.
   await element("start").click();
   await expect(figure.getByText("Step 1 of 3")).toBeVisible();
   await figure.getByRole("button", { name: "Show all" }).click();
   await expect(figure.getByText("3 steps")).toBeVisible();
-  // Steps and elements have addresses.
   await page.goto("http://127.0.0.1:4174/second-page#step-flow--end");
   await expect(figure.getByText("Then it moves on.")).toBeVisible();
   await page.goto("http://127.0.0.1:4174/second-page#step-flow--hint");
@@ -158,10 +155,8 @@ test("a build carries the source files its pages name, and only those", async ({
   await excerpt.getByRole("link", { name: "sample/greet.ts:1–4" }).click();
   await expect(page).toHaveURL(/\/-\/files\/sample\/greet\.ts$/);
   await expect(page.locator("main article [data-file] [data-line]")).toHaveCount(4);
-  // A deep link works on a static host, and shows its lines.
   await page.goto("http://127.0.0.1:4174/-/files/sample/greet.ts#L2-L3");
   await expect(page.locator("[data-selected]")).toHaveCount(2);
-  // Files whose names other plugins claim, such as JSON and CSS, are shown as text.
   await page.goto("http://127.0.0.1:4174/-/files/sample/settings.json");
   await expect(page.locator("main article [data-file]")).toContainText('"greeting": "Hello"');
   await page.goto("http://127.0.0.1:4174/-/files/sample/greeting.css");
@@ -215,12 +210,10 @@ test("single HTML works from disk without external assets", async ({ page }) => 
     await expect(page.getByRole("img", { name: label, exact: true })).toBeVisible();
   }
   await expect(page.getByRole("img", { name: "Redis", exact: true })).toHaveCSS("width", "28px");
-  // Source files open from the single file too.
   await page.goto(
     `${pathToFileURL(path.join(root, "dist-single/content/index.html")).href}#/-/files/sample/greet.ts#L2`,
   );
   await expect(page.locator("[data-selected]")).toHaveCount(1);
-  // A file's chart loads its data from inside the single file.
   await page.goto(
     `${pathToFileURL(path.join(root, "dist-single/content/index.html")).href}#/charts`,
   );
