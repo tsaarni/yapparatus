@@ -1,7 +1,10 @@
 /**
  * Checks over the scene and the compiled drawing: ids, positions, overlaps, crossings.
  */
-import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "./compiled.ts";
+
+import type { DiagramBuilder } from "../builder.ts";
+import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "../drawing.ts";
+import { type Edge, type Element, Enclosure, elementOf, Node, Stack } from "../elements.ts";
 import {
   contains,
   inflate,
@@ -10,16 +13,7 @@ import {
   round,
   segmentHitsRect,
   type Vec,
-} from "./geometry.ts";
-import {
-  type DiagramBuilder,
-  type Edge,
-  type Element,
-  Enclosure,
-  elementOf,
-  Node,
-  Stack,
-} from "./scene.ts";
+} from "../geometry.ts";
 import type { Report } from "./text.ts";
 
 /**

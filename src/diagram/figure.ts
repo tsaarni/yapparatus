@@ -3,11 +3,12 @@
  * compiler runs it in Node with the web app's font files; tests run it with a fixed measure.
  */
 import type { DiagnosticCode } from "../document/diagnostic.ts";
-import { compile } from "./compile.ts";
-import { type CompiledDiagram, expand } from "./compiled.ts";
+import { DiagramBuilder } from "./builder.ts";
+import { compile } from "./compile/compile.ts";
+import { type CompiledDiagram, expand } from "./drawing.ts";
+import type { Diagnostic } from "./elements.ts";
 import { overlap } from "./geometry.ts";
 import { type Measure, minScale, readingWidth } from "./metrics.ts";
-import { type Diagnostic, DiagramBuilder } from "./scene.ts";
 
 /** A step as data: its id and the ids it focuses, as written. */
 export interface FigureStep {

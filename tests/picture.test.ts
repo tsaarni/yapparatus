@@ -4,12 +4,14 @@
  */
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import type { DiagramBuilder } from "../src/diagram/builder.ts";
 import { compileFigure, type Figure } from "../src/diagram/figure.ts";
 import type { Measure } from "../src/diagram/metrics.ts";
-import { lightColors } from "../src/diagram/paint.ts";
 import { type PictureOptions, pictureOf } from "../src/diagram/picture.ts";
-import type { DiagramBuilder } from "../src/diagram/scene.ts";
 import { fontMeasure, textOutline } from "../src/font-measure.ts";
+import { lightPaint } from "../src/server/theme-values.ts";
+
+const lightColors = lightPaint.colors;
 
 /** 7 units per character: deterministic stand-in for font measurement. */
 const measure: Measure = (text) => text.length * 7;
@@ -19,7 +21,7 @@ const outline = (text: string, _font: unknown, x: number, y: number) => `M${x} $
 function draw(figure: Figure, options: PictureOptions = {}) {
   const drawing = compileFigure(figure, measure);
   assert.equal(drawing.ok, true, JSON.stringify(drawing.diagnostics));
-  return pictureOf(drawing, options, { measure, outline });
+  return pictureOf(drawing, options, { measure, outline }, lightPaint);
 }
 
 /** The ids of the elements a picture draws. */
@@ -169,7 +171,7 @@ test("text is drawn as outlines from the web app's font files", () => {
   const { measure: fontWidth } = fontMeasure();
   const figure: Figure = { draw: (d) => void d.box("Outline"), steps: [], build: false };
   const drawing = compileFigure(figure, fontWidth);
-  const { svg } = pictureOf(drawing, {}, { measure: fontWidth, outline: textOutline });
+  const { svg } = pictureOf(drawing, {}, { measure: fontWidth, outline: textOutline }, lightPaint);
   assert.doesNotMatch(svg, /<text/);
   // The label is glyph outlines: a path with curves.
   assert.match(svg, /<path d="M[^"]*Q[^"]*" fill="#11141b"\/>/);

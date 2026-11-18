@@ -3,7 +3,7 @@
  * the fonts are ready.
  */
 import { useEffect, useState } from "react";
-import { defaultMetrics as m } from "../diagram/metrics.ts";
+import { defaultMetrics as m } from "../../diagram/metrics.ts";
 
 const fontQueries = [
   ...[m.textWeight, m.edgeWeight, m.labelWeight].map((w) => `${w} ${m.labelSize}px ${m.sans}`),

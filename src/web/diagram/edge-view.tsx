@@ -2,9 +2,16 @@
  * Edges, enclosures, and frames.
  */
 import * as stylex from "@stylexjs/stylex";
-import { dash, stroke, theme } from "../web/theme.stylex.ts";
-import { styled } from "../web/ui.tsx";
-import type { CompiledEdge, CompiledEnclosure, CompiledFrame, ElementState } from "./compiled.ts";
+import type {
+  CompiledEdge,
+  CompiledEnclosure,
+  CompiledFrame,
+  ElementState,
+} from "../../diagram/drawing.ts";
+import { corner } from "../../diagram/metrics.ts";
+import { fragmentTab, outline, pointList, roundedPath, rule } from "../../diagram/outlines.ts";
+import { dash, stroke, theme } from "../theme.stylex.ts";
+import { styled } from "../ui.tsx";
 import {
   categoryStyle,
   elementStyles,
@@ -14,8 +21,6 @@ import {
   type Target,
   targetFor,
 } from "./element.tsx";
-import { corner } from "./metrics.ts";
-import { fragmentTab, outline, pointList, roundedPath, rule } from "./shapes.ts";
 
 export function EdgeView({
   edge,

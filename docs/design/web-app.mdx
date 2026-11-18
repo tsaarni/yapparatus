@@ -199,7 +199,7 @@ The panel header shows the [agent state](server#agent-state). While the newest m
 
 ## Diagnostics display
 
-In dev mode, the header shows the number of errors and warnings, and opens a list of them grouped by page. An item opens the page at the diagnostic's place. Its Comment button writes a request to fix the diagnostic into the message box. Diagnostics also appear in place: a page that fails to render shows its error instead of its content, and a [diagram](components#diagram) or chart lists them under the figure.
+In dev mode, the header shows the number of errors and warnings, and opens a list of them grouped by page. An item's code and line open the page at the diagnostic's place. Its message is text that the reader can select, and its Copy button copies the diagnostic with its file and line. Its Comment button writes a request to fix the diagnostic into the message box. Diagnostics also appear in place: a page that fails to render shows its error instead of its content, and a [diagram](components#diagram) or chart lists them under the figure.
 
 Some problems appear only when a page runs in the browser: render errors, runtime errors, chart problems, and replies that fail to show. The web app reports them to the server with the page's revision, and reports a clean revision too, so the server knows the page was checked. See [revisions and reports](diagnostics#revisions-and-reports).
 
@@ -219,6 +219,9 @@ Some problems appear only when a page runs in the browser: render errors, runtim
 | [`prose.tsx`](/-/files/yapparatus/src/web/prose.tsx) | Markdown elements, alerts, code blocks, the breakout rule |
 | [`components.tsx`](/-/files/yapparatus/src/web/components.tsx) | `Figure`, `Table`, `Listing`, `Ref`, `FileTree`, `Excerpt` |
 | [`alternatives.tsx`](/-/files/yapparatus/src/web/alternatives.tsx) | `Tabs`, `Columns`, `Panel` |
+| [`components/figure-diagnostics.tsx`](/-/files/yapparatus/src/web/components/figure-diagnostics.tsx) | The diagnostics under a diagram or a chart |
+| [`diagram/`](/-/files/yapparatus/src/web/diagram/diagram.tsx) | `Diagram`, `Step`, and the views of a compiled diagram; see [components](components#diagram) |
+| [`chart/`](/-/files/yapparatus/src/web/chart/chart.tsx) | `Chart`, its margins, and the wait for fonts; see [charts](charts) |
 | [`icons.tsx`](/-/files/yapparatus/src/web/icons.tsx) | `Icon` and the web app's own icons |
 | [`registry.ts`](/-/files/yapparatus/src/web/registry.ts) | The components that pages and replies use without imports |
 | [`targets.tsx`](/-/files/yapparatus/src/web/targets.tsx) | Targets and the Link and Comment buttons |

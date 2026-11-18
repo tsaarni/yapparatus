@@ -1,8 +1,8 @@
-import { Chart } from "../chart/Chart.tsx";
-import { Diagram, Step } from "../diagram/Diagram.tsx";
 import type { pageComponents } from "../document/page-module.ts";
 import { Columns, Panel, Tabs } from "./alternatives.tsx";
+import { Chart } from "./chart/chart.tsx";
 import { Excerpt, Figure, FileTree, Listing, Ref, Table } from "./components.tsx";
+import { Diagram, Step } from "./diagram/diagram.tsx";
 import { Icon } from "./icons.tsx";
 import { prose } from "./prose.tsx";
 

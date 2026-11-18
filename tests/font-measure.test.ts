@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { test } from "node:test";
 import * as fontkit from "fontkit";
+import type { DiagramBuilder } from "../src/diagram/builder.ts";
 import { compileFigure } from "../src/diagram/figure.ts";
 import { defaultMetrics as m } from "../src/diagram/metrics.ts";
-import type { DiagramBuilder } from "../src/diagram/scene.ts";
 import { fontMeasure, fontStylesheets } from "../src/font-measure.ts";
 import { examples } from "./diagram-examples.ts";
 

@@ -3,9 +3,9 @@
  * so a diagram compiled in Node has the layout the browser would compute.
  */
 import { expect, test } from "@playwright/test";
-import { compile } from "../../src/diagram/compile.ts";
+import { DiagramBuilder } from "../../src/diagram/builder.ts";
+import { compile } from "../../src/diagram/compile/compile.ts";
 import { type FontSpec, defaultMetrics as m } from "../../src/diagram/metrics.ts";
-import { DiagramBuilder } from "../../src/diagram/scene.ts";
 import { fontMeasure } from "../../src/font-measure.ts";
 import { examplePages, examples } from "../diagram-examples.ts";
 

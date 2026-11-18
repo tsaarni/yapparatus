@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { loadThemes } from "../src/diagram/paint.ts";
+import { loadThemes } from "../src/server/theme-values.ts";
 
 /** The contrast every theme must reach, checked on the real theme file. */
 const { theme, lightTheme } = await loadThemes();

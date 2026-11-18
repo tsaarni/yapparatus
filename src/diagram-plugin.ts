@@ -12,9 +12,9 @@ import type {
   MdxJsxTextElementHast,
 } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
-import type { CompiledDiagram } from "./diagram/compiled.ts";
+import type { DiagramBuilder } from "./diagram/builder.ts";
+import type { CompiledDiagram } from "./diagram/drawing.ts";
 import { compileFigure, drawFailed, type FigureStep } from "./diagram/figure.ts";
-import type { DiagramBuilder } from "./diagram/scene.ts";
 import { fontMeasure } from "./font-measure.ts";
 import { type ContentIssue, compiledAttribute, contentIssues } from "./markdown-plugin.ts";
 

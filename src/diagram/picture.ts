@@ -1,21 +1,22 @@
 /**
  * A compiled drawing as a standalone SVG picture, for an agent that looks at a figure. It draws
- * what the web app draws, in the same order as `DiagramView.tsx`, with the light theme's colors
- * written into it and text as glyph outlines, so a rasterizer needs no fonts and no styles.
+ * what the web app draws, in the same order as `web/diagram/diagram-view.tsx`, with the paint
+ * values it is given written into it and text as glyph outlines, so a rasterizer needs no fonts
+ * and no styles.
  */
 
+import { type Align, textLine } from "./compile/text.ts";
 import {
   type CompiledDiagram,
   type CompiledEdge,
   type CompiledNode,
   stepOnlyElements,
   type TextLine,
-} from "./compiled.ts";
+} from "./drawing.ts";
 import { type Rect, union } from "./geometry.ts";
 import { badge, corner, defaultMetrics, type FontSpec, type Measure } from "./metrics.ts";
-import { categories, lightColors as color, dash, haloWidth, roles, stroke } from "./paint.ts";
-import * as shape from "./shapes.ts";
-import { type Align, textLine } from "./text.ts";
+import * as shape from "./outlines.ts";
+import { categories, haloWidth, type Paint, roles } from "./paint.ts";
 
 /** Text as glyph outlines: path data for text that starts at x with its central baseline at y. */
 export type TextOutline = (text: string, font: FontSpec, x: number, y: number) => string;
@@ -39,8 +40,6 @@ export interface Picture {
 }
 
 const m = defaultMetrics;
-/** The figure's own color, behind the drawing and in the halos. */
-const background = color.surface;
 
 /** The legend under the drawing, as the web app's legend buttons are laid out. */
 const legend = {
@@ -78,7 +77,8 @@ interface Ink {
   weight: number;
 }
 
-function inkOf(element: { role: string; category?: number }): Ink {
+function inkOf(element: { role: string; category?: number }, paint: Paint): Ink {
+  const { colors: color, stroke } = paint;
   const role =
     roles[element.role === "external" ? "default" : (element.role as keyof typeof roles)];
   const category = element.category === undefined ? undefined : categories[element.category - 1];
@@ -99,7 +99,11 @@ export function pictureOf(
   diagram: CompiledDiagram,
   options: PictureOptions,
   fonts: PictureFonts,
+  paint: Paint,
 ): Picture {
+  const { colors: color, stroke, dash } = paint;
+  /** The figure's own color, behind the drawing and in the halos. */
+  const background = color.surface;
   if (!diagram.ok) throw new Error("The drawing did not compile, so it has no picture.");
   const stepOnly = stepOnlyElements(diagram);
   const shown = (id: string) => !stepOnly.has(id);
@@ -240,7 +244,7 @@ export function pictureOf(
         tag,
       );
     const layered = (node.shape === "record" && node.rules !== undefined) || node.shape === "cell";
-    const k = inkOf(node);
+    const k = inkOf(node, paint);
     let body = shapeOf(node, k) + lines(node, k.label);
     if (node.role === "warning" && !layered) body += warningBadge(node.rect);
     if (flagged.has(node.id) && !layered)
@@ -250,7 +254,7 @@ export function pictureOf(
 
   /** A record's outline over its cells, its title divider, and the hairlines between cells. */
   const recordOutline = (node: CompiledNode): string => {
-    const k = inkOf(node);
+    const k = inkOf(node, paint);
     const rule = { stroke: k.ink, "stroke-width": stroke.hairline };
     let body = rect(node.rect, corner.shape, {
       ...outlined(k, node.role === "external"),
@@ -265,7 +269,7 @@ export function pictureOf(
   };
 
   const pin = (node: CompiledNode): string => {
-    const k = inkOf(node);
+    const k = inkOf(node, paint);
     const { x, y } = node.rect;
     const label: TextLine = {
       text: String(node.pin),
@@ -283,10 +287,10 @@ export function pictureOf(
   const edgeOf = (edge: CompiledEdge): string => {
     const d = shape.roundedPath(edge.points, edge.radius);
     if (edge.passive) {
-      const k = inkOf(edge);
+      const k = inkOf(edge, paint);
       return `<path${attrs({ d, fill: "none", stroke: k.ink, "stroke-width": stroke.hairline, "stroke-dasharray": dash.dotted })}/>`;
     }
-    const k = inkOf(edge);
+    const k = inkOf(edge, paint);
     const line = {
       fill: "none",
       stroke: k.ink,
@@ -320,7 +324,7 @@ export function pictureOf(
     out.push(group(shown(f.id), body, { "element-id": f.id, shape: "frame" }));
   }
   for (const e of diagram.enclosures) {
-    const k = inkOf(e);
+    const k = inkOf(e, paint);
     const ink = { stroke: k.ink, "stroke-width": k.weight };
     let body = rect(e.rect, corner.group, {
       fill: "none",
@@ -352,10 +356,12 @@ export function pictureOf(
     body += labels(f.title) + f.dividers.map((divider) => labels(divider.label)).join("");
     out.push(group(shown(f.id), body));
   }
-  if (options.ids) out.push(idLayer(diagram, fonts.measure, text));
+  if (options.ids) out.push(idLayer(diagram, fonts.measure, text, paint.colors));
 
   const vb = diagram.viewBox;
-  const key = diagram.legend.length ? legendOf(diagram, vb, fonts, text) : { svg: "", height: 0 };
+  const key = diagram.legend.length
+    ? legendOf(diagram, vb, fonts, text, paint.colors)
+    : { svg: "", height: 0 };
   const height = vb.height + key.height;
   const svg = [
     `<svg xmlns="http://www.w3.org/2000/svg"${attrs({ viewBox: `${n(vb.x)} ${n(vb.y)} ${n(vb.width)} ${n(height)}`, width: vb.width, height })}>`,
@@ -377,6 +383,7 @@ function idLayer(
   diagram: CompiledDiagram,
   measure: Measure,
   text: (line: TextLine, fill: string, halo?: boolean) => string,
+  color: Paint["colors"],
 ): string {
   const font = { family: m.mono, size: 9, weight: 400 };
   const tag = (id: string, x: number, y: number, align: Align = "start") =>
@@ -415,6 +422,7 @@ function legendOf(
   vb: Rect,
   fonts: PictureFonts,
   text: (line: TextLine, fill: string) => string,
+  color: Paint["colors"],
 ): { svg: string; height: number } {
   const { swatch } = legend;
   let x = vb.x;

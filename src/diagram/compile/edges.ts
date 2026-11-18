@@ -2,10 +2,7 @@
  * Edges: routes, curves, loops, endpoints snapped to outlines, arrowheads, and labels.
  */
 
-import type { CompiledEdge, CompiledLabel } from "./compiled.ts";
-import { anchorOf, boundaryToward, distance, type Rect, round, type Vec } from "./geometry.ts";
-import type { Layout } from "./layout.ts";
-import type { Measure, Metrics } from "./metrics.ts";
+import type { CompiledEdge, CompiledLabel } from "../drawing.ts";
 import {
   type Edge,
   type Element,
@@ -16,7 +13,10 @@ import {
   type PointLike,
   type Side,
   toExpr,
-} from "./scene.ts";
+} from "../elements.ts";
+import { anchorOf, boundaryToward, distance, type Rect, round, type Vec } from "../geometry.ts";
+import type { Measure, Metrics } from "../metrics.ts";
+import type { Layout } from "./layout.ts";
 import { type Report, textLine } from "./text.ts";
 
 /** Legs a curved edge is sampled into; even, so a vertex sits at the apex. */

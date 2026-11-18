@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { expand } from "../src/diagram/compiled.ts";
+import type { DiagramBuilder } from "../src/diagram/builder.ts";
+import { expand } from "../src/diagram/drawing.ts";
 import { compileFigure } from "../src/diagram/figure.ts";
 import type { Measure } from "../src/diagram/metrics.ts";
-import type { DiagramBuilder } from "../src/diagram/scene.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */
 const measure: Measure = (text) => text.length * 7;

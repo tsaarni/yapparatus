@@ -8,12 +8,12 @@ The page compiler finds each `<Diagram>` on a page and [hands its draw program t
 
 <Diagram id="dc-stages" caption="The stages of the diagram compiler, with the module of each and what it adds." draw={(d) => {
   const stages = [
-    d.box("Record", { sub: "figure.ts, scene.ts", id: "record" }),
-    d.box("Settle ids", { sub: "validate.ts", id: "ids" }),
+    d.box("Record", { sub: "figure.ts, builder.ts", id: "record" }),
+    d.box("Settle ids", { sub: "checks.ts", id: "ids" }),
     d.box("Measure", { sub: "text.ts", id: "measure" }),
     d.box("Size and place", { sub: "layout.ts, records.ts", id: "layout" }),
     d.box("Route", { sub: "edges.ts", id: "route" }),
-    d.box("Check", { sub: "validate.ts", id: "check" }),
+    d.box("Check", { sub: "checks.ts", id: "check" }),
     d.box("Finish", { sub: "compile.ts", id: "finish" }),
     d.box("Check steps", { sub: "figure.ts", id: "steps" }),
   ]
@@ -53,7 +53,7 @@ The page compiler finds each `<Diagram>` on a page and [hands its draw program t
   <Step focus="compiled page picture">The page carries the compiled diagram, and the server draws a picture from the same data. See [the compiled diagram](#the-compiled-diagram) and [pictures](#pictures).</Step>
 </Diagram>
 
-[The compiler](/-/files/yapparatus/src/diagram/compile.ts#L24-L116) measures, sizes, and places on demand: it computes a value the first time a later stage asks for it, and keeps it. The order in <Ref to="dc-stages" /> is the order in which results become final.
+[The compiler](/-/files/yapparatus/src/diagram/compile/compile.ts#L25-L117) measures, sizes, and places on demand: it computes a value the first time a later stage asks for it, and keeps it. The order in <Ref to="dc-stages" /> is the order in which results become final.
 
 A stage reports each problem it finds and continues with a usable value, so one compile reports all problems at once. Only a placement cycle or an exception stops the compile, and the result then has no geometry. A diagram with any error is marked as failed, and the server draws no picture of it.
 
@@ -175,19 +175,19 @@ Every element has an id. The page uses it as the element's address, `/page#figur
 
 </Table>
 
-[The id check](/-/files/yapparatus/src/diagram/validate.ts#L30-L50) makes the ids final before layout. A repeated explicit id is `DUPLICATE_ID`, and a repeated derived id gets `-2`, `-3`, in the order of creation. Cells, marks, and edges are settled last, because their ids are built from the final ids of their parents and ends.
+[The id check](/-/files/yapparatus/src/diagram/compile/checks.ts#L24-L44) makes the ids final before layout. A repeated explicit id is `DUPLICATE_ID`, and a repeated derived id gets `-2`, `-3`, in the order of creation. Cells, marks, and edges are settled last, because their ids are built from the final ids of their parents and ends.
 
 A derived id changes when its label changes. The link check verifies only the figure part of an address, so [the diagram reference](/-/files/yapparatus/starter/docs/diagrams.md#L133-L150) asks for an explicit id on any element that something outside points at.
 
 ## Text measurement
 
-[Text measurement](/-/files/yapparatus/src/diagram/text.ts#L76-L162) splits each label into lines, and wraps them at word boundaries when the shape has a fixed `width`. Every line in the compiled diagram carries its font size and weight, and the web app and the picture draw it with exactly those values.
+[Text measurement](/-/files/yapparatus/src/diagram/compile/text.ts#L76-L162) splits each label into lines, and wraps them at word boundaries when the shape has a fixed `width`. Every line in the compiled diagram carries its font size and weight, and the web app and the picture draw it with exactly those values.
 
 The widths come from [the font measure](/-/files/yapparatus/src/font-measure.ts#L57-L71), which reads the font files and `@font-face` rules that the web app loads. For each character, it picks the face that a browser picks, and it shapes the text with fontkit. A browser test checks that its widths are within 0.5 pixels of the browser's own. A character that no face has gets a width of one em and is reported as `FONT_FALLBACK`, because a browser draws it in a system font of unknown width.
 
 ## Layout
 
-[The layout](/-/files/yapparatus/src/diagram/layout.ts#L33-L326) answers three questions about any element: its size, its position, and its rectangle, which combines the two. Sizes are computed from the inside out, and positions from the outside in.
+[The layout](/-/files/yapparatus/src/diagram/compile/layout.ts#L33-L326) answers three questions about any element: its size, its position, and its rectangle, which combines the two. Sizes are computed from the inside out, and positions from the outside in.
 
 ### Sizes
 
@@ -252,7 +252,7 @@ The compiler uses three rectangles for each shape, as <Ref to="dc-boxes" /> show
 
 ## Edges
 
-[Routing](/-/files/yapparatus/src/diagram/edges.ts#L37-L298) turns each edge into a list of points, its arrowheads, and its label boxes. An edge that ends at an element attaches to the element's outline. An edge that ends at a point, such as `api.bottom`, ends exactly there.
+[Routing](/-/files/yapparatus/src/diagram/compile/edges.ts#L37-L298) turns each edge into a list of points, its arrowheads, and its label boxes. An edge that ends at an element attaches to the element's outline. An edge that ends at a point, such as `api.bottom`, ends exactly there.
 
 ### Routes
 
@@ -300,7 +300,7 @@ In the running example, `client->api` is straight. Both elements are at the same
 
 ### Labels
 
-[A label](/-/files/yapparatus/src/diagram/edges.ts#L223-L295) stays horizontal and sits on one straight piece of the finished route: by default the longest, at its middle, above a horizontal piece and to the right of a vertical one. A label on a single straight edge must fit between the two ends, or the compiler reports `LABEL_CROWDED`. Labels on other routes are covered by [the overlap checks](#checks).
+[A label](/-/files/yapparatus/src/diagram/compile/edges.ts#L223-L295) stays horizontal and sits on one straight piece of the finished route: by default the longest, at its middle, above a horizontal piece and to the right of a vertical one. A label on a single straight edge must fit between the two ends, or the compiler reports `LABEL_CROWDED`. Labels on other routes are covered by [the overlap checks](#checks).
 
 In the running example, "request" sits above the middle of its edge, centered at x = 148, and "query" sits to the right of the vertical edge.
 
@@ -324,11 +324,11 @@ The cells of a record and the marks of a text are elements of their own, so edge
   d.arrow(outline, rec.element("payload"))
 }} />
 
-[The grid](/-/files/yapparatus/src/diagram/records.ts#L54-L156) lays out a record's cells row by row on equal columns, as wide as the widest text needs. A cell can span several columns, and a cell that starts a row and spans a multiple of the row covers several rows, as Payload does. A cell that does not fit in its row is `CELL_SPAN`.
+[The grid](/-/files/yapparatus/src/diagram/compile/records.ts#L54-L156) lays out a record's cells row by row on equal columns, as wide as the widest text needs. A cell can span several columns, and a cell that starts a row and spans a multiple of the row covers several rows, as Payload does. A cell that does not fit in its row is `CELL_SPAN`.
 
-An edge at a cell [attaches at the middle of a side on the record's outline](/-/files/yapparatus/src/diagram/records.ts#L337-L360), so that it crosses no other cell. A cell with no such side, such as Flags, cannot take an edge without crossing its neighbors, so a pin gives it a numbered badge that a note can refer to.
+An edge at a cell [attaches at the middle of a side on the record's outline](/-/files/yapparatus/src/diagram/compile/records.ts#L337-L360), so that it crosses no other cell. A cell with no such side, such as Flags, cannot take an edge without crossing its neighbors, so a pin gives it a numbered badge that a note can refer to.
 
-[A mark](/-/files/yapparatus/src/diagram/records.ts#L224-L278) highlights words or lines of a text. The compiler finds the marked words in the measured lines and computes their rectangle from the measured widths. Words that do not occur exactly once on one line are `MARK_UNMATCHED`.
+[A mark](/-/files/yapparatus/src/diagram/compile/records.ts#L224-L278) highlights words or lines of a text. The compiler finds the marked words in the measured lines and computes their rectangle from the measured widths. Words that do not occur exactly once on one line are `MARK_UNMATCHED`.
 
 ## Sequences
 
@@ -340,7 +340,7 @@ The compiler gives every element a role and at most one category. The web app an
 
 An element keeps the role the author gave it, or the default role, and an enclosure without a role is `muted`. More than one element with the `accent` role is `ACCENT_OVERUSED`.
 
-[Categories are numbered](/-/files/yapparatus/src/diagram/compile.ts#L35-L38) 1 to 4 in the order the draw program first uses them, and each number has its own color. A fifth category is `TOO_MANY_CATEGORIES`, and its elements get no color. The legend lists the categories, and a step that focuses a category's id focuses all its elements.
+[Categories are numbered](/-/files/yapparatus/src/diagram/compile/compile.ts#L36-L39) 1 to 4 in the order the draw program first uses them, and each number has its own color. A fifth category is `TOO_MANY_CATEGORIES`, and its elements get no color. The legend lists the categories, and a step that focuses a category's id focuses all its elements.
 
 ## Checks
 
@@ -363,22 +363,22 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 
 ### Collisions
 
-[The collision checks](/-/files/yapparatus/src/diagram/validate.ts#L71-L230) run on the exact geometry, before rounding. Two rectangles overlap only when they share more than half a unit in both directions, and an edge hits a shape only when it passes more than one unit inside it. Shapes that touch, and an edge that ends on an outline, are therefore not reported. Edges also keep eight units away from enclosure titles.
+[The collision checks](/-/files/yapparatus/src/diagram/compile/checks.ts#L65-L224) run on the exact geometry, before rounding. Two rectangles overlap only when they share more than half a unit in both directions, and an edge hits a shape only when it passes more than one unit inside it. Shapes that touch, and an edge that ends on an outline, are therefore not reported. Edges also keep eight units away from enclosure titles.
 
 The checks report conflicts between elements that the reader sees as separate. They skip a cell or mark and its parent, an edge and its own ends, lifelines and activation bars, and pairs of step-only elements, which the step checks compare.
 
 ### Steps and width
 
-[The step checks](/-/files/yapparatus/src/diagram/figure.ts#L83-L163) run on the finished diagram, so they see the final ids. Each id in a step's `focus` must name an element, a container, or a category, or it is `UNKNOWN_ELEMENT`. Every step-only element must appear in some step, and two that one step shows together must not overlap.
+[The step checks](/-/files/yapparatus/src/diagram/figure.ts#L84-L164) run on the finished diagram, so they see the final ids. Each id in a step's `focus` must name an element, a container, or a category, or it is `UNKNOWN_ELEMENT`. Every step-only element must appear in some step, and two that one step shows together must not overlap.
 
-[The width check](/-/files/yapparatus/src/diagram/figure.ts#L71-L81) reports `DIAGRAM_SCROLLS` for a diagram wider than a fixed limit: the widest figure area divided by the smallest scale the web app shrinks a diagram to. The limit does not depend on any window, so every author gets the same result.
+[The width check](/-/files/yapparatus/src/diagram/figure.ts#L72-L82) reports `DIAGRAM_SCROLLS` for a diagram wider than a fixed limit: the widest figure area divided by the smallest scale the web app shrinks a diagram to. The limit does not depend on any window, so every author gets the same result.
 
 ## The compiled diagram
 
 <Ref to="dc-compiled-type" /> shows the type of the compiled diagram. It holds what the web app and the picture need to draw, and nothing that only the compiler uses.
 
-<Listing id="dc-compiled-type" caption="The compiled diagram, in src/diagram/compiled.ts.">
-<Excerpt from="/-/files/yapparatus/src/diagram/compiled.ts" start="export interface CompiledDiagram {" />
+<Listing id="dc-compiled-type" caption="The compiled diagram, in src/diagram/drawing.ts.">
+<Excerpt from="/-/files/yapparatus/src/diagram/drawing.ts" start="export interface CompiledDiagram {" />
 </Listing>
 
 Shapes, edges, enclosures, and frames hold their final geometry: rectangles, points, and text lines with their positions and fonts. `groups` lists, for each container and category, the elements that a step focuses with it. `ok` and `diagnostics` say whether the diagram can be drawn and what is wrong with it. <Ref to="dc-compiled-edge" /> shows one edge of the running example.
@@ -395,7 +395,7 @@ Shapes, edges, enclosures, and frames hold their final geometry: rectangles, poi
   ], { title: "api->database", header: "field\tvalue", mono: true, id: "edge" })
 }} />
 
-Every reader downloads the compiled diagrams of a page with its JavaScript, so [the last stage](/-/files/yapparatus/src/diagram/compile.ts#L77-L112) keeps them small. It rounds every number to hundredths of a unit, once, after the checks. It also computes the view box: everything painted, with a margin, rounded outward to whole units.
+Every reader downloads the compiled diagrams of a page with its JavaScript, so [the last stage](/-/files/yapparatus/src/diagram/compile/compile.ts#L78-L113) keeps them small. It rounds every number to hundredths of a unit, once, after the checks. It also computes the view box: everything painted, with a margin, rounded outward to whole units.
 
 ## Pictures
 
@@ -411,16 +411,16 @@ A picture is a PNG of a diagram that the server draws for the agent. The agent a
   d.arrow(compiled, svg)
   d.arrow(svg, resvg)
   d.arrow(resvg, png)
-  const paint = d.box("Light theme colors", { sub: "paint.ts", id: "paint" })
+  const paint = d.box("Light theme values", { sub: "theme-values.ts", id: "paint" })
   const glyphs = d.box("Glyph outlines", { sub: "font-measure.ts", id: "glyphs" })
   d.place(d.row([paint, glyphs], { gap: 32, id: "inputs" }), { above: svg, gap: 56 })
   d.arrow(paint, svg)
   d.arrow(glyphs, svg)
 }} />
 
-[The SVG writer](/-/files/yapparatus/src/diagram/picture.ts#L98-L369) writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same [shape outlines](/-/files/yapparatus/src/diagram/shapes.ts), and adds a legend below. The picture shows the diagram with no step open. Its colors are those of the light theme, so every agent gets the same picture; [styling](styling) describes how the server reads them. Text is drawn as [glyph outlines](/-/files/yapparatus/src/font-measure.ts#L111-L143) from the web app's font files, so it is exactly as wide as the compiler measured it.
+[The SVG writer](/-/files/yapparatus/src/diagram/picture.ts#L98-L375) writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same [shape outlines](/-/files/yapparatus/src/diagram/outlines.ts), and adds a legend below. The picture shows the diagram with no step open. It paints each role and category with the theme tokens in [a plain table](/-/files/yapparatus/src/diagram/paint.ts), the tokens that the web app's role styles use, and a unit test checks that the two agree. The server resolves the tokens to the light theme's values and passes them to the SVG writer, so every agent gets the same picture; [styling](styling) describes how the server reads them. Text is drawn as [glyph outlines](/-/files/yapparatus/src/font-measure.ts#L111-L143) from the web app's font files, so it is exactly as wide as the compiler measured it.
 
-With the `ids` option, the picture also writes each element's id beside it and outlines the elements that diagnostics name. [The server](/-/files/yapparatus/src/server/figures.ts#L26-L38) passes the SVG to resvg at two pixels per unit, so that small text stays legible to a model.
+With the `ids` option, the picture also writes each element's id beside it and outlines the elements that diagnostics name. [The server](/-/files/yapparatus/src/server/figures.ts#L27-L37) passes the SVG to resvg at two pixels per unit, so that small text stays legible to a model.
 
 ## Where the code is
 
@@ -430,28 +430,31 @@ With the `ids` option, the picture also writes each element's id beside it and o
 
 - src/
   - diagram/
-    - **scene.ts** what a draw program calls, and the scene it records
+    - **builder.ts** what a draw program calls, and the scene it records
+    - elements.ts the elements, points, and edges of the scene, and their options
     - figure.ts runs the draw program, checks steps and width
-    - compile.ts runs the stages, makes the legend, finishes
-    - text.ts measures and wraps labels
-    - metrics.ts fonts, paddings, and shape sizes
-    - layout.ts sizes, positions, rectangles, and points
-    - records.ts record grids, cells, and marks
-    - geometry.ts rectangles, anchors, sides, and segment tests
-    - nodes.ts compiled shapes, enclosures, and frames
-    - edges.ts routes, curves, loops, arrowheads, labels
     - sequence.ts sequence diagrams from the other elements
-    - validate.ts ids, placement, and collisions
-    - compiled.ts the compiled diagram and step state
-    - shapes.ts outlines as path data, for the web app and the picture
-    - element.tsx the colors of roles and categories, and what every drawn element shares
-    - paint.ts the light theme and role colors as plain values
+    - metrics.ts fonts, paddings, and shape sizes
+    - geometry.ts rectangles, anchors, sides, and segment tests
+    - compile/
+      - compile.ts runs the stages, makes the legend, finishes
+      - text.ts measures and wraps labels
+      - layout.ts sizes, positions, rectangles, and points
+      - records.ts record grids, cells, and marks
+      - nodes.ts compiled shapes, enclosures, and frames
+      - edges.ts routes, curves, loops, arrowheads, labels
+      - checks.ts ids, placement, and collisions
+    - drawing.ts the compiled diagram and step state
+    - outlines.ts outlines as path data, for the web app and the picture
+    - paint.ts the theme tokens of each role and category, for the picture
     - picture.ts the compiled diagram as a standalone SVG
-    - Diagram.tsx, DiagramView.tsx, NodeView.tsx, EdgeView.tsx, Legend.tsx, Diagnostics.tsx the web app's views; see [components](components#diagram)
   - diagram-plugin.ts the page compiler's diagram stage
   - font-measure.ts widths and glyph outlines from the font files
   - server/
     - figures.ts the figures resource and resvg
+    - theme-values.ts the light theme's values for the picture
+  - web/
+    - diagram/ the web app's views, and element.tsx with the role styles; see [components](components#diagram)
 
 </FileTree>
 

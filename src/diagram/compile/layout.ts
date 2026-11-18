@@ -3,12 +3,9 @@
  * lazy and memoized, so declaration order never matters; a real cycle is reported with its chain.
  */
 
-import { anchorOf, portOf, type Rect, round, union, type Vec } from "./geometry.ts";
-import { type Measure, type Metrics, shapes, tab } from "./metrics.ts";
-import { createRecords } from "./records.ts";
+import type { DiagramBuilder } from "../builder.ts";
 import {
   type Align,
-  type DiagramBuilder,
   type Element,
   Enclosure,
   Node,
@@ -16,7 +13,10 @@ import {
   type PointExpr,
   Stack,
   toExpr,
-} from "./scene.ts";
+} from "../elements.ts";
+import { anchorOf, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
+import { type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { createRecords } from "./records.ts";
 import type { Report, Text } from "./text.ts";
 
 /** A placement chain that depends on itself. */

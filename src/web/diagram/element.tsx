@@ -3,10 +3,10 @@
  * lines, and its address as a link and a button.
  */
 import * as stylex from "@stylexjs/stylex";
-import { elementSeparator } from "../document/address.ts";
-import { dash, duration, stroke, theme, when } from "../web/theme.stylex.ts";
-import type { ElementState, TextLine } from "./compiled.ts";
-import type { Role } from "./scene.ts";
+import type { ElementState, TextLine } from "../../diagram/drawing.ts";
+import type { Role } from "../../diagram/elements.ts";
+import { elementSeparator } from "../../document/address.ts";
+import { dash, duration, stroke, theme, when } from "../theme.stylex.ts";
 
 /**
  * Diagram elements are targets: a namespaced DOM id (`figure--element`) makes them linkable.

@@ -10,14 +10,14 @@ import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
+import { type DataFormat, formatNamed, formatNames, formatOfFile } from "./chart/formats.ts";
 import {
   type ChartData,
   type DataIssue,
   type RawTable,
   rowCount,
   typeTable,
-} from "./chart/data.ts";
-import { type DataFormat, formatNamed, formatNames, formatOfFile } from "./chart/formats.ts";
+} from "./chart/table.ts";
 import { excerptFiles } from "./code-plugin.ts";
 import { type FileAddress, parseFileAddress } from "./document/file-address.ts";
 import { contentIssues } from "./markdown-plugin.ts";

@@ -2,7 +2,8 @@
  * Compilation: measure → size → place → route → label → validate → bounds. Each step has
  * its own file; this file runs them in order, each with what the steps before it made.
  */
-import { type DiagnosticCode, diagnosticCodes } from "../document/diagnostic.ts";
+import { type DiagnosticCode, diagnosticCodes } from "../../document/diagnostic.ts";
+import type { DiagramBuilder } from "../builder.ts";
 import {
   type CompiledDiagram,
   type CompiledEdge,
@@ -11,15 +12,15 @@ import {
   type CompiledNode,
   type LegendEntry,
   maxCategories,
-} from "./compiled.ts";
+} from "../drawing.ts";
+import { type Diagnostic, slug } from "../elements.ts";
+import { inflate, rounded, union } from "../geometry.ts";
+import { defaultMetrics, type Measure, type Metrics } from "../metrics.ts";
+import { checkIds, checkPlaced, groupsOf, validate } from "./checks.ts";
 import { createEdges } from "./edges.ts";
-import { inflate, rounded, union } from "./geometry.ts";
 import { CycleError, createLayout } from "./layout.ts";
-import { defaultMetrics, type Measure, type Metrics } from "./metrics.ts";
 import { createNodes } from "./nodes.ts";
-import { type Diagnostic, type DiagramBuilder, slug } from "./scene.ts";
 import { createText, type Report } from "./text.ts";
-import { checkIds, checkPlaced, groupsOf, validate } from "./validate.ts";
 
 export function compile(
   scene: DiagramBuilder,

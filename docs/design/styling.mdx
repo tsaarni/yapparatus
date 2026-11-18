@@ -19,15 +19,20 @@ The web app is styled with [StyleX](https://stylexjs.com/), which compiles the s
     - prose.tsx Markdown elements, for pages and replies
     - appearance.ts applies the theme
     - styles.css a reset and the reduced-motion rule
+    - diagram/
+      - element.tsx the styles that every diagram element shares
     - …
   - diagram/
-    - element.tsx the styles that every diagram element shares
-    - paint.ts the theme as plain values, for pictures
+    - paint.ts the theme tokens of each role and category, for pictures
+    - …
+  - server/
+    - theme-values.ts the light theme's values, for pictures
     - …
 - scripts/
   - check-styles.ts the style check of `pnpm verify`
 - tests/
   - theme.test.ts the contrast checks
+  - paint.test.ts the role styles agree with the picture's table
 
 </FileTree>
 
@@ -51,7 +56,7 @@ Conditions, such as a narrow reading column, are tokens too, as <Ref to="styling
 
 The narrow condition is a container query on the reading column, which narrows both when the window shrinks and when the reader widens the chat. The chat panel uses a media query, because on a phone it covers the window. See [page layout](/web-app#page-layout).
 
-The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run, so it reads the theme file as plain values. Pictures, tests, and the web app then use the same colors.
+The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run. [The picture's table](/-/files/yapparatus/src/diagram/paint.ts) names the theme tokens that each role and category paints with, and [the server](/-/files/yapparatus/src/server/theme-values.ts) reads the theme file as plain values and resolves the tokens to the light theme's values. [A unit test](/-/files/yapparatus/tests/paint.test.ts) checks that the table names the same tokens as the role styles in `element.tsx`. Pictures, tests, and the web app then use the same colors.
 
 A new value goes into a scale in the theme file, with a comment on what it is for. A new color role needs a dark and a light value and a contrast rule in the test.
 

@@ -17,7 +17,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { flashElement } from "../diagram/element.tsx";
 import { elementSeparator, splitAddress, textFragment } from "../document/address.ts";
 import { parseFileAddress } from "../document/file-address.ts";
 import type { Reference } from "../document/reference.ts";
@@ -26,6 +25,7 @@ import { useLive } from "./api.ts";
 import { type ThemeChoice, themeSwitchable, useThemeChoice } from "./appearance.ts";
 import { Chat } from "./Chat.tsx";
 import { DiagnosticsMenu, PageBoundary } from "./diagnostics.tsx";
+import { flashElement } from "./diagram/element.tsx";
 import { FileView } from "./FileView.tsx";
 import { AppIcon as Icon } from "./icons.tsx";
 import { numbering, numbersOf, PageContext } from "./numbering.ts";

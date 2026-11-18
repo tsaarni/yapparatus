@@ -8,7 +8,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { Resvg } from "@resvg/resvg-js";
 import type { ViteDevServer } from "vite";
-import type { CompiledDiagram } from "../diagram/compiled.ts";
+import type { CompiledDiagram } from "../diagram/drawing.ts";
 import { pictureOf } from "../diagram/picture.ts";
 import { pageFigures } from "../diagram-plugin.ts";
 import { fontMeasure, textOutline } from "../font-measure.ts";
@@ -16,6 +16,7 @@ import { createLogger } from "../protocol/log.ts";
 import { compilePage } from "./diagnostics.ts";
 import { HttpError, type Router } from "./http.ts";
 import { pictureErrors } from "./prompt.ts";
+import { lightPaint } from "./theme-values.ts";
 
 const log = createLogger("figures");
 
@@ -24,10 +25,8 @@ export const pictureScale = 2;
 
 /** A figure's picture as PNG, at `pictureScale` pixels per unit. */
 export function renderPicture(drawing: CompiledDiagram, options: { ids: boolean }): Uint8Array {
-  const { svg } = pictureOf(drawing, options, {
-    measure: fontMeasure().measure,
-    outline: textOutline,
-  });
+  const fonts = { measure: fontMeasure().measure, outline: textOutline };
+  const { svg } = pictureOf(drawing, options, fonts, lightPaint);
   return new Resvg(svg, {
     fitTo: { mode: "zoom", value: pictureScale },
     // Text is drawn as outlines, so no font is needed.

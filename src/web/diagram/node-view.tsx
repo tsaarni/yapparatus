@@ -2,9 +2,12 @@
  * Shapes: boxes, cylinders, records and their cells, marks, notes, and their badges and pins.
  */
 import * as stylex from "@stylexjs/stylex";
-import { stroke, theme } from "../web/theme.stylex.ts";
-import { styled } from "../web/ui.tsx";
-import type { CompiledNode, ElementState } from "./compiled.ts";
+import type { CompiledNode, ElementState } from "../../diagram/drawing.ts";
+import { type Rect, union } from "../../diagram/geometry.ts";
+import { badge, corner, defaultMetrics } from "../../diagram/metrics.ts";
+import * as shape from "../../diagram/outlines.ts";
+import { stroke, theme } from "../theme.stylex.ts";
+import { styled } from "../ui.tsx";
 import {
   categoryStyle,
   elementStyles,
@@ -14,9 +17,6 @@ import {
   type Target,
   targetFor,
 } from "./element.tsx";
-import { type Rect, union } from "./geometry.ts";
-import { badge, corner, defaultMetrics } from "./metrics.ts";
-import * as shape from "./shapes.ts";
 
 const m = defaultMetrics;
 

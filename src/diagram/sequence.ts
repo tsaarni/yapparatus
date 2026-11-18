@@ -5,8 +5,8 @@
  * in a row, draws lifelines, derives activation bars from calls and replies, attaches each
  * message to the right bar edge, and draws notes and fragments (alt, loop, opt) as frames.
  */
+import type { DiagramBuilder } from "./builder.ts";
 import {
-  type DiagramBuilder,
   Edge,
   type EdgeOptions,
   type Element,
@@ -15,7 +15,7 @@ import {
   type PointLike,
   type Role,
   slug,
-} from "./scene.ts";
+} from "./elements.ts";
 
 /** Elements a fragment or a whole sequence holds, for steps that focus it. */
 type Members = Array<Element | Edge | Frame>;

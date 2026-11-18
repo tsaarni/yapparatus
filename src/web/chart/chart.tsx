@@ -1,13 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
-import { Diagnostics } from "../diagram/Diagnostics.tsx";
-import { diagnosticCodes } from "../document/diagnostic.ts";
-import { FigureFrame } from "../web/components.tsx";
-import { useChartReport } from "../web/diagnostics.tsx";
-import { fontSize, radius, sizes, space, theme } from "../web/theme.stylex.ts";
-import { Button, styled } from "../web/ui.tsx";
-import { type ChartData, rowObjects } from "./data.ts";
-import { useFontsReady } from "./fonts.ts";
 import {
   type ChartProblem,
   type ChartSpec,
@@ -16,7 +8,16 @@ import {
   firstUseOrder,
   type PlotFunction,
   type PlotLibrary,
-} from "./plot.ts";
+} from "../../chart/spec.ts";
+import { type ChartData, rowObjects } from "../../chart/table.ts";
+import { diagnosticCodes } from "../../document/diagnostic.ts";
+import { Diagnostics } from "../components/figure-diagnostics.tsx";
+import { FigureFrame } from "../components.tsx";
+import { useChartReport } from "../diagnostics.tsx";
+import { fontSize, radius, sizes, space, theme } from "../theme.stylex.ts";
+import { Button, styled } from "../ui.tsx";
+import { useFontsReady } from "./fonts-ready.ts";
+import { fitMargins, type Margins, type PlotDrawing } from "./margins.ts";
 
 export interface ChartProps {
   /** Returns the marks: `(Plot, rows) => ({ marks: [Plot.lineY(rows, { x: "Month", y: "Sales" })] })`. */
@@ -36,8 +37,6 @@ export interface ChartProps {
 const dev = import.meta.env.DEV;
 /** The categories' colors, in order of first use. */
 const categoryColors = [theme.category1, theme.category2, theme.category3, theme.category4];
-/** Room kept between a label and the figure's edge, or another label. */
-const labelClearance = 4;
 
 let library: Promise<PlotLibrary> | undefined;
 /** Plot loads with the first chart, so documents without charts never load it. */
@@ -126,10 +125,6 @@ interface Drawn {
 }
 
 const lastValid = new Map<string, Drawn>();
-/** What Plot draws: an SVG element that also answers for its scales. */
-type PlotDrawing = SVGSVGElement & {
-  scale: (name: string) => { domain?: unknown[]; range?: number[] } | undefined;
-};
 const swatches = () => [s.swatch1, s.swatch2, s.swatch3, s.swatch4];
 
 /**
@@ -313,70 +308,6 @@ function thrown(error: unknown): ChartProblem {
     code: "CHART_FAILED",
     message: error instanceof Error ? error.message : String(error),
   };
-}
-
-interface Margins {
-  top: number;
-  right: number;
-  bottom: number;
-  left: number;
-}
-
-/** The margins Plot chose for a drawing, read from where its outer scales start and end. */
-function marginsOf(svg: PlotDrawing): Margins {
-  const width = svg.width.baseVal.value;
-  const height = svg.height.baseVal.value;
-  const extent = (name: string) => {
-    const range = svg.scale(name)?.range;
-    return range?.length ? [Math.min(...range), Math.max(...range)] : undefined;
-  };
-  const [left = 0, right = width] = extent("fx") ?? extent("x") ?? [];
-  const [top = 0, bottom = height] = extent("fy") ?? extent("y") ?? [];
-  return { top, right: width - right, bottom: height - bottom, left };
-}
-
-const rectOf = (element: Element) => element.getBoundingClientRect();
-/**
- * Margins wide enough for every label, from a first drawing: grown by how far labels reach
- * past the edge, and on an axis label's side by how far it comes closer to the tick labels
- * than the clearance, since Plot sets an axis label into the margin. Undefined when Plot's
- * own margins fit.
- */
-function fitMargins(svg: PlotDrawing): Margins | undefined {
-  const frame = rectOf(svg);
-  const over = { top: 0, right: 0, bottom: 0, left: 0 };
-  for (const text of svg.querySelectorAll("text")) {
-    const r = rectOf(text);
-    if (!r.width) continue;
-    over.left = Math.max(over.left, frame.left - r.left);
-    over.right = Math.max(over.right, r.right - frame.right);
-    over.top = Math.max(over.top, frame.top - r.top);
-    over.bottom = Math.max(over.bottom, r.bottom - frame.bottom);
-  }
-  // An axis label needs a clear band beyond its tick labels, even where it falls between two.
-  for (const axis of ["x", "y", "fx", "fy"]) {
-    const label = svg.querySelector(`[aria-label="${axis}-axis label"] text`);
-    const ticks = [...svg.querySelectorAll(`[aria-label="${axis}-axis tick label"] text`)].map(
-      rectOf,
-    );
-    if (!label || !ticks.length) continue;
-    const at = rectOf(label);
-    const top = Math.min(...ticks.map((r) => r.top));
-    const bottom = Math.max(...ticks.map((r) => r.bottom));
-    const left = Math.min(...ticks.map((r) => r.left));
-    const right = Math.max(...ticks.map((r) => r.right));
-    const middle = at.top + at.height / 2;
-    if (middle > bottom) over.bottom = Math.max(over.bottom, bottom + labelClearance - at.top);
-    else if (middle < top) over.top = Math.max(over.top, at.bottom + labelClearance - top);
-    else if (at.left + at.width / 2 < left)
-      over.left = Math.max(over.left, at.right + labelClearance - left);
-    else over.right = Math.max(over.right, right + labelClearance - at.left);
-  }
-  if (Object.values(over).every((n) => n <= 0)) return;
-  const base = marginsOf(svg);
-  const grow = (side: keyof Margins) =>
-    over[side] > 0 ? Math.ceil(base[side] + over[side] + labelClearance) : base[side];
-  return { top: grow("top"), right: grow("right"), bottom: grow("bottom"), left: grow("left") };
 }
 
 /** Tick labels on one axis that run into each other, which no margin can fix. */

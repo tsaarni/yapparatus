@@ -3,14 +3,14 @@
  */
 import * as stylex from "@stylexjs/stylex";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { diagnosticCodes } from "../document/diagnostic.ts";
-import { fontSize, space, theme } from "../web/theme.stylex.ts";
-import type { CompiledDiagram, ElementState } from "./compiled.ts";
-import { EdgeView, EnclosureView, FrameView } from "./EdgeView.tsx";
+import type { CompiledDiagram, ElementState } from "../../diagram/drawing.ts";
+import { minScale } from "../../diagram/metrics.ts";
+import { outline } from "../../diagram/outlines.ts";
+import { diagnosticCodes } from "../../document/diagnostic.ts";
+import { fontSize, space, theme } from "../theme.stylex.ts";
+import { EdgeView, EnclosureView, FrameView } from "./edge-view.tsx";
 import { interactive } from "./element.tsx";
-import { minScale } from "./metrics.ts";
-import { CellWarning, NodeView, Pin, RecordOutline } from "./NodeView.tsx";
-import { outline } from "./shapes.ts";
+import { CellWarning, NodeView, Pin, RecordOutline } from "./node-view.tsx";
 
 const dev = import.meta.env.DEV;
 

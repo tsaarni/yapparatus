@@ -46,10 +46,11 @@ The [page compiler](page-compiler#charts) reads the data and gives each column a
 |---|---:|---|
 | `chart-plugin.ts` | 262 | Page compiler |
 | `chart/formats.ts` | 36 | Page compiler |
-| `chart/data.ts` | 195 | Both |
-| `chart/Chart.tsx` | 437 | Browser |
-| `chart/plot.ts` | 174 | Browser |
-| `chart/fonts.ts` | 31 | Browser |
+| `chart/table.ts` | 195 | Both |
+| `web/chart/chart.tsx` | 368 | Browser |
+| `web/chart/margins.ts` | 75 | Browser |
+| `chart/spec.ts` | 174 | Browser |
+| `web/chart/fonts-ready.ts` | 31 | Browser |
 
 </Table>
 
@@ -77,7 +78,7 @@ Each source gives a header and rows of cell text, each row with its line. The ce
 Each problem is `CHART_DATA`. <Ref to="charts-data-type" /> shows the typed data: one array per column, with `null` for an empty cell and dates as text, so the data is plain JSON.
 
 <Listing id="charts-data-type" caption="A chart's data, by column, as the page or the data module carries it.">
-<Excerpt from="/-/files/yapparatus/src/chart/data.ts" start="export interface ChartData {" />
+<Excerpt from="/-/files/yapparatus/src/chart/table.ts" start="export interface ChartData {" />
 </Listing>
 
 ## The data module
@@ -97,7 +98,7 @@ The chart shows the second drawing with a legend.
 
 The author names the column of categories with `fill` or `stroke`, and the chart sets the colors: the four category colors of [the theme](styling#color), as CSS variables, so a theme switch needs no new drawing. Categories take the colors in the order the rows first use them, as diagram categories do. A fifth category and later ones are muted and reported as `TOO_MANY_CATEGORIES`, a warning.
 
-**[Direction](directions):** a reader can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/charts#charts-modules--Module=chart%2FChart.tsx` or `Lines=100..300`, so it still finds the marks after rows are added or sorted.
+**[Direction](directions):** a reader can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/charts#charts-modules--Module=web%2Fchart%2Fchart.tsx` or `Lines=100..300`, so it still finds the marks after rows are added or sorted.
 
 ## Checks on the marks
 

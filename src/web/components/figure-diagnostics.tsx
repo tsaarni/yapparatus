@@ -2,9 +2,9 @@
  * A figure's diagnostics, listed under it while editing. Charts use it too.
  */
 import * as stylex from "@stylexjs/stylex";
-import { type DiagnosticCode, diagnosticCodes } from "../document/diagnostic.ts";
-import { fontSize, fontWeight, lineHeight, radius, space, theme } from "../web/theme.stylex.ts";
-import type { Diagnostic } from "./scene.ts";
+import type { Diagnostic } from "../../diagram/elements.ts";
+import { type DiagnosticCode, diagnosticCodes } from "../../document/diagnostic.ts";
+import { fontSize, fontWeight, lineHeight, radius, space, theme } from "../theme.stylex.ts";
 
 /** A figure's diagnostics under it, open while there are errors. Charts show theirs here too. */
 export function Diagnostics({

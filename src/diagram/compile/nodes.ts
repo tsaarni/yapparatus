@@ -2,11 +2,11 @@
  * Nodes, enclosures, and frames: their compiled form, with text lines placed.
  */
 
-import type { CompiledEnclosure, CompiledFrame, CompiledNode, TextLine } from "./compiled.ts";
-import type { Rect, Vec } from "./geometry.ts";
+import type { CompiledEnclosure, CompiledFrame, CompiledNode, TextLine } from "../drawing.ts";
+import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "../elements.ts";
+import type { Rect, Vec } from "../geometry.ts";
+import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
 import type { Layout } from "./layout.ts";
-import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "./metrics.ts";
-import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "./scene.ts";
 import { type Align, type Content, type Text, textLine } from "./text.ts";
 
 export function createNodes(

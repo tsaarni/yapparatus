@@ -1,9 +1,10 @@
 /**
  * Text: measuring labels, wrapping them, and placing lines in the fonts the compiler chose.
  */
-import type { DiagnosticCode } from "../document/diagnostic.ts";
-import type { TextLine } from "./compiled.ts";
-import { round } from "./geometry.ts";
+import type { DiagnosticCode } from "../../document/diagnostic.ts";
+import type { TextLine } from "../drawing.ts";
+import type { Node } from "../elements.ts";
+import { round } from "../geometry.ts";
 import {
   cylinderCap,
   type FontSpec,
@@ -12,8 +13,7 @@ import {
   type Metrics,
   shapes,
   tab,
-} from "./metrics.ts";
-import type { Node } from "./scene.ts";
+} from "../metrics.ts";
 
 /** Reports a diagnostic; every compiler step takes one. */
 export type Report = (code: DiagnosticCode, message: string, ids: string[]) => void;

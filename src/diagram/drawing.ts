@@ -3,8 +3,9 @@
  * so it is kept small: coordinates are rounded to hundredths, and a flag that is false or a
  * value that is the default is left out.
  */
+
+import type { Diagnostic, Role, Shape } from "./elements.ts";
 import type { Rect, Vec } from "./geometry.ts";
-import type { Diagnostic, Role, Shape } from "./scene.ts";
 
 /**
  * Categories a figure can color. Beyond four, readers with red-green color blindness can no

@@ -2,9 +2,9 @@
  * The legend under a figure: one entry per category, which highlights its elements.
  */
 import * as stylex from "@stylexjs/stylex";
-import { space } from "../web/theme.stylex.ts";
-import { Button, styled } from "../web/ui.tsx";
-import type { LegendEntry } from "./compiled.ts";
+import type { LegendEntry } from "../../diagram/drawing.ts";
+import { space } from "../theme.stylex.ts";
+import { Button, styled } from "../ui.tsx";
 import { categoryStyle } from "./element.tsx";
 
 /**

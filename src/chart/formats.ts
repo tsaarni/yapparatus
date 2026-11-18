@@ -4,7 +4,7 @@
  * `typeTable`). A format is named by the language of a block of data inside `<Chart>` and by
  * the extension of a file, so adding one here is all it takes for both.
  */
-import { type DataIssue, parseDelimited, type RawTable } from "./data.ts";
+import { type DataIssue, parseDelimited, type RawTable } from "./table.ts";
 
 export interface DataFormat {
   /** The block language and the file extension: "csv". */
