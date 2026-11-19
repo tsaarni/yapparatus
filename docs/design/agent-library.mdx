@@ -14,7 +14,7 @@ The agent runs in its own terminal, and the server does not start it. The agent 
   d.equalSize([agent, library, server, web])
   d.sequence([agent, library, server, web], [
     { from: agent, to: library, label: "waitForMessage()", id: "wait" },
-    { from: library, to: server, label: "GET /chat, wait", id: "read" },
+    { from: library, to: server, label: "GET /chat, wait", id: "get-chat-wait" },
     { from: web, to: server, label: "POST /chat", id: "message" },
     { from: server, to: library, label: "messages, prompt", reply: true, id: "answer" },
     { from: library, to: agent, label: "prompt on stdout", reply: true, id: "printed" },
@@ -30,7 +30,7 @@ The agent runs in its own terminal, and the server does not start it. The agent 
     { from: agent, to: library, label: "waitForMessage()", id: "next" },
   ], { gap: 72 })
 }}>
-  <Step focus="wait read">The library opens a read of the chat, which the server holds open.</Step>
+  <Step focus="wait get-chat-wait">The library opens a read of the chat, which the server holds open.</Step>
   <Step focus="message answer printed">A reader message ends the read, and the command prints the prompt.</Step>
   <Step focus="edit check diagnostics checked check-printed">The agent edits pages if needed and checks the document.</Step>
   <Step focus="reply post-reply update accepted next">The agent replies, and the same command waits for the next message.</Step>

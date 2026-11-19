@@ -29,6 +29,7 @@
     "test": "pnpm build:lib && playwright test",
     "test:unit": "node --experimental-strip-types --test \"tests/unit/**/*.test.ts\"",
     "api:report": "node scripts/api-report.ts",
+    "screenshots": "pnpm build:lib && node scripts/screenshots.ts",
     "build:lib": "node -e \"fs.rmSync('lib', { recursive: true, force: true })\" && tsc -p tsconfig.lib.json",
     "prepare": "tsc -p tsconfig.lib.json"
   },
