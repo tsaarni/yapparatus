@@ -35,9 +35,9 @@ The requests that read and report diagnostics are in [the REST API](/rest-api#di
 
 Every diagnostic records which check found it as its origin.
 
-After every change, the server checks `document.json` and its page list (origin `pages`), compiles every page (origin `compile`), and checks links and references across pages (origin `link`). Compiling a page also checks its [Markdown conventions](/page-compiler#markdown-conventions), its charts' data, and its [diagrams](/diagram-compiler#checks).
+After every change, the server checks `document.json` and its page list (origin `pages`), compiles every page (origin `compile`), and checks links and references across pages (origin `link`). Compiling a page also checks its [Markdown conventions](/page-compiler#markdown-conventions), its charts' data and marks, and its [diagrams](/diagram-compiler#checks).
 
-The web app checks what exists only when a page runs: [the marks of a chart](/charts#checks-on-the-marks) (origin `chart`), a page that throws while it renders (origin `render`), an error outside rendering (origin `runtime`), and a reply that cannot be shown (origin `reply`). It reports them to the server.
+The web app checks what exists only when a page runs: [the drawing of a chart](/charts#checks-on-the-marks) (origin `chart`), a page that throws while it renders (origin `render`), an error outside rendering (origin `runtime`), and a reply that cannot be shown (origin `reply`). It reports them to the server.
 
 The server also [checks each reply](/server#reply-checks), and returns its errors to the agent without storing them.
 
@@ -82,7 +82,7 @@ The web app sends one report for every revision it renders: an empty list when t
 
 A report only adds diagnostics. A fix changes the revision, and the old revision's findings stop counting. The store's list holds the server's checks, the findings for each page's current revision, and those for replies still in the chat. Reports from several browser tabs add up, because a chart can have a problem at one window width and not at another.
 
-A page is unchecked when no web app has rendered its current revision. Its diagrams are known, because the server checks them, and its charts and render errors are not. The store lists it with what the last rendered revision found, so the agent can tell an unconfirmed error from one that is gone.
+A page is unchecked when no web app has rendered its current revision. Its diagrams and chart marks are known, because the server checks them, and its chart drawings and render errors are not. The store lists it with what the last rendered revision found, so the agent can tell an unconfirmed error from one that is gone.
 
 A change to a component's code does not change a revision, so a finding the component caused stays until the page changes or the server restarts.
 

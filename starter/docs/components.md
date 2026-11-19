@@ -49,7 +49,7 @@ Wrap one fenced code block or one `Excerpt`. The caption goes above the code. Ev
 </Listing>
 ```
 
-Lines of an external file, read when the page is compiled, from a directory that `"files"` in `document.json` names. The excerpt finds its lines by their text, so it keeps showing the same code when lines are added or removed above it.
+Lines of an external file, read when the page is compiled, from a directory that `"files"` in `document.json` names. The page compiler finds the excerpt's lines by their text, so the excerpt keeps showing the same code when lines are added or removed above it.
 
 | Attribute | Value |
 |---|---|

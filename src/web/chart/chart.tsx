@@ -4,12 +4,11 @@ import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import {
   type ChartProblem,
-  type ChartSpec,
-  chartLibrary,
-  checkSpec,
   firstUseOrder,
   type PlotFunction,
   type PlotLibrary,
+  runPlot,
+  thrownProblem,
 } from "../../chart/spec.ts";
 import { type ChartData, rowObjects } from "../../chart/table.ts";
 import { diagnosticCodes } from "../../document/diagnostic.ts";
@@ -119,11 +118,15 @@ function useData(
   return data ? { data } : loaded;
 }
 
-/** A drawing, or only the problems that kept it from being drawn. */
+/**
+ * A drawing, or only the problems that kept it from being drawn. `drawing` holds the problems
+ * found while drawing, which only a browser finds; the page compiler reports the others.
+ */
 interface Drawn {
   svg?: SVGSVGElement;
   legend?: { value: string; color: string }[];
   problems: ChartProblem[];
+  drawing: ChartProblem[];
 }
 
 const lastValid = new Map<string, Drawn>();
@@ -152,11 +155,13 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
   const fallback = dev && result && !result.svg && key ? lastValid.get(key) : undefined;
   const drawn = result?.svg ? result : fallback;
   const missing = !written && !load;
-  const problems: ChartProblem[] = missing
+  const unloaded: ChartProblem[] = missing
     ? [{ code: "CHART_DATA", message: "The chart has no data." }]
     : error
       ? [{ code: "CHART_DATA", message: `The data could not load: ${error}` }]
-      : (result?.problems ?? []);
+      : [];
+  const problems = unloaded.length ? unloaded : (result?.problems ?? []);
+  const reported = unloaded.length ? unloaded : (result?.drawing ?? []);
 
   const canvas = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -180,7 +185,7 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
     marker,
     key ?? marker,
     result || missing || error
-      ? problems.map((p) => ({ ...p, ...(id ? { target: id } : {}) }))
+      ? reported.map((p) => ({ ...p, ...(id ? { target: id } : {}) }))
       : undefined,
   );
 
@@ -239,15 +244,10 @@ function draw(
   rows: ReturnType<typeof rowObjects>,
   width: number,
 ): Drawn {
-  const problems: ChartProblem[] = [];
-  let spec: ChartSpec;
-  try {
-    spec = plot(chartLibrary(Plot, problems), rows);
-  } catch (error) {
-    return { problems: [...problems, thrown(error)] };
-  }
-  problems.push(...checkSpec(spec));
-  if (problems.some((p) => diagnosticCodes[p.code].severity === "error")) return { problems };
+  const { spec, problems: called } = runPlot(Plot, plot, rows);
+  if (!spec || called.some((p) => diagnosticCodes[p.code].severity === "error"))
+    return { problems: called, drawing: [] };
+  const drawing: ChartProblem[] = [];
   const base = {
     ...spec,
     width,
@@ -271,7 +271,7 @@ function draw(
     measure.append(first);
     const domain = firstUseOrder([...((first as PlotDrawing).scale("color")?.domain ?? [])], rows);
     if (domain.length > categoryColors.length)
-      problems.push({
+      drawing.push({
         code: "TOO_MANY_CATEGORIES",
         message: `The colors name ${domain.length} categories: ${domain.slice(0, 8).join(", ")}${domain.length > 8 ? ", …" : ""}. A chart has ${categoryColors.length} category colors, so the rest are drawn muted. Give fill or stroke a column with fewer categories, or split the chart with fx.`,
       });
@@ -285,26 +285,19 @@ function draw(
     ) as SVGSVGElement;
     svg.style.setProperty("--plot-background", theme.surfaceRaised);
     measure.append(svg);
-    problems.push(...overlaps(svg));
+    drawing.push(...overlaps(svg));
     svg.remove();
     const legend = domain.map((value, i) => ({
       value: value instanceof Date ? value.toISOString().slice(0, 10) : String(value),
       color: range[i] as string,
     }));
-    return { svg, legend, problems };
+    return { svg, legend, problems: [...called, ...drawing], drawing };
   } catch (error) {
-    return { problems: [...problems, thrown(error)] };
+    drawing.push(thrownProblem(error));
+    return { problems: [...called, ...drawing], drawing };
   } finally {
     measure.remove();
   }
-}
-
-/** The problem for an error thrown while drawing. */
-function thrown(error: unknown): ChartProblem {
-  return {
-    code: "CHART_FAILED",
-    message: error instanceof Error ? error.message : String(error),
-  };
 }
 
 /** Tick labels on one axis that run into each other, which no margin can fix. */

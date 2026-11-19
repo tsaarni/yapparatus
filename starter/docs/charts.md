@@ -1,29 +1,33 @@
 # Charts
 
-`<Chart>` draws a chart from data with [Observable Plot](https://observablehq.com/plot/). You write the marks; the chart sets its size, fonts, margins, and colors, gives each category a theme color, and reports problems. The data is a table on the page, a block of CSV inside the chart, or a CSV or TSV file in an external directory.
+`<Chart>` draws a chart from data with [Observable Plot](https://observablehq.com/plot/). You write the marks. Yapparatus sets the size, fonts, margins, and colors, gives each category a theme color, and reports problems. The data is a table on the page, a block of CSV inside the chart, or a CSV or TSV file in an external directory.
 
 ## Example
 
 ````mdx
-<Chart id="latency" caption="p99 latency per service." plot={(Plot, rows) => ({
-  marks: [
-    Plot.lineY(rows, { x: "Month", y: "p99 (ms)", stroke: "Service" }),
-    Plot.dot(rows, { x: "Month", y: "p99 (ms)", fill: "Service" }),
-  ],
-})}>
-
-```csv
-Month,Service,p99 (ms)
-2026-01,Search,90
-2026-02,Search,95
-2026-01,Checkout,180
-2026-02,Checkout,240
-```
-
-</Chart>
+<Chart
+  id="latency"
+  caption="Latency of each request, by cache result."
+  from="/-/files/app/logs/requests.csv"
+  plot={(Plot, rows) => ({
+    marks: [
+      Plot.dot(rows, { x: "Time", y: "Latency (ms)", fill: "Cache" }),
+      Plot.ruleY([300]),
+      Plot.text([300], {
+        y: (d) => d, frameAnchor: "right", textAnchor: "end", dy: -8, text: () => "300 ms target",
+      }),
+      Plot.ruleX([new Date("2026-03-14T10:04:00Z")]),
+      Plot.text([new Date("2026-03-14T10:04:00Z")], {
+        x: (d) => d, frameAnchor: "top", textAnchor: "end", dx: -6, text: () => "Deploy",
+      }),
+    ],
+    x: { type: "utc" },
+    y: { type: "log", grid: true },
+  })}
+/>
 ````
 
-`id` and `caption` make a numbered figure. `description` is the accessible description.
+In this example, the data is a file that a tool wrote. Each request is a dot on a time axis and a log scale, colored by a column of categories. A rule and a label show a target and an event. `id` and `caption` make a numbered figure. `description` is the accessible description. The charts page of the design of Yapparatus, `node_modules/yapparatus/docs/design/charts.mdx`, draws this chart and examples of the other forms.
 
 ## Choosing a form
 
@@ -32,10 +36,16 @@ Draw a chart when the reader needs to compare numbers, see a trend, or see how v
 | To show | Marks |
 |---|---|
 | A change over time | `Plot.lineY`, with `Plot.dot` on measured points |
+| A noisy series as its trend | `Plot.lineY(rows, Plot.windowY({ k: 7 }, { x: "…", y: "…" }))` |
+| Parts of a total over time | `Plot.areaY(rows, { x: "…", y: "…", fill: "…" })`, which stacks |
 | Amounts by category | `Plot.barY`, or `Plot.barX` when the labels are long |
+| Single events, such as requests | `Plot.dot` with a time `x`, and `y: { type: "log" }` for latencies |
 | How two values relate | `Plot.dot` |
 | How values spread | `Plot.rectY(rows, Plot.binX({ y: "count" }, { x: "…" }))` |
-| A threshold or a target | `Plot.ruleY([200])` |
+| How groups differ in spread | `Plot.boxY(rows, { x: "…", y: "…" })` |
+| The same chart for each group | Any marks, with `fx: "…"` or `fy: "…"` |
+| A threshold or a target | `Plot.ruleY([200])`, with `Plot.text` for its label |
+| When something happened | `Plot.ruleX([new Date("…")])`, with `Plot.text` for its label |
 
 ## Data
 
@@ -43,7 +53,7 @@ Write the data in one of three places:
 
 - **A `Table` on the page**, when the reader should see the numbers too: `from="#requests"` names `<Table id="requests">` on the same page, before or after the chart. The table stays shown, and the chart draws its rows.
 - **A block of CSV** inside the chart, fenced as ```` ```csv ````, for numbers you write yourself. Leave a blank line after the opening tag and before the closing tag. A ```` ```tsv ```` block works too.
-- **A file**, for numbers a tool produced or more than a few dozen rows: `from="/-/files/bench/results.csv"`. The file is a `.csv` or `.tsv` in an external directory; see [external files](guide.md#external-files). Never copy a tool's numbers into the page. The page holds none of the file's rows, and the chart loads them when the reader scrolls near it, so a large file does not slow the page. An edit to the file redraws the chart. Files over 1 MB are not shown.
+- **A file**, for numbers a tool produced or more than a few dozen rows: `from="/-/files/bench/results.csv"`. The file is a `.csv` or `.tsv` in an external directory; see [external files](guide.md#external-files). Never copy a tool's numbers into the page. The page holds none of the file's rows. They load when the reader scrolls near the chart, so a large file does not slow the page. An edit to the file redraws the chart. Files over 1 MB are not shown.
 
 A chart has one source: a block or `from`, not both. A block's data is not shown; when the reader needs the exact numbers, put them in a `Table` and name it with `from`.
 
@@ -70,17 +80,18 @@ plot={(Plot, rows) => ({
 })}
 ```
 
-- Draw with marks from the rows: `Plot.dot(rows, …)`, `Plot.lineY(rows, …)`, `Plot.barY(rows, …)`. Transforms such as `Plot.groupX` and `Plot.binX` work too.
+- Every mark and transform of Plot works: `Plot.dot(rows, …)`, `Plot.boxY(rows, …)`, `Plot.areaY(rows, …)`, and transforms such as `Plot.groupX`, `Plot.binX`, and `Plot.windowY`. A mark can also take its own array, as `Plot.ruleY([300])` does.
 - A field option names a column exactly as its header is written: `y: "p99 (ms)"`. A name that is not a column is an error that lists the columns.
-- `plot` may also return `x`, `y`, `fx`, `fy`, and `r`: the options of those scales, such as `{ type: "log" }`, `{ grid: true }`, `{ label: "…" }`, `{ ticks: 5 }`, or `{ tickRotate: -30 }`. Use `fx` or `fy` to split a chart into small multiples.
-- The chart sets the width, height, margins, fonts, and colors. `plot` returns nothing else, and does not call `Plot.plot` or `Plot.legend`.
+- `plot` may also return `x`, `y`, `fx`, `fy`, and `r`: the options of those scales, such as `{ type: "log" }`, `{ type: "utc" }` for times written with `Z`, `{ grid: true }`, `{ label: "…" }`, `{ ticks: 5 }`, or `{ tickRotate: -30 }`. Use `fx` or `fy` to split a chart into small multiples.
+- Yapparatus sets the width, height, margins, fonts, and colors. `plot` returns nothing else, and does not call `Plot.plot` or `Plot.legend`.
 - `plot` uses only `Plot`, `rows`, and values written inside it.
 
 ## Color
 
 - **Set `fill` or `stroke` to a column of categories** to color by it: `stroke: "Service"`. Categories take the theme's four category colors in the order the rows first use them, and a legend under the chart names them.
 - **Four categories at most.** More are drawn in a muted color and reported. Give `fill` or `stroke` a column with fewer values, or split the chart with `fx`.
-- **No literal colors.** `fill: "tomato"` or `stroke: "#f00"` is an error, because the theme picks colors. A mark without `fill` or `stroke` is drawn in the text color.
+- **Color shows categories, not amounts.** A column of numbers in `fill` or `stroke` becomes one category for each value. Show amounts by position or size, with `y` or `r`.
+- **No literal colors.** `fill: "tomato"` or `stroke: "#f00"` is an error, because colors come from the theme. A mark without `fill` or `stroke` is drawn in the text color.
 
 ## Many rows
 
@@ -90,15 +101,15 @@ A reader comments on a chart as a whole, like any figure.
 
 ## Diagnostics
 
-Data problems are found when the page is compiled and reported with their line in the page, or in the file. Problems with the marks are found when a browser shows the page.
+Problems with the data and with what `plot` names are found when the page is compiled, and reported with their line in the page, or in the file. Problems with the drawing, `TOO_MANY_CATEGORIES`, `CHART_OVERLAP`, and Plot failing to draw, are found when a browser shows the page.
 
 | Code | Severity | Meaning |
 |---|---|---|
 | `CHART_PLOT` | error | The chart has no `plot` function |
 | `CHART_DATA` | error | The data is missing, comes from two places, names no table on the page, is not in a known format, has a column problem, or could not load |
 | `CHART_FIELD` | error | A mark names a field that is not a column of its data |
-| `CHART_COLOR` | error | A mark sets a literal color |
-| `CHART_OPTION` | error | `plot` returns options the chart sets itself, or calls `Plot.plot` |
+| `CHART_COLOR` | error | A mark has a literal color |
+| `CHART_OPTION` | error | `plot` returns options that Yapparatus sets, or calls `Plot.plot` |
 | `CHART_FAILED` | error | Plot could not draw the marks; the message is Plot's |
 | `TOO_MANY_CATEGORIES` | warning | More than four categories |
 | `CHART_OVERLAP` | warning | Tick labels on one axis overlap; show fewer ticks, rotate them, or swap the axes |

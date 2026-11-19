@@ -91,7 +91,7 @@ export function diagnosticsSection(
           .join("\n")}`
       : "Diagnostics: none",
     unchecked.length
-      ? `Not checked since they changed: charts, render errors, and runtime errors on these pages. A browser checks them when the reader opens a page, so link each change in your reply:\n${unchecked
+      ? `Not checked since they changed: chart drawings, render errors, and runtime errors on these pages. A browser checks them when the reader opens a page, so link each change in your reply:\n${unchecked
           .map((page) =>
             [
               `- ${page.address}`,

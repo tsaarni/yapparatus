@@ -4,7 +4,7 @@ A chart is a figure that [Observable Plot](https://observablehq.com/plot/), a Ja
 
 ## Overview
 
-The [page compiler](page-compiler#charts) reads the data and gives each column a type, so data problems are reported at their lines without a browser. The browser runs the chart's `plot` function and draws the chart at the width of the page. <Ref to="charts-path" /> shows the path.
+The [page compiler](page-compiler#charts) reads the data, gives each column a type, and runs the chart's `plot` function on it, so problems with the data and the marks are reported without a browser. The browser runs `plot` again and draws the chart at the width of the page. <Ref to="charts-path" /> shows the path.
 
 <Diagram id="charts-path" caption="The path of a chart's data, from the page or a file to the drawing." draw={(d) => {
   const table = d.box("Table on the page", { id: "table-source", sub: "from=\"#id\"" })
@@ -38,7 +38,112 @@ The [page compiler](page-compiler#charts) reads the data and gives each column a
   <Step focus="figure">The chart runs `plot` and draws twice: once to measure, once to show.</Step>
 </Diagram>
 
-The page compiler reads the CSV and TSV formats, gives the columns their types, and checks them. The browser draws the chart, measures its margins, waits for the fonts, and checks the calls to Plot. The typed data is the one form that both sides use.
+The page compiler reads the CSV and TSV formats, gives the columns their types, and checks them and the calls to Plot. The browser draws the chart, measures its margins, waits for the fonts, and checks the drawing. The typed data is the one form that both sides use.
+
+## Examples
+
+The charts in this section show the forms that a chart supports. The browser shares are yearly worldwide figures from [StatCounter](https://gs.statcounter.com/browser-market-share). The request latencies are made-up example data, read from a CSV file in the repository. <Ref to="charts-example-share" /> draws lines and dots, colored by a column of categories, with a legend. <Ref to="charts-example-latency" /> and <Ref to="charts-example-latency-box" /> read the same file, as a performance investigation would. The scatter plot on a log scale shows that the requests over the target began with a deploy that emptied a cache, and the box plots show that almost every cache miss is slower than the target. <Ref to="charts-example-devices" /> draws the rows of <Ref to="charts-example-device-table" /> as bars, split into small multiples with `fx`.
+
+<Chart id="charts-example-share" caption="Worldwide browser share by year, on all devices, as lines with dots. Data from StatCounter." plot={(Plot, rows) => ({
+  marks: [
+    Plot.lineY(rows, { x: "Year", y: "Share (%)", stroke: "Browser" }),
+    Plot.dot(rows, { x: "Year", y: "Share (%)", fill: "Browser" }),
+    Plot.ruleY([0]),
+  ],
+  y: { grid: true },
+})}>
+
+```csv
+Year,Browser,Share (%)
+2016-01,Chrome,49.1
+2017-01,Chrome,54.0
+2018-01,Chrome,59.1
+2019-01,Chrome,63.3
+2020-01,Chrome,64.6
+2021-01,Chrome,64.5
+2022-01,Chrome,64.8
+2023-01,Chrome,63.9
+2024-01,Chrome,65.8
+2025-01,Chrome,68.9
+2016-01,Safari,13.3
+2017-01,Safari,14.5
+2018-01,Safari,14.4
+2019-01,Safari,15.9
+2020-01,Safari,17.8
+2021-01,Safari,18.9
+2022-01,Safari,18.9
+2023-01,Safari,19.8
+2024-01,Safari,18.2
+2025-01,Safari,16.0
+2016-01,Edge,1.4
+2017-01,Edge,1.9
+2018-01,Edge,1.9
+2019-01,Edge,2.1
+2020-01,Edge,2.8
+2021-01,Edge,3.8
+2022-01,Edge,4.3
+2023-01,Edge,5.1
+2024-01,Edge,5.2
+2025-01,Edge,5.0
+2016-01,Firefox,8.0
+2017-01,Firefox,6.2
+2018-01,Firefox,5.2
+2019-01,Firefox,4.6
+2020-01,Firefox,4.2
+2021-01,Firefox,3.6
+2022-01,Firefox,3.4
+2023-01,Firefox,3.0
+2024-01,Firefox,2.8
+2025-01,Firefox,2.4
+```
+
+</Chart>
+
+<Chart id="charts-example-latency" caption="Latency of each request to an orders API over ten minutes, by cache result, on a log scale. Example data." from="/-/files/yapparatus/docs/design/data/orders-latency.csv" plot={(Plot, rows) => ({
+  marks: [
+    Plot.dot(rows, { x: "Time", y: "Latency (ms)", fill: "Cache", r: 2.5 }),
+    Plot.ruleY([300]),
+    Plot.text([300], { y: (d) => d, frameAnchor: "right", textAnchor: "end", dy: -8, text: () => "300 ms target" }),
+    Plot.ruleX([new Date("2026-03-14T10:04:00Z")]),
+    Plot.text([new Date("2026-03-14T10:04:00Z")], { x: (d) => d, frameAnchor: "top", dx: -6, textAnchor: "end", text: () => "Deploy" }),
+  ],
+  x: { type: "utc", label: "Time (UTC)" },
+  y: { type: "log", grid: true },
+})} />
+
+<Chart id="charts-example-latency-box" caption="The same requests as box plots of latency by cache result, on a log scale. Example data." from="/-/files/yapparatus/docs/design/data/orders-latency.csv" plot={(Plot, rows) => ({
+  marks: [
+    Plot.boxY(rows, { x: "Cache", y: "Latency (ms)", fill: "Cache" }),
+    Plot.ruleY([300]),
+  ],
+  x: { label: null },
+  y: { type: "log", grid: true },
+})} />
+
+<Table id="charts-example-device-table" caption="Worldwide browser share on desktop and on mobile in 2025. Data from StatCounter.">
+
+| Device | Browser | Share (%) |
+|---|---|---:|
+| Desktop | Chrome | 70.4 |
+| Desktop | Safari | 6.7 |
+| Desktop | Edge | 11.7 |
+| Desktop | Firefox | 5.2 |
+| Mobile | Chrome | 68.4 |
+| Mobile | Safari | 21.9 |
+| Mobile | Edge | 0.5 |
+| Mobile | Firefox | 0.5 |
+
+</Table>
+
+<Chart id="charts-example-devices" caption="Browser share on desktop and on mobile in 2025, as small multiples." from="#charts-example-device-table" plot={(Plot, rows) => ({
+  marks: [
+    Plot.barY(rows, { fx: "Device", x: "Browser", y: "Share (%)", fill: "Browser" }),
+    Plot.ruleY([0]),
+  ],
+  x: { label: null, domain: ["Chrome", "Safari", "Edge", "Firefox"] },
+  fx: { label: null },
+  y: { grid: true },
+})} />
 
 ## Data sources
 
@@ -76,21 +181,23 @@ A chart's `fill` or `stroke` names the column of categories. The colors are the 
 
 ## Checks on the marks
 
-The library that `plot` receives checks each call before it calls Plot. <Ref to="charts-mark-checks" /> lists the checks.
+The library that `plot` receives checks each call before it calls Plot. The page compiler runs `plot` with this library in a fresh JavaScript context, as it runs a diagram's draw program, so `plot` uses only `Plot`, `rows`, and the values it defines itself. <Ref to="charts-mark-checks" /> lists the checks and where each is found.
 
 <Table id="charts-mark-checks" caption="The checks on what plot asks of Plot. All are errors except CHART_OVERLAP.">
 
-| Code | Found when |
-|---|---|
-| `CHART_FIELD` | A field, such as `x` or `fill`, names no column |
-| `CHART_COLOR` | `fill` or `stroke` is a CSS color, such as `"tomato"` |
-| `CHART_OPTION` | `plot` calls `Plot.plot` or `Plot.legend`, or returns more than `marks`, `x`, `y`, `fx`, `fy`, and `r` |
-| `CHART_FAILED` | `plot` or Plot throws |
-| `CHART_OVERLAP` | Tick labels on one axis overlap |
+| Code | Found when | Found by |
+|---|---|---|
+| `CHART_FIELD` | A field, such as `x` or `fill`, names no column | Page compiler |
+| `CHART_COLOR` | `fill` or `stroke` is a CSS color, such as `"tomato"` | Page compiler |
+| `CHART_OPTION` | `plot` calls `Plot.plot` or `Plot.legend`, or returns more than `marks`, `x`, `y`, `fx`, `fy`, and `r` | Page compiler |
+| `CHART_FAILED` | `plot` throws, or Plot throws while it draws | Page compiler, browser |
+| `CHART_OVERLAP` | Tick labels on one axis overlap | Browser |
 
 </Table>
 
-Plot alone draws nothing for an unknown field without an error, and reads a color name as a constant color. The chart reports its problems from the browser, as [revisions and reports](diagnostics#revisions-and-reports) describes, so they are known only after a browser has shown the page.
+Plot alone draws nothing for an unknown field without an error, and reads a color name as a constant color. The browser shows every problem under the chart, and reports to the server only those that drawing finds, as [revisions and reports](diagnostics#revisions-and-reports) describes. Those are known only after a browser has shown the page.
+
+**[Direction](directions):** the server draws charts too, so `TOO_MANY_CATEGORIES`, `CHART_OVERLAP`, and Plot's drawing errors are found when the page compiles. Overlap depends on the width, so the server checks at fixed widths.
 
 ## Design decisions
 
@@ -107,3 +214,4 @@ Plot alone draws nothing for an unknown field without an error, and reads a colo
 - [Observable Plot](https://observablehq.com/plot/): marks, scales, and transforms.
 - [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180): the CSV format.
 - [Observable Framework, files](https://observablehq.com/framework/files): data named by the page and served as separate files.
+- [StatCounter browser market share](https://gs.statcounter.com/browser-market-share): the browser shares in the examples.

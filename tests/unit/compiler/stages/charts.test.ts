@@ -66,7 +66,9 @@ test("a chart reads a table on its page, which stays shown", async () => {
 });
 
 test("a chart's file stays out of the page: the page loads it", async () => {
-  const { js, issues } = await build(`<Chart from="/-/files/sample/throughput.csv" ${plot} />\n`);
+  const { js, issues } = await build(
+    `<Chart from="/-/files/sample/throughput.csv" ${plot.replace('"a"', '"connections"').replace('"b"', '"rps"')} />\n`,
+  );
   assert.deepEqual(issues, []);
   assert.match(
     js,
@@ -112,4 +114,31 @@ test("a mixed column is reported at the page line of its row", async () => {
   assert.equal(issues.length, 1);
   assert.equal(issues[0]?.line, 8);
   assert.match(issues[0]?.message ?? "", /"2 ms" in column "b"/);
+});
+
+test("the stage runs plot and reports what its marks name, before any browser draws it", async () => {
+  const source = (marks: string) =>
+    `<Chart id="speed" plot={(Plot, rows) => ({ marks: [${marks}] })}>\n\n\`\`\`csv\na,b,kind\n1,2,x\n\`\`\`\n\n</Chart>\n`;
+  const field = await build(source('Plot.dot(rows, { x: "a", y: "c" })'));
+  assert.deepEqual(
+    field.issues.map((i) => [i.code, i.target, i.subject]),
+    [["CHART_FIELD", "speed", "Plot.dot y: c"]],
+  );
+  const color = await build(source('Plot.dot(rows, { x: "a", y: "b", fill: "tomato" })'));
+  assert.deepEqual(
+    color.issues.map((i) => i.code),
+    ["CHART_COLOR"],
+  );
+  const column = await build(source('Plot.dot(rows, { x: "a", y: "b", fill: "kinds" })'));
+  assert.deepEqual(
+    column.issues.map((i) => i.code),
+    ["CHART_FIELD"],
+  );
+  const thrown = await build(source("Plot.nothing(rows)"));
+  assert.deepEqual(
+    thrown.issues.map((i) => i.code),
+    ["CHART_FAILED"],
+  );
+  const clean = await build(source('Plot.dot(rows, { x: "a", y: "b", fill: "kind" })'));
+  assert.deepEqual(clean.issues, []);
 });

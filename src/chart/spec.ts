@@ -59,18 +59,49 @@ const fieldOptions = [
 ] as const;
 const colorOptions = new Set(["fill", "stroke"]);
 /** Constant colors that are no color of their own. */
-const neutral = new Set(["none", "currentcolor", "inherit"]);
+const neutral = new Set(["none", "currentcolor", "inherit", "transparent"]);
 /** Plot functions that would draw outside the figure Yapparatus makes. */
 const outside = new Set(["plot", "legend"]);
+/** The CSS color keywords, so that a color is told from a column name without a browser. */
+const namedColors = new Set(
+  (
+    "aliceblue antiquewhite aqua aquamarine azure beige bisque black blanchedalmond blue " +
+    "blueviolet brown burlywood cadetblue chartreuse chocolate coral cornflowerblue cornsilk " +
+    "crimson cyan darkblue darkcyan darkgoldenrod darkgray darkgreen darkgrey darkkhaki " +
+    "darkmagenta darkolivegreen darkorange darkorchid darkred darksalmon darkseagreen " +
+    "darkslateblue darkslategray darkslategrey darkturquoise darkviolet deeppink deepskyblue " +
+    "dimgray dimgrey dodgerblue firebrick floralwhite forestgreen fuchsia gainsboro ghostwhite " +
+    "gold goldenrod gray green greenyellow grey honeydew hotpink indianred indigo ivory khaki " +
+    "lavender lavenderblush lawngreen lemonchiffon lightblue lightcoral lightcyan " +
+    "lightgoldenrodyellow lightgray lightgreen lightgrey lightpink lightsalmon lightseagreen " +
+    "lightskyblue lightslategray lightslategrey lightsteelblue lightyellow lime limegreen linen " +
+    "magenta maroon mediumaquamarine mediumblue mediumorchid mediumpurple mediumseagreen " +
+    "mediumslateblue mediumspringgreen mediumturquoise mediumvioletred midnightblue mintcream " +
+    "mistyrose moccasin navajowhite navy oldlace olive olivedrab orange orangered orchid " +
+    "palegoldenrod palegreen paleturquoise palevioletred papayawhip peachpuff peru pink plum " +
+    "powderblue purple rebeccapurple red rosybrown royalblue saddlebrown salmon sandybrown " +
+    "seagreen seashell sienna silver skyblue slateblue slategray slategrey snow springgreen " +
+    "steelblue tan teal thistle tomato turquoise violet wheat white whitesmoke yellow yellowgreen"
+  ).split(" "),
+);
 
 /** Is this text a CSS color, as Plot would read a constant `fill` or `stroke`? */
 function isColor(value: string): boolean {
-  if (typeof CSS !== "undefined" && CSS.supports) return CSS.supports("color", value);
-  return /^(#[0-9a-f]{3,8}|(rgb|hsl|hwb|lab|lch|oklab|oklch|color)a?\(.*\)|[a-z]+)$/i.test(value);
+  const text = value.trim().toLowerCase();
+  return (
+    neutral.has(text) ||
+    namedColors.has(text) ||
+    /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/.test(text) ||
+    /^(rgb|hsl|hwb|lab|lch|oklab|oklch|color)a?\(.*\)$/.test(text)
+  );
 }
 
-const isPlain = (value: unknown): value is Record<string, unknown> =>
-  !!value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype;
+/** A plain object, also one made in another realm, such as the context the compiler runs in. */
+function isPlain(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === null || Object.getPrototypeOf(proto) === null;
+}
 
 /** The fields of an array of rows: the keys of the first rows, or nothing to check against. */
 function fieldsOf(data: unknown): Set<string> | undefined {
@@ -119,7 +150,7 @@ function checkOptions(
     if (typeof value !== "string" || fields?.has(value)) continue;
     if (colorOptions.has(key) && isColor(value)) {
       const reported = problems.some((p) => p.message.includes(`sets ${key}: "${value}"`));
-      if (!neutral.has(value.toLowerCase()) && !reported)
+      if (!neutral.has(value.trim().toLowerCase()) && !reported)
         problems.push({
           code: "CHART_COLOR",
           subject: `Plot.${name} ${key}: ${value}`,
@@ -155,6 +186,35 @@ export function checkSpec(spec: unknown): ChartProblem[] {
       message: `plot returns ${list(extra)}. It may return ${list(specOptions)}: the chart sets its size, margins, fonts, colors, and legend itself.`,
     },
   ];
+}
+
+/** The problem for an error thrown by `plot` or Plot, also one made in another realm. */
+export function thrownProblem(error: unknown): ChartProblem {
+  const message =
+    error && typeof error === "object" && "message" in error
+      ? String(error.message)
+      : String(error);
+  return { code: "CHART_FAILED", message };
+}
+
+/**
+ * Call `plot` with the checked library and check what it returns. The page compiler runs this
+ * to report the problems, and the browser to get the marks it draws.
+ */
+export function runPlot(
+  Plot: PlotLibrary,
+  plot: PlotFunction,
+  rows: Row[],
+): { spec?: ChartSpec; problems: ChartProblem[] } {
+  const problems: ChartProblem[] = [];
+  let spec: ChartSpec;
+  try {
+    spec = plot(chartLibrary(Plot, problems), rows);
+  } catch (error) {
+    return { problems: [...problems, thrownProblem(error)] };
+  }
+  problems.push(...checkSpec(spec));
+  return { spec, problems };
 }
 
 /**

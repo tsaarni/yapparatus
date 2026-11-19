@@ -123,7 +123,7 @@ Options:
 - `role`: what the element is for. `accent` is the one element that matters most (one per figure, drawn heavier), `warning` is a failure or a risk (it gets a badge), `muted` steps an element back, and `external` is outside the system (dashed).
 - `category`: what sets the element apart, in a few words, such as `"New"` or `"To be removed"`. See [Categories](#categories).
 
-`role` and `category` also work on arrows, enclosures, and sequence messages. There is no option for a color: the theme picks it.
+`role` and `category` also work on arrows, enclosures, and sequence messages. There is no option for a color: colors come from the theme.
 - `width`: a fixed width; the text wraps.
 - `height`: a fixed height; overflow is reported.
 - `minWidth`, `minHeight`, `mono`.

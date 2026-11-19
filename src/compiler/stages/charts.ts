@@ -2,17 +2,21 @@
  * `<Chart>` data, read and checked at compile time. A data block or page table becomes the `data`
  * prop; a file, which can be large, is loaded from its own module through the `load` prop.
  */
+import vm from "node:vm";
+import * as Plot from "@observablehq/plot";
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
 import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
 import { type DataFormat, formatNamed, formatNames, formatOfFile } from "../../chart/formats.ts";
+import { type ChartProblem, type PlotFunction, runPlot } from "../../chart/spec.ts";
 import {
   type ChartData,
   type DataIssue,
   type RawTable,
   rowCount,
+  rowObjects,
   typeTable,
 } from "../../chart/table.ts";
 import { type FileAddress, parseFileAddress } from "../../document/file-address.ts";
@@ -67,6 +71,28 @@ export function dataModuleId(address: FileAddress, source: SourceFile) {
 /** A chart file's data as a module: JSON that the browser parses only when the chart loads it. */
 export function dataModuleCode(data: ChartData) {
   return `export default JSON.parse(${JSON.stringify(JSON.stringify(data))});`;
+}
+
+/**
+ * Run a chart's `plot` on its rows in its own context, with JavaScript's globals and none of
+ * Node's, and return what the checked Plot library and the returned spec show is wrong.
+ */
+export function plotProblems(source: string, data: ChartData): ChartProblem[] {
+  let plot: unknown;
+  try {
+    plot = vm.runInContext(`"use strict";(${source})`, vm.createContext());
+  } catch (error) {
+    return [{ code: "CHART_PLOT", subject: "plot", message: `plot does not compile: ${error}` }];
+  }
+  if (typeof plot !== "function")
+    return [
+      {
+        code: "CHART_PLOT",
+        subject: "plot",
+        message: "plot is a function that returns the marks: (Plot, rows) => ({ marks: [...] }).",
+      },
+    ];
+  return runPlot(Plot, plot as PlotFunction, rowObjects(data)).problems;
 }
 
 /** The JSX attribute of an element with a name, if the author wrote one. */
@@ -132,7 +158,23 @@ export function charts(files: ExternalFiles) {
       const issue = (subject: string, message: string, at = line) =>
         issues.push({ code: "CHART_DATA", line: at, subject, message });
       const plot = attribute(node, "plot");
-      if (plot?.type !== "mdxJsxAttribute" || typeof plot.value !== "object" || !plot.value)
+      const plotSource =
+        plot?.type === "mdxJsxAttribute" && typeof plot.value === "object" && plot.value
+          ? plot.value.value
+          : undefined;
+      const chartId = attribute(node, "id")?.value;
+      const check = (data: ChartData) => {
+        if (plotSource === undefined || !rowCount(data)) return;
+        for (const problem of plotProblems(plotSource, data))
+          issues.push({
+            code: problem.code,
+            line,
+            ...(typeof chartId === "string" ? { target: chartId } : {}),
+            subject: problem.subject ?? problem.code,
+            message: problem.message,
+          });
+      };
+      if (plotSource === undefined)
         issues.push({
           code: "CHART_PLOT",
           line,
@@ -168,6 +210,7 @@ export function charts(files: ExternalFiles) {
         for (const problem of read.issues)
           issue(problem.subject, problem.message, block.line + problem.line - 1);
         if (!rowCount(read.data)) issue("data", "<Chart> has no rows of data.");
+        check(read.data);
         setAttribute(node, "data", valueToEstree(read.data));
         return;
       }
@@ -196,6 +239,7 @@ export function charts(files: ExternalFiles) {
         for (const problem of found)
           issue(problem.subject, `<Chart> in table "${id}": ${problem.message}`, problem.line);
         if (!rowCount(data)) issue("data", "<Chart> has no rows of data.");
+        check(data);
         setAttribute(node, "data", valueToEstree(data));
         return;
       }
@@ -220,6 +264,7 @@ export function charts(files: ExternalFiles) {
       for (const problem of read.issues)
         issue(problem.subject, `<Chart> in ${from}, line ${problem.line}: ${problem.message}`);
       if (!rowCount(read.data)) issue("data", "<Chart> has no rows of data.");
+      check(read.data);
       const watched = excerptFiles.get(file.path) ?? new Set<string>();
       watched.add(read.source.file);
       excerptFiles.set(file.path, watched);

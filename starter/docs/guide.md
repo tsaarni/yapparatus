@@ -14,7 +14,7 @@ npx giget gh:tsaarni/yapparatus/starter my-document && cd my-document && pnpm in
 
 2. Write `document.json` and the pages in the document directory: `content/` for the first document, or a new directory such as `tutorial/` when `content/` already holds one. Name the documented repository under `"files"`.
 3. End your turn: tell the user to run `pnpm dev <directory>`, such as `pnpm dev content`, in the project directory, open the address it prints, and paste the prompt the document's chat shows back to you.
-4. The prompt connects you to the chat. It lists diagnostics, including diagrams, which are checked when a page compiles, and charts, which are checked only once the browser shows them. Fix them, then reply to the reader's messages there.
+4. The prompt connects you to the chat. It lists diagnostics, including diagrams and charts, which are checked when a page compiles, and chart drawings, which are checked only once the browser shows them. Fix them, then reply to the reader's messages there.
 
 A minimal document for a repository `myapp` next to the project `my-document`:
 
@@ -59,6 +59,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 ## Writing
 
 - Write plain, neutral prose in complete sentences that say who does what, such as "The server checks every link." One idea per sentence, one topic per paragraph.
+- Write without personification: only people and programs act, as in "the color comes from the theme" rather than "the theme picks the color".
 - Avoid hype, metaphor, and filler words, such as "seamless", "under the hood", and "simply".
 - Avoid punchy patterns: slogans, kickers in headings or closing lines ("Small change, big impact"), questions answered at once ("The catch? …"), and announcements ("Let's dive in").
 - Do not use em dashes. Use a period, a comma, or a colon instead.
@@ -117,7 +118,7 @@ A full document to learn from: `node_modules/yapparatus/docs/design/`, the desig
 ## Charts
 
 - Draw numbers with `<Chart>`, from a `<Table id>` on the page named with `from="#id"`, a block of CSV inside it, or a CSV or TSV file named with `from`. Read [the chart reference](charts.md) before drawing.
-- Name a file that a tool produced instead of copying its numbers into the page. Use a file for more than a few dozen rows: the page then holds none of them, and the chart loads them when the reader scrolls to it.
+- Name a file that a tool produced instead of copying its numbers into the page. Use a file for more than a few dozen rows: the page then holds none of them, and they load when the reader scrolls to the chart.
 - A block's data is not shown. When the reader needs the exact numbers, write them in a `Table` and chart it with `from="#id"`, rather than writing them twice.
 - Write each column's unit in its header, such as `p99 (ms)`, and plain numbers or ISO dates in its cells.
 - Color by a column of categories, never by a literal color. Four categories at most.
@@ -150,7 +151,7 @@ node --input-type=module-typescript -e 'import { checkDocument } from "yapparatu
 ```
 
 - In the chat, read them after editing and fix them before you reply. Errors found later, when a browser opens a changed page, end your wait for messages.
-- Diagrams are checked when their page compiles, so their diagnostics are listed at once. Charts, render errors, and runtime errors are checked only when a browser shows the page. The diagnostics list the pages no browser has shown since they changed, with what was found before the change. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.
+- Diagrams and what a chart's `plot` names are checked when their page compiles, so their diagnostics are listed at once. Chart drawings, render errors, and runtime errors are checked only when a browser shows the page. The diagnostics list the pages no browser has shown since they changed, with what was found before the change. In your reply, say in a sentence what changed on each page and link to the change, such as `[the new section on misses](/cache#misses)`: the reader's browser checks a page when the reader opens it.
 - Diagnostics do not tell you that a diagram is hard to read. After you write or change a diagram and its diagnostics are clean, look at it once. This saves its picture as the reader sees it in the PNG file that you name. Open the file as an image, and delete it afterwards. `savePicture("/cache#flow", "/tmp/flow.png", { ids: true })` labels each element with its id.
 
 ```sh
