@@ -1,6 +1,6 @@
 # Agent library
 
-The agent library is the package export `yapparatus/agent`. The agent calls it from shell commands to wait for the reader's messages, reply, check the document, and look at diagrams. This page describes the calls, the commands that run them, and the prompts the agent reads.
+The agent library is the package export `yapparatus/agent`. The agent calls it from shell commands to wait for the user's messages, reply, check the document, and look at diagrams. This page describes the calls, the commands that run them, and the prompts the agent reads.
 
 ## Overview
 
@@ -95,7 +95,7 @@ A prompt is text the server writes for the agent. The library passes it on uncha
 
 | Prompt | When | Ends with |
 |---|---|---|
-| Start prompt | The reader pastes it into a new agent session. It is the `prompt` of a whole read of the chat | The wait command, then the check and picture commands |
+| Start prompt | The user pastes it into a new agent session. It is the `prompt` of a whole read of the chat | The wait command, then the check and picture commands |
 | Messages | A wait returns reader messages | The check command, then the reply command |
 | Errors | A wait returns new errors and no message | The check command, then the reply command, or the wait command when no message was given yet |
 | Idle | An agent's read returns nothing. `waitForMessage()` reads again instead of returning it | The wait command |
@@ -110,22 +110,22 @@ The start prompt holds the instructions for the whole session: where the authori
 
 <Ref to="agent-prompt" /> shows a prompt with one reader message, about a page and about lines of a file in an external directory named `app`.
 
-<Diagram id="agent-prompt" caption="A prompt with one reader message, in its four parts. The two commands are shortened. The reply command is in full in its listing." description="The text of a prompt, with the reader's message, the references, the diagnostics, and the next commands marked" draw={(d) => {
-  d.text("Reader, 14:02:\n--- reader ---\nWhy does a read wait at most 25 s?\n--- end reader ---\nReferences, at the lines the reader saw. If the file changed since, find each by its address and words:\n- section, docs/design/rest-api.mdx:88-140, /rest-api#read-the-chat\n- file lines, ../app/src/server.ts:40-52, /-/files/app/src/server.ts#L40-L52\n\nDiagnostics: none\n\nEdit pages (/home/me/doc/docs/guide.md) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\nnode --input-type=module-typescript -e '… checkDocument() …'\n\nThen reply and wait:\n\nnode --input-type=module-typescript -e '… sendReply() … waitForMessage() …' <<'MDX'\n<your reply>\nMDX", {
+<Diagram id="agent-prompt" caption="A prompt with one reader message, in its four parts. The two commands are shortened. The reply command is in full in its listing." description="The text of a prompt, with the user's message, the references, the diagnostics, and the next commands marked" draw={(d) => {
+  d.text("<reader_message time=\"14:02\">\nWhy does a read wait at most 25 s?\n</reader_message>\nAttached by the reader, at the lines they saw:\n- section, docs/design/rest-api.mdx:88-140, /rest-api#read-the-chat\n- file lines, ../app/src/server.ts:40-52, /-/files/app/src/server.ts#L40-L52\n\nIf a file changed since, find each reference by its address and words.\n\nDiagnostics: none\n\nEdit pages (/home/me/doc/docs/guide.md) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\nnode --input-type=module-typescript -e '… checkDocument() …'\n\nThen reply and wait:\n\nnode --input-type=module-typescript -e '… sendReply() … waitForMessage() …' <<'MDX'\n<your reply>\nMDX", {
     mono: true,
     id: "prompt",
     marks: {
-      message: { lines: "1-4", category: "The reader's message" },
-      references: { lines: "5-7", category: "References" },
-      diagnostics: { lines: "9", category: "Diagnostics" },
-      next: { lines: "11-19", category: "What to run next" },
+      message: { lines: "1-3", category: "The user's message" },
+      references: { lines: "4-8", category: "References" },
+      diagnostics: { lines: "10", category: "Diagnostics" },
+      next: { lines: "12-20", category: "What to run next" },
     },
   })
 }} />
 
-The reader's text sits between `--- reader ---` and `--- end reader ---`, so the agent can tell the reader's words from the server's instructions. Each message is labelled with the time the reader wrote it, because the reader never sees message numbers.
+The prompt calls the user the reader, so that the agent can tell comments from the chat from what the user types directly to the agent. Each message is a `<reader_message>` element that holds only the reader's text, so the agent can tell it from the server's instructions. A closing tag in the text is escaped, so the text cannot end the element. The element carries the time the message was written, because the web app shows no message numbers.
 
-Each reference is one line: its kind, its file and the lines the reader saw, its address, and the selected words or the open diagram step. The prompt points at the lines instead of copying them, because the agent can open the file. When the file changed after the reader attached the reference, the prompt tells the agent to find it by its address and words.
+Each reference is one line: its kind, its file and the lines the user saw, its address, and the selected words or the open diagram step. The prompt points at the lines instead of copying them, because the agent can open the file. The references follow the element, because the server writes them. One sentence after all the messages tells the agent to find a reference by its address and words when its file changed.
 
 The diagnostics part has the format that [diagnostics](diagnostics#what-the-agent-sees) describes, with the new errors first.
 
@@ -153,14 +153,14 @@ Each call finds the server through `.yapparatus/server.json` in the current dire
 
 ### Commands that call a library
 
-Commands that call a library work with the agent the reader already uses, often the session that wrote the document. <Ref to="agent-alternatives" /> lists the alternatives that were considered.
+Commands that call a library work with the agent the user already uses, often the session that wrote the document. <Ref to="agent-alternatives" /> lists the alternatives that were considered.
 
 <Table id="agent-alternatives" caption="Ways to connect the agent that were considered, and why each was not chosen.">
 
 | Alternative | Why not |
 |---|---|
 | ACP (Agent Client Protocol) | Works with few agents. It starts a fresh session that does not know how the document was written, and leaves permissions and reconnection to the server |
-| MCP (Model Context Protocol) | Cannot tell an agent that the reader wrote a message. It needs configuration for each agent, and the client sets the timeouts of tool calls. Every coding agent can run Node |
+| MCP (Model Context Protocol) | Cannot tell an agent that the user wrote a message. It needs configuration for each agent, and the client sets the timeouts of tool calls. Every coding agent can run Node |
 | A CLI | Returns only text. A library returns data that the agent can filter and combine, and one command can both reply and wait |
 | Copy and paste | A person moves every message between the web app and the agent by hand |
 

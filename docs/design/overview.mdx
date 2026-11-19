@@ -1,26 +1,35 @@
 # Overview
 
-This document describes how Yapparatus works, for the people and agents who change its code. To write a document with Yapparatus, read the authoring guide.
+This document describes the design and implementation of Yapparatus. The [authoring guide](https://github.com/tsaarni/yapparatus/tree/main/starter/docs) describes how to write documents.
 
-## What Yapparatus does
+## Purpose
 
-Yapparatus lets a person and their coding agent write and revise a technical document together. The agent writes the pages. The person, called the reader, reads them in the browser, selects something on a page, and comments on it in a message to the agent. A message can be a question, a correction, or a request to change the page. The agent revises the page, replies in the chat beside the page, or both. The agent is the reader's own coding agent, running in a terminal.
+Yapparatus is a tool in which a coding agent writes a technical document and the user comments on it. The user reads the pages in the browser, selects something on a page, such as a sentence, a shape in a diagram, or lines of code, and comments on it in the chat beside the page. A comment can be a question, a correction, or a request to change the page. The agent revises the page, replies in the chat, or both. The agent is the user's own coding agent, running in a terminal.
 
-Three properties make this work. First, the agent can write a rich document with little effort. It writes short MDX pages, and Yapparatus lays them out and draws their diagrams, charts, and code excerpts. Yapparatus reports every error with its file and line, so the agent fixes its own pages. Second, everything on a page has an address: a sentence, a table row, a shape in a diagram, or a few lines of a source file. The reader can point at exactly what a comment is about. Third, the page is live. An edit by the agent appears while the reader reads.
+Three properties of the design support this. First, the agent can write pages with diagrams, charts, and code excerpts, and check the result without a browser:
 
-People use Yapparatus for:
+- The agent describes a diagram as rows, columns, and placements in a short TypeScript program, and the [diagram compiler](diagram-compiler) computes every size and position. A language model states an arrangement well and computes coordinates poorly.
+- The diagram compiler reports overlapping shapes, edges that cross shapes, and text that does not fit. The agent can also save a [picture](diagram-compiler#pictures) of a diagram and look at it.
+- The agent writes chart data as a table or a CSV file, and draws it with Observable Plot, which agents already know. The page compiler checks the data.
+- The agent shows code from the source files without copying it into the page, so the page stays up to date when the code changes.
+- Figures, tables, and listings are numbered automatically, and every color comes from the theme. The agent writes no numbers and no colors.
+- Every problem, such as a broken link, is reported with its file and line, so the agent fixes its own pages.
 
-- Understanding a codebase. The agent explains unfamiliar code with diagrams and excerpts of the real files, and the reader comments where something is unclear.
-- Design documents. The reader directs, and the agent writes and redraws.
-- Reviewing a plan or a change. The agent explains what it intends to do or what it did, and the reader marks what to change.
-- Reports, such as benchmarks, incident analyses, and comparisons, with charts drawn from the data files that a tool produced.
-- Teaching material about protocols, data layouts, and algorithms, with diagrams that the reader steps through.
+Second, everything on a page has an address: a sentence, a table row, a shape in a diagram, or a few lines of a source file. The user can point at exactly what a comment is about. Third, the page is live. An edit by the agent appears while the user reads.
+
+The user and the agent can use it for:
+
+- Understanding a codebase. The agent writes an overview of the codebase with diagrams and excerpts of the code, and the user asks about what is unclear.
+- Design documents. The user directs, and the agent writes the text and draws the diagrams and charts.
+- Reviewing a pull request. The agent explains the change, and the user asks questions about it.
+- Troubleshooting. The agent charts measurements from data files, such as latency during an outage.
+- Teaching material about protocols, data layouts, and algorithms, with diagrams that the user steps through.
 
 A finished document can be built as a static website or as one HTML file, without the chat.
 
 ## The system
 
-<Ref to="overview-system" /> shows the system in dev mode: the web app, the server, the project directory, and the agent. This is the mode in which the reader and the agent work on a document.
+<Ref to="overview-system" /> shows the system in dev mode: the web app, the server, the project directory, and the agent. Dev mode is the mode for writing documents, in which the user and the agent work on a document together. It is named after the Vite dev server that runs it.
 
 <Diagram id="overview-system" caption="The system in dev mode. The legend shows what a build keeps." description="The web app in the browser, the server with the page compiler and the REST API, the project directory with pages and chat state, and the agent, with the data that flows between them" draw={(d) => {
   const page = d.box("Page view", { id: "page-view", sub: "pages, figures", category: "In builds too" })
@@ -63,21 +72,21 @@ A finished document can be built as a static website or as one HTML file, withou
   <Step focus="in-builds-too">A build keeps only the compiled pages and the page view.</Step>
 </Diagram>
 
-The [web app](web-app) is a React app that shows the pages and the chat panel. The [server](server) is a Vite dev server that the `yap` command starts for one [document directory](documents). Its [page compiler](page-compiler) compiles the pages with their [diagrams](diagram-compiler) and [charts](charts), and its [REST API](rest-api) keeps the chat and the [diagnostics](diagnostics). The agent calls the [agent library](agent-library) from shell commands, and everything it reads is text that the server writes.
+The [web app](web-app) is a React app that shows the pages and the chat panel. The [server](server) is a Vite dev server that the `yap` command starts for one [document directory](documents). Its [page compiler](page-compiler) compiles the pages with their [diagrams](diagram-compiler) and [charts](charts). Its [REST API](rest-api) serves the chat and the [diagnostics](diagnostics) to the web app and the agent. The agent calls the [agent library](agent-library) from shell commands, and everything it reads is text that the server writes.
 
-## From a comment to a revised page
+## Handling a comment
 
-<Ref to="overview-comment" /> follows one comment from the reader to a page edit and a reply.
+<Ref to="overview-comment" /> follows one comment from the user to a page edit and a reply.
 
-<Diagram id="overview-comment" caption="A comment, a page edit, and the reply." description="Sequence between the reader, the web app, the server, the agent, and the page files" draw={(d) => {
-  const reader = d.actor("Reader")
+<Diagram id="overview-comment" caption="A comment, a page edit, and the reply." description="Sequence between the user, the web app, the server, the agent, and the page files" draw={(d) => {
+  const user = d.actor("User")
   const web = d.box("Web app")
   const server = d.box("Server")
   const agent = d.box("Agent", { role: "external" })
   const pages = d.cylinder("Page files")
-  d.sequence([reader, web, server, pages, agent], [
+  d.sequence([user, web, server, pages, agent], [
     { from: agent, to: server, label: "wait", id: "wait" },
-    { from: reader, to: web, label: "select, Comment", id: "comment" },
+    { from: user, to: web, label: "select, Comment", id: "comment" },
     { from: web, to: server, label: "POST /chat", id: "post" },
     { from: server, to: agent, label: "prompt", reply: true, id: "prompt" },
     { from: agent, to: pages, label: "edit", id: "edit" },
@@ -90,71 +99,71 @@ The [web app](web-app) is a React app that shows the pages and the chat panel. T
   ], { gap: 72 })
 }}>
   <Step focus="wait">The agent waits for the next message, and the server holds the request open until one arrives.</Step>
-  <Step focus="comment post">The reader selects text and comments on it. The web app sends the message to the [chat](rest-api#add-a-message).</Step>
+  <Step focus="comment post">The user selects text and comments on it. The web app sends the message to the [chat](rest-api#add-a-message).</Step>
   <Step focus="prompt">The server returns a [prompt](agent-library#prompts) to the agent: the message, its references, and the document's errors.</Step>
   <Step focus="edit change hot">The agent edits a page. The server compiles it, and the web app shows the new page [without a reload](web-app#hot-updates).</Step>
   <Step focus="check diagnostics">The agent [checks the document](agent-library#checkdocument) and fixes the errors.</Step>
   <Step focus="reply chat-update">The agent sends a reply. The server [checks it](server#reply-checks) and saves it, and the chat panel shows it.</Step>
 </Diagram>
 
-## Runtimes
+## Source directories
 
-Each part of Yapparatus has one runtime. Pure code uses neither the DOM nor Node, so the server, the agent library, and the web app can all import it. Node code runs in the server's process or the agent's process. Browser code runs in the web app. <Ref to="overview-parts" /> lists the parts, their runtimes, and the parts that each may import.
+The source code is split into directories. Code in each directory runs in Node, in the browser, or in both. Node code runs in the server's process or the agent's process, and browser code runs in the web app. Shared code uses neither Node nor the DOM, so the server, the agent library, and the web app can all import it. <Ref to="overview-directories" /> lists the directories, where their code runs, and what each may import.
 
-<Table id="overview-parts" caption="The parts of Yapparatus, their runtimes, and what each may import.">
+<Table id="overview-directories" caption="The source directories, where their code runs, and what each may import.">
 
-| Part | Runtime | May import | Holds |
+| Directory | Runs in | May import | Holds |
 |---|---|---|---|
-| Document | Pure | Nothing | [Pages, addresses](documents), references, and diagnostics |
-| Protocol | Pure | Document | The types of the [REST API](rest-api), and the logger |
-| Diagram | Pure | Document | The [diagram compiler](diagram-compiler) |
-| Chart | Pure | Document | The [chart](charts) data and specification checks |
-| Compiler | Node | The pure parts | The [page compiler](page-compiler) and its [stages](page-compiler#pipeline), reading [external files](documents#external-files), and the checks of `document.json` and of links |
-| Server | Node | Compiler and the pure parts | The [server](server) |
+| Document | Both | Nothing | [Pages, addresses](documents), references, and diagnostics |
+| Protocol | Both | Document | The types of the [REST API](rest-api), and the logger |
+| Diagram | Both | Document | The [diagram compiler](diagram-compiler) |
+| Chart | Both | Document | The [chart](charts) data and specification checks |
+| Compiler | Node | The shared directories | The [page compiler](page-compiler) and its [stages](page-compiler#pipeline), reading [external files](documents#external-files), and the checks of `document.json` and of links |
+| Server | Node | Compiler and the shared directories | The [server](server) |
 | Agent | Node | Protocol and document | The [agent library](agent-library) |
-| Vite | Node | Compiler, server, and the pure parts | The `yapparatus()` plugin, which combines the compiler and the server, and the [`yap` command](server#starting) |
-| Web | Browser | The pure parts | The [web app](web-app) |
+| Vite | Node | Compiler, server, and the shared directories | The `yapparatus()` plugin, which combines the compiler and the server, and the [`yap` command](server#starting) |
+| Web | Browser | The shared directories | The [web app](web-app) |
 
 </Table>
 
-<Ref to="overview-imports" /> draws the same rule. The web app and the server share only pure code, and so do the server and the agent library.
+<Ref to="overview-imports" /> draws the same rule. The web app and the server have only the shared directories in common, and so do the server and the agent library.
 
-<Diagram id="overview-imports" caption="What each part may import." description="The browser part Web and the Node parts Vite, Server, Compiler, and Agent above the pure parts Diagram, Chart, Protocol, and Document, with an arrow for each import the rule allows" draw={(d) => {
-  const part = (name, runtime) => d.box(name[0].toUpperCase() + name.slice(1), { id: name, category: runtime })
-  const web = part("web", "Browser")
-  const vite = part("vite", "Node")
-  const server = part("server", "Node")
-  const compiler = part("compiler", "Node")
-  const agent = part("agent", "Node")
-  const diagram = part("diagram", "Pure")
-  const chart = part("chart", "Pure")
-  const protocol = part("protocol", "Pure")
-  const doc = part("document", "Pure")
+<Diagram id="overview-imports" caption="What each directory may import." description="The browser directory Web and the Node directories Vite, Server, Compiler, and Agent above the shared directories Diagram, Chart, Protocol, and Document, with an arrow for each import the rule allows" draw={(d) => {
+  const dir = (name, runsIn) => d.box(name[0].toUpperCase() + name.slice(1), { id: name, category: runsIn })
+  const web = dir("web", "Browser")
+  const vite = dir("vite", "Node")
+  const server = dir("server", "Node")
+  const compiler = dir("compiler", "Node")
+  const agent = dir("agent", "Node")
+  const diagram = dir("diagram", "Both")
+  const chart = dir("chart", "Both")
+  const protocol = dir("protocol", "Both")
+  const doc = dir("document", "Both")
   d.equalSize([web, vite, server, compiler, agent, diagram, chart, protocol, doc])
   const upper = d.row([web, vite, server, compiler, agent], { gap: 56 })
   const lower = d.row([diagram, chart, protocol], { gap: 56 })
   d.place(lower, { below: upper, gap: 104 })
   d.place(doc, { below: chart, gap: 64 })
-  const pure = d.enclose([lower, doc], { id: "pure-parts", title: "Pure parts", titleAt: "bottomLeft" })
+  const shared = d.enclose([lower, doc], { id: "shared", title: "Shared code", titleAt: "bottomLeft" })
   d.arrow(vite, server)
   d.arrow(server, compiler)
   d.arrow(vite, compiler, { bend: 40 })
-  d.arrow(web.bottom, pure.left, { route: "vh" })
-  for (const from of [vite, server, compiler]) d.arrow(from.bottom, d.xy(from.bottom, pure.top))
+  d.arrow(web.bottom, shared.left, { route: "vh" })
+  for (const from of [vite, server, compiler]) d.arrow(from.bottom, d.xy(from.bottom, shared.top))
   d.arrow(agent, protocol)
   d.arrow(agent.right, doc.right, { route: { viaX: agent.right.offset(32, 0) } })
   for (const from of [diagram, chart, protocol]) d.arrow(from, doc)
 }} />
 
-The type checker enforces the rule. Each part is a TypeScript project with the library and types of its runtime and a reference to each part it may import. The pure parts have neither the DOM library nor Node's types, the Node parts have Node's types, and the web app has the DOM library and Vite's client types. An import from a part that a project does not reference is an error, and so is a name from another runtime, such as `document` in the diagram compiler.
+The type checker enforces the rule. Each directory is a TypeScript project with the library and types of where its code runs, and a reference to each directory it may import. The shared directories have neither the DOM library nor Node's types, the Node directories have Node's types, and the web app has the DOM library and Vite's client types. An import from a directory that a project does not reference is an error, and so is a name from the wrong environment, such as `document` in the diagram compiler.
 
-Two pure parts need more than the standard library. The chart part has the DOM library, because the types of Observable Plot, which the chart specification uses, name DOM types. The logger runs in both runtimes, so its declarations give it the console methods that both runtimes have and the level that Vite's `define` gives the browser. The web app declares the [document module](page-compiler#the-document-module), the other virtual modules, and the single-file build's constant.
+Two shared directories need more than the standard library. The chart directory has the DOM library, because the types of Observable Plot, which the chart specification uses, name DOM types. The logger runs in Node and in the browser, so its declarations give it the console methods that both have and the level that Vite's `define` gives the browser. The web app declares the [document module](page-compiler#the-document-module), the other virtual modules, and the single-file build's constant.
 
-The `yap` command and the `yapparatus/vite` and `yapparatus/agent` entries are compiled to JavaScript before they are published, so the compiled package holds only Node and pure code. The web app is published as source, and the Vite of the project that uses it compiles it.
+The `yap` command and the `yapparatus/vite` and `yapparatus/agent` entries are compiled to JavaScript before they are published, so the compiled package holds only Node and shared code. The web app is published as source, and the Vite of the project that uses it compiles it.
 
 ## How to read this document
 
-<Ref to="overview-pages" /> lists the pages, which follow a document from its files to the reader and the agent.
+<Ref to="overview-pages" /> lists the pages, which follow a document from its files to the user and the agent.
 
 <Table id="overview-pages" caption="The pages of this document.">
 

@@ -148,26 +148,35 @@ function timeOf(iso: string): string {
   return new Date(iso).toTimeString().slice(0, 5);
 }
 
+/** The reader's text, with any closing tag in it escaped so that it cannot end its element. */
+function readerText(text: string): string {
+  return text.replaceAll("</reader_message", "&lt;/reader_message");
+}
+
+/** One reader message in its element, then the references the reader attached. */
+function describeMessage(message: ReaderMessage): string {
+  return [
+    `<reader_message time="${timeOf(message.createdAt)}">`,
+    readerText(message.text),
+    "</reader_message>",
+    message.references.length
+      ? `Attached by the reader, at the lines they saw:\n${message.references
+          .map(describeReference)
+          .join("\n")}`
+      : "No references: a message about the document in general.",
+  ].join("\n");
+}
+
 /** Reader messages not answered yet, the diagnostics, and how to answer. */
 export function messagesPrompt(
   messages: ReaderMessage[],
   diagnostics: string,
   guide: string,
 ): string {
+  const referenced = messages.some((message) => message.references.length > 0);
   return [
-    ...messages.map((message) =>
-      [
-        `Reader, ${timeOf(message.createdAt)}:`,
-        "--- reader ---",
-        message.text,
-        "--- end reader ---",
-        message.references.length
-          ? `References, at the lines the reader saw. If the file changed since, find each by its address and words:\n${message.references
-              .map(describeReference)
-              .join("\n")}`
-          : "No references: a message about the document in general.",
-      ].join("\n"),
-    ),
+    ...messages.map(describeMessage),
+    referenced ? "If a file changed since, find each reference by its address and words." : "",
     diagnostics,
     `Edit pages (${guide}) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\n${checkCommand()}\n\nThen reply and wait:`,
     replyCommand(),
@@ -211,7 +220,7 @@ function foldersSection(folders: Record<string, string>): string {
 /** The text a person gives an agent to connect it to the document, and how to work in it. */
 export function startPrompt(guide: string, folders: Record<string, string>, root: string): string {
   return [
-    `You are connected to a Yapparatus document. In the browser, a reader comments on it and sends you messages. You act on each by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, TeX between $$ marks is math, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when you edit a page: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses).`,
+    `You are connected to a Yapparatus document. In the browser, a reader comments on it and sends you messages. Each message arrives in a <reader_message> element, which holds only the reader's own words. You act on each by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, TeX between $$ marks is math, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when you edit a page: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses).`,
     foldersSection(folders),
     `Run this from the project directory, ${root}, and follow what it prints. It waits until the reader writes, which may take hours: run it in the background if you are notified when commands finish, otherwise with the longest timeout your shell allows, and run it again if your shell stops it.`,
     waitCommand(),

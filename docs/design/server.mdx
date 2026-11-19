@@ -63,7 +63,7 @@ The server is the dev server: Vite with the `yapparatus()` plugin, serving one d
   <Step focus="pictures to-pictures draws files to-files reads-files external-dirs">The other two handlers draw [pictures](#pictures) and read [external files](#external-files).</Step>
 </Diagram>
 
-Each resource is a module of its own. One function creates the modules and connects them. When a module changes, this function sends an update to the web app and tells the chat handler, which answers the waiting agent reads.
+When the chat, the diagnostics, or an external file changes, the server sends an [update](#updates) to the web app and answers the agent reads that are waiting.
 
 ## Starting
 
@@ -114,7 +114,7 @@ A reader message holds its text and its [references](documents#references). A re
 
 ## Agent state
 
-The server sees an agent only while one of its requests is open. It computes the agent state from these requests and two time limits. <Ref to="server-agent-state" /> shows the states and what moves between them.
+The server computes the agent state from the agent's requests and two time limits. <Ref to="server-agent-state" /> shows the states and what moves between them.
 
 <Diagram id="server-agent-state" caption="The agent state as the server computes it." description="State machine with the states away, waiting, and working, and the agent requests and time limits that move between them" draw={(d) => {
   const start = d.start()
@@ -200,7 +200,7 @@ The server sends changes to the web app on Vite's hot-update connection. It coll
 
 ## Security
 
-The server trusts local processes, which can already read and write the project, and uses no token. It guards against web pages in the reader's browser and DNS rebinding. It listens on `127.0.0.1`, so other machines cannot reach it. The router answers `403` to a request whose `Origin` header is not `http://` followed by the request's `Host`. The web app sends its own origin, and the agent library sends no `Origin` header. Vite checks the `Host` header against its allowed hosts before the router sees the request, which blocks DNS rebinding.
+The server trusts local processes, which can already read and write the project, and uses no token. It guards against web pages in the user's browser and DNS rebinding. It listens on `127.0.0.1`, so other machines cannot reach it. The router answers `403` to a request whose `Origin` header is not `http://` followed by the request's `Host`. The web app sends its own origin, and the agent library sends no `Origin` header. Vite checks the `Host` header against its allowed hosts before the router sees the request, which blocks DNS rebinding.
 
 ## Logging
 

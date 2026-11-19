@@ -1,12 +1,12 @@
 # Charts
 
-A chart is a figure that [Observable Plot](https://observablehq.com/plot/), a JavaScript charting library, draws from data. This page follows a chart's data from the page or a file to the drawing. Authors read the chart reference of the authoring guide.
+A chart is a figure that [Observable Plot](https://observablehq.com/plot/), a JavaScript charting library, draws from data. This page follows a chart's data from the page or a file to the drawing.
 
 ## Overview
 
-The [page compiler](page-compiler#charts) reads the data and gives each column a type, so data problems are reported at their lines without a browser. The browser runs the author's `plot` function and draws the chart at the width of the page. <Ref to="charts-path" /> shows the path.
+The [page compiler](page-compiler#charts) reads the data and gives each column a type, so data problems are reported at their lines without a browser. The browser runs the chart's `plot` function and draws the chart at the width of the page. <Ref to="charts-path" /> shows the path.
 
-<Diagram id="charts-path" caption="The path of a chart's data, from where the author writes it to the drawing." draw={(d) => {
+<Diagram id="charts-path" caption="The path of a chart's data, from the page or a file to the drawing." draw={(d) => {
   const table = d.box("Table on the page", { id: "table-source", sub: "from=\"#id\"" })
   const block = d.box("CSV block", { id: "csv-block", sub: "inside the chart" })
   const file = d.cylinder("CSV or TSV file", { id: "data-file", sub: "in an external directory" })
@@ -70,9 +70,9 @@ The chart shows the second drawing with a legend.
 
 ## Color
 
-The author names the column of categories with `fill` or `stroke`, and the chart sets the colors: the four category colors of [the theme](styling#color), as CSS variables, so a theme switch needs no new drawing. Categories take the colors in the order the rows first use them, as diagram categories do. A fifth category and later ones are muted and reported as `TOO_MANY_CATEGORIES`, a warning.
+A chart's `fill` or `stroke` names the column of categories. The colors are the four category colors of [the theme](styling#color), as CSS variables, so a theme switch needs no new drawing. Categories take the colors in the order the rows first use them, as diagram categories do. A fifth category and later ones are muted and reported as `TOO_MANY_CATEGORIES`, a warning.
 
-**[Direction](directions):** a reader can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/sales#sales-chart--Month=2026-03` or `Revenue=100..300`, so it still finds the marks after rows are added or sorted.
+**[Direction](directions):** a user can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/sales#sales-chart--Month=2026-03` or `Revenue=100..300`, so it still finds the marks after rows are added or sorted.
 
 ## Checks on the marks
 

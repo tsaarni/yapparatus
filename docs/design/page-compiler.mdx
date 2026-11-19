@@ -4,7 +4,7 @@ The page compiler turns an MDX page into a JavaScript module that the web app ca
 
 ## Pipeline
 
-The page compiler is a list of Vite plugins. Its core is the MDX plugin, set up with the stages in order; the others add icons, styles, and React, and virtual modules give the web app the document. The `yapparatus()` plugin combines these plugins with the [server](server) and with what only a build needs. Each stage reads or changes the page's syntax tree, which holds its headings, paragraphs, and components. <Ref to="compiler-pipeline" /> shows the stages in order.
+The page compiler turns a page into a module in stages. Each stage reads or changes the page's syntax tree, which holds its headings, paragraphs, and components. <Ref to="compiler-pipeline" /> shows the stages in order. The stages run inside Vite's MDX plugin, and other Vite plugins add the icons, the styles, and React.
 
 <Diagram id="compiler-pipeline" caption="The stages of the page compiler, in order. Each color is one form of the page's syntax tree." draw={(d) => {
   const file = d.box("Page file", { id: "page-file", sub: "MDX" })
@@ -43,7 +43,7 @@ The page compiler is a list of Vite plugins. Its core is the MDX plugin, set up 
 
 Files are read before the outline is recorded, because the page's [revision](#revisions) covers those files. Highlighting runs after the excerpts and the source marks, so it colors every code block and numbers its lines.
 
-On the dev server, the diagnostic store, the pictures, and the document module compile a page in the server's own environment, so these compiles do not hold back the browser's first page load. A page whose file changed since its last compile is compiled again.
+The server also compiles pages for its own use: to find diagnostics, to draw pictures, and to list the pages. It does this apart from the pages it sends to the browser, so the browser's first page load does not wait for it. A page is compiled again when its file changes.
 
 A stage that finds a problem adds an issue for the file. After each compile, the server turns the issues into diagnostics at the page's lines, as [origins](diagnostics#origins) describes. A stage that cannot continue throws, and the compile fails with `COMPILE_FAILED`. <Ref to="compiler-sample" /> shows a page and its module.
 
@@ -117,7 +117,7 @@ The compiler first checks `document.json` and its page list against the files on
 
 The module holds every page's outline, so the contents, figure numbers, and `<Ref>` work before any page's code loads. To get the outlines, the compiler compiles every page. A page that fails to compile gets an empty outline, so the contents still list it.
 
-A page's code loads when the page is first shown. When it changes, the module swaps in the new page module and outline and tells the web app, as [hot updates](web-app#hot-updates) describes. Pages are compiled without React Fast Refresh, which would reload the browser for a module that exports an outline.
+A page's code loads when the page is first shown. When it changes, the module swaps in the new page module and outline and tells the web app, as [hot updates](web-app#hot-updates) describes.
 
 ## Markdown conventions
 
@@ -193,7 +193,7 @@ The source marks stage marks every top-level block, list item, and table row wit
 
 ## Revisions
 
-A page's revision is a hash of the page's text and of every file it reads for excerpts and charts. The outline stage writes it into the outline. The diagnostic store computes it again from the files on disk, as [revisions and reports](diagnostics#revisions-and-reports) describes. A change to a component's code does not change a revision.
+A page's revision is a hash of the page's text and of every file it reads for excerpts and charts. The outline stage writes it into the outline. The diagnostic store computes it again from the files on disk, as [revisions and reports](diagnostics#revisions-and-reports) describes.
 
 ## Replies
 
@@ -244,6 +244,10 @@ A build finds the external files by their addresses in the text of its pages, an
 
 ## Design decisions
 
-**Diagrams are compiled with the page.** Compiling in the server finds a diagram's problems on every save without a browser, lets the server refuse a reply with a broken diagram, and keeps the diagram compiler out of the reader's download. The cost is that a draw program cannot use the page's imports.
+**Diagrams are compiled with the page.** Compiling in the server finds a diagram's problems on every save without a browser, lets the server refuse a reply with a broken diagram, and keeps the diagram compiler out of the user's download. The cost is that a draw program cannot use the page's imports.
 
 **Excerpts find their lines by text.** Line numbers show the wrong code after lines are added above, and marker comments, as in [mdBook](https://rust-lang.github.io/mdBook/format/mdbook.html#including-portions-of-a-file), change the file. Quoted text, as in the `start-after` option of [Sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-literalinclude), fails with an error at the page's line when the file changes.
+
+### Open questions
+
+- Whether a website build also writes each page as static HTML. The page compiler compiles each page into a JavaScript module, and the web app runs it to show the page. The HTML file of each address holds only the web app's script, so a user without JavaScript or a search engine sees no text. The build could render each page to HTML, with its text, tables, code, and diagrams, and the web app would then add diagram steps, tabs, and charts in the browser.

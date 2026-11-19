@@ -9,7 +9,7 @@ This page explains how the web app, its components, and its figures are styled: 
 
 The web app is styled with [StyleX](https://stylexjs.com/), which compiles the styles of each component to atomic CSS at build time, so the style sheet grows only with the number of distinct values. Each component keeps its styles next to its markup. Every value that a style uses, such as a color, a space, or a duration, is a token: a named, typed value defined once in the theme.
 
-Authors' own components import the same tokens from `yapparatus/theme.stylex`; see [custom components](/components#custom-components). `palettes` gives the hex values of each theme for a component that computes with them, as [the contrast table](#contrast) does.
+A document's own components import the same tokens from `yapparatus/theme.stylex`; see [custom components](/components#custom-components). `palettes` gives the hex values of each theme for a component that computes with them, as [the contrast table](#contrast) does.
 
 ## Tokens
 
@@ -17,9 +17,9 @@ The colors, shadows, and font stacks change with the theme, so they are CSS vari
 
 Conditions, such as a narrow reading column, are tokens too, in the group `when`.
 
-The narrow condition is a container query on the reading column, which narrows both when the window shrinks and when the reader widens the chat. The chat panel uses a media query, because on a phone it covers the window. See [page layout](/web-app#page-layout).
+The narrow condition is a container query on the reading column, which narrows both when the window shrinks and when the user widens the chat. The chat panel uses a media query, because on a phone it covers the window. See [page layout](/web-app#page-layout).
 
-The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run. The picture's paint table names the theme tokens that each role and category paints with, and the server reads the theme as plain values and resolves the tokens to the light theme's values. A unit test checks that the paint table names the same tokens as the role styles of the web app's diagram elements. Pictures, tests, and the web app then use the same colors.
+The server draws [pictures](/diagram-compiler#pictures) in Node, where StyleX does not run, so it reads the theme tokens as plain values.
 
 A new value goes into a scale in the theme, with a comment on what it is for. A new color role needs a dark and a light value and a contrast rule in the theme test.
 
@@ -52,23 +52,7 @@ Surfaces step away from the background in lightness: `canvas`, `surface`, `surfa
 
 The theme test computes the WCAG contrast of each pair of roles drawn together, in the dark and light themes, each with increased contrast and in print. Text and status colors need 4.5:1, the [AA minimum](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html). Control edges and diagram outlines need 3:1, the [minimum for graphics](https://www.w3.org/WAI/WCAG22/Understanding/non-text-contrast.html). Tinted fills and dividers need 1.3:1. The test also checks that the category colors stay apart with red-green color blindness.
 
-Contrast compares the relative luminance of two colors. Each channel of a color, read as a fraction $$s$$ of 255, is first made linear, and the three linear channels are weighted by how bright each looks:
-
-$$
-c = \begin{cases} \dfrac{s}{12.92} & s \le 0.04045 \\ \left(\dfrac{s + 0.055}{1.055}\right)^{2.4} & \text{otherwise} \end{cases}
-$$
-
-$$
-L = 0.2126\,c_R + 0.7152\,c_G + 0.0722\,c_B
-$$
-
-The ratio of the lighter color's luminance to the darker one's ranges from 1 for equal colors to 21 for black on white:
-
-$$
-\text{contrast} = \frac{L_\text{lighter} + 0.05}{L_\text{darker} + 0.05}
-$$
-
-<Ref to="styling-contrast" /> lists the ratios on `surface`. The page computes them with the same formula from the theme, so they follow any change to the colors.
+<Ref to="styling-contrast" /> lists the ratios on `surface`. The page computes them from the theme with the [WCAG formula](https://www.w3.org/TR/WCAG22/#dfn-contrast-ratio), so they follow any change to the colors.
 
 <Table id="styling-contrast" caption="Contrast on surface, by role and theme.">
 
@@ -103,7 +87,7 @@ Diagram labels are 13.5 px, outside the scale, because the diagram compiler [mea
 
 ## Feedback
 
-The web app shows feedback where the reader acted. A copy button confirms on itself. A notice closes after a few seconds, and an error stays until dismissed. Clearing the chat asks for confirmation beside its button, because browser dialogs block the page and ignore the theme.
+The web app shows feedback where the user acted. A copy button confirms on itself. A notice closes after a few seconds, and an error stays until dismissed. Clearing the chat asks for confirmation beside its button, because browser dialogs block the page and ignore the theme.
 
 ## Accessibility and print
 
@@ -115,7 +99,7 @@ Print uses the light theme, because browsers leave out backgrounds and a dark th
 
 `pnpm verify` runs a style check, which rejects two things that StyleX accepts. One is shorthand properties, such as `border`: StyleX silently drops a shorthand that holds a theme variable, so styles write longhands such as `borderWidth`. The other is literal colors, such as hex values.
 
-Two more rules are kept by convention. A component that needs a class name, for tests and debugging, sets it with `styled("name", ...styles)`, because spreading StyleX's props after a `className` replaces it. Each element carries its own style: a figure does not style the elements inside it.
+Two more rules are kept by convention. An element that tests and debugging look up keeps a readable class name. Each element carries its own style: a figure does not style the elements inside it.
 
 ## Icons
 

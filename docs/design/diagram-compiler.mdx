@@ -1,6 +1,6 @@
 # Diagram compiler
 
-This page describes how the diagram compiler turns a draw program into a compiled diagram, and how the server draws a picture from it. How the web app shows a compiled diagram is on [the components page](components#diagram). How authors write diagrams is in the diagram reference of the authoring guide.
+This page describes how the diagram compiler turns a draw program into a compiled diagram, and how the server draws a picture from it. How the web app shows a compiled diagram is on [the components page](components#diagram).
 
 ## Overview
 
@@ -160,7 +160,7 @@ Rows and columns can be placed like any element, so they nest.
 
 ## Ids
 
-Every element has an id. The page uses it as the element's address, `/page#figure--element`, and steps, diagnostics, and references refer to elements by it. An author may set `id`. Without one, the compiler derives an id, as <Ref to="dc-ids" /> lists.
+Every element has an id. The page uses it as the element's address, `/page#figure--element`, and steps, diagnostics, and references refer to elements by it. An element may have an explicit `id`. Without one, the compiler derives an id, as <Ref to="dc-ids" /> lists.
 
 <Table id="dc-ids" caption="Derived ids.">
 
@@ -177,7 +177,7 @@ Every element has an id. The page uses it as the element's address, `/page#figur
 
 The id check makes the ids final before layout. A repeated explicit id is `DUPLICATE_ID`, and a repeated derived id gets `-2`, `-3`, in the order of creation. Cells, marks, and edges are settled last, because their ids are built from the final ids of their parents and ends.
 
-A derived id changes when its label changes. The link check verifies only the figure part of an address, so the diagram reference of the authoring guide asks for an explicit id on any element that something outside points at.
+A derived id changes when its label changes. The link check verifies only the figure part of an address, so the [diagram reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagrams.md#ids) asks for an explicit id on any element that something outside points at.
 
 ## Text measurement
 
@@ -191,17 +191,7 @@ The layout answers three questions about any element: its size, its position, an
 
 ### Sizes
 
-A shape's size is its measured text plus the shape's padding $$p$$ on each side, and at least a minimum size. A fixed `width` or `height` replaces it, and shapes in a size group, such as `equalSize`, take the largest size in the group. A row of $$n$$ children with gap $$g$$ is as wide as its children and the gaps between them, and as tall as its tallest child; a column is the same on the other axis. An enclosure surrounds its members with padding and a band for its title.
-
-$$
-w_\text{shape} = \max(w_\text{text} + 2p,\; w_\text{min})
-$$
-
-$$
-w_\text{row} = \sum_{i=1}^{n} w_i + (n - 1)\,g
-\qquad
-h_\text{row} = \max_i h_i
-$$
+A shape's size is its measured text plus padding on each side, and at least a minimum size. A fixed `width` or `height` replaces it, and shapes in a size group, such as `equalSize`, take the largest size in the group. A row is as wide as its children and the gaps between them, and as tall as its tallest child; a column is the same on the other axis. An enclosure surrounds its members with padding and a band for its title.
 
 In the running example, "Client" measures 38.0 by 18.6. With the padding, the box would be 70 by 40.6, so the minimum size of 104 by 46 applies. The cylinder adds 7.3 units of cap above and below its text and is 55.2 units tall.
 
@@ -266,7 +256,7 @@ Routing turns each edge into a list of points, its arrowheads, and its label box
 
 ### Routes
 
-The author chooses the form of the route, and the compiler adds the corners that the form needs between the two ends. <Ref to="dc-routes" /> shows the forms: a straight line, one elbow, a channel at a given x or y, a list of points, a curve, and a loop.
+Each edge has a route form, and the compiler adds the corners that the form needs between the two ends. <Ref to="dc-routes" /> shows the forms: a straight line, one elbow, a channel at a given x or y, a list of points, a curve, and a loop.
 
 <Diagram id="dc-routes" caption="The route forms, a curve, and loops." draw={(d) => {
   const panel = (title, at, draw) => {
@@ -320,7 +310,7 @@ A head points along the last straight piece, with its tip on the end point. The 
 
 ## Records and marked text
 
-The cells of a record and the marks of a text are elements of their own, so edges, steps, and links treat them like any other element. Their rectangles come from their parent's rectangle. <Ref to="dc-record" /> shows a record; the forms for authors are in the structures reference of the authoring guide.
+The cells of a record and the marks of a text are elements of their own, so edges, steps, and links treat them like any other element. Their rectangles come from their parent's rectangle. <Ref to="dc-record" /> shows a record; the [structures reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagram-structures.md) lists the forms.
 
 <Diagram id="dc-record" caption="A record on a grid of eight columns: cells of several spans, an inner cell with a pin, and an edge that enters a cell on the outline." draw={(d) => {
   const rec = d.record([
@@ -348,13 +338,13 @@ A sequence diagram is built from the other elements while the draw program runs,
 
 The compiler gives every element a role and at most one category. The web app and the picture turn them into colors and strokes, as [the components page](components#roles-and-categories) shows.
 
-An element keeps the role the author gave it, or the default role, and an enclosure without a role is `muted`. More than one element with the `accent` role is `ACCENT_OVERUSED`.
+An element keeps its own role, or the default role, and an enclosure without a role is `muted`. More than one element with the `accent` role is `ACCENT_OVERUSED`.
 
 Categories are numbered 1 to 4 in the order the draw program first uses them, and each number has its own color. A fifth category is `TOO_MANY_CATEGORIES`, and its elements get no color. The legend lists the categories, and a step that focuses a category's id focuses all its elements.
 
 ## Checks
 
-Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. What each code means and how an author fixes it is in the diagram reference of the authoring guide.
+Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. What each code means and how to fix it is in the [diagram reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagrams.md).
 
 <Table id="dc-check-origins" caption="The stage that finds each diagram diagnostic.">
 
@@ -375,7 +365,7 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 
 The collision checks run on the exact geometry, before rounding. Two rectangles overlap only when they share more than half a unit in both directions, and an edge hits a shape only when it passes more than one unit inside it. Shapes that touch, and an edge that ends on an outline, are therefore not reported. Edges also keep eight units away from enclosure titles.
 
-The checks report conflicts between elements that the reader sees as separate. They skip a cell or mark and its parent, an edge and its own ends, lifelines and activation bars, and pairs of step-only elements, which the step checks compare.
+The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, an edge and its own ends, lifelines and activation bars, and pairs of step-only elements, which the step checks compare.
 
 ### Steps and width
 
@@ -383,11 +373,7 @@ The step checks run on the finished diagram, so they see the final ids. Each id 
 
 The width check reports `DIAGRAM_SCROLLS` for a diagram wider than a fixed limit: the width of the widest figure area divided by the smallest scale the web app shrinks a diagram to.
 
-$$
-w_\text{limit} = \frac{w_\text{figure area}}{s_\text{min}}
-$$
-
-The limit does not depend on any window, so every author gets the same result.
+The limit does not depend on any window, so the result is the same on every screen.
 
 ## The compiled diagram
 
@@ -407,7 +393,7 @@ Shapes, edges, enclosures, and frames hold their final geometry: rectangles, poi
   ], { title: "api->database", header: "field\tvalue", mono: true, id: "edge" })
 }} />
 
-Every reader downloads the compiled diagrams of a page with its JavaScript, so the last stage keeps them small. It rounds every number to hundredths of a unit, once, after the checks. It also computes the view box: everything painted, with a margin, rounded outward to whole units.
+Every browser downloads the compiled diagrams of a page with its JavaScript, so the last stage keeps them small. It rounds every number to hundredths of a unit, once, after the checks. It also computes the view box: everything painted, with a margin, rounded outward to whole units.
 
 ## Pictures
 
@@ -430,15 +416,15 @@ A picture is a PNG of a diagram that the server draws for the agent. The agent a
   d.arrow(glyphs, svg)
 }} />
 
-The SVG writer writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same shape outlines, and adds a legend below. The picture shows the diagram with no step open. It paints each role and category with the theme tokens in a plain table, the tokens that the web app's role styles use, and a unit test checks that the two agree. The server resolves the tokens to the light theme's values and passes them to the SVG writer, so every agent gets the same picture; [styling](styling) describes how the server reads them. Text is drawn as glyph outlines from the web app's font files, so it is exactly as wide as the compiler measured it.
+The SVG writer writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same shape outlines, and adds a legend below. The picture shows the diagram with no step open. It paints each role and category with the same theme tokens as the web app, resolved to the light theme's values, so every agent gets the same picture. Text is drawn as glyph outlines from the web app's font files, so it is exactly as wide as the compiler measured it.
 
 With the `ids` option, the picture also writes each element's id beside it and outlines the elements that diagnostics name. The server passes the SVG to resvg at two pixels per unit, so that small text stays legible to a model.
 
 ## Design decisions
 
-The author arranges the diagram, and the compiler measures it. Automatic graph layout, as in Graphviz or ELK, can rearrange the whole diagram when one edge is added. A language model states an arrangement well and computes coordinates poorly, so the author states rows, columns, and placements, and the compiler computes every number.
+The draw program states the arrangement, and the compiler measures it. Automatic graph layout, as in Graphviz or ELK, can rearrange the whole diagram when one edge is added. A language model states an arrangement well and computes coordinates poorly, so a draw program states rows, columns, and placements, and the compiler computes every number.
 
-The compiler reports problems and does not repair them. A silent repair, such as moving a shape to remove an overlap, hides the problem, changes what the author wrote, and can be undone by the next edit.
+The compiler reports problems and does not repair them. A silent repair, such as moving a shape to remove an overlap, hides the problem, changes what the draw program says, and can be undone by the next edit.
 
 A draw program is TypeScript. A text language such as Mermaid, D2, or PlantUML is shorter for simple graphs, but it has no loops, variables, or functions, and its errors are vague. An error in a draw program names the page line of the statement.
 

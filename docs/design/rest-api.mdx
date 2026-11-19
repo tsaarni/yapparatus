@@ -47,7 +47,7 @@ The server has an HTTP API under `/-/api`, which the web app and the agent libra
 
 These rules hold for every request:
 
-- A `GET` changes nothing the reader sees. A `POST` adds to a collection, and a `DELETE` empties one.
+- A `GET` changes nothing the user sees. A `POST` adds to a collection, and a `DELETE` empties one.
 - A `POST` sends `Content-Type: application/json` and a JSON object of at most 512,000 characters.
 - Every response with a body is JSON, except a picture, which is `image/png`.
 - Every response has `Cache-Control: no-store`, because every read can change.
@@ -118,21 +118,21 @@ GET /-/api/chat?include=diagnostics HTTP/1.1
   "messages": [
     {
       "seq": 12,
-      // A message the reader wrote in the web app.
+      // A message the user wrote in the web app.
       "author": "reader",
       "text": "Why does a read wait?",
-      // What the reader attached. Empty: a message about the document in general.
+      // What the user attached. Empty: a message about the document in general.
       "references": [
         {
           // page, text, section, figure, table, listing, code, diagram-element, file, or lines.
           "kind": "section",
-          // The address of what the reader commented on.
+          // The address of what the user commented on.
           "address": "/rest-api#read-the-chat",
-          // Its file, relative to the project directory, and the lines the reader saw.
+          // Its file, relative to the project directory, and the lines the user saw.
           "source": "docs/design/rest-api.mdx",
           "startLine": 88,
           "endLine": 140,
-          // Optional: the diagram step the reader had open, with its text.
+          // Optional: the diagram step the user had open, with its text.
           "step": "Step 2 of 3: …"
         }
       ],
@@ -188,7 +188,7 @@ Yapparatus-Agent: 5f0c2d4e-…
   "agent": "waiting",
   // The errors the agent has not been given.
   "diagnostics": [],
-  "prompt": "Reader, 14:05:\n--- reader ---\nAnd the errors too?\n--- end reader ---\n…"
+  "prompt": "<reader_message time=\"14:05\">\nAnd the errors too?\n</reader_message>\n…"
 }
 ```
 

@@ -1,6 +1,6 @@
 # Diagnostics
 
-A diagnostic is one error or warning in a document, such as a broken link or two boxes that overlap in a diagram. This page follows a diagnostic from the check that finds it, through the server, to the agent and the reader.
+A diagnostic is one error or warning in a document, such as a broken link or two boxes that overlap in a diagram. This page follows a diagnostic from the check that finds it, through the server, to the agent and the user.
 
 ## Overview
 
@@ -25,7 +25,7 @@ The server finds problems in the source files, and the web app reports those tha
 }}>
   <Step focus="save server-checks">The agent saves a page. The server compiles it and checks the links.</Step>
   <Step focus="check check-result">`checkDocument` returns every diagnostic and lists the page as unchecked by a browser.</Step>
-  <Step focus="update report">The reader opens the page, and the web app reports a chart that fails to draw.</Step>
+  <Step focus="update report">The user opens the page, and the web app reports a chart that fails to draw.</Step>
   <Step focus="new-error wait">The error lasts 2 s and is new to the agent, so it ends the agent's wait.</Step>
 </Diagram>
 
@@ -45,13 +45,13 @@ The server also [checks each reply](/server#reply-checks), and returns its error
 
 ## Codes and severity
 
-Every code is in one registry, `diagnosticCodes`, with its severity and meaning.
+Every code is listed once, with its severity and meaning.
 
 A check passes a code and never a severity, so a code has the same severity everywhere. Each problem has one code: any two things that share an id are `DUPLICATE_ID`.
 
-A code is an `error` when the result is not what the author wrote: a reference to nothing, a duplicate, an invalid form, or something that threw. It is a `warning` when the page renders as written but reads badly: overlap, overflow, or too much of something.
+A code is an `error` when the page cannot be shown as written: a reference to nothing, a duplicate, an invalid form, or something that threw. It is a `warning` when the page renders as written but reads badly: overlap, overflow, or too much of something.
 
-The web app sends codes without a severity, and the server adds it from the registry.
+The web app sends codes without a severity, and the server adds it from that list.
 
 <Ref to="diagnostics-groups" /> lists the groups of the registry.
 
@@ -76,11 +76,11 @@ The target is a figure id on a page, or a message number in a reply. The subject
 
 ## Revisions and reports
 
-The web app's findings belong to a [revision](/page-compiler#revisions) of a page: a hash of the page's text and of every file it reads.
+The web app's findings belong to a [revision](/page-compiler#revisions) of a page.
 
 The web app sends one report for every revision it renders: an empty list when the page renders, `RENDER_FAILED` when it throws, and what its charts found.
 
-A report only adds diagnostics. A fix changes the revision, and the old revision's findings stop counting. The store's list holds the server's checks, the findings for each page's current revision, and those for replies still in the chat. Reports from several tabs add up, because a chart can overlap at one width only.
+A report only adds diagnostics. A fix changes the revision, and the old revision's findings stop counting. The store's list holds the server's checks, the findings for each page's current revision, and those for replies still in the chat. Reports from several browser tabs add up, because a chart can have a problem at one window width and not at another.
 
 A page is unchecked when no web app has rendered its current revision. Its diagrams are known, because the server checks them, and its charts and render errors are not. The store lists it with what the last rendered revision found, so the agent can tell an unconfirmed error from one that is gone.
 
@@ -110,7 +110,7 @@ The agent reads diagnostics in the prompt of a wait, in the result of `checkDocu
 
 [`waitForMessage`](/agent-library#waitformessage) returns reader messages and new errors. An error ends a wait when it has lasted 2 s and has not been given. Warnings never end a wait. An error that is fixed and comes back is new again.
 
-## What the reader sees
+## What the user sees
 
 In dev mode, the web app shows diagnostics under each diagram and chart, in place of a page that throws, and in a menu in the header, which lists them by page. **Comment** in the menu starts a message about the diagnostic. A diagnostic reaches the chat only this way. A build shows none. See [diagnostics display](/web-app#diagnostics-display).
 

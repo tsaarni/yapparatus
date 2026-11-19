@@ -1,6 +1,6 @@
 # Components
 
-This page describes how the web app renders the built-in components, with a live example of each. How authors write them is in the component reference of the authoring guide.
+This page describes how the web app renders the built-in components, with a live example of each.
 
 ## Overview
 
@@ -57,6 +57,14 @@ const retry = {
 ```
 
 An excerpt shows the line numbers of its file outside the text, so a selection or a copy takes only the code. With `wrap`, a long line breaks under its own text. A `Table` or `Listing` shows its title above its content.
+
+## Math
+
+The page compiler turns TeX between `$$` marks into MathML; see [math](page-compiler#math). The browser draws it in the system's math font, inline as in $$L_1 > L_2$$, or as a block:
+
+$$
+\text{contrast} = \frac{L_1 + 0.05}{L_2 + 0.05}
+$$
 
 ## Figures
 
@@ -137,13 +145,13 @@ Pointing at a legend entry highlights its category's elements as a step does. In
 
 ### Accessibility and print
 
-To assistive technology, a diagram with clickable elements is a group of them, and another diagram is an image. Each element's accessible name is its label. A screen reader reads each step's text when the step opens. Fading and scrolling follow the reader's reduced motion setting.
+To assistive technology, a diagram with clickable elements is a group of them, and another diagram is an image. Each element's accessible name is its label. A screen reader reads each step's text when the step opens. Fading and scrolling follow the user's reduced motion setting.
 
 Print shows the plain figure without step-only elements, and prints the text of every step as a numbered list under the caption.
 
 ## Chart
 
-The web app loads Observable Plot with the first chart on a page and calls the author's `plot` with the checked rows and the chart's width. Only the browser draws a chart, so it reports a chart's problems to the server; see [charts](charts).
+The web app loads Observable Plot with the first chart on a page and calls the chart's `plot` with the checked rows and the chart's width. Only the browser draws a chart, so it reports a chart's problems to the server; see [charts](charts).
 
 ## References and icons
 
@@ -172,7 +180,7 @@ The page compiler reads the Markdown list inside a `FileTree` into entries. The 
 
 The page compiler passes the labels of the panels to their container, and each `Panel` renders as a tab panel or a column depending on its container.
 
-`Tabs` follows the WAI-ARIA tabs pattern for the keyboard. The browser stores the reader's recent choices, and every tab set shows the most recent one it has, so a choice changes every set with that label, on every page and on the next visit. Find in page reveals a hidden panel in that set only. Print shows every panel.
+`Tabs` follows the WAI-ARIA tabs pattern for the keyboard. The browser stores the user's recent choices, and every tab set shows the most recent one it has, so a choice changes every set with that label, on every page and on the next visit. Find in page reveals a hidden panel in that set only. Print shows every panel.
 
 <Tabs>
 <Panel label="Dev mode">
@@ -204,18 +212,18 @@ A new built-in component is added in one change, in these places:
 1. The registry, so pages and replies can use it without an import.
 2. The list of page components that the reply check accepts.
 3. The component list in [the start prompt](agent-library#prompts).
-4. The authoring guide and its component reference.
+4. The [authoring guide](https://github.com/tsaarni/yapparatus/tree/main/starter/docs) and its component reference.
 5. This page: a row in <Ref to="components-inventory" />, a section, and a live example.
 
 A component that takes structured content gets a stage of the page compiler that reads it from Markdown, as `FileTree` has, because agents write Markdown reliably and the compiler can check it. A component that declares itself wide may use the breakout track; see [page layout](web-app#page-layout).
 
 ## Design decisions
 
-Authors give an element a role or a category, and the theme picks the color. A color chosen by the author would break in the light theme, in print, and with forced colors.
+An element has a role or a category, and its color comes from the theme. A color written in the page would break in the light theme, in print, and with forced colors.
 
-A step changes only emphasis and visibility, because elements that moved between steps would make the reader lose track of them.
+A step changes only emphasis and visibility, because elements that moved between steps would make the user lose track of them.
 
-Tab sets are linked by their labels, so authors have no group key to choose or forget. Unrelated sets with the same labels then change together, which is one reason content to compare goes in columns.
+Tab sets are linked by their labels, so a tab set needs no group key. Unrelated sets with the same labels then change together, which is one reason content to compare goes in columns.
 
 ## Sources
 

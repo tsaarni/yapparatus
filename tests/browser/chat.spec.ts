@@ -123,10 +123,10 @@ test("the agent channel: reader messages, wait, reply, checks, and the next wait
   const [start] = commands(state.prompt);
   const first = await runCommand(start ?? "");
   expect(first.stderr).toBe("");
-  expect(first.stdout).toMatch(/^Reader, \d\d:\d\d:$/m);
+  expect(first.stdout).toMatch(/^<reader_message time="\d\d:\d\d">$/m);
   expect(first.stdout).not.toMatch(/#\d+ reader/);
   expect(first.stdout).toContain(
-    "--- reader ---\nHow does the miss edge relate to this paragraph?",
+    "\nHow does the miss edge relate to this paragraph?\n</reader_message>",
   );
   expect(first.stdout).toMatch(
     /- text, content\/first-page\.mdx:\d+, \/first-page#[a-z-]+: “The target paragraph/,

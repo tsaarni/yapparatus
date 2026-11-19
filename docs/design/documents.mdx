@@ -1,6 +1,6 @@
 # Documents and addresses
 
-This page describes what a document is on disk and how everything in it is named, from pages to words in a file, and the references that the reader attaches to a message. <Ref to="documents-project" /> shows a project with two documents.
+This page describes the files of a document and how addresses name everything in it. <Ref to="documents-project" /> shows a project with two documents.
 
 <Figure id="documents-project" caption="A project with two document directories, after a dev session and both builds of content/.">
 
@@ -40,7 +40,7 @@ The project has one `.yapparatus/server.json`, where the running server writes i
 
 ## document.json
 
-`document.json` holds the settings of one document: its title, page list, theme, icons, numbering, and external directories. The authoring guide lists the fields.
+`document.json` holds the settings of one document: its title, page list, theme, icons, numbering, and external directories. The [authoring guide](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/guide.md) lists the fields.
 
 `"pages"` is the only required field. It lists the page files in reading order. The server compares it with the MDX files on disk and reports each difference and each invalid field as a `PAGE_LIST` diagnostic. It reads the file again when it changes, so a fix needs no restart. See [the document module](page-compiler#the-document-module).
 
@@ -52,7 +52,7 @@ A page has one `#` heading, at the top, which is its title.
 
 ## Addresses
 
-An address names something that the reader can open, link to, or attach to a message. Links, Copy link, references, and prompts use the same forms, which <Ref to="documents-forms" /> lists.
+An address names something that the user can open, link to, or attach to a message. Links, Copy link, references, and prompts use the same forms, which <Ref to="documents-forms" /> lists.
 
 <Table id="documents-forms" caption="The address forms.">
 
@@ -127,7 +127,7 @@ A browser that opens such an address goes to the first place on the page where t
 
 ## Lines
 
-Lines of an external file are written as on GitHub: `#L40` for one line and `#L40-L72` for a range, counted from 1. When an address has words too, the lines come first: the lines say where to look, and the words say which part of those lines the reader meant.
+Lines of an external file are written as on GitHub: `#L40` for one line and `#L40-L72` for a range, counted from 1. When an address has words too, the lines come first: the lines say where to look, and the words say which part of those lines the user meant.
 
 **[Direction](directions):** a list of lines, such as `#L54-L68,L80`, with a list in the reference.
 
@@ -141,13 +141,13 @@ A file also has a path relative to the project, such as `../../contour/internal/
 
 ## References
 
-A reference is one address that the reader attached to a message, with the file and lines it came from. A message has a list of references. The reader adds them as [commenting on the page](web-app#commenting-on-the-page) describes. Its type is `Reference`.
+A reference is one address that the user attached to a message, with the file and lines it came from. A message has a list of references. The user adds them as [commenting on the page](web-app#commenting-on-the-page) describes. Its type is `Reference`.
 
-`kind` says what the reader attached, and `address` names it. `source` is the page file or external file, relative to the project, and `startLine` and `endLine` are the lines in it. For a diagram element, `step` holds the step that the reader had open, with its text. The page compiler records which lines every block came from (see [source marks](page-compiler#outline-and-source-marks)), and the web app copies them into the reference. If the file has changed since, the address and its words tell the agent where to look. <Ref to="documents-kinds" /> lists the kinds.
+`kind` says what the user attached, and `address` names it. `source` is the page file or external file, relative to the project, and `startLine` and `endLine` are the lines in it. For a diagram element, `step` holds the step that the user had open, with its text. The page compiler records which lines every block came from (see [source marks](page-compiler#outline-and-source-marks)), and the web app copies them into the reference. If the file has changed since, the address and its words tell the agent where to look. <Ref to="documents-kinds" /> lists the kinds.
 
 <Table id="documents-kinds" caption="The kinds of reference.">
 
-| Kind | What the reader attached | Lines |
+| Kind | What the user attached | Lines |
 |---|---|---|
 | `page` | A page | The `#` heading |
 | `section` | A section | The section |

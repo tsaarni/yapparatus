@@ -1,19 +1,18 @@
 # Terminology
 
-This page explains the words that have a specific meaning in this document. Each term links to the page that describes it.
+This page explains the words that have a specific meaning in this document.
 
-## People and programs
+## Architecture
 
-<Table id="terms-people" caption="The people and programs involved.">
+<Table id="terms-architecture" caption="The pieces of the system.">
 
 | Term | Meaning |
 |---|---|
-| Reader | The person who reads a document in the browser and comments on it in messages to the agent. |
-| Author | Whoever writes the pages of a document. This is usually the agent, and sometimes a person. |
-| [Agent](agent-library) | The reader's AI coding agent, such as Claude Code, running in a terminal. It writes and revises the pages and replies to the reader's messages. Yapparatus does not include an agent. |
-| [Web app](web-app) | The program that runs in the browser. It shows the pages and the chat. |
-| [Server](server) | The program that the reader starts with `pnpm dev`. It compiles the pages, serves them to the web app, and passes messages between the web app and the agent. |
-| [Agent library](agent-library) | The functions that the agent calls to receive the reader's messages and to send replies. |
+| [Web app](web-app) | Shows the pages and the chat in the browser. |
+| [Server](server) | Compiles the pages, serves them to the web app, and passes chat messages between the web app and the agent. |
+| [Page compiler](page-compiler) | Compiles the MDX pages into JavaScript modules for the web app. |
+| [Diagram compiler](diagram-compiler) | Computes the layout of a diagram from its code. |
+| [Agent library](agent-library) | The agent's client of the server's REST API. |
 
 </Table>
 
@@ -23,15 +22,13 @@ This page explains the words that have a specific meaning in this document. Each
 
 | Term | Meaning |
 |---|---|
-| [Document](documents) | A set of pages about one topic, with a list that gives their order. |
-| [Project](documents#projects-and-document-directories) | The directory in which the reader runs the server. It can hold several documents. |
-| [Document directory](documents#projects-and-document-directories) | The directory that holds the files of one document. |
-| [Address](documents#addresses) | The name of anything in a document that can be opened, linked to, or commented on. `/setup#install` is the address of the section "Install" on the page "Setup". |
-| [External file](documents#external-files) | A file from outside the project that a document shows, such as a source file of the software that the document describes. |
+| [Document](documents) | A directory with a `document.json` and the pages it lists. |
+| [Project](documents#projects-and-document-directories) | The directory where `pnpm dev` runs. It holds one or more documents. |
+| [Address](documents#addresses) | The path of anything that can be linked to or commented on, such as `/setup#install`. |
+| [External file](documents#external-files) | A file outside the project that a document shows, such as source code. |
 | [Excerpt](page-compiler#code-and-excerpts) | Some lines of an external file, shown inside a page. |
 | [File view](web-app#file-view) | The screen of the web app that shows one whole external file. |
-| [Page compiler](page-compiler) | The part of the server that turns a page file into code that the web app can show. |
-| [Build](page-compiler#builds) | A copy of a document made for sharing: a static website or a single HTML file. A build has no chat. |
+| [Build](page-compiler#builds) | A document as a static website or one HTML file, without the chat. |
 
 </Table>
 
@@ -41,27 +38,30 @@ This page explains the words that have a specific meaning in this document. Each
 
 | Term | Meaning |
 |---|---|
-| Figure | Anything with a figure number and a caption: an image, a diagram, or a chart. |
-| [Diagram](components#diagram) | A figure made of shapes and arrows. The author describes it in a few lines of code, and the [diagram compiler](diagram-compiler) draws it. |
-| [Element](diagram-compiler#ids) | One shape, arrow, or cell in a diagram. The reader can click an element to comment on it. |
-| [Step](components#steps) | One stage of an explanation that a diagram shows in order. Each step highlights some elements and shows a sentence about them. |
-| [Picture](diagram-compiler#pictures) | An image file of a diagram that the server makes for the agent, so that the agent can see what it drew. |
-| [Chart](charts) | A figure that shows numbers, such as a line chart or a bar chart. |
+| [Figure](components#figures) | A diagram or chart with a number and a caption. |
+| [Diagram](components#diagram) | Shapes and arrows that the agent describes in code and the diagram compiler draws. |
+| [Element](diagram-compiler#ids) | One shape, arrow, or cell in a diagram. Clicking an element adds it to a comment. |
+| [Step](components#steps) | A sentence that highlights some elements of a diagram. The steps are shown in order. |
+| [Picture](diagram-compiler#pictures) | A PNG of a diagram, which the agent saves to see what it drew. |
+| [Chart](charts) | A figure drawn from data with Observable Plot. |
 
 </Table>
 
 ## Chat and diagnostics
 
-<Table id="terms-chat" caption="Terms for the chat between the reader and the agent.">
+<Table id="terms-chat" caption="Terms for the chat between the user and the agent.">
 
 | Term | Meaning |
 |---|---|
-| [Chat](server#chat-log) | The messages between the reader and the agent, shown in a panel beside the page. |
-| [Comment](web-app#commenting-on-the-page) | A message from the reader about something on the page, such as a question, a correction, or a request to change it. |
-| [Reply](agent-library#sendreply) | A message from the agent to the reader. |
+| [Chat](server#chat-log) | The messages between the user and the agent, shown in a panel beside the page. |
+| Reader | The user's name in the chat. Prompts use it so that the agent can tell comments from the chat from what the user types directly to the agent. |
+| [Agent](agent-library) | Writes replies through the agent library. |
+| [Comment](web-app#commenting-on-the-page) | What the user writes about the document in the web app. |
+| [Reader message](server#chat-log) | A comment as the chat stores it. |
+| [Reply](agent-library#sendreply) | A message from the agent. |
 | [Reference](documents#references) | What a comment refers to: selected text, a section, a figure, an element of a diagram, or lines of a file. |
-| [Prompt](agent-library#prompts) | The text that the server writes for the agent. It holds the reader's messages, their references, and instructions for the next step. |
-| [Agent state](server#agent-state) | Whether an agent is connected to the chat and whether it is working on a reply. The chat panel shows it. |
-| [Diagnostic](diagnostics) | An error or a warning that the system found in a document, such as a broken link or two shapes that overlap in a diagram. |
+| [Prompt](agent-library#prompts) | The text that the server writes for the agent. It holds the reader messages, their references, and instructions for the next step. |
+| [Agent state](server#agent-state) | Whether the agent is waiting for messages, working on a reply, or away. The chat panel shows it. |
+| [Diagnostic](diagnostics) | An error or warning in a document, such as a broken link or overlapping shapes. |
 
 </Table>

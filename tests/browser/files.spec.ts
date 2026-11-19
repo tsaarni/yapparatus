@@ -228,7 +228,7 @@ test("an agent gets the selected code's file, lines, and words, and answers with
   const [start] = commands(state.prompt);
   const read = await runCommand(start ?? "");
   expect(read.stderr).toBe("");
-  expect(read.stdout).toContain("--- reader ---\nWhy does it build the text first?");
+  expect(read.stdout).toContain(">\nWhy does it build the text first?\n</reader_message>");
   expect(read.stdout).toContain(
     "- file lines, source/greet.ts:2-3, /-/files/sample/greet.ts#L2-L3\n",
   );
@@ -261,6 +261,6 @@ test("an agent gets the selected code's file, lines, and words, and answers with
     data: { author: "reader", text: "Thanks.", references: [] },
   });
   const next = (await waiting).stdout;
-  expect(next).toContain("--- reader ---\nThanks.");
+  expect(next).toContain(">\nThanks.\n</reader_message>");
   expect(next).not.toContain("Why does it build the text first?");
 });

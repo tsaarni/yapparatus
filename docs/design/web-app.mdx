@@ -1,6 +1,6 @@
 # Web app
 
-The web app is the program in the browser that shows a document and its chat. This page describes the screen, how the web app moves between pages and follows edits, how it lays out and numbers a page, how the reader comments on the page, and how it shows the chat and the diagnostics. How each built-in component renders is on [components](components).
+The web app is the program in the browser that shows a document and its chat. How each built-in component renders is on [components](components).
 
 ## Screen
 
@@ -28,28 +28,28 @@ The screen has four regions: the header, the contents, the page, and the chat pa
 }}>
   <Step focus="header">The header shows the document title, the current page, and in dev mode the diagnostics count and the Chat button.</Step>
   <Step focus="contents">The contents list the pages, and the sections of the current page.</Step>
-  <Step focus="page chat-panel">The page and the chat panel each scroll by themselves. The reader can drag the panel's left edge to resize it.</Step>
+  <Step focus="page chat-panel">The page and the chat panel each scroll by themselves. The user can drag the panel's left edge to resize it.</Step>
   <Step focus="compact small-screen">When the space beside the chat is narrow, the contents move into a drawer. On a small screen, the open chat covers the whole width.</Step>
 </Diagram>
 
 The header also shows a theme button when `theme` in `document.json` is `"auto"`. The web app picks the layout from the width left beside the chat panel, so opening or widening the chat can change it.
 
-The window itself does not scroll, so each scrollbar is at the edge of its own region. The page takes the keyboard focus at startup and when the reader clicks it, so keys such as Page Down scroll it. Print shows only the page.
+The window itself does not scroll, so each scrollbar is at the edge of its own region. The page takes the keyboard focus at startup and when the user clicks it, so keys such as Page Down scroll it. Print shows only the page.
 
 ## Navigation
 
 The router is the part of the web app that turns an [address](documents#addresses) into what the screen shows. It receives every navigation from the browser's Navigation API. <Ref to="web-navigation" /> follows one click on a link.
 
-<Diagram id="web-navigation" caption="From a click on a link to the new page on screen." description="Sequence between the reader, the browser, the router, the page code, and the screen" draw={(d) => {
-  const reader = d.actor("Reader")
+<Diagram id="web-navigation" caption="From a click on a link to the new page on screen." description="Sequence between the user, the browser, the router, the page code, and the screen" draw={(d) => {
+  const user = d.actor("User")
   const browser = d.box("Browser")
   const router = d.box("Router", { role: "accent" })
   const code = d.box("Page code", { id: "page-code" })
   const screen = d.box("Screen")
-  d.sequence([reader, browser, router, code, screen], [
-    { from: reader, to: router, label: "points at link", id: "point" },
+  d.sequence([user, browser, router, code, screen], [
+    { from: user, to: router, label: "points at link", id: "point" },
     { from: router, to: code, label: "start loading", async: true, id: "prefetch" },
-    { from: reader, to: browser, label: "click", id: "click" },
+    { from: user, to: browser, label: "click", id: "click" },
     { from: browser, to: router, label: "navigation", id: "event" },
     { from: router, to: browser, label: "save scroll", id: "save", async: true },
     { from: router, to: code, label: "wait for code", id: "await" },
@@ -62,22 +62,22 @@ The router is the part of the web app that turns an [address](documents#addresse
     ] }] },
   ], { gap: 64 })
 }}>
-  <Step focus="reader router point prefetch">When the pointer or the keyboard focus reaches a link, the router starts loading the code of its page.</Step>
+  <Step focus="user router point prefetch">When the pointer or the keyboard focus reaches a link, the router starts loading the code of its page.</Step>
   <Step focus="browser click event">The browser changes the address at once. The router takes over if the address belongs to the document.</Step>
-  <Step focus="save">The router saves the scroll position of the page the reader leaves.</Step>
+  <Step focus="save">The router saves the scroll position of the page the user leaves.</Step>
   <Step focus="page-code await loaded">The old page stays on screen until the new page's code has loaded.</Step>
   <Step focus="screen route scroll">The new page renders. Back and Forward restore the saved position. Other navigations scroll to the target or to the top.</Step>
 </Diagram>
 
-The router leaves reloads, downloads, and other sites to the browser. It does the scrolling itself, because the browser restores only the window's position, and the page scrolls in its own region. Each page's code loads once and is kept, so a prefetch and a click share one load. When the reader follows another link while a page loads, the latest navigation wins.
+The router leaves reloads, downloads, and other sites to the browser. It does the scrolling itself, because the browser restores only the window's position, and the page scrolls in its own region. Each page's code loads once and is kept, so a prefetch and a click share one load. When the user follows another link while a page loads, the latest navigation wins.
 
-While the reader reads, the web app also loads the next page in the contents. In a browser without the Navigation API, every link loads a page from the server, and links between pages of a [single-file build](page-compiler#builds) do not work.
+While the user reads, the web app also loads the next page in the contents. In a browser without the Navigation API, every link loads a page from the server, and links between pages of a [single-file build](page-compiler#builds) do not work.
 
 ## Hot updates
 
 In dev mode, the web app shows an edited page without a reload. When a page or an external file that it excerpts changes, the page compiler compiles the page again, and the [document module](page-compiler#the-document-module) swaps in the new page and its outline. The web app then numbers the document again and renders the page with its new code. An edit to `document.json` reloads the web app.
 
-The chat panel is outside the page, so an update keeps the reader's draft, references, and place in the chat. Session storage keeps them across a reload too.
+The chat panel is outside the page, so an update keeps the user's draft, references, and place in the chat. Session storage keeps them across a reload too.
 
 ## Page layout
 
@@ -97,7 +97,7 @@ The page is a grid with a text column and a breakout track to its right, as <Ref
 
 Text stays in the text column. Code, tables, figures, file trees, tabs, and columns may grow into the breakout track as far as their content needs. When space is short, the breakout track shrinks first, then the text column. A diagram then scrolls sideways, and so do long code lines and wide tables.
 
-Reading styles, such as the title size, change when the text column becomes narrow, which also happens when the reader widens the chat. See [typography and scales](styling#typography-and-scales).
+Reading styles, such as the title size, change when the text column becomes narrow, which also happens when the user widens the chat. See [typography and scales](styling#typography-and-scales).
 
 ## Numbering and references
 
@@ -107,7 +107,7 @@ The same pass collects every page, heading, figure, table, and listing that a `R
 
 ## Commenting on the page
 
-In dev mode, the reader adds parts of the page to the next message as [references](documents#references), in three ways. Pages, sections, figures, tables, listings, and code blocks are targets. A target shows a Comment button, and a Link button that copies its address, when the pointer or the keyboard focus is on it. A diagram element is added by a click. Selected text opens a menu with two icon buttons: Copy link, which copies the address of the words as a [text fragment](documents#text-fragments), and Comment. Builds keep only the Link buttons and Copy link.
+In dev mode, the user adds parts of the page to the next message as [references](documents#references), in three ways. Pages, sections, figures, tables, listings, and code blocks have addresses. Each shows a Comment button, and a Link button that copies its address, when the pointer or the keyboard focus is on it. A diagram element is added by a click. Selected text opens a menu with two icon buttons: Copy link, which copies the address of the words as a [text fragment](documents#text-fragments), and Comment. Builds keep only the Link buttons and Copy link.
 
 <Ref to="web-selection" /> shows how a selection that touches three blocks becomes three references.
 
@@ -132,7 +132,7 @@ In dev mode, the reader adds parts of the page to the next message as [reference
   d.place(marks, { above: page, gap: 24 })
 }}>
   <Step focus="page marks">The page compiler has marked each block, list item, and table row with its file and lines.</Step>
-  <Step focus="paragraph list-item table-row">The reader selects text that touches three of these blocks.</Step>
+  <Step focus="paragraph list-item table-row">The user selects text that touches three of these blocks.</Step>
   <Step focus="to-1 to-2 to-3 message-box">Each block becomes one `text` reference. Its address is the section or figure the words are in, followed by the words.</Step>
 </Diagram>
 
@@ -187,19 +187,19 @@ A diagram appears only after its fonts load, so the web app repeats the search f
 
 The file view shows a whole external file at its file address, `/-/files/<directory>/<path>`. In dev mode the web app reads the file from the server's [files resource](rest-api#read-an-external-file), and reads it again when the file changes. A build holds only the files that its pages name; see [builds](page-compiler#builds).
 
-The view draws the file like an excerpt. The file is a target, and under its title, "Discussed in" lists the sections that link to it or excerpt it. Line numbers work as on GitHub: a click selects a line, a shift-click extends the selection, and the address ends in a range such as `#L11-L14`. A click on a line number in an excerpt opens the file view at that line.
+The view draws the file like an excerpt. The file has a Comment button, and under its title, "Discussed in" lists the sections that link to it or excerpt it. Line numbers work as on GitHub: a click selects a line, a shift-click extends the selection, and the address ends in a range such as `#L11-L14`. A click on a line number in an excerpt opens the file view at that line.
 
 ## Chat panel
 
 The chat panel exists only in dev mode. It shows the [chat](server#chat-log) in order, a typing indicator, and the message box. The server's [updates](rest-api#updates) keep it current.
 
-A reader message shows its references, each with its address and the Show on page button. A reply is MDX that the server has compiled into a module. The web app loads the module and renders it with the same components as a page, without numbers or Comment buttons, and with ids prefixed so that they do not clash with the page's.
+A comment shows its references, each with its address and the Show on page button. A reply is MDX that the server has compiled into a module. The web app loads the module and renders it with the same components as a page, without numbers or Comment buttons, and with ids prefixed so that they do not clash with the page's.
 
-The panel header shows the [agent state](server#agent-state). While the newest message is unanswered and an agent is connected, the thread ends with typing dots and the seconds since the message. While no agent is connected, Copy prompt copies the [start prompt](agent-library#prompts) for a new agent. Clear deletes the chat on the server after the reader confirms. The thread follows new messages while the reader is at its bottom.
+The panel header shows the [agent state](server#agent-state). While the newest message is unanswered and an agent is connected, the thread ends with typing dots and the seconds since the message. While no agent is connected, Copy prompt copies the [start prompt](agent-library#prompts) for a new agent. Clear deletes the chat on the server after the user confirms. The thread follows new messages while the user is at its bottom.
 
 ## Diagnostics display
 
-In dev mode, the header shows the number of errors and warnings, and opens a list of them grouped by page. An item's code and line open the page at the diagnostic's place. Its message is text that the reader can select, and its Copy button copies the diagnostic with its file and line. Its Comment button writes a request to fix the diagnostic into the message box. Diagnostics also appear in place: a page that fails to render shows its error instead of its content, and a [diagram](components#diagram) or chart lists them under the figure.
+In dev mode, the header shows the number of errors and warnings, and opens a list of them grouped by page. An item's code and line open the page at the diagnostic's place. Its message is text that the user can select, and its Copy button copies the diagnostic with its file and line. Its Comment button writes a request to fix the diagnostic into the message box. Diagnostics also appear in place: a page that fails to render shows its error instead of its content, and a [diagram](components#diagram) or chart lists them under the figure.
 
 Some problems appear only when a page runs in the browser: render errors, runtime errors, chart problems, and replies that fail to show. The web app reports them to the server with the page's revision, and reports a clean revision too, so the server knows the page was checked. See [revisions and reports](diagnostics#revisions-and-reports).
 
@@ -224,7 +224,7 @@ At startup, the web app applies the theme, starts the error reports, sets the fa
 
 The router uses the Navigation API because it reports every navigation through one event, including Back, Forward, and links in replies. The address changes before the page loads because Safari lacks the option to delay it.
 
-Edited pages update in place because React's Fast Refresh reloads the whole app for a page module, which also exports its outline. A reload makes the page flash and loses the reader's place.
+Edited pages update in place because React's Fast Refresh reloads the whole app for a page module, which also exports its outline. A reload makes the page flash and loses the user's place.
 
 ## Sources
 
