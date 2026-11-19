@@ -215,7 +215,7 @@ The `yap` command makes three outputs from one document directory, as <Ref to="c
     d.arrow(source.bottom, out.top, { route: { viaY: d.lerp(source.bottom, out.top) } })
 }} />
 
-The website build writes an HTML file for every address, so any static host serves every page, as <Ref to="compiler-site" /> shows.
+The website build writes an HTML file for every address, so any static host serves every page, as <Ref to="compiler-site" /> shows. The site is served from the root of the host unless `--base <path>` gives another path, such as `/yapparatus/design/` on GitHub Pages; page links and assets start with that path.
 
 <Figure id="compiler-site" caption="The website build of the document directory docs/design.">
 

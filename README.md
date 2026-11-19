@@ -13,7 +13,7 @@ The [starter README](starter/README.md) describes how to create a new project, a
 
 ## Example
 
-The design document of the project itself is a Yapparatus document. See [`docs/design/`](docs/design/overview.mdx).
+The design document of the project itself is a Yapparatus document. [Read it online](https://tsaarni.github.io/yapparatus/design/), or see the source in [`docs/design/`](docs/design/overview.mdx).
 You need Node.js 22.18 or later, and pnpm or npm. Install the dependencies and start:
 
 ```sh

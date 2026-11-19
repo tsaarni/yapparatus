@@ -6,7 +6,7 @@ import { yapparatus } from "./plugin.ts";
 
 const usage = `Usage:
   yap dev <directory> [--port <port>] [--open] [--force]
-  yap build <directory> [--single]
+  yap build <directory> [--single | --base <path>]
   yap preview <directory> [--port <port>] [--open]
 
 <directory> is the document's directory, which holds its document.json.
@@ -15,7 +15,8 @@ Options:
   --port <port>  Serve on this port.
   --open         Open the document in the browser.
   --force        Rebuild Vite's dependency cache.
-  --single       Build the document as one offline HTML file.`;
+  --single       Build the document as one offline HTML file.
+  --base <path>  Serve the site from this path, such as /project/docs/. Default: /.`;
 
 /** Print the message and the usage, and exit with an error. */
 function fail(message: string): never {
@@ -32,6 +33,7 @@ const { values, positionals } = (() => {
         open: { type: "boolean", default: false },
         force: { type: "boolean", default: false },
         single: { type: "boolean", default: false },
+        base: { type: "string" },
       },
     });
   } catch (error) {
@@ -51,7 +53,12 @@ const accepted: Record<string, string[]> = {
   open: ["dev", "preview"],
   force: ["dev"],
   single: ["build"],
+  base: ["build"],
 };
+if (values.single && values.base !== undefined)
+  fail("--base is not an option of a single-file build.");
+if (values.base !== undefined && !/^\/(.*\/)?$/.test(values.base))
+  fail(`Invalid base: ${values.base}. It starts and ends with /.`);
 for (const [option, value] of Object.entries(values)) {
   const commands = accepted[option] ?? [];
   if (value !== undefined && value !== false && !commands.includes(command))
@@ -62,6 +69,7 @@ for (const [option, value] of Object.entries(values)) {
 const config: InlineConfig = {
   root: process.cwd(),
   plugins: yapparatus({ document, singleFile: values.single }),
+  ...(values.base === undefined ? {} : { base: values.base }),
 };
 /**
  * Listen only on this machine: the chat server trusts local processes.

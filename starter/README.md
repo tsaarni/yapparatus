@@ -49,6 +49,8 @@ pnpm build:single content   # or: npm run build:single content
 
 `build` writes the document as a static site to `dist/content/`, and `build:single` writes it as one offline file, `dist-single/content/index.html`.
 
+To serve the site from a path other than the root of the host, give the path to the build: `pnpm build content --base /project/docs/`.
+
 Neither build includes the chat.
 
 ## Add another document
