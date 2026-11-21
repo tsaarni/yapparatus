@@ -23,7 +23,7 @@ pnpm dev docs/design
 
 Open [http://127.0.0.1:5173/](http://127.0.0.1:5173/) in the browser.
 
-In this demo, the user selects an arrow of a sequence diagram and asks about it in the chat panel. The user then asks the agent to show the query parameters on the arrow, and the diagram updates on the page.
+In the demo animation below, the user selects an arrow of a sequence diagram and asks about it in the chat panel. The user then asks the agent to show the query parameters on the arrow, and the diagram updates on the page.
 
 <img src="assets/demo-light.webp#gh-light-mode-only">
 <img src="assets/demo-dark.webp#gh-dark-mode-only">
