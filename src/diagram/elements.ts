@@ -479,8 +479,8 @@ export interface LabelOptions {
   gap?: number;
 }
 
-/** Which ends of an edge get arrowheads. */
-export type Ends = "->" | "<-" | "<->" | "--";
+/** The arrowhead at one end of an edge: a filled or an open head, or none. */
+export type HeadKind = "filled" | "open" | "none";
 
 /** Options of an edge. */
 export interface EdgeOptions {
@@ -495,9 +495,10 @@ export interface EdgeOptions {
    */
   category?: string;
   dashed?: boolean;
-  ends?: Ends;
-  /** Arrowhead style: "filled" (default) for calls and flows, "open" for replies and async. */
-  head?: "filled" | "open";
+  /** The arrowhead at the `to` end. Default: "filled" on an arrow, "none" on a line. */
+  head?: HeadKind;
+  /** The arrowhead at the `from` end. Default: "none". */
+  tail?: HeadKind;
   /** Show only while a step focuses it, such as a message that comes and goes. */
   stepOnly?: boolean;
 }
@@ -521,8 +522,8 @@ export class Edge {
   readonly role: Role;
   readonly category: string | undefined;
   readonly dashed: boolean;
-  readonly ends: Ends;
-  readonly head: "filled" | "open";
+  readonly head: HeadKind;
+  readonly tail: HeadKind;
   readonly passive: boolean;
   readonly stepOnly: boolean;
   readonly labels: LabelOptions[] = [];
@@ -540,8 +541,8 @@ export class Edge {
     this.role = options.role ?? "default";
     this.category = options.category;
     this.dashed = options.dashed ?? false;
-    this.ends = options.ends ?? "->";
     this.head = options.head ?? "filled";
+    this.tail = options.tail ?? "none";
     this.passive = internals.passive ?? false;
     this.stepOnly = options.stepOnly ?? false;
     if (options.label) this.label(options.label);

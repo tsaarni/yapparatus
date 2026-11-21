@@ -115,8 +115,8 @@ The sections below follow one small diagram through the stages. <Ref to="dc-exam
   const pd = d.cylinder("Database", { id: "p-db" })
   const placedRow = d.row([pc, pa], { id: "placed" })
   d.place(pd, { below: pa })
-  d.line(pc.right, pa.left, { ends: "<->", label: "88", id: "row-gap", role: "muted" })
-  d.line(pa.bottom, pd.top, { ends: "<->", label: "64", id: "place-gap", role: "muted" })
+  d.arrow(pc.right, pa.left, { tail: "filled", label: "88", id: "row-gap", role: "muted" })
+  d.arrow(pa.bottom, pd.top, { tail: "filled", label: "64", id: "place-gap", role: "muted" })
   const origin = d.text("Client at (0, 0)", { id: "origin" })
   d.place(origin, { below: pc, gap: 16 })
   const place = d.enclose([pc, pa, pd, origin], { title: "Place", id: "place" })
@@ -155,7 +155,7 @@ One check runs every call against its signature before the call records anything
 - `UNKNOWN_OPTION`: the call does not take the option. The message lists the options the call takes, the nearest first when the name is a few edits away, and the option is ignored.
 - `INVALID_ARGUMENT`: the value is not one the argument or the option takes. The message names the call, the value, and the values it takes. The option's default is used. An argument has a stand-in, such as empty text for a label or an empty list for a list, or the call leaves out what it cannot make, such as an edge with an end that is not an element or a point. An item of a list that is not one of the list's values is left out, and an empty cell stands in for a grid's cell.
 - A call with several forms takes exactly one form key and only the options of that form. `place()` takes one of `below`, `above`, `leftOf`, `rightOf`, and `at`; the first four take `gap` and `align`, and `at` takes `anchor`. A mark takes one of `text` and `lines`, and a sequence message at most one of `reply` and `async`. No form key, a second one, and an option of another form are `INVALID_ARGUMENT`. A `place()` without a form, or without its options, is ignored.
-- An option that the call takes but that has no effect in its form is `INVALID_ARGUMENT` and is ignored: `head` on an edge without arrowheads, `side` on a start or end without a label, `titleAt` on an enclosure without a title, `levelGap` in the `indent` layout of a tree, and `reply` or `async` on a message from a participant to itself.
+- An option that the call takes but that has no effect in its form is `INVALID_ARGUMENT` and is ignored: `side` on a start or end without a label, `titleAt` on an enclosure without a title, `levelGap` in the `indent` layout of a tree, and `reply` or `async` on a message from a participant to itself.
 - A route that the edge cannot take is `INVALID_ARGUMENT`, and the edge's default route stands in: a route other than `loop` on an edge from an element to itself, and a `loop` route on any other edge.
 
 The diagnostic's subject is the path of the argument or option, such as `role`, `label.side`, or `steps[2].label`, so two problems on one element are two diagnostics. A frame is not an element, so a frame given where an element or a point is due is `INVALID_ARGUMENT`.
@@ -364,9 +364,11 @@ In the running example, "request" sits above the middle of its edge, centered at
 
 ### Arrowheads
 
-A head points along the last straight piece, with its tip on the end point. The line is shortened into the head, so the stroke does not show past the tip. In the running example, the line of `client->api` ends at x = 186.5, and the tip of its head is at x = 192.
+Each end of an edge has an arrowhead kind: `head` at the `to` end and `tail` at the `from` end. The kinds are `filled`, `open`, and `none`. `d.arrow` has a filled head and no tail, and `d.line` has neither, unless the options say otherwise. The two calls differ only in these defaults, so an edge with two heads is `d.arrow(a, b, { tail: "filled" })`. A sequence gives a call a filled head, a reply and an async message an open head, and a lifeline none. A tree's lines have none unless its `edge` option gives `head` or `tail`.
 
-The piece that carries a head is the last leg of a route with corners, and the whole curve of a bent edge. The compiler samples a curve into short legs, and the head points along the last of them. A head is 10 units long and needs a piece of at least 17 units, because it takes at most 60% of the piece. On a shorter piece, the head shrinks to fit, and the compiler reports `HEAD_CROWDED` with the room the head has and the room it needs.
+A head points along the last straight piece at its end, with its tip on the end point. The line is shortened into each head, so the stroke does not show past the tip. An end without a head keeps its full length. In the running example, the line of `client->api` ends at x = 186.5, and the tip of its head is at x = 192.
+
+The piece that carries a head is the last leg of a route with corners, and the whole curve of a bent edge. The compiler samples a curve into short legs, and the head points along the last of them. A head is 10 units long and needs a piece of at least 17 units, because it takes at most 60% of the piece. On a shorter piece, the head shrinks to fit, and the compiler reports `HEAD_CROWDED` for that end, with the room the head has and the room it needs. Its subject is `head` or `tail`, so the two ends of one edge are two diagnostics.
 
 ## Records and marked text
 
@@ -446,7 +448,7 @@ The collision checks run on the exact geometry, before rounding. Two rectangles 
 
 The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. Free text is checked like any shape, because it has no fill and an edge through it shows through the words. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and an edge whose two ends are on one element, or that has a `bend` route, is not checked against its ends.
 
-Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel such as a grid's gutter, and an edge that lies wholly on another are reported. The fixes are the route `{ bend: units }`, a `port()`, or one edge with `ends: "<->"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
+Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel such as a grid's gutter, and an edge that lies wholly on another are reported. The fixes are the route `{ bend: units }`, a `port()`, or, for two edges in opposite directions, one edge with `tail: "filled"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
 
 ### Steps and width
 
@@ -460,15 +462,14 @@ The limit does not depend on any window, so the result is the same on every scre
 
 The compiled diagram, `CompiledDiagram`, holds what the web app and the picture need to draw, and nothing that only the compiler uses.
 
-Shapes, edges, enclosures, and frames hold their final geometry: rectangles, points, and text lines with their positions and fonts. The compiled diagram lists nodes in paint order: decorations first, then the author's elements in creation order. Decorations are the elements that the checks and the steps leave out, such as activation bars, so a note over a bar covers it. `groups` lists, for each container and category, the elements that a step focuses with it. `icons` holds the markup of each icon that a node names, once, as the icon package gives it: elements on a 24 unit grid that paint in `currentColor`. A node with an icon names it and gives the icon's rectangle. The table holds only markup from the package; the author's text never reaches it. Each icon's markup is in the table once however many nodes use it, and a typical icon's markup is about 250 bytes. `ok` and `diagnostics` say whether the diagram can be drawn and what is wrong with it. <Ref to="dc-compiled-edge" /> shows one edge of the running example.
+Shapes, edges, enclosures, and frames hold their final geometry: rectangles, points, and text lines with their positions and fonts. The compiled diagram lists nodes in paint order: decorations first, then the author's elements in creation order. Decorations are the elements that the checks and the steps leave out, such as activation bars, so a note over a bar covers it. `groups` lists, for each container and category, the elements that a step focuses with it. `icons` holds the markup of each icon that a node names, once, as the icon package gives it: elements on a 24 unit grid that paint in `currentColor`. A node with an icon names it and gives the icon's rectangle. The table holds only markup from the package; the author's text never reaches it. Each icon's markup is in the table once however many nodes use it, and a typical icon's markup is about 250 bytes. `ok` and `diagnostics` say whether the diagram can be drawn and what is wrong with it. An edge gives its arrowheads as `head` and `tail`, each with its kind and its points, and leaves out an end without one, so the web app and the picture draw each end by itself: a filled head as a polygon, an open head as a polyline. <Ref to="dc-compiled-edge" /> shows one edge of the running example.
 
 <Diagram id="dc-compiled-edge" caption="The compiled edge api->database of the running example." draw={(d) => {
   d.record([
     "id\t\"api->database\"",
     "role\t\"default\"",
-    "head\t\"filled\"",
     "points\t(244, 46) (244, 104.5)",
-    "heads\t(244, 110) (240, 100) (244, 102.8) (248, 100)",
+    "head\tfilled (244, 110) (240, 100) (244, 102.8) (248, 100)",
     "labels\t\"query\" at (270.71, 78), box 41.42 × 18.56",
     "ariaLabel\t\"query, from API to Database\"",
   ], { title: "api->database", header: "field\tvalue", mono: true, id: "edge" })

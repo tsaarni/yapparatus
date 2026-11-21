@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
+import type { CompiledEdge } from "../../../src/diagram/drawing.ts";
 import type { BoxOptions, Node, Route } from "../../../src/diagram/elements.ts";
 import { type Rect, round } from "../../../src/diagram/geometry.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
@@ -551,7 +552,7 @@ test("an icon shape is laid out as an actor: the icon above its label", () => {
   assert.deepEqual(icon?.rect, { x: 0, y: 0, width: 36, height: figure?.rect.height });
   assert.deepEqual(icon?.icon, { name: "user", rect: { x: 3, y: 0, width: 30, height: 30 } });
   assert.equal(icon?.lines[0]?.y, figure?.lines[0]?.y);
-  assert.equal(out.edges[0]?.heads[0]?.[0]?.x, 36, "an edge attaches to the bounds");
+  assert.equal(out.edges[0]?.head?.points[0]?.x, 36, "an edge attaches to the bounds");
 });
 
 test("an icon used twice is in the table once, and each node names it", () => {
@@ -905,7 +906,7 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
   assert.equal(barOf("c").length, 1);
   assert.ok((barOf("c")[0]?.rect.height ?? 99) < 44);
   assert.equal(done.dashed, true);
-  assert.equal(done.head, "open");
+  assert.deepEqual([done.head?.kind, done.tail], ["open", undefined]);
   const frame = out.frames[0];
   assert.equal(frame?.tab?.line.text, "loop");
   assert.equal(frame?.title?.text, "[retry]");
@@ -1636,7 +1637,7 @@ test("an edge leaves a wide cell through the side its line crosses first", () =>
   d.arrow(note, rec.element("options"));
   const out = compile(scene, lookups);
   const cell = out.nodes.find((n) => n.id === "tcp.options")?.rect;
-  const tip = out.edges[0]?.heads[0]?.[0];
+  const tip = out.edges[0]?.head?.points[0];
   assert.ok(cell && tip);
   assert.deepEqual(tip, { x: cell.x + cell.width / 2, y: cell.y + cell.height });
 });
@@ -1693,11 +1694,104 @@ test("a head with too little room shrinks and is reported; a curve carries a ful
   const crowded = out.diagnostics.filter((x) => x.code === "HEAD_CROWDED");
   assert.deepEqual(
     crowded.map((x) => [x.ids, x.message]),
-    [[[close.id], "a->b has 4 units for its arrowhead, which needs 17. Widen the gap."]],
+    [[[close.id], "a->b has 4 units for its head, which needs 17. Widen the gap."]],
   );
-  const head = (id: string) => out.edges.find((x) => x.id === id)?.heads[0] ?? [];
+  const head = (id: string) => out.edges.find((x) => x.id === id)?.head?.points ?? [];
   assert.ok(Math.abs(headLength(head(close.id)) - 2.4) < 0.01);
   assert.ok(Math.abs(headLength(head(curved.id)) - 10) < 0.01);
+});
+
+test("each end draws the head its kind names, and a line shortens only at an end with a head", () => {
+  const kinds = ["filled", "open", "none"] as const;
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b]);
+  const plain = d.line(a, b, { id: "plain" });
+  const pairs = kinds.flatMap((head) => kinds.map((tail) => ({ head, tail })));
+  const edges = pairs.map((o) => d.arrow(a, b, { ...o, id: `${o.head}-${o.tail}` }));
+  const out = compile(scene, lookups);
+  const edge = (id: string) => out.edges.find((x) => x.id === id);
+  const [start, end] = [edge(plain.id)?.points[0], edge(plain.id)?.points.at(-1)];
+  assert.ok(start && end);
+  for (const [i, { head, tail }] of pairs.entries()) {
+    const e = edge(edges[i]?.id ?? "");
+    assert.ok(e);
+    const kindOf = (h: CompiledEdge["head"]) => h?.kind ?? "none";
+    assert.deepEqual([kindOf(e.head), kindOf(e.tail)], [head, tail], e.id);
+    assert.equal(e.head?.points.length, { filled: 4, open: 3, none: undefined }[head], e.id);
+    assert.equal(e.tail?.points.length, { filled: 4, open: 3, none: undefined }[tail], e.id);
+    assert.equal(e.points[0]?.x === start.x, tail === "none", `${e.id} start`);
+    assert.equal(e.points.at(-1)?.x === end.x, head === "none", `${e.id} end`);
+    if (e.tail) assert.deepEqual(e.tail.points[tail === "open" ? 1 : 0], start, e.id);
+    if (e.head) assert.deepEqual(e.head.points[head === "open" ? 1 : 0], end, e.id);
+  }
+});
+
+test("an arrow has a filled head and a line none, unless the options say otherwise", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b]);
+  d.arrow(a, b, { id: "arrow" });
+  d.line(a, b, { id: "line" });
+  d.arrow(a, b, { id: "both", tail: "filled" });
+  d.arrow(a, b, { id: "back", head: "none", tail: "filled" });
+  d.line(a, b, { id: "line-head", head: "open" });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.edges.map((e) => [e.id, e.head?.kind, e.tail?.kind]),
+    [
+      ["arrow", "filled", undefined],
+      ["line", undefined, undefined],
+      ["both", "filled", "filled"],
+      ["back", undefined, "filled"],
+      ["line-head", "open", undefined],
+    ],
+  );
+});
+
+test("HEAD_CROWDED is reported for each end by itself", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b], { gap: 4 });
+  d.arrow(a, b, { tail: "open" });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.diagnostics.filter((x) => x.code === "HEAD_CROWDED").map((x) => [x.subject, x.message]),
+    [
+      ["head", "a->b has 4 units for its head, which needs 17. Widen the gap."],
+      ["tail", "a->b has 4 units for its tail, which needs 17. Widen the gap."],
+    ],
+  );
+});
+
+test("a sequence reply has an open head and no tail; a call has a filled head", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.sequence(
+    [a, b],
+    [
+      { from: a, to: b, label: "ask", id: "ask" },
+      { from: b, to: a, label: "answer", id: "answer", reply: true },
+      { from: a, to: b, label: "tell", id: "tell", async: true },
+    ],
+  );
+  const out = compile(scene, lookups);
+  const ends = (id: string) => {
+    const e = out.edges.find((x) => x.id === id);
+    return [e?.head?.kind, e?.tail?.kind];
+  };
+  assert.deepEqual(ends("ask"), ["filled", undefined]);
+  assert.deepEqual(ends("answer"), ["open", undefined]);
+  assert.deepEqual(ends("tell"), ["open", undefined]);
+  assert.deepEqual(ends("a-lifeline"), [undefined, undefined]);
 });
 
 test("a fragment widens to cover its members, and an outer one covers the inner", () => {
@@ -1748,7 +1842,7 @@ function overlapsIn(edges: (d: DiagramBuilder, s1: Node, s2: Node, t: Node, u: N
   if (overlaps[0])
     assert.match(
       overlaps[0].message,
-      /\{ bend: units \}.*port\(\).*ends: "<->"/,
+      /\{ bend: units \}.*port\(\).*tail: "filled"/,
       "the message names the fixes",
     );
   return overlaps.map((x) => x.ids);

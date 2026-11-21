@@ -132,6 +132,27 @@ test("the picture is well formed and draws every shape the figure has", () => {
   );
 });
 
+test("each end of an edge draws its own head: filled as a polygon, open as a polyline", () => {
+  const { svg } = draw({
+    draw: (d) => {
+      const a = d.box("A");
+      const b = d.box("B");
+      d.row([a, b]);
+      d.arrow(a, b, { id: "mixed", head: "open", tail: "filled" });
+      d.line(a.bottom, b.bottom, { id: "plain", route: { viaY: 80 } });
+    },
+    steps: [],
+    build: false,
+  });
+  const body = (id: string) =>
+    svg.match(new RegExp(`data-element-id="${id}"[^>]*>(.*?)</g>`))?.[1] ?? "";
+  assert.deepEqual(
+    [...body("mixed").matchAll(/<(polyline|polygon)/g)].map((m) => m[1]),
+    ["polyline", "polygon"],
+  );
+  assert.doesNotMatch(body("plain"), /<poly/);
+});
+
 test("a box's icon draws in its label's color, and an icon shape's in its ink, as an actor", () => {
   const { svg } = draw({
     draw: (d) => {

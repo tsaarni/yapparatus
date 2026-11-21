@@ -327,7 +327,7 @@ export function sequence(
     const lifeline = arrow(
       n.bottom,
       xy(n.bottom, at(bottom)),
-      { dashed: true, role: "muted", ends: "--" },
+      { dashed: true, role: "muted", head: "none" },
       "",
       true,
     );

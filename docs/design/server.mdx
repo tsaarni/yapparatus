@@ -39,7 +39,7 @@ The server is the dev server: Vite with the `yapparatus()` plugin, serving one d
 
   d.enclose([router, modules, prompt, log, compiler], { id: "server", title: "Server", titleAt: "bottomLeft" })
 
-  d.arrow(web, router, { id: "web-http", ends: "<->", label: "HTTP, updates" })
+  d.arrow(web, router, { id: "web-http", tail: "filled", label: "HTTP, updates" })
   d.arrow(library, router, { id: "agent-http", label: "HTTP" })
   d.arrow(router, resource, { id: "to-chat" })
   d.arrow(router, store, { id: "to-diagnostics" })

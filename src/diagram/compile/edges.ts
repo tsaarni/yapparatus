@@ -2,7 +2,7 @@
  * Edges: routes, curves, loops, endpoints snapped to outlines, arrowheads, and labels.
  */
 
-import type { CompiledEdge, CompiledLabel } from "../drawing.ts";
+import type { CompiledEdge, CompiledHead, CompiledLabel } from "../drawing.ts";
 import {
   type Edge,
   type Element,
@@ -102,18 +102,15 @@ export function createEdges(
       shape = curve(edge, r.bend, fromEl, toEl);
     else shape = { points: routed(edge, fromEl, toEl), label: {}, radius: corner.edge };
     const points = dedupe(shape.points);
-    const heads: Vec[][] = [];
     const base: Omit<CompiledEdge, "labels" | "ariaLabel"> = {
       id: edge.id,
       role: edge.role,
       ...categoryOf(edge.category),
       ...(edge.dashed ? { dashed: true } : {}),
-      head: edge.head,
       radius: shape.radius,
       ...(edge.passive ? { passive: true } : {}),
       ...(edge.stepOnly ? { stepOnly: true } : {}),
       points,
-      heads,
     };
     if (points.length < 2) {
       report("DEGENERATE_EDGE", `${edge.id} starts and ends at the same point.`, [edge.id]);
@@ -122,25 +119,26 @@ export function createEdges(
     const labels = edge.labels.map((l) => placeLabel(edge, points, { ...shape.label, ...l }));
     const route = [...points];
     const curved = shape.radius === 0;
-    const tips: Array<"start" | "end"> = [];
-    if (edge.ends === "->" || edge.ends === "<->") tips.push("end");
-    if (edge.ends === "<-" || edge.ends === "<->") tips.push("start");
-    const made = tips.map((at) => arrowHead(route, at, edge.head === "open", curved));
-    const crowded = made.find((h) => h.room < h.needs);
-    if (crowded)
-      report(
-        "HEAD_CROWDED",
-        `${edge.id} has ${round(crowded.room)} units for its arrowhead, which needs ${Math.ceil(crowded.needs)}. Widen the gap.`,
-        [edge.id],
-      );
+    const made = (["head", "tail"] as const).flatMap((end) => {
+      const kind = edge[end];
+      return kind === "none" ? [] : [{ end, ...arrowHead(route, end, kind, curved) }];
+    });
+    const heads: Pick<CompiledEdge, "head" | "tail"> = {};
     for (const h of made) {
-      heads.push(h.head);
-      trim(points, h.at, h.cut);
+      if (h.room < h.needs)
+        report(
+          "HEAD_CROWDED",
+          `${edge.id} has ${round(h.room)} units for its ${h.end}, which needs ${Math.ceil(h.needs)}. Widen the gap.`,
+          [edge.id],
+          h.end,
+        );
+      heads[h.end] = h.head;
+      trim(points, h.end === "head" ? "end" : "start", h.cut);
     }
     const text = edge.labels.map((l) => l.text.split("\n").join(" ")).join(", ");
     const ends = `from ${endpointName(edge.from)} to ${endpointName(edge.to)}`;
     const ariaLabel = text ? `${text}, ${ends}` : `Connection ${ends}`;
-    return { compiled: { ...base, labels, ariaLabel }, route };
+    return { compiled: { ...base, ...heads, labels, ariaLabel }, route };
   }
 
   function routed(edge: Edge, fromEl?: Element, toEl?: Element): Vec[] {
@@ -266,10 +264,16 @@ export function createEdges(
     return sideExit(attachment(form, rect), rect, side, at) ?? at;
   }
 
-  function arrowHead(route: Vec[], at: "start" | "end", open: boolean, curved: boolean) {
+  function arrowHead(
+    route: Vec[],
+    end: "head" | "tail",
+    kind: CompiledHead["kind"],
+    curved: boolean,
+  ) {
     const n = route.length;
-    const tip = (at === "end" ? route[n - 1] : route[0]) as Vec;
-    const prev = (at === "end" ? route[n - 2] : route[1]) as Vec;
+    const open = kind === "open";
+    const tip = (end === "head" ? route[n - 1] : route[0]) as Vec;
+    const prev = (end === "head" ? route[n - 2] : route[1]) as Vec;
     const len = distance(prev, tip) || 1;
     const room = curved ? pathLength(route) : len;
     const needs = m.headLength / 0.6;
@@ -281,8 +285,11 @@ export function createEdges(
     const left = { x: base.x - uy * hw, y: base.y + ux * hw };
     const right = { x: base.x + uy * hw, y: base.y - ux * hw };
     const notch = { x: tip.x - ux * hl * 0.72, y: tip.y - uy * hl * 0.72 };
-    const head = open ? [left, tip, right] : [tip, left, notch, right];
-    return { at, head, cut: hl * (open ? 0.08 : 0.55), room, needs };
+    const head: CompiledHead = {
+      kind,
+      points: open ? [left, tip, right] : [tip, left, notch, right],
+    };
+    return { head, cut: hl * (open ? 0.08 : 0.55), room, needs };
   }
   function placeLabel(edge: Edge, points: Vec[], l: LabelOptions): CompiledLabel {
     const texts = l.text.split("\n");

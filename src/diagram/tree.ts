@@ -32,7 +32,7 @@ export interface TreeOptions {
   gap?: number;
   /** Space between a parent and its children. Default: 48. `indent` uses `gap` instead. */
   levelGap?: number;
-  /** Options of every line, such as `ends`, `dashed`, or `role`. */
+  /** Options of every line, such as `tail`, `dashed`, or `role`. Lines have no heads by default. */
   edge?: Omit<EdgeOptions, "id" | "label" | "route">;
 }
 
@@ -104,7 +104,7 @@ function grown(
     scene.nameAfter(container, parent, "-tree");
     const lines = kids.map((kid, i) => {
       const [from, route] = branch(i);
-      return scene.addEdge(from, split(kid)[0], { ends: "--", ...options.edge, route });
+      return scene.addEdge(from, split(kid)[0], { head: "none", ...options.edge, route });
     });
     scene.addGroup(container, lines);
     return container;

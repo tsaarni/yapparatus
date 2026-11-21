@@ -3,7 +3,7 @@
  * so coordinates are rounded to hundredths and false flags and default values are left out.
  */
 
-import type { Diagnostic, Role, Shape } from "./elements.ts";
+import type { Diagnostic, HeadKind, Role, Shape } from "./elements.ts";
 import type { Rect, Vec } from "./geometry.ts";
 
 /**
@@ -86,23 +86,36 @@ export interface CompiledLabel {
   rect: Rect;
 }
 
-/** An edge with its route as points, its arrowheads as polygons, and its labels placed. */
+/** An arrowhead: its kind, and its points, a filled polygon or an open polyline. */
+export interface CompiledHead {
+  kind: Exclude<HeadKind, "none">;
+  points: Vec[];
+}
+
+/** An edge with its route as points, its arrowheads, and its labels placed. */
 export interface CompiledEdge {
   id: string;
   role: Role;
   /** The category color slot, when the element has a category. */
   category?: number;
   dashed?: true;
-  head: "filled" | "open";
   radius: number;
   /** Decoration only, such as a lifeline or an activation bar: never interactive. */
   passive?: true;
   /** Shown only while a step focuses it. */
   stepOnly?: true;
   points: Vec[];
-  heads: Vec[][];
+  /** The arrowhead at the `to` end, when it has one. */
+  head?: CompiledHead;
+  /** The arrowhead at the `from` end, when it has one. */
+  tail?: CompiledHead;
   labels: CompiledLabel[];
   ariaLabel: string;
+}
+
+/** The arrowheads an edge has: the one at `to`, then the one at `from`. */
+export function headsOf(edge: CompiledEdge): CompiledHead[] {
+  return [edge.head, edge.tail].filter((h) => h !== undefined);
 }
 
 /** An enclosure with its boundary rectangle and placed title. */

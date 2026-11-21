@@ -76,7 +76,7 @@ test("down: each line leaves the parent's bottom and turns halfway down the leve
     { x: cx("b"), y: 88 },
   ]);
   assert.equal(
-    out.edges.every((e) => e.heads.length === 0),
+    out.edges.every((e) => !e.head && !e.tail),
     true,
     "lines have no arrowheads",
   );
@@ -207,17 +207,23 @@ test("edge options apply to every line, and an explicit root id names the contai
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
   const tree = d.tree(d.box("Root", { id: "top" }), [d.box("A"), d.box("B")], {
-    edge: { ends: "->", dashed: true, role: "muted" },
+    edge: { tail: "filled", dashed: true, role: "muted" },
   });
   const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   assert.equal(tree.id, "top-tree");
   assert.deepEqual(
-    out.edges.map((e) => [e.id, e.dashed, e.role, e.heads.length]),
+    out.edges.map((e) => [e.id, e.dashed, e.role, e.head, e.tail?.kind]),
     [
-      ["top->a", true, "muted", 1],
-      ["top->b", true, "muted", 1],
+      ["top->a", true, "muted", undefined, "filled"],
+      ["top->b", true, "muted", undefined, "filled"],
     ],
+  );
+  const top = out.nodes.find((n) => n.id === "top")?.rect;
+  assert.equal(
+    out.edges[0]?.tail?.points[0]?.y,
+    top && top.y + top.height,
+    "the head is at the root",
   );
 });
 

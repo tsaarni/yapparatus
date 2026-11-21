@@ -9,6 +9,7 @@ import {
   type CompiledEnclosure,
   type CompiledFrame,
   type CompiledNode,
+  headsOf,
   type LegendEntry,
   maxCategories,
 } from "../drawing.ts";
@@ -96,7 +97,11 @@ export function compile(
       ...frames.map((f) => f.rect),
       ...edges.flatMap((e) => [
         ...e.labels.map((l) => l.rect),
-        ...[...e.points, ...e.heads.flat()].map((p) => ({ ...p, width: 0, height: 0 })),
+        ...[...e.points, ...headsOf(e).flatMap((h) => h.points)].map((p) => ({
+          ...p,
+          width: 0,
+          height: 0,
+        })),
       ]),
     ]) ?? { x: 0, y: 0, width: 0, height: 0 };
     const viewBox = inflate(painted, m.margin);
@@ -144,7 +149,10 @@ function compileFrames(
     if (member instanceof Edge) {
       const e = edgeOf.get(member);
       return e
-        ? [...[...e.points, ...e.heads.flat()].map(point), ...e.labels.map((l) => l.rect)]
+        ? [
+            ...[...e.points, ...headsOf(e).flatMap((h) => h.points)].map(point),
+            ...e.labels.map((l) => l.rect),
+          ]
         : [];
     }
     const n = nodeById.get(member.id);

@@ -10,9 +10,9 @@ import type {
   Corner,
   EdgeOptions,
   EncloseOptions,
-  Ends,
   FrameOptions,
   GridOptions,
+  HeadKind,
   LabelOptions,
   LabelSide,
   LineOptions,
@@ -149,13 +149,15 @@ const route = either(
     { required: ["loop"], tag: "loop", noun: "{ loop: side }" },
   ),
 );
+/** The arrowhead at one end of an edge. */
+const headKind = oneOf<HeadKind>()("filled", "open", "none");
 /** How an edge is drawn, which a tree's lines share. */
 const edgeStyle = {
   role,
   category: text,
   dashed: boolean,
-  ends: oneOf<Ends>()("->", "<-", "<->", "--"),
-  head: oneOf<NonNullable<EdgeOptions["head"]>>()("filled", "open"),
+  head: headKind,
+  tail: headKind,
   stepOnly: boolean,
 };
 /** The options of an edge, or its label alone. */

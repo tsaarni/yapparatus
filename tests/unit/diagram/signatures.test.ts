@@ -204,13 +204,20 @@ test("each row of the item table gives its diagnostic", () => {
   assert.deepEqual(
     problems((d) => {
       const [a, b] = two(d);
-      d.arrow(a, b, { ends: "=>", head: "hollow", route: "zigzag" } as never);
+      d.arrow(a, b, { head: "hollow", tail: "=>", route: "zigzag" } as never);
     }),
     [
-      ["INVALID_ARGUMENT", ["a->b"], "ends"],
       ["INVALID_ARGUMENT", ["a->b"], "head"],
+      ["INVALID_ARGUMENT", ["a->b"], "tail"],
       ["INVALID_ARGUMENT", ["a->b"], "route"],
     ],
+  );
+  assert.deepEqual(
+    problems((d) => {
+      const [a, b] = two(d);
+      d.line(a, b, { ends: "<->" } as never);
+    }),
+    [["UNKNOWN_OPTION", ["a->b"], "ends"]],
   );
   assert.deepEqual(
     problems((d) => {
@@ -462,7 +469,6 @@ test("an option that has no effect in its form is INVALID_ARGUMENT, and the figu
     const b = d.box("B");
     d.row([s, b]);
     d.enclose([b], { titleAt: "topRight" });
-    d.line(s, b, { head: "open" });
     d.tree(d.box("R"), [d.box("L")], { layout: "indent", levelGap: 4 });
     d.sequence([d.box("P")], [{ from: d.box("P"), to: d.box("P"), label: "x", reply: true }]);
   });
@@ -471,7 +477,6 @@ test("an option that has no effect in its form is INVALID_ARGUMENT, and the figu
     [
       [["start-1"], "side"],
       [["enclosure-1"], "titleAt"],
-      [["start-1->b"], "head"],
       [["r-tree"], "levelGap"],
     ],
   );

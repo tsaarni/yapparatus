@@ -12,6 +12,7 @@ export type {
   Diagnostic,
   EdgeOptions,
   EncloseOptions,
+  HeadKind,
   LabelOptions,
   NodeOptions,
   PlaceOptions,

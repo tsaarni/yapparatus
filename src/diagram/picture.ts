@@ -8,6 +8,7 @@ import {
   type CompiledDiagram,
   type CompiledEdge,
   type CompiledNode,
+  headsOf,
   stepOnlyElements,
   type TextLine,
 } from "./drawing.ts";
@@ -312,11 +313,11 @@ export function pictureOf(
       "stroke-linecap": "round",
     };
     let body = `<path${attrs({ d, ...line, "stroke-dasharray": edge.dashed ? dash.dashed : undefined })}/>`;
-    for (const head of edge.heads)
+    for (const head of headsOf(edge))
       body +=
-        edge.head === "open"
-          ? `<polyline${attrs({ points: shape.pointList(head), ...line })}/>`
-          : `<polygon${attrs({ points: shape.pointList(head), fill: k.ink })}/>`;
+        head.kind === "open"
+          ? `<polyline${attrs({ points: shape.pointList(head.points), ...line })}/>`
+          : `<polygon${attrs({ points: shape.pointList(head.points), fill: k.ink })}/>`;
     for (const label of edge.labels)
       body += label.lines.map((l) => text(l, color.textBody, true)).join("");
     if (flagged.has(edge.id)) for (const label of edge.labels) body += flag(label.rect, 1, 4);

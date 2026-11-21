@@ -308,17 +308,20 @@ export class DiagramBuilder {
     return enclosure;
   }
 
-  /** An arrow. A string third argument is its label. `d.arrow(a, a)` draws a self-loop. */
+  /**
+   * An edge with `head: "filled"` and `tail: "none"` unless the options say otherwise. A string
+   * third argument is its label. `d.arrow(a, a)` draws a self-loop.
+   */
   arrow(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
     return this.#edge(signatures.arrow, from, to, options, {});
   }
-  /** A connection without arrowheads. */
+  /** An edge with `head: "none"` and `tail: "none"` unless the options say otherwise. */
   line(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
-    return this.#edge(signatures.line, from, to, options, { ends: "--" });
+    return this.#edge(signatures.line, from, to, options, { head: "none" });
   }
   /**
-   * An edge of the author's, over the call's defaults. With an end it cannot use it is left out.
-   * An option that the edge's form ignores is reported, and a route it cannot take is replaced.
+   * An edge of the author's, over the call's defaults. With an end it cannot use it is left out,
+   * and a route it cannot take is replaced.
    */
   #edge(
     signature: Signature,
@@ -348,12 +351,6 @@ export class DiagramBuilder {
         self
           ? `route is ${quote(route)}, but the edge goes from ${elementOf(a)?.id} to itself and takes only { loop: side }. { loop: "right" } stands in.`
           : `route is ${quote(route)}, but only an edge from an element to itself takes { loop: side }. "straight" stands in.`,
-      );
-    if (full.ends === "--" && given.head !== undefined)
-      call.ignore(
-        "head",
-        given.head,
-        () => `head is ${quote(given.head)}, but the edge has no arrowheads: its ends are "--".`,
       );
     call.done([edge]);
     return edge;

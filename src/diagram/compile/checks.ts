@@ -277,7 +277,7 @@ export function checkOverlaps(edges: CompiledEdge[], routes: Vec[][], report: Re
       if (shared > sharedLimit)
         report(
           "EDGE_OVERLAP",
-          `${a.id} and ${b.id} run on top of each other for ${round(shared)} units, so they read as one line. Give one the route { bend: units }, attach one at a port(), or draw one edge with ends: "<->".`,
+          `${a.id} and ${b.id} run on top of each other for ${round(shared)} units, so they read as one line. Give one the route { bend: units }, attach one at a port(), or draw one edge with tail: "filled".`,
           [a.id, b.id],
         );
     }

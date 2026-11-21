@@ -309,8 +309,8 @@ Derived points:
 
 ```ts
 d.arrow(from, to, "label")
-d.arrow(from, to, { id, label, route, role, category, dashed, ends, head, stepOnly })
-d.line(from, to, ...)   // the same, without arrowheads
+d.arrow(from, to, { id, label, route, role, category, dashed, head, tail, stepOnly })
+d.line(from, to, ...)   // the same, with no arrowhead unless head or tail gives one
 ```
 
 - **Shape endpoint** (`api`): the edge meets the outline facing the other end.
@@ -321,11 +321,17 @@ d.line(from, to, ...)   // the same, without arrowheads
 | `id` | See [Ids](#ids) |
 | `label` | A string, or a label's options, as below |
 | `route` | `"straight"` (default), `"hv"`, `"vh"`, `{ viaX: x }`, `{ viaY: y }`, `{ via: [p1, p2] }`, `{ bend: units }`, `{ loop: side }` |
-| `ends` | `"->"` (default), `"<-"`, `"<->"`, `"--"` |
-| `head` | `"filled"` (default) for calls and flows, `"open"` for replies and async messages |
+| `head` | The arrowhead at `to`: `"filled"` (default on `d.arrow`), `"open"`, or `"none"` (default on `d.line`) |
+| `tail` | The arrowhead at `from`: `"filled"`, `"open"`, or `"none"` (default) |
 | `dashed` | `true` for returns and optional paths |
 | `role`, `category` | As on shapes |
 | `stepOnly` | Shown only in the steps that focus it |
+
+Arrowheads:
+
+- `head` is the arrowhead at the `to` end and `tail` the one at the `from` end. Either call takes both, and they override its defaults.
+- A filled head is for calls and flows, and an open head for replies and async messages.
+- An edge with a head at both ends is `d.arrow(a, b, { tail: "filled" })`.
 
 Routes:
 
@@ -458,8 +464,8 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are out of range. Mark a longer text or whole lines, or break the text's lines with `\n` |
 | `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
 | `EDGE_NODE_INTERSECTION` | warning | Give the edge the route `{ viaX: x }`, `{ viaY: y }`, `{ via: [points] }`, or `{ bend: units }`, or move the shape. An edge that runs through its own end needs a straight route or another route form |
-| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one the route `{ bend: units }`, attach one at a `port()`, or draw one edge with `ends: "<->"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
-| `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Widen the gap |
+| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one the route `{ bend: units }`, attach one at a `port()`, or draw one edge with `tail: "filled"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
+| `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Each end is reported by itself. Widen the gap |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |

@@ -1,11 +1,12 @@
 /** The SVG views of a diagram's edges, enclosures, and frames. */
 
 import * as stylex from "@stylexjs/stylex";
-import type {
-  CompiledEdge,
-  CompiledEnclosure,
-  CompiledFrame,
-  ElementState,
+import {
+  type CompiledEdge,
+  type CompiledEnclosure,
+  type CompiledFrame,
+  type ElementState,
+  headsOf,
 } from "../../diagram/drawing.ts";
 import { corner } from "../../diagram/metrics.ts";
 import { fragmentTab, outline, pointList, roundedPath, rule } from "../../diagram/outlines.ts";
@@ -50,19 +51,19 @@ export function EdgeView({
     >
       <path d={d} {...stylex.props(styles.line, edge.dashed && elementStyles.dashed)} />
       <path d={d} {...stylex.props(styles.hit)} />
-      {edge.heads.map((head, i) =>
-        edge.head === "open" ? (
+      {headsOf(edge).map((head, i) =>
+        head.kind === "open" ? (
           <polyline
             // biome-ignore lint/suspicious/noArrayIndexKey: Heads are positional.
             key={i}
-            points={pointList(head)}
+            points={pointList(head.points)}
             {...stylex.props(styles.openHead)}
           />
         ) : (
           <polygon
             // biome-ignore lint/suspicious/noArrayIndexKey: Heads are positional.
             key={i}
-            points={pointList(head)}
+            points={pointList(head.points)}
             {...stylex.props(styles.head)}
           />
         ),

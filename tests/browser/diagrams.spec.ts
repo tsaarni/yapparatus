@@ -60,6 +60,15 @@ test("every diagram form compiles without diagnostics and draws in the browser",
     ),
   ).toHaveCount(2);
   await expect(page.locator('figure#team-tree [data-element-id*="->"]')).toHaveCount(7);
+  const heads = (id: string) =>
+    page.locator(`figure#request-sequence [data-element-id="${id}"] :is(polygon, polyline)`);
+  await expect(heads("get-item")).toHaveCount(1);
+  await expect(heads("get-item").first()).toHaveJSProperty("tagName", "polygon");
+  await expect(heads("rows")).toHaveCount(1);
+  await expect(heads("rows").first()).toHaveJSProperty("tagName", "polyline");
+  await expect(
+    page.locator('figure#team-tree [data-element-id*="->"] :is(polygon, polyline)'),
+  ).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Diagram diagnostics" })).toHaveCount(0);
 });
 

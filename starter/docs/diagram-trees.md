@@ -26,7 +26,7 @@ d.tree(error, [
   [d.box("IOError", { mono: true }), [d.box("FileNotFound", { mono: true }), d.box("Timeout", { mono: true })]],
   d.box("ParseError", { mono: true }),
   d.box("AuthError", { mono: true, role: "accent" }),
-], { layout: "right", edge: { ends: "<-" } })
+], { layout: "right", edge: { tail: "filled" } })
 ```
 
 - `edge` gives options for every line: here an arrowhead at the parent, as UML draws inheritance.
@@ -69,10 +69,10 @@ d.tree(t("src/"), [
 | `layout` | `down` (default), `right`, `both`, or `indent` |
 | `gap` | Space between siblings. Default: 24 |
 | `levelGap` | Space between a parent and its children. Default: 48. `indent` uses `gap` |
-| `edge` | `{ ends?, head?, dashed?, role?, category?, stepOnly? }` for every line |
+| `edge` | `{ head?, tail?, dashed?, role?, category?, stepOnly? }` for every line |
 
 - The `indent` layout uses `gap` between levels too, so a `levelGap` there is `INVALID_ARGUMENT`.
-- The lines have no arrowheads unless `edge` gives `ends`. The lines from one parent share one trunk, and the overlap check accepts a shared trunk.
+- The lines have no arrowheads unless `edge` gives `head` or `tail`. A line goes from the parent to the child, so `tail` puts the arrowhead at the parent. The lines from one parent share one trunk, and the overlap check accepts a shared trunk.
 - Each subtree with children is a row or column whose id is its root's final id followed by `-tree`, such as `platform-tree`, or `platform-2-tree` when the root is `platform-2`. A step that focuses it focuses the branch: its shapes and its lines. `d.tree` returns the outermost one, so you can place it like any other element.
 - Inside a subtree, the row, column, or grid of the root's children is the root's id followed by `-children`. In the `both` layout, the two sides of the tree's root are `-left` and `-right` instead.
 - A line's id joins the ids of its ends, such as `platform->build`.
