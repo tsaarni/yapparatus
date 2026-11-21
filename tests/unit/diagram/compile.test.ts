@@ -4,7 +4,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
+import type { Node } from "../../../src/diagram/elements.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
+import type { SequenceStep } from "../../../src/diagram/sequence.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */
 const measure: Measure = (text) => text.length * 7;
@@ -206,6 +208,16 @@ test("equalSize, fixed-width wrapping, and overflow", () => {
   assert.ok(codes(out).includes("TEXT_OVERFLOW"));
 });
 
+test("an overflowing member of a size group is reported once", () => {
+  const d = new DiagramBuilder();
+  const a = d.box("Too tall\nfor this", { height: 20, id: "tight" });
+  const b = d.box("B");
+  const c = d.box("C");
+  d.equalSize([a, b, c]);
+  d.row([a, b, c]);
+  assert.deepEqual(codes(compile(d, measure)), ["TEXT_OVERFLOW"]);
+});
+
 test("enclosure wraps members with title band and flags intruders", () => {
   const d = new DiagramBuilder();
   const api = d.box("API");
@@ -260,6 +272,157 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
   assert.ok(frame?.tab && frame.title);
   assert.ok(frame.tab.rect.width >= measure("loop", { family: "", size: 11, weight: 600 }) + 8);
   assert.ok(frame.title.x >= frame.tab.rect.x + frame.tab.rect.width);
+});
+
+/** Compile a sequence of boxes A, B, C and give the rectangles of its bars and notes by id. */
+function sequenceRects(steps: (a: Node, b: Node, c: Node) => SequenceStep[]) {
+  const d = new DiagramBuilder();
+  const a = d.box("A");
+  const b = d.box("B");
+  const c = d.box("C");
+  d.sequence([a, b, c], steps(a, b, c));
+  const out = compile(d, measure);
+  assert.deepEqual(codes(out), []);
+  const rects = Object.fromEntries(
+    out.nodes.filter((n) => n.shape === "bar" || n.shape === "note").map((n) => [n.id, n.rect]),
+  );
+  return { out, rects };
+}
+
+test("sequence: a reply closes the bar its call opened", () => {
+  const { rects } = sequenceRects((a, b) => [
+    { from: a, to: b, label: "call" },
+    { from: b, to: a, label: "done", reply: true },
+  ]);
+  assert.deepEqual(rects, {
+    "a-active-1": { x: 43, y: 73, width: 10, height: 65.4 },
+    "b-active-2": { x: 179, y: 79, width: 10, height: 44 },
+  });
+});
+
+test("sequence: nested calls stack their bars and replies close them inside out", () => {
+  const { rects } = sequenceRects((a, b, c) => [
+    { from: a, to: b, label: "outer" },
+    { from: b, to: c, label: "inner" },
+    { from: c, to: b, label: "inner done", reply: true },
+    { from: b, to: a, label: "outer done", reply: true },
+  ]);
+  assert.deepEqual(rects, {
+    "a-active-1": { x: 43, y: 73, width: 10, height: 153.4 },
+    "b-active-2": { x: 179, y: 79, width: 10, height: 132 },
+    "c-active-3": { x: 315, y: 123, width: 10, height: 44 },
+  });
+});
+
+test("sequence: a self-message opens a nested bar beside the caller's bar", () => {
+  const { out, rects } = sequenceRects((a, b) => [
+    { from: a, to: b, label: "call" },
+    { from: b, to: b, label: "think", id: "think" },
+    { from: b, to: a, label: "done", reply: true },
+  ]);
+  assert.deepEqual(rects, {
+    "a-active-1": { x: 43, y: 73, width: 10, height: 120.4 },
+    "b-active-2": { x: 179, y: 79, width: 10, height: 99 },
+    "b-active-3": { x: 185, y: 142.8, width: 10, height: 22 },
+  });
+  assert.deepEqual(out.edges.find((e) => e.id === "think")?.points, [
+    { x: 189, y: 123 },
+    { x: 215, y: 123 },
+    { x: 215, y: 147.2 },
+    { x: 200.5, y: 147.2 },
+  ]);
+});
+
+test("sequence: an async message opens no bar on its receiver", () => {
+  const { out, rects } = sequenceRects((a, b) => [
+    { from: a, to: b, label: "fire", async: true, id: "fire" },
+  ]);
+  assert.deepEqual(rects, { "a-active-1": { x: 43, y: 73, width: 10, height: 22 } });
+  assert.deepEqual(out.edges.find((e) => e.id === "fire")?.points, [
+    { x: 53, y: 79 },
+    { x: 183.2, y: 79 },
+  ]);
+});
+
+test("sequence: a note sits over one participant or between two", () => {
+  const { rects } = sequenceRects((a, b) => [
+    { note: "one", over: a, id: "one" },
+    { note: "both", over: [a, b], id: "both" },
+  ]);
+  assert.deepEqual(rects, {
+    one: { x: 23, y: 85.6, width: 50, height: 34.56 },
+    both: { x: 87.5, y: 136.2, width: 57, height: 34.56 },
+  });
+});
+
+test("sequence: a fragment with an else branch frames both branches with a divider", () => {
+  const { out, rects } = sequenceRects((a, b) => [
+    {
+      fragment: "alt",
+      title: "ok",
+      id: "alt",
+      steps: [{ from: a, to: b, label: "yes" }],
+      else: [{ title: "fail", steps: [{ from: a, to: b, label: "no" }] }],
+    },
+  ]);
+  assert.deepEqual(rects, {
+    "a-active-1": { x: 43, y: 97.2, width: 10, height: 80.8 },
+    "b-active-2": { x: 179, y: 103.2, width: 10, height: 24.2 },
+    "b-active-3": { x: 179, y: 162.6, width: 10, height: 24.2 },
+  });
+  const frame = out.frames.find((f) => f.id === "alt");
+  assert.deepEqual(frame?.rect, { x: -38, y: 59.2, width: 308, height: 134.2 });
+  assert.deepEqual(
+    frame?.dividers.map((div) => [div.y, div.label?.text]),
+    [[131.8, "[fail]"]],
+  );
+});
+
+test("sequence: a reply closes the last call from its receiver, and an earlier call stays short", () => {
+  const { rects } = sequenceRects((a, b) => [
+    { from: a, to: b, label: "fire" },
+    { from: a, to: b, label: "call" },
+    { from: b, to: a, label: "done", reply: true },
+  ]);
+  assert.deepEqual(rects, {
+    "a-active-1": { x: 43, y: 73, width: 10, height: 109.4 },
+    "b-active-2": { x: 179, y: 79, width: 10, height: 24.2 },
+    "b-active-3": { x: 179, y: 123, width: 10, height: 44 },
+  });
+});
+
+test("sequence: an inner unanswered call does not take the reply to the outer call", () => {
+  const { rects } = sequenceRects((a, b, c) => [
+    { from: a, to: b, label: "outer" },
+    { from: c, to: b, label: "inner" },
+    { from: b, to: a, label: "done", reply: true },
+  ]);
+  assert.deepEqual(rects, {
+    "a-active-1": { x: 43, y: 73, width: 10, height: 109.4 },
+    "b-active-2": { x: 179, y: 79, width: 10, height: 88 },
+    "c-active-3": { x: 315, y: 117, width: 10, height: 22 },
+    "b-active-4": { x: 185, y: 123, width: 10, height: 24.2 },
+  });
+});
+
+test("sequence: a note is painted over the activation bar under it", () => {
+  const d = new DiagramBuilder();
+  const envoy = d.box("Envoy");
+  const contour = d.box("Contour");
+  d.sequence(
+    [envoy, contour],
+    [
+      { from: contour, to: envoy, label: "Cluster B (CDS)", id: "cds" },
+      { from: envoy, to: contour, label: "request ClusterLoadAssignment B", id: "eds-req" },
+      { note: "B warms: waits for endpoints", over: envoy, id: "warm" },
+      { from: contour, to: envoy, label: "ClusterLoadAssignment B (EDS)", id: "eds" },
+    ],
+    { gap: 280, numbered: true, step: 64 },
+  );
+  const ids = compile(d, measure).nodes.map((n) => n.id);
+  const bars = ids.filter((id) => id.includes("-active-"));
+  assert.ok(bars.length > 0);
+  for (const bar of bars) assert.ok(ids.indexOf(bar) < ids.indexOf("warm"), bar);
 });
 
 test("record cells are elements; an edge from a row leaves the record's side", () => {

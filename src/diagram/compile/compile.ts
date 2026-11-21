@@ -57,7 +57,7 @@ export function compile(
   let edges: CompiledEdge[] = [];
   let frames: CompiledFrame[] = [];
   try {
-    nodes = scene.nodes.map((node) => compileNode(node, layout.bounds(node)));
+    nodes = paintOrder(scene.nodes.map((node) => compileNode(node, layout.bounds(node))));
     for (const s of scene.stacks) layout.bounds(s);
     enclosures = scene.enclosures.map(compileEnclosure);
     edges = scene.edges.map(compileEdge);
@@ -113,6 +113,11 @@ export function compile(
 
   validate(scene, nodes, edges, enclosures, report);
   return finish(true);
+}
+
+/** Nodes in paint order: passive decorations first, then the rest, each in creation order. */
+function paintOrder(nodes: CompiledNode[]): CompiledNode[] {
+  return [...nodes.filter((n) => n.passive), ...nodes.filter((n) => !n.passive)];
 }
 
 /**

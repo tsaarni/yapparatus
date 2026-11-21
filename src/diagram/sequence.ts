@@ -183,19 +183,22 @@ export function sequence(
   const bottom = y + step * 0.1;
 
   const answered = new Set<Event>();
-  events.forEach((e, i) => {
-    if (e.kind !== "message" || e.m.reply || e.m.async || e.m.from === e.m.to) return;
-    for (const later of events.slice(i + 1))
-      if (
-        later.kind === "message" &&
-        later.m.reply &&
-        later.m.from === e.m.to &&
-        later.m.to === e.m.from
-      ) {
-        answered.add(e);
-        return;
-      }
-  });
+  const pending = new Map<Node, Array<Event & { kind: "message" }>>();
+  for (const e of events) {
+    if (e.kind !== "message" || e.m.async || e.m.from === e.m.to) continue;
+    const callee = e.m.reply ? e.m.from : e.m.to;
+    const calls = pending.get(callee) ?? [];
+    pending.set(callee, calls);
+    if (!e.m.reply) {
+      calls.push(e);
+      continue;
+    }
+    const i = calls.findLastIndex((call) => call.m.from === e.m.to);
+    const call = calls[i];
+    if (!call) continue;
+    answered.add(call);
+    calls.splice(i);
+  }
 
   const stacks = new Map<Node, Bar[]>(participants.map((n) => [n, []]));
   const bars: Array<{ owner: Node; bar: Bar }> = [];

@@ -43,6 +43,7 @@ export function createLayout(
   const records = createRecords(m, measure, report, text, bounds);
   const { grid, member } = records;
   const known = new Set<Element>([...scene.nodes, ...scene.stacks, ...scene.enclosures]);
+  const intrinsicSizes = new Map<Node, { width: number; height: number }>();
   const sizes = new Map<Element, { width: number; height: number }>();
   const positions = new Map<Element, Vec>();
   const stackOffsets = new Map<Stack, Vec[]>();
@@ -65,6 +66,14 @@ export function createLayout(
   }
 
   function intrinsicSize(node: Node) {
+    const cached = intrinsicSizes.get(node);
+    if (cached) return cached;
+    const s = contentSize(node);
+    intrinsicSizes.set(node, s);
+    return s;
+  }
+
+  function contentSize(node: Node) {
     const o = node.options;
     const c = measureNode(node);
     const fixed = (width: number, height: number) => ({

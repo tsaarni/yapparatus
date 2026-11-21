@@ -332,7 +332,7 @@ A mark highlights words or lines of a text. The compiler finds the marked words 
 
 ## Sequences
 
-A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A call opens an activation bar on its receiver, and the reply closes it. Lifelines and bars are drawn, but the checks and the steps leave them out.
+A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar. Lifelines and bars are drawn, but the checks and the steps leave them out.
 
 ## Roles and categories
 
@@ -379,7 +379,7 @@ The limit does not depend on any window, so the result is the same on every scre
 
 The compiled diagram, `CompiledDiagram`, holds what the web app and the picture need to draw, and nothing that only the compiler uses.
 
-Shapes, edges, enclosures, and frames hold their final geometry: rectangles, points, and text lines with their positions and fonts. `groups` lists, for each container and category, the elements that a step focuses with it. `ok` and `diagnostics` say whether the diagram can be drawn and what is wrong with it. <Ref to="dc-compiled-edge" /> shows one edge of the running example.
+Shapes, edges, enclosures, and frames hold their final geometry: rectangles, points, and text lines with their positions and fonts. The compiled diagram lists nodes in paint order: decorations first, then the author's elements in creation order. Decorations are the elements that the checks and the steps leave out, such as activation bars, so a note over a bar covers it. `groups` lists, for each container and category, the elements that a step focuses with it. `ok` and `diagnostics` say whether the diagram can be drawn and what is wrong with it. <Ref to="dc-compiled-edge" /> shows one edge of the running example.
 
 <Diagram id="dc-compiled-edge" caption="The compiled edge api->database of the running example." draw={(d) => {
   d.record([
