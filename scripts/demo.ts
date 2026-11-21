@@ -24,7 +24,7 @@ import { apiPrefix } from "../src/protocol/rest-api.ts";
 const scene = { page: "agent-library", figure: "agent-round", element: "get-chat-wait" };
 
 /** The question the reader asks about the element. */
-const question = "Why does the library wait on GET /chat instead of polling the server?";
+const question = "Why does the library wait instead of polling?";
 
 /** The agent's reply, in MDX. Keep it true to the design document. */
 const reply = `Holding the request open lets the server answer as soon as the user sends a message, so the agent gets it without a delay and without extra requests.
