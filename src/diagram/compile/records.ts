@@ -251,7 +251,7 @@ export function createRecords(
     if (!only || !line)
       return unmatched(
         text.label.replace(/\s+/g, " ").includes(place.text)
-          ? `"${place.text}" is split across wrapped lines. Widen the text, or mark whole lines.`
+          ? `"${place.text}" is split across wrapped lines. Break the lines with \\n, or mark whole lines.`
           : `"${place.text}" does not occur in ${text.id}.`,
       );
     const x = startOf(line.width) + measure(line.text.slice(0, only.at), font);

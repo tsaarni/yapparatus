@@ -33,6 +33,10 @@ export interface Metrics {
   lineHeight: number;
   padX: number;
   padY: number;
+  /** Where the text of boxes, cylinders, decisions, and actors wraps when no width is fixed. */
+  wrapWidth: number;
+  /** Where notes, free text, and the labels of start and end dots wrap. */
+  textWrapWidth: number;
   minWidth: number;
   minHeight: number;
   headLength: number;
@@ -53,6 +57,8 @@ export const defaultMetrics: Metrics = {
   lineHeight: 1.38,
   padX: 16,
   padY: 11,
+  wrapWidth: 220,
+  textWrapWidth: 320,
   minWidth: 104,
   minHeight: 46,
   headLength: 10,

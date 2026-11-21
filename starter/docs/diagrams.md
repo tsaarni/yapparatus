@@ -125,11 +125,13 @@ Options:
 - `category`: what sets the element apart, in a few words, such as `"New"` or `"To be removed"`. See [Categories](#categories).
 
 `role` and `category` also work on arrows, enclosures, and sequence messages. There is no option for a color: colors come from the theme.
-- `width`: a fixed width; the text wraps.
+- `width`: a fixed width; the text wraps at the width less the padding.
 - `height`: a fixed height; overflow is reported.
 - `minWidth`, `minHeight`, `mono`.
 
 `\n` starts a new line in a shape's label or `sub` and in an edge or message label. Sequence fragment titles and divider labels are one line.
+
+Long text wraps at spaces into lines of similar length: at 220 units in boxes, cylinders, decisions, and actors, and at 320 in notes, text, and the labels of start and end. The shape grows to its widest line. Text in `mono`, record titles and cells, and edge labels do not wrap unless `width` is fixed; break their lines with `\n`.
 
 ## Ids
 
@@ -359,7 +361,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or use `loop` |
 | `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |
-| `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are out of range. Mark a longer text, or whole lines |
+| `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are out of range. Mark a longer text or whole lines, or break the text's lines with `\n` |
 | `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
 | `BEND_WITH_ROUTE` | error | An edge has both `bend` and `route`. Keep one |
 | `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape. An edge that runs through its own end needs a straight route or another route form |
@@ -368,7 +370,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
-| `TEXT_OVERFLOW` | warning | Increase `width` or `height` |
+| `TEXT_OVERFLOW` | warning | A word is wider than a fixed `width`, a record cell is wider than its cell, or the text is taller than a fixed `height`. Increase `width` or `height` |
 | `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a grid, row, or column, or `place()` it |

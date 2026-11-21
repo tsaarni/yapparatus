@@ -399,18 +399,55 @@ test("an overflowing member of a size group is reported once", () => {
 test("a fixed size in a size group is kept, and a smaller one is reported", () => {
   const d = new DiagramBuilder();
   const fixed = d.box("wrap these words please", { width: 120, id: "fixed" });
-  const wide = d.box("A much much longer label than that", { id: "wide" });
+  const wide = d.box("A much longer label than that", { id: "wide" });
   d.equalSize([fixed, wide]);
   d.row([fixed, wide]);
   const out = compile(d, measure);
   const rect = (id: string) => out.nodes.find((n) => n.id === id)?.rect;
   assert.equal(rect("fixed")?.width, 120);
-  assert.equal(rect("wide")?.width, 34 * 7 + 2 * 16);
+  assert.equal(rect("wide")?.width, 29 * 7 + 2 * 16);
   assert.equal(rect("fixed")?.height, rect("wide")?.height);
   const lines = out.nodes.find((n) => n.id === "fixed")?.lines ?? [];
   assert.ok(lines.length > 1 && lines.every((l) => l.text.length * 7 <= 120 - 2 * 16));
   assert.deepEqual(codes(out), ["FIXED_SIZE_IN_GROUP"]);
-  assert.match(out.diagnostics[0]?.message ?? "", /fixed has a fixed width of 120.*270/);
+  assert.match(out.diagnostics[0]?.message ?? "", /fixed has a fixed width of 120.*235/);
+});
+
+test("a long label wraps at the shape's limit, in balanced lines", () => {
+  const d = new DiagramBuilder();
+  const label = "one two three four five six seven eight nine";
+  d.column([
+    d.box(label, { id: "long" }),
+    d.box("Short label", { id: "short" }),
+    d.box(label, { id: "code", mono: true }),
+    d.box(label, { id: "fixed", width: 240 }),
+    d.text(label, { id: "text" }),
+    d.text(`${label} ten eleven`, { id: "longer-text" }),
+  ]);
+  const out = compile(d, measure);
+  assert.deepEqual(codes(out), []);
+  const node = (id: string) => out.nodes.find((n) => n.id === id);
+  const lines = (id: string) => node(id)?.lines.map((l) => l.text);
+  assert.deepEqual(lines("long"), ["one two three four five", "six seven eight nine"]);
+  assert.equal(node("long")?.rect.width, 23 * 7 + 2 * 16, "as wide as its widest line");
+  assert.deepEqual(lines("short"), ["Short label"]);
+  assert.deepEqual(lines("code"), [label], "monospace text does not wrap");
+  assert.deepEqual(lines("fixed"), ["one two three four five", "six seven eight nine"]);
+  assert.equal(node("fixed")?.rect.width, 240);
+  assert.deepEqual(lines("text"), [label], "free text wraps at a wider limit");
+  assert.equal(lines("longer-text")?.length, 2);
+});
+
+test("a word wider than the limit widens the shape, and overflows only a fixed width", () => {
+  const d = new DiagramBuilder();
+  const word = "x".repeat(40);
+  d.column([d.box(word, { id: "free" }), d.box(word, { id: "fixed", width: 120 })]);
+  const out = compile(d, measure);
+  assert.equal(out.nodes.find((n) => n.id === "free")?.rect.width, 40 * 7 + 2 * 16);
+  assert.deepEqual(
+    out.diagnostics.map((x) => [x.code, x.ids]),
+    [["TEXT_OVERFLOW", ["fixed"]]],
+  );
 });
 
 test("a fixed size that is the largest sets its group's size; other axes are free", () => {

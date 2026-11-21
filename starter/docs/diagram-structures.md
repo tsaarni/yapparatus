@@ -101,6 +101,7 @@ d.arrow(secret, req.element("auth"))
 - A string is the substring: `path: "/users/42"`.
 - `mono` text keeps its lines' start, like code. Other text is centered, and its marks follow.
 - Mark a longer substring, or the lines, when the text repeats.
+- Break a marked text's lines yourself with `\n`. Text that is not `mono` wraps at 320 units, and a mark whose words land on two lines is `MARK_UNMATCHED`.
 
 ## Reference
 

@@ -3,7 +3,7 @@
  */
 import type { DiagnosticCode } from "../../document/diagnostic.ts";
 import type { TextLine } from "../drawing.ts";
-import type { Node } from "../elements.ts";
+import type { Node, Shape } from "../elements.ts";
 import { round } from "../geometry.ts";
 import {
   cylinderCap,
@@ -59,12 +59,11 @@ export function textLine(
   };
 }
 
-/** Break text into lines at spaces so each fits the width; one line if the width is infinite. */
-function wrap(text: string, font: FontSpec, width: number, measure: Measure): string[] {
-  if (!Number.isFinite(width) || measure(text, font) <= width) return [text];
+/** Break words into lines greedily, so each line fits the width unless one word is wider. */
+function greedy(words: string[], font: FontSpec, width: number, measure: Measure): string[] {
   const lines: string[] = [];
   let current = "";
-  for (const word of text.split(/\s+/)) {
+  for (const word of words) {
     const candidate = current ? `${current} ${word}` : word;
     if (current && measure(candidate, font) > width) {
       lines.push(current);
@@ -74,6 +73,30 @@ function wrap(text: string, font: FontSpec, width: number, measure: Measure): st
   if (current) lines.push(current);
   return lines;
 }
+
+/**
+ * Break text into lines at spaces so each fits the width, then wrap again at the narrowest width
+ * that keeps the number of lines, so the lines are balanced. One line if the width is infinite.
+ */
+function wrap(text: string, font: FontSpec, width: number, measure: Measure): string[] {
+  if (!Number.isFinite(width) || measure(text, font) <= width) return [text];
+  const words = text.split(/\s+/);
+  const count = greedy(words, font, width, measure).length;
+  let fits = width;
+  let short = Math.min(width, Math.max(...words.map((w) => measure(w, font))));
+  while (fits - short > 1) {
+    const mid = (fits + short) / 2;
+    if (greedy(words, font, mid, measure).length === count) fits = mid;
+    else short = mid;
+  }
+  return greedy(words, font, fits, measure);
+}
+
+/** The shapes whose text wraps at `wrapWidth` when no width is fixed. */
+const labelShapes = new Set<Shape>(["box", "cylinder", "diamond", "actor"]);
+
+/** The shapes whose text wraps at `textWrapWidth` when no width is fixed. */
+const textShapes = new Set<Shape>(["note", "text", "dot", "ring"]);
 
 /** Text measuring for one compile, with each node's measured content cached. */
 export function createText(m: Metrics, measure: Measure, report: Report) {
@@ -101,11 +124,18 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
         : node.shape === "note"
           ? shapes.note.padX
           : m.padX;
-    const wrapWidth = o.width !== undefined ? o.width - 2 * pad : Number.POSITIVE_INFINITY;
+    const fixed = o.width !== undefined ? o.width - 2 * pad : undefined;
+    const shapeWidth = labelShapes.has(node.shape)
+      ? m.wrapWidth
+      : textShapes.has(node.shape)
+        ? m.textWrapWidth
+        : Number.POSITIVE_INFINITY;
+    const wrapWidth = (font: FontSpec) =>
+      fixed ?? (font.family === m.mono ? Number.POSITIVE_INFINITY : shapeWidth);
     const lines: Content["lines"] = [];
     const push = (text: string, font: FontSpec, muted: boolean) => {
       for (const paragraph of text.split("\n")) {
-        for (const line of wrap(paragraph, font, wrapWidth, measure)) {
+        for (const line of wrap(paragraph, font, wrapWidth(font), measure)) {
           lines.push({
             text: line,
             width: measure(line, font),
@@ -123,10 +153,10 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
     const height = lines.reduce((sum, l) => sum + l.size * m.lineHeight, 0);
     const c = { lines, width, height };
     content.set(node, c);
-    if (lines.length && width > wrapWidth + 0.5)
+    if (fixed !== undefined && lines.length && width > fixed + 0.5)
       report(
         "TEXT_OVERFLOW",
-        `${node.id}: a word is ${round(width - wrapWidth)} units wider than the fixed width allows.`,
+        `${node.id}: a word is ${round(width - fixed)} units wider than the fixed width allows.`,
         [node.id],
       );
     return c;

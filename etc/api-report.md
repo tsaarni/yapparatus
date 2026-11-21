@@ -519,7 +519,7 @@ export interface NodeOptions {
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
-  /** Fixed width; text wraps inside it. Default: fit content. */
+  /** Fixed width; text wraps inside it. Default: fit the text, wrapped at the shape's limit. */
   width?: number;
   /** Fixed height. Overflowing content is reported, never shrunk. */
   height?: number;
