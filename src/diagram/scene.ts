@@ -15,15 +15,17 @@ import {
   type FrameOptions,
   Grid,
   type GridOptions,
+  type MethodCheck,
   type Named,
   Node,
   type NodeInternals,
   type Placement,
-  Point,
   type PointLike,
   type Reporter,
   type Shape,
 } from "./elements.ts";
+import { CallCheck } from "./signature.ts";
+import { signatures } from "./signatures.ts";
 
 /** The most elements a drawing may have, so that the checks, which compare pairs, stay fast. */
 const maxElements = 2000;
@@ -114,6 +116,7 @@ export class Scene {
     this.#grow();
     const node = new Node(shape, label, options, internals);
     node.report = this.report;
+    node.checkArgs = this.checkArgs;
     internals.member?.parent.members.push(node);
     this.#nodes.push(node);
     this.#noteCategory(node.options.category);
@@ -128,6 +131,7 @@ export class Scene {
   ): Edge {
     this.#grow();
     const edge = new Edge(from, to, options, internals);
+    edge.checkArgs = this.checkArgs;
     this.#edges.push(edge);
     this.#noteCategory(edge.category);
     return edge;
@@ -146,6 +150,7 @@ export class Scene {
     const cells = rows.map((row) => row.map((cell) => (cell && placeable(cell) ? cell : null)));
     const grid = new Grid(kind, cells, options, name);
     grid.report = this.report;
+    grid.checkArgs = this.checkArgs;
     this.#grids.push(grid);
     for (const child of rows.flat()) if (child) this.own(child, grid);
     return grid;
@@ -154,6 +159,7 @@ export class Scene {
   addEnclosure(members: Element[], options: EncloseOptions, name = "enclosure"): Enclosure {
     this.#grow();
     const enclosure = new Enclosure(members, options, name);
+    enclosure.checkArgs = this.checkArgs;
     this.#enclosures.push(enclosure);
     this.#noteCategory(options.category);
     return enclosure;
@@ -209,6 +215,13 @@ export class Scene {
   addGroup(container: Element | Frame, members: Array<Element | Edge | Frame>) {
     this.#groups.set(container, [...members]);
   }
+  /** Check a method's arguments against its signature, and report its problems about `self`. */
+  readonly checkArgs: MethodCheck = (self, method, given) => {
+    const call = new CallCheck(this.report, signatures[method]);
+    const args = call.args(given);
+    call.done(self ? [self] : []);
+    return args;
+  };
   /** Report a problem about elements. Its message is written when the diagnostics are read. */
   report: Reporter = (code, about, message, subject) => {
     this.#problems.push({ code, about, message, ...(subject !== undefined ? { subject } : {}) });
@@ -250,33 +263,4 @@ function placeable(el: Element): boolean {
 /** How a message names a position owner: `row(row-1)` or `place()`. */
 function ownerName(owner: Grid | Placement): string {
   return owner instanceof Grid ? `${owner.kind}(${owner.id})` : "place()";
-}
-
-/**
- * A value as a message quotes it: an element by its id and kind, text and numbers as written,
- * a list by its length, and an object by its keys, so that a misspelled option shows.
- */
-export function quote(value: unknown): string {
-  if (value instanceof Node) return value.id;
-  if (value instanceof Grid) return `${value.id}, a ${value.kind}`;
-  if (value instanceof Enclosure) return `${value.id}, an enclosure`;
-  if (value instanceof Frame) return `${value.id}, a frame`;
-  if (value instanceof Edge) return `${value.id}, an edge`;
-  if (value instanceof Point) return "a point";
-  if (Array.isArray(value)) return `a list of ${value.length}`;
-  if (typeof value === "string") return JSON.stringify(value);
-  if (typeof value === "function") return "a function";
-  if (value === null || typeof value !== "object") return String(value);
-  return `{ ${Object.keys(value).join(", ")} }`;
-}
-
-/** Whether a value is something a diagnostic can name by its id. */
-export function isNamed(value: unknown): value is Named {
-  return (
-    value instanceof Node ||
-    value instanceof Grid ||
-    value instanceof Enclosure ||
-    value instanceof Edge ||
-    value instanceof Frame
-  );
 }

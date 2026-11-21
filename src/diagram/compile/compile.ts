@@ -32,8 +32,8 @@ export function compile(
   const m = metrics;
   const measure: Measure = (text, font) => lookups.measure(text.replace(/ {2,}/g, " "), font);
   const diagnostics: Diagnostic[] = [];
-  const report = (code: DiagnosticCode, message: string, ids: string[]) =>
-    diagnostics.push({ code, message, ids });
+  const report = (code: DiagnosticCode, message: string, ids: string[], subject?: string) =>
+    diagnostics.push({ code, message, ids, ...(subject !== undefined ? { subject } : {}) });
   const categoryOf = (name: string | undefined) => {
     const index = name === undefined ? -1 : scene.categories.indexOf(name);
     return index >= 0 && index < maxCategories ? { category: index + 1 } : {};

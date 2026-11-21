@@ -113,6 +113,8 @@ d.arrow(secret, req.element("auth"))
 | `["label", span]` | `span` columns |
 | `["label", { span, id, role, category, stepOnly, pin }]` | With options; `span` defaults to 1 |
 
+A span is a whole number of 1 or more.
+
 ### Record options
 
 | Option | Meaning |
@@ -120,10 +122,20 @@ d.arrow(secret, req.element("auth"))
 | `title` | A title over the cells. Without one, give the record an `id` |
 | `columns` | Grid columns. Cells fill them left to right. Default: 1, one cell per row |
 | `header` | Column names over the cells, tab-separated like the cells |
-| `ruler` | `{ top: (column) => label, left: (row) => label }`. An empty label is skipped |
-| `mono`, `role`, `category`, `width`, `id` | As on other shapes |
+| `ruler` | `{ top: (column) => label, left: (row) => label }`. A label is text or a number; an empty label is skipped |
+| `id`, `role`, `category`, `stepOnly`, `width`, `mono` | As on other shapes. The cells set the height |
 
 A header names the columns of a table; a ruler numbers positions. Neither is a cell.
+
+### Marks
+
+| Mark | Meaning |
+|---|---|
+| `"text"` | The substring |
+| `{ text, role?, category?, stepOnly?, pin? }` | The substring, with options |
+| `{ lines, role?, category?, stepOnly?, pin? }` | Whole lines, such as `"3"` or `"2-4"`, with options |
+
+A mark takes exactly one of `text` and `lines`. Its name in `marks` is its id.
 
 ### Members
 

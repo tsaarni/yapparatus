@@ -6,6 +6,7 @@ import type { TextLine } from "../drawing.ts";
 import type { Element, Member, Node } from "../elements.ts";
 import { anchorOf, type Rect, round, type Side, sideToward, type Vec } from "../geometry.ts";
 import { type FontSpec, fontsOf, type Measure, type Metrics, shapes } from "../metrics.ts";
+import { quote } from "../signature.ts";
 import type { Report, Text } from "./text.ts";
 
 /** A record's grid, relative to the record's top-left corner. */
@@ -93,9 +94,16 @@ export function createRecords(
     const c = measureNode(node);
     const titleBand = node.label ? c.height + 2 * r.padY : 0;
     const headerBand = header.length ? r.row : 0;
-    const labels = (f: ((i: number) => string | number) | undefined, n: number) =>
-      f ? Array.from({ length: n }, (_, i) => String(f(i))) : [];
-    const ruler = { top: labels(o.ruler?.top, columns), left: labels(o.ruler?.left, rows) };
+    const labels = (side: "top" | "left", n: number) => {
+      const f = o.ruler?.[side];
+      let first = true;
+      const once: Report = (...problem) => {
+        if (first) report(...problem);
+        first = false;
+      };
+      return f ? Array.from({ length: n }, (_, i) => rulerLabel(node, side, f, i, once)) : [];
+    };
+    const ruler = { top: labels("top", columns), left: labels("left", rows) };
     const gutter = ruler.left.length
       ? Math.max(...ruler.left.map((t) => measure(t, fonts.ruler))) + 2 * r.gutterPad
       : 0;
@@ -333,4 +341,36 @@ export function createRecords(
   }
 
   return { grid, member, recordLines, cellSide };
+}
+
+/**
+ * A ruler's label for column or row `i`: its function's text or number. A function that throws
+ * or gives anything else is reported, and the label is empty; the record reports its first one.
+ */
+function rulerLabel(
+  node: Node,
+  side: "top" | "left",
+  label: (i: number) => unknown,
+  i: number,
+  report: Report,
+): string {
+  const track = side === "top" ? "column" : "row";
+  const fail = (what: string) => {
+    report(
+      "INVALID_ARGUMENT",
+      `record ${node.id}: ruler.${side} gives no label for ${track} ${i}: it ${what}. A ruler label is text or a number, so the label is empty.`,
+      [node.id],
+      `ruler.${side}`,
+    );
+    return "";
+  };
+  let value: unknown;
+  try {
+    value = label(i);
+  } catch (error) {
+    return fail(`threw "${error instanceof Error ? error.message : String(error)}"`);
+  }
+  if (typeof value === "string") return value;
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return fail(`returned ${quote(value)}`);
 }

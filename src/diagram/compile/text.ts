@@ -10,7 +10,12 @@ import { room } from "../outlines.ts";
 import type { Icons } from "./icons.ts";
 
 /** Reports a diagnostic; every compiler step takes one. */
-export type Report = (code: DiagnosticCode, message: string, ids: string[]) => void;
+export type Report = (
+  code: DiagnosticCode,
+  message: string,
+  ids: string[],
+  subject?: string,
+) => void;
 
 /**
  * A node's label and sublabel, wrapped and measured, after a box's icon. The width and height

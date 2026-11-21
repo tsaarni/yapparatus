@@ -8,7 +8,7 @@ Yapparatus is a tool in which a coding agent writes a technical document and the
 
 Three properties of the design support this. First, the agent can write pages with diagrams, charts, and code excerpts, and check the result without a browser:
 
-- The agent describes a diagram as rows, columns, and placements in a short TypeScript program, and the [diagram compiler](diagram-compiler) computes every size and position. A language model states an arrangement well and computes coordinates poorly.
+- The agent describes a diagram as rows, columns, and placements in a short JavaScript program, and the [diagram compiler](diagram-compiler) computes every size and position. A language model states an arrangement well and computes coordinates poorly.
 - The diagram compiler reports overlapping shapes, edges that cross shapes, and text that does not fit. The agent can also save a [picture](diagram-compiler#pictures) of a diagram and look at it.
 - The agent writes chart data as a table or a CSV file, and draws it with Observable Plot, which agents already know. The page compiler checks the data.
 - The agent shows code from the source files without copying it into the page, so the page stays up to date when the code changes.

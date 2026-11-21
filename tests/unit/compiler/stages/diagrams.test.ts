@@ -155,9 +155,9 @@ test("a diagram problem's subject joins its element ids and its option", async (
   assert.deepEqual(
     issues.map(({ code, subject, elements }) => ({ code, subject, elements })),
     [
-      { code: "INVALID_REPLICAS", subject: "a-2", elements: ["a-2"] },
-      { code: "INVALID_ARGUMENT", subject: "a->b route", elements: ["a->b"] },
-      { code: "INVALID_ARGUMENT", subject: "b->a route", elements: ["b->a"] },
+      { code: "INVALID_ARGUMENT", subject: "a-2 replicas", elements: ["a-2"] },
+      { code: "INVALID_ARGUMENT", subject: "a->b,b route.viaX", elements: ["a->b", "b"] },
+      { code: "INVALID_ARGUMENT", subject: "b->a,a route.viaX", elements: ["b->a", "a"] },
     ],
   );
 });

@@ -139,9 +139,9 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 | `d.text(label, options?)` | Text without an outline; with `marks`, see [Marked text](diagram-structures.md#marked-text) |
 
 - **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
-- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is the call and its count: `start-1`, `start-2`, and `end-1`. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
+- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is the call and its count: `start-1`, `start-2`, and `end-1`.
 - **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element. Text has no fill, so an edge through it is reported like an edge through a shape.
-- **Replicas:** `replicas` on `d.box` or `d.doc` draws a stack of 2 to 4 boxes or pages, for pods, shards, workers, or several documents. The stack has exactly that many, so two pods are `replicas: 2`. For a larger or unknown number, put the number in the label of a stack of 4. Each shape behind adds 5 units to the width and the height, and the text sits on the front shape. A fixed `width` or `height` is the front shape's.
+- **Replicas:** `replicas` on `d.box` or `d.doc` draws a stack of 2 to 4 boxes or pages, for pods, shards, workers, or several documents. The stack has exactly that many, so two pods are `replicas: 2`. For a larger or unknown number, put the number in the label of a stack of 4. Any other value is `INVALID_ARGUMENT`, and the shape is drawn alone. Each shape behind adds 5 units to the width and the height, and the text sits on the front shape. A fixed `width` or `height` is the front shape's.
 
 ```js
 const api = d.box("API")
@@ -169,17 +169,35 @@ d.arrow(api, db, "SQL")
 d.arrow(api, cloud, "charge")
 ```
 
-Options:
+The shapes take these options. "All" is every shape in the table above but `d.record`, which takes the options in [Structures](diagram-structures.md#record-options).
 
-- `id`: see [Ids](#ids).
-- `sub`: a second, smaller line.
-- `role`: what the element is for. `accent` is the one element that matters most (one per figure, drawn heavier), `warning` is a failure or a risk (it gets a badge), `muted` steps an element back, and `external` is outside the system (dashed).
-- `category`: what sets the element apart, in a few words, such as `"New"` or `"To be removed"`. See [Categories](#categories).
+| Option | Shapes | Meaning |
+|---|---|---|
+| `id` | all | See [Ids](#ids) |
+| `sub` | all | A second, smaller line |
+| `role` | all | What the element is for, as the list below says |
+| `category` | all | What sets the element apart. See [Categories](#categories) |
+| `stepOnly` | all | Shown only in the steps that focus it. See [Steps](#steps) |
+| `width` | all but `start` and `end` | A fixed width. The text wraps at the width less the padding, and less a box's icon |
+| `height` | all but `start` and `end` | A fixed height. Overflow is reported |
+| `minWidth`, `minHeight` | all but `start` and `end` | The least width and height |
+| `mono` | all but `start` and `end` | Monospace text |
+| `replicas` | `box`, `doc` | A stack of 2 to 4. See Replicas above |
+| `icon` | `box` | An icon left of the label. See Icons above |
+| `side` | `start`, `end` | Where the label sits beside the dot |
+| `marks` | `text` | Marked spans and lines. See [Marked text](diagram-structures.md#marked-text) |
+
+`role` is one of these:
+
+- `accent`: the one element that matters most, drawn heavier. Use it once per figure.
+- `warning`: a failure or a risk. It gets a badge.
+- `muted`: an element that steps back.
+- `external`: an element outside the system, drawn dashed.
+- `default`: the role without the option.
 
 `role` and `category` also work on arrows, enclosures, and sequence messages. There is no option for a color: colors come from the theme.
-- `width`: a fixed width; the text wraps at the width less the padding, and less a box's icon and the gap after it.
-- `height`: a fixed height; overflow is reported.
-- `minWidth`, `minHeight`, `mono`.
+
+A misspelled option is `UNKNOWN_OPTION`, and a value that the option does not take is `INVALID_ARGUMENT`. Both list what the call takes.
 
 `\n` starts a new line in a shape's label or `sub` and in an edge or message label. Sequence fragment titles and divider labels are one line.
 
@@ -217,14 +235,25 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 | `d.column([a, b], { gap?, align? })` | Top to bottom: a grid of one column. Default gap: 64 |
 | `d.place(b, { below: a, gap?, align? })` | Also `above`, `leftOf`, `rightOf` |
 | `d.place(b, { at: point, anchor? })` | Put the anchor of `b` (default `center`) on a point |
-| `d.enclose([a, b], { title?, titleAt?, padding?, role?, category? })` | A boundary around shapes. It never moves them |
+| `d.enclose([a, b], { id?, title?, titleAt?, padding?, role?, category? })` | A boundary around shapes. It never moves them |
 | `d.equalSize([a, b])`, `equalWidth`, `equalHeight` | Share the largest measured size |
+
+| Option | Calls | Meaning |
+|---|---|---|
+| `id` | `grid`, `row`, `column`, `enclose` | See [Ids](#ids) |
+| `gap` | `grid`, `row`, `column`, `place` | The space between the shapes |
+| `align` | `grid`, `row`, `column`, `place` | `start`, `center` (the default), or `end` |
+| `below`, `above`, `leftOf`, `rightOf` | `place` | The element to place the shape next to |
+| `at`, `anchor` | `place` | A point, and the anchor of the shape that goes on it |
+| `title`, `titleAt`, `padding` | `enclose` | The title, the corner that holds it, and the space around the members |
+| `role`, `category` | `enclose` | As on shapes |
 
 - Gaps are measured between edges, not between centers.
 - A shape with a fixed `width` or `height` keeps it in a size group. A fixed size smaller than the group's is reported.
-- `align` is `start`, `center` (the default), or `end`. In a row it places the shapes vertically, in a column horizontally.
+- In a row, `align` places the shapes vertically, and in a column horizontally.
+- `place` takes exactly one of `below`, `above`, `leftOf`, `rightOf`, and `at`. The first four take `gap` and `align`, and `at` takes `anchor`.
 - Grids, rows, and columns are elements: they nest, and you can place them.
-- `titleAt` is the corner that holds the title: `topLeft` (the default), `topRight`, `bottomLeft`, or `bottomRight`.
+- `titleAt` is `topLeft` (the default), `topRight`, `bottomLeft`, or `bottomRight`.
 - The first shape without a position goes at the origin.
 
 ### Grids
@@ -288,12 +317,16 @@ d.line(from, to, ...)   // the same, without arrowheads
 
 | Option | Values |
 |---|---|
+| `id` | See [Ids](#ids) |
+| `label` | A string, or a label's options, as below |
 | `route` | `"straight"` (default), `"hv"`, `"vh"`, `{ viaX: x }`, `{ viaY: y }`, `{ via: [p1, p2] }` |
 | `bend` | Curve this many units to the left of the direction of travel |
 | `loop` | For `d.arrow(a, a)`: the side of the loop. Default `right` |
 | `ends` | `"->"` (default), `"<-"`, `"<->"`, `"--"` |
 | `head` | `"filled"` (default) for calls and flows, `"open"` for replies and async messages |
 | `dashed` | `true` for returns and optional paths |
+| `role`, `category` | As on shapes |
+| `stepOnly` | Shown only in the steps that focus it |
 
 Routes:
 
@@ -327,7 +360,14 @@ A label is a string or `{ text, segment, at, side, gap }`:
 
 ## Frames
 
-`d.frame(topLeft, bottomRight, { tab, title, dividers })` draws a titled region between two points, such as a UML fragment. It does not own or move anything.
+`d.frame(topLeft, bottomRight, options?)` draws a titled region between two points, such as a UML fragment. It does not own or move anything. A frame is not an element: grids, `place`, `enclose`, and edges do not take it.
+
+| Option | Meaning |
+|---|---|
+| `id` | See [Ids](#ids) |
+| `tab` | The label in the top-left corner, such as `loop` |
+| `title` | The text after the tab |
+| `dividers` | A list of `{ at, label? }`: a dashed line at the y of the point `at`, with an optional label |
 
 ## Categories
 
@@ -411,9 +451,9 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `PLACEMENT_CYCLE` | error | Placements depend on each other. Place one of them independently |
 | `CONFLICTING_PLACEMENT` | error | A shape is in a grid, row, or column and also placed, or in two of them. Keep one |
 | `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
-| `INVALID_PLACEMENT` | error | Give `place()` exactly one of `below`, `above`, `leftOf`, `rightOf`, and `at` |
 | `NOT_PLACEABLE` | error | An enclosure, a cell, or a mark is in a grid, row, or column, or placed. Position its members or its parent instead |
-| `INVALID_ARGUMENT` | error | A call has a value it cannot use. The message names the call, the value, and the values it takes; the call uses a stand-in, such as leaving the value out |
+| `UNKNOWN_OPTION` | error | A call has an option it does not take, so the option is ignored. The message lists the options it takes, the nearest first |
+| `INVALID_ARGUMENT` | error | A call has a value it cannot use, an option of another form, such as `anchor` with `below`, or an option that has no effect, such as `loop` between two shapes. The message names the call, the value, and the values it takes; the call uses the default or a stand-in |
 | `UNKNOWN_PARTICIPANT` | error | A sequence message or note names a shape that is not in the participants, so it is skipped. Add the shape to the participants |
 | `DRAW_FAILED` | error | The `draw` function threw, at the line given, uses a name it does not define, ran longer than 1 second, or created more than 2000 elements |
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
@@ -432,7 +472,6 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a grid, row, or column, or `place()` it |
-| `INVALID_REPLICAS` | error | `replicas` is not a whole number from 2 to 4, so the shape is drawn alone. For more, or an unknown number, put the number in the label of a stack of 4 |
 | `UNKNOWN_ICON` | error | The icon name is not a Lucide icon, so nothing is drawn. Use a name from the message, or find one as [Icons](icons.md#find-names) shows, without the `lucide:` prefix |
 | `UNKNOWN_GUTTER` | error | `gutterX(i)` or `gutterY(i)` names a gap that does not exist. A grid of n columns has gutters 0 to n - 2 |
 | `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `element()` names a member that does not. The message lists the valid ids |

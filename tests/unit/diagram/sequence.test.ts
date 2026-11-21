@@ -156,17 +156,17 @@ test("a message to a shape that is not a participant is UNKNOWN_PARTICIPANT and 
   );
   d.place(outside, { below: s });
   const out = compile(scene, lookups);
-  const participants = "Participants: a, a-2.";
+  const participants = "The participants are a, a-2.";
   assert.deepEqual(out.diagnostics, [
     {
       code: "UNKNOWN_PARTICIPANT",
-      message: `sequence sequence-1: steps[0].to is a-3, which is not a participant, so the message is skipped. ${participants}`,
+      message: `sequence sequence-1: steps[0].to is a-3, which is not a participant. steps[0] is left out. ${participants}`,
       ids: ["sequence-1", "a-3"],
       subject: "steps[0].to",
     },
     {
       code: "UNKNOWN_PARTICIPANT",
-      message: `sequence sequence-1: steps[1].over[1] is a-3, which is not a participant, so the note is skipped. ${participants}`,
+      message: `sequence sequence-1: steps[1].over[1] is a-3, which is not a participant. steps[1] is left out. ${participants}`,
       ids: ["sequence-1", "a-3"],
       subject: "steps[1].over[1]",
     },
@@ -175,7 +175,7 @@ test("a message to a shape that is not a participant is UNKNOWN_PARTICIPANT and 
   assert.ok(out.nodes.some((n) => n.id === "a-3"));
 });
 
-test("a message without a label, and a step of no kind, are INVALID_ARGUMENT and skipped", () => {
+test("a message without a label, and a step of no kind, are reported and skipped", () => {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
   const a = d.box("A");
@@ -190,25 +190,32 @@ test("a message without a label, and a step of no kind, are INVALID_ARGUMENT and
     ],
   );
   const out = compile(scene, lookups);
+  const step =
+    "a message { from, to, label }, a note { note, over }, or a fragment { fragment, steps }";
   assert.deepEqual(out.diagnostics, [
+    {
+      code: "UNKNOWN_OPTION",
+      message:
+        "sequence sequence-1: steps[0].lable is not an option. steps[0] takes label, from, to, reply, async, id, role, category. It is ignored.",
+      ids: ["sequence-1"],
+      subject: "steps[0].lable",
+    },
     {
       code: "INVALID_ARGUMENT",
       message:
-        "sequence sequence-1: the message steps[0], { from, to, lable }, has no label, so it is skipped.",
+        "sequence sequence-1: steps[0].label is missing; it takes text. steps[0] is left out.",
       ids: ["sequence-1"],
       subject: "steps[0].label",
     },
     {
       code: "INVALID_ARGUMENT",
-      message:
-        "sequence sequence-1: steps[1] is { form }, but a step is a message (from), a note (note), or a fragment (fragment), so it is skipped.",
+      message: `sequence sequence-1: steps[1] is { form }, but it takes ${step}. steps[1] is left out.`,
       ids: ["sequence-1"],
       subject: "steps[1]",
     },
     {
       code: "INVALID_ARGUMENT",
-      message:
-        "sequence sequence-1: steps[2].steps[1] is 3, but a step is a message (from), a note (note), or a fragment (fragment), so it is skipped.",
+      message: `sequence sequence-1: steps[2].steps[1] is 3, but it takes ${step}. steps[2].steps[1] is left out.`,
       ids: ["sequence-1"],
       subject: "steps[2].steps[1]",
     },

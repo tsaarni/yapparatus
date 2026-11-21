@@ -2,22 +2,21 @@
  * Sequence diagrams from the diagram primitives: participants in a row with lifelines, and
  * activation bars derived from calls and replies, with notes and fragments drawn as frames.
  */
-import type { DiagnosticCode } from "../document/diagnostic.ts";
 import {
   type Edge,
   type EdgeOptions,
   type Element,
   type Frame,
-  type Grid,
   lerp,
-  Node,
+  type Node,
   type PointLike,
   type Role,
   slug,
   xy,
 } from "./elements.ts";
 import { defaultGap, sequenceSpacing, shapes } from "./metrics.ts";
-import { quote, type Scene } from "./scene.ts";
+import type { Scene } from "./scene.ts";
+import type { CallCheck } from "./signature.ts";
 
 /** Elements a fragment or a whole sequence holds, for steps that focus it. */
 type Members = Array<Element | Edge | Frame>;
@@ -54,8 +53,14 @@ export interface SequenceFragment {
   title?: string;
   steps: SequenceStep[];
   /** Alternative branches, separated by dashed dividers. */
-  else?: Array<{ title?: string; steps: SequenceStep[] }>;
+  else?: SequenceBranch[];
   id?: string;
+}
+
+/** An alternative branch of a fragment, after a dashed divider. */
+export interface SequenceBranch {
+  title?: string;
+  steps: SequenceStep[];
 }
 
 /** One step of a sequence: a message, a note, or a fragment. */
@@ -85,26 +90,16 @@ const barHalf = shapes.bar / 2;
 
 /**
  * Draw a sequence diagram into the scene and return the column that holds it all. `name` is
- * its id without an `id`, such as `sequence-1`. A step it cannot draw is reported and skipped.
+ * its id without an `id`, such as `sequence-1`. `call` checked the steps and reports about it.
  */
 export function sequence(
   scene: Scene,
+  call: CallCheck,
   participants: Node[],
-  written: SequenceStep[],
+  steps: SequenceStep[],
   options: SequenceOptions,
   name: string,
 ): Element {
-  const problems: Array<(sequence: Grid) => void> = [];
-  const steps = drawable(participants, written, (code, about, message, subject) =>
-    problems.push((sequence) =>
-      scene.report(
-        code,
-        [sequence, ...about],
-        () => `sequence ${sequence.id}: ${message()}`,
-        subject,
-      ),
-    ),
-  );
   const step = options.step ?? sequenceSpacing.step;
   const boxes = participants.filter((n) => n.shape !== "actor" && n.shape !== "icon");
   for (const n of boxes) n.options.minWidth ??= sequenceSpacing.minWidth;
@@ -143,6 +138,7 @@ export function sequence(
   const walk = (list: SequenceStep[], depth: number, within: Members[]) => {
     for (const s of list) {
       if ("from" in s) {
+        if (s.from === s.to) ignoreForm(call, s);
         events.push({ kind: "message", m: s, y, n: ++count, within });
         y += s.from === s.to ? step * sequenceSpacing.self.step : step;
       } else if ("note" in s) {
@@ -363,98 +359,19 @@ export function sequence(
   scene.nameAfter(header, sequence, "-participants");
   scene.nameAfter(space, sequence, "-space");
   scene.addGroup(sequence, all);
-  for (const report of problems) report(sequence);
+  call.done([sequence]);
   return sequence;
 }
 
-/** Reports a step's problem; the sequence adds itself to the ids and its id to the message. */
-type StepReport = (
-  code: DiagnosticCode,
-  about: Node[],
-  message: () => string,
-  subject: string,
-) => void;
-
-/**
- * The steps that can be drawn, in order. Each step that cannot be drawn is reported and left
- * out, and steps or branches that are not a list are reported and stand in as none.
- */
-function drawable(participants: Node[], written: unknown, report: StepReport): SequenceStep[] {
-  const known = new Set<unknown>(participants);
-  const invalid = (at: string, message: () => string) =>
-    report("INVALID_ARGUMENT", [], message, at);
-  const participant = (value: unknown, at: string, what: string) => {
-    if (known.has(value)) return true;
-    report(
-      "UNKNOWN_PARTICIPANT",
-      value instanceof Node ? [value] : [],
-      () =>
-        `${at} is ${quote(value)}, which is not a participant, so the ${what} is skipped. Participants: ${participants.map((n) => n.id).join(", ")}.`,
-      at,
-    );
-    return false;
-  };
-  const text = (step: object, key: "label" | "note", at: string, what: string) => {
-    const value: unknown = Reflect.get(step, key);
-    if (typeof value === "string") return true;
-    invalid(`${at}.${key}`, () =>
-      value === undefined
-        ? `the ${what} ${at}, ${quote(step)}, has no ${key}, so it is skipped.`
-        : `${at}.${key} is ${quote(value)}, but a ${what} takes text, so it is skipped.`,
-    );
-    return false;
-  };
-  const list = (value: unknown, at: string): SequenceStep[] => {
-    if (Array.isArray(value)) return value.flatMap((s, i) => one(s, `${at}[${i}]`));
-    invalid(at, () => `${at} is ${quote(value)}, but it takes a list of steps, so it has none.`);
-    return [];
-  };
-  const branches = (value: unknown, at: string): NonNullable<SequenceFragment["else"]> => {
-    if (Array.isArray(value))
-      return value.map((b: unknown, j) => {
-        const branch = b && typeof b === "object" ? (b as { title?: string; steps?: unknown }) : {};
-        return {
-          ...(branch.title !== undefined ? { title: branch.title } : {}),
-          steps: list(branch.steps, `${at}[${j}].steps`),
-        };
-      });
-    invalid(at, () => `${at} is ${quote(value)}, but it takes a list of branches, so it has none.`);
-    return [];
-  };
-  const one = (s: unknown, at: string): SequenceStep[] => {
-    if (s && typeof s === "object" && "from" in s) {
-      const m = s as SequenceMessage;
-      const usable = [
-        participant(m.from, `${at}.from`, "message"),
-        participant(m.to, `${at}.to`, "message"),
-        text(m, "label", at, "message"),
-      ];
-      return usable.every(Boolean) ? [m] : [];
-    }
-    if (s && typeof s === "object" && "note" in s) {
-      const n = s as SequenceNote;
-      const over = Array.isArray(n.over) ? n.over : [n.over];
-      const usable = [
-        ...over.map((p, j) =>
-          participant(p, Array.isArray(n.over) ? `${at}.over[${j}]` : `${at}.over`, "note"),
-        ),
-        text(n, "note", at, "note"),
-      ];
-      return usable.every(Boolean) ? [n] : [];
-    }
-    if (s && typeof s === "object" && "fragment" in s) {
-      const f = s as SequenceFragment;
-      const steps = list(f.steps, `${at}.steps`);
-      return [
-        { ...f, steps, ...(f.else !== undefined ? { else: branches(f.else, `${at}.else`) } : {}) },
-      ];
-    }
-    invalid(
-      at,
-      () =>
-        `${at} is ${quote(s)}, but a step is a message (from), a note (note), or a fragment (fragment), so it is skipped.`,
-    );
-    return [];
-  };
-  return list(written, "steps");
+/** Report `reply` or `async` on a message to the sender itself, which is drawn as a call. */
+function ignoreForm(call: CallCheck, message: SequenceMessage) {
+  for (const key of ["reply", "async"] as const) {
+    const path = `${call.pathOf(message)}.${key}`;
+    if (message[key])
+      call.ignore(
+        path,
+        message[key],
+        () => `${path} is true, but a message from a participant to itself is drawn as a call.`,
+      );
+  }
 }

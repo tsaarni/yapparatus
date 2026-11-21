@@ -70,10 +70,11 @@ test("a problem a call reports names the final id of its element", () => {
   });
   assert.deepEqual(out.diagnostics, [
     {
-      code: "INVALID_REPLICAS",
+      code: "INVALID_ARGUMENT",
       message:
-        "a-2 has replicas: 9, but a stack draws 2 to 4 boxes. For more, or an unknown number, put the number in the label of a box with replicas: 4.",
+        "box a-2: replicas is 9, but it takes a whole number from 2 to 4. The default is used.",
       ids: ["a-2"],
+      subject: "replicas",
     },
   ]);
 });

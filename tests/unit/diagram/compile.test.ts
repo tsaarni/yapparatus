@@ -486,19 +486,17 @@ test("a stack of replicas is the box plus 5 units each way per box behind, text 
   }
 });
 
-test("replicas other than 2 to 4 are INVALID_REPLICAS, and the box is drawn alone", () => {
+test("replicas other than 2 to 4 are INVALID_ARGUMENT, and the box is drawn alone", () => {
   const plain = stacked("box", "Twelve chars").nodes[0];
   for (const replicas of [0, 1, 5, 2.5, "3"]) {
     const out = stacked("box", "Twelve chars", replicas);
-    assert.deepEqual(codes(out), ["INVALID_REPLICAS"], `replicas: ${replicas}`);
+    assert.deepEqual(codes(out), ["INVALID_ARGUMENT"], `replicas: ${replicas}`);
     assert.deepEqual(out.diagnostics[0]?.ids, ["n"]);
-    assert.match(
-      out.diagnostics[0]?.message ?? "",
-      /2 to 4 boxes.*label of a box with replicas: 4/,
-    );
+    assert.equal(out.diagnostics[0]?.subject, "replicas");
+    assert.match(out.diagnostics[0]?.message ?? "", /takes a whole number from 2 to 4/);
     assert.deepEqual(out.nodes[0], plain);
   }
-  assert.match(stacked("doc", "Doc", 9).diagnostics[0]?.message ?? "", /2 to 4 pages/);
+  assert.match(stacked("doc", "Doc", 9).diagnostics[0]?.message ?? "", /^doc n: replicas is 9/);
 });
 
 /** A box labelled "Billing service", 105 units wide, at the origin, compiled. */

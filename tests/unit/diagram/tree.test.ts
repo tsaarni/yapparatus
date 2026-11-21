@@ -319,7 +319,7 @@ test("a layout that is not one of the four is INVALID_ARGUMENT, and the tree gro
     {
       code: "INVALID_ARGUMENT",
       message:
-        'tree r-tree: layout is "up", but a tree takes down, right, both, indent. The tree grows down.',
+        'tree r-tree: layout is "up", but it takes "down", "right", "both", or "indent". The default is used.',
       ids: ["r-tree"],
       subject: "layout",
     },

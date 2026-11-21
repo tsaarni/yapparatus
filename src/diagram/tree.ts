@@ -13,7 +13,8 @@ import type {
   Route,
 } from "./elements.ts";
 import { defaultGap, treeSpacing } from "./metrics.ts";
-import { quote, type Scene } from "./scene.ts";
+import type { Scene } from "./scene.ts";
+import { type CallCheck, quote } from "./signature.ts";
 
 /** How a tree grows: down, to the right, to both sides, or as an indented list. */
 export type TreeLayout = "down" | "right" | "both" | "indent";
@@ -41,29 +42,27 @@ type Growth = "down" | "right" | "left" | "indent";
 /** Where the line to the `i`th child starts, and its route. */
 type Branch = (i: number) => [PointLike, Route];
 
-/** The layouts, to check one from a draw program, which has no types. */
-const layouts: readonly TreeLayout[] = ["down", "right", "both", "indent"];
-
 /**
- * Draw a tree into the scene and return the row or column that holds it all. A layout that is
- * not one of the four is reported, and the tree grows down.
+ * Draw a tree into the scene and return the row or column that holds it all. `call` checked
+ * the arguments and reports about the outermost branch.
  */
 export function tree(
   scene: Scene,
+  call: CallCheck,
   root: Node,
   children: TreeChild[],
-  options: TreeOptions = {},
+  options: TreeOptions,
 ): Grid {
   const layout = options.layout ?? "down";
-  if (layouts.includes(layout)) return grown(scene, root, children, options, layout);
-  const outermost = grown(scene, root, children, options, "down");
-  scene.report(
-    "INVALID_ARGUMENT",
-    [outermost],
-    () =>
-      `tree ${outermost.id}: layout is ${quote(layout)}, but a tree takes ${layouts.join(", ")}. The tree grows down.`,
-    "layout",
-  );
+  const outermost = grown(scene, root, children, options, layout);
+  if (layout === "indent" && options.levelGap !== undefined)
+    call.ignore(
+      "levelGap",
+      options.levelGap,
+      () =>
+        `levelGap is ${quote(options.levelGap)}, but the indent layout uses gap between levels.`,
+    );
+  call.done([outermost]);
   return outermost;
 }
 

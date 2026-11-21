@@ -9,16 +9,16 @@ import {
   type EdgeOptions,
   type Element,
   type EncloseOptions,
-  Enclosure,
+  type Enclosure,
   type Frame,
   type FrameOptions,
-  Grid,
+  type Grid,
   type GridOptions,
   type LineOptions,
   lerp,
-  type Mark,
+  type MarkOptions,
   type MemberOptions,
-  Node,
+  type Node,
   type NodeOptions,
   type Place,
   type Placement,
@@ -34,13 +34,18 @@ import {
   xy,
 } from "./elements.ts";
 import { defaultGap } from "./metrics.ts";
-import { isNamed, quote, type Scene } from "./scene.ts";
+import type { Scene } from "./scene.ts";
 import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
+import { CallCheck, isNamed, quote, type Signature } from "./signature.ts";
+import { signatures } from "./signatures.ts";
 import { type TreeChild, type TreeOptions, tree } from "./tree.ts";
+
+/** The relative placements, each with the axis its default gap is on. */
+const directions = { below: "y", above: "y", leftOf: "x", rightOf: "x" } as const;
 
 /**
  * The author's calls. Its state is the scene it records into and the count of each call,
- * which a draw program cannot reach.
+ * which a draw program cannot reach. Each call checks what it is given against its signature.
  */
 export class DiagramBuilder {
   readonly #scene: Scene;
@@ -51,89 +56,102 @@ export class DiagramBuilder {
 
   /** A component, service, or step: a rectangle fitted around its text. */
   box(label: string, options: BoxOptions = {}): Node {
-    return this.#stacked("box", label, options);
+    return this.#shape(signatures.box, "box", label, options);
   }
   /** Storage: a database, a cache. */
   cylinder(label: string, options: NodeOptions = {}): Node {
-    return this.#scene.addNode("cylinder", label, options);
+    return this.#shape(signatures.cylinder, "cylinder", label, options);
   }
   /** Input or output of a flow: a parallelogram around its text. */
   io(label: string, options: NodeOptions = {}): Node {
-    return this.#scene.addNode("io", label, options);
+    return this.#shape(signatures.io, "io", label, options);
   }
   /** A document, a report, a file: a page with a wavy bottom. */
   doc(label: string, options: StackOptions = {}): Node {
-    return this.#stacked("doc", label, options);
+    return this.#shape(signatures.doc, "doc", label, options);
   }
   /** A queue, a topic, a stream: a cylinder on its side. */
   queue(label: string, options: NodeOptions = {}): Node {
-    return this.#scene.addNode("queue", label, options);
+    return this.#shape(signatures.queue, "queue", label, options);
   }
   /** Free-standing text without an outline. `marks` name spans or lines as members. */
   text(label: string, options: TextOptions = {}): Node {
-    const { marks, ...rest } = options;
-    const node = this.#scene.addNode("text", label, rest);
+    const call = this.#check(signatures.text);
+    const [text, { marks, ...rest }] = call.args([label, options]) as [string, TextOptions];
+    const node = this.#scene.addNode("text", text, rest);
     for (const [id, mark] of Object.entries(marks ?? {})) {
-      const { text, lines, ...o } =
-        typeof mark === "string"
-          ? { text: mark }
-          : (mark as Mark & { text?: string; lines?: string });
+      const {
+        text: span,
+        lines,
+        ...o
+      }: MarkOptions = typeof mark === "string" ? { text: mark } : mark;
       const place: Place =
-        text !== undefined ? { kind: "mark", text } : { kind: "mark", lines: lines ?? "" };
-      this.#member(node, text ?? "", { ...o, id }, place);
+        span !== undefined ? { kind: "mark", text: span } : { kind: "mark", lines: lines ?? "" };
+      this.#member(node, span ?? "", { ...o, id }, place);
     }
+    call.done([node]);
     return node;
   }
   /** A person or outside system that acts: a figure above its name. */
   actor(label: string, options: NodeOptions = {}): Node {
-    return this.#scene.addNode("actor", label, options);
+    return this.#shape(signatures.actor, "actor", label, options);
   }
   /**
    * A thing drawn as a picture, such as a user, a cloud, or a server: a Lucide icon, named
    * without a prefix, above its label.
    */
   icon(name: string, label: string, options: NodeOptions = {}): Node {
-    return this.#scene.addNode("icon", label, { ...options, icon: name });
+    const call = this.#check(signatures.icon);
+    const [icon, text, o] = call.args([name, label, options]) as [
+      string | undefined,
+      string,
+      NodeOptions,
+    ];
+    const node = this.#scene.addNode("icon", text, icon === undefined ? o : { ...o, icon });
+    call.done([node]);
+    return node;
   }
   /** An annotation with a folded corner. */
   note(label: string, options: NodeOptions = {}): Node {
-    return this.#scene.addNode("note", label, options);
+    return this.#shape(signatures.note, "note", label, options);
   }
   /** A decision: a diamond around a short question. */
   decision(label: string, options: NodeOptions = {}): Node {
-    return this.#scene.addNode("diamond", label, options);
+    return this.#shape(signatures.decision, "diamond", label, options);
   }
   /**
    * A start point: a filled dot. A label, such as the event that starts the flow, sits
    * outside the dot and does not move it: layout and gaps use the dot alone.
    */
   start(label = "", options: TerminalOptions = {}): Node {
-    return this.#terminal("dot", "start", label, options);
+    return this.#terminal(signatures.start, "dot", label, options);
   }
   /** An end point: a ringed dot, with an optional label outside it, as for `start`. */
   end(label = "", options: TerminalOptions = {}): Node {
-    return this.#terminal("ring", "end", label, options);
+    return this.#terminal(signatures.end, "ring", label, options);
   }
-  /** A box or document, alone or as a stack of 2 to 4. Any other count draws it alone. */
-  #stacked(shape: "box" | "doc", label: string, options: StackOptions): Node {
-    const { replicas, ...rest } = options;
-    const valid =
-      typeof replicas === "number" && Number.isInteger(replicas) && replicas >= 2 && replicas <= 4;
-    const node = this.#scene.addNode(shape, label, valid ? options : rest);
-    if (replicas !== undefined && !valid) {
-      const what = shape === "box" ? "boxes" : "pages";
-      this.#scene.report(
-        "INVALID_REPLICAS",
-        [node],
-        () =>
-          `${node.id} has replicas: ${quote(replicas)}, but a stack draws 2 to 4 ${what}. For more, or an unknown number, put the number in the label of a ${shape} with replicas: 4.`,
-      );
-    }
+  /** A shape from its label and options, which its signature checks. */
+  #shape(signature: Signature, shape: Shape, label: unknown, options: unknown): Node {
+    const call = this.#check(signature);
+    const [text, o] = call.args([label, options]) as [string, Node["options"]];
+    const node = this.#scene.addNode(shape, text, o);
+    call.done([node]);
     return node;
   }
-  #terminal(shape: Shape, kind: string, label: string, options: TerminalOptions): Node {
-    const name = this.#name(kind);
-    return this.#scene.addNode(shape, label, options, label ? {} : { id: name });
+  /** A start or an end. Without a label, its id is the call's name and its count. */
+  #terminal(signature: Signature, shape: Shape, label: unknown, options: unknown): Node {
+    const call = this.#check(signature);
+    const [text, o] = call.args([label, options]) as [string, TerminalOptions];
+    const name = this.#name(signature.name);
+    const node = this.#scene.addNode(shape, text, o, text ? {} : { id: name });
+    if (!text && o.side !== undefined)
+      call.ignore(
+        "side",
+        o.side,
+        () => `side is ${quote(o.side)}, but ${node.id} has no label for it to place.`,
+      );
+    call.done([node]);
+    return node;
   }
   /** The id of an element without text: the call's name and its count, such as `row-1`. */
   #name(call: string): string {
@@ -141,19 +159,28 @@ export class DiagramBuilder {
     this.#counts.set(call, n);
     return `${call}-${n}`;
   }
+  /** The check of one call, which reports into the scene. */
+  #check(signature: Signature): CallCheck {
+    return new CallCheck(this.#scene.report, signature);
+  }
   /**
    * Cells on a grid under an optional title: a type, a table, a packet header, a register,
    * an array. Each cell is a member: `rec.element("id")`.
    */
   record(cells: Cell[], options: RecordOptions = {}): Node {
-    const { title = "", ...rest } = options;
+    const call = this.#check(signatures.record);
+    const [checked, { title = "", ...rest }] = call.args([cells, options]) as [
+      Cell[],
+      RecordOptions,
+    ];
     const name = this.#name("record");
     const node = this.#scene.addNode("record", title, rest, title ? {} : { id: name });
-    for (const cell of cells) {
+    for (const cell of checked) {
       const [label, o] = typeof cell === "string" ? [cell, {}] : cell;
       const { span = 1, ...options } = typeof o === "number" ? { span: o } : o;
-      this.#member(node, label, options, { kind: "cell", span: Math.max(1, Math.round(span)) });
+      this.#member(node, label, options, { kind: "cell", span });
     }
+    call.done([node]);
     return node;
   }
   /**
@@ -181,18 +208,37 @@ export class DiagramBuilder {
    * Returns one element that can be placed like any other.
    */
   sequence(participants: Node[], steps: SequenceStep[], options: SequenceOptions = {}): Element {
-    return sequence(this.#scene, participants, steps, options, this.#name("sequence"));
+    const call = this.#check(signatures.sequence);
+    const [p, s, o] = call.args([participants, steps, options]) as [
+      Node[],
+      SequenceStep[],
+      SequenceOptions,
+    ];
+    return sequence(this.#scene, call, p, s, o, this.#name("sequence"));
   }
   /**
    * A tree: the root over its subtrees, joined by lines. A child is a node or `[node, children]`.
    * Returns the outermost row or column, which can be placed like any other element.
    */
   tree(root: Node, children: TreeChild[], options: TreeOptions = {}): Grid {
-    return tree(this.#scene, root, children, options);
+    const call = this.#check(signatures.tree);
+    const [node, c, o] = call.args([root, children, options]) as [
+      Node | undefined,
+      TreeChild[],
+      TreeOptions,
+    ];
+    if (node) return tree(this.#scene, call, node, c, o);
+    const empty = this.#scene.addGrid("column", [], {}, "tree");
+    call.done([empty]);
+    return empty;
   }
   /** A titled region between two corners, such as a UML fragment. */
   frame(from: PointLike, to: PointLike, options: FrameOptions = {}): Frame {
-    return this.#scene.addFrame(from, to, options, this.#name("frame"));
+    const call = this.#check(signatures.frame);
+    const [a, b, o] = call.args([from, to, options]) as [PointLike, PointLike, FrameOptions];
+    const frame = this.#scene.addFrame(a, b, o, this.#name("frame"));
+    call.done([frame]);
+    return frame;
   }
 
   /**
@@ -200,159 +246,172 @@ export class DiagramBuilder {
    * tallest. `null` is an empty cell. Gutters between the tracks carry edges.
    */
   grid(rows: Array<Array<Element | null>>, options: GridOptions = {}): Grid {
-    return this.#scene.addGrid("grid", rows, options, this.#name("grid"));
+    const call = this.#check(signatures.grid);
+    const [cells, o] = call.args([rows, options]) as [Array<Array<Element | null>>, GridOptions];
+    const grid = this.#scene.addGrid("grid", cells, o, this.#name("grid"));
+    call.done([grid]);
+    return grid;
   }
   /** Left to right: a grid of one row. `align` places the children vertically. */
   row(children: Element[], options: LineOptions = {}): Grid {
-    const { gap = defaultGap.x, ...rest } = options;
+    const call = this.#check(signatures.row);
+    const [cells, { gap = defaultGap.x, ...rest }] = call.args([children, options]) as [
+      Element[],
+      LineOptions,
+    ];
     const name = this.#name("row");
-    return this.#scene.addGrid("row", [children], { ...rest, gap: [gap, defaultGap.y] }, name);
+    const row = this.#scene.addGrid("row", [cells], { ...rest, gap: [gap, defaultGap.y] }, name);
+    call.done([row]);
+    return row;
   }
   /** Top to bottom: a grid of one column. `align` places the children horizontally. */
   column(children: Element[], options: LineOptions = {}): Grid {
-    const { gap = defaultGap.y, ...rest } = options;
-    const rows = children.map((child) => [child]);
+    const call = this.#check(signatures.column);
+    const [cells, { gap = defaultGap.y, ...rest }] = call.args([children, options]) as [
+      Element[],
+      LineOptions,
+    ];
+    const rows = cells.map((child) => [child]);
     const name = this.#name("column");
-    return this.#scene.addGrid("column", rows, { ...rest, gap: [defaultGap.x, gap] }, name);
+    const column = this.#scene.addGrid("column", rows, { ...rest, gap: [defaultGap.x, gap] }, name);
+    call.done([column]);
+    return column;
   }
 
+  /**
+   * Position an element next to another or with an anchor at a point. Without exactly one of
+   * `below`, `above`, `leftOf`, `rightOf`, and `at`, the placement is ignored.
+   */
   place(el: Element, options: PlaceOptions): Element {
-    const dirs = (["below", "above", "leftOf", "rightOf"] as const).filter((d) => options[d]);
-    const count = dirs.length + (options.at ? 1 : 0);
-    if (count !== 1) {
-      this.#scene.report(
-        "INVALID_PLACEMENT",
-        [el],
-        () =>
-          `place(${el.id}) needs exactly one of below, above, leftOf, rightOf, or at; got ${count}.`,
-      );
-      return el;
-    }
-    const dir = dirs[0];
-    const ref = dir ? options[dir] : undefined;
-    const placement: Placement =
-      dir && ref
-        ? {
-            kind: "relative",
-            dir,
-            ref,
-            gap: options.gap ?? (dir === "below" || dir === "above" ? defaultGap.y : defaultGap.x),
-            align: options.align ?? "center",
-          }
-        : { kind: "at", at: options.at ?? [0, 0], anchor: options.anchor ?? "center" };
-    this.#scene.own(el, placement);
+    const call = this.#check(signatures.place);
+    const [target, o] = call.args([el, options]) as [Element | undefined, PlaceOptions];
+    const where = placement(o);
+    if (target && where) this.#scene.own(target, where);
+    call.done(target ? [target] : []);
     return el;
   }
 
   enclose(members: Element[], options: EncloseOptions = {}): Enclosure {
-    return this.#scene.addEnclosure(members, options, this.#name("enclosure"));
+    const call = this.#check(signatures.enclose);
+    const [m, o] = call.args([members, options]) as [Element[], EncloseOptions];
+    const enclosure = this.#scene.addEnclosure(m, o, this.#name("enclosure"));
+    if (o.titleAt !== undefined && !o.title)
+      call.ignore(
+        "titleAt",
+        o.titleAt,
+        () => `titleAt is ${quote(o.titleAt)}, but the enclosure has no title.`,
+      );
+    call.done([enclosure]);
+    return enclosure;
   }
 
   /** An arrow. A string third argument is its label. `d.arrow(a, a)` draws a self-loop. */
   arrow(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
-    return this.#edge(
-      "arrow",
-      from,
-      to,
-      typeof options === "string" ? { label: options } : options,
-    );
+    return this.#edge(signatures.arrow, from, to, options, {});
   }
   /** A connection without arrowheads. */
   line(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
-    return this.#edge(
-      "line",
-      from,
-      to,
-      typeof options === "string" ? { label: options, ends: "--" } : { ends: "--", ...options },
-    );
+    return this.#edge(signatures.line, from, to, options, { ends: "--" });
   }
   /**
-   * An edge of the author's. With an end that is not an element or a point it is left out, and
-   * with a `viaX` or `viaY` that is not a number or a point it is straight; both are reported.
+   * An edge of the author's, over the call's defaults. With an end it cannot use it is left out.
+   * An option that the edge's form ignores is reported.
    */
-  #edge(call: string, from: PointLike, to: PointLike, options: EdgeOptions): Edge {
-    const ends = { from, to };
-    const wrong = (["from", "to"] as const).filter((end) => !isEnd(ends[end]));
-    for (const end of wrong)
-      this.#scene.report(
-        "INVALID_ARGUMENT",
-        [from, to].flatMap((end) => (isNamed(end) ? [end] : [])),
+  #edge(
+    signature: Signature,
+    from: unknown,
+    to: unknown,
+    options: unknown,
+    defaults: EdgeOptions,
+  ): Edge {
+    const call = this.#check(signature);
+    const [a, b, o] = call.args([from, to, options]) as [
+      PointLike?,
+      PointLike?,
+      (string | EdgeOptions)?,
+    ];
+    const given = typeof o === "string" ? { label: o } : (o ?? {});
+    const full = { ...defaults, ...given };
+    if (!a || !b) {
+      call.done([], [from, to].filter(isNamed));
+      return new Edge(from as PointLike, to as PointLike, full);
+    }
+    const edge = this.#scene.addEdge(a, b, full);
+    const self = a === b && !(a instanceof Point) && !Array.isArray(a);
+    const loop = () => `${edge.id} goes from an element to itself, which loop draws`;
+    if (self) {
+      for (const key of ["route", "bend"] as const)
+        if (given[key] !== undefined)
+          call.ignore(key, given[key], () => `${key} is ${quote(given[key])}, but ${loop()}.`);
+    } else if (given.loop !== undefined)
+      call.ignore(
+        "loop",
+        given.loop,
         () =>
-          `${call}: ${end} is ${quote(ends[end])}, but an edge ends at a shape, a grid, an enclosure, a point, or [x, y]. The edge is left out.`,
-        end,
+          `loop is ${quote(given.loop)}, but loop draws only an edge from an element to itself.`,
       );
-    if (wrong.length) return new Edge(from, to, options);
-    const via = viaOf(options.route);
-    const wrongVia = via && !(typeof via.value === "number" || via.value instanceof Point);
-    const edge = this.#scene.addEdge(
-      from,
-      to,
-      wrongVia ? { ...options, route: "straight" } : options,
-    );
-    if (via && wrongVia)
-      this.#scene.report(
-        "INVALID_ARGUMENT",
-        [edge],
-        () =>
-          `${call} ${edge.id}: route ${via.axis} is ${quote(via.value)}, but ${via.axis} takes a number or a point, such as grid.gutter${via.axis.slice(3)}(0). The edge is drawn straight.`,
-        "route",
+    if (full.ends === "--" && given.head !== undefined)
+      call.ignore(
+        "head",
+        given.head,
+        () => `head is ${quote(given.head)}, but the edge has no arrowheads: its ends are "--".`,
       );
+    call.done([edge]);
     return edge;
   }
 
   /** Give these nodes the largest measured width and height among them. */
   equalSize(nodes: Node[]) {
-    this.#sizeGroup("equalSize", nodes, true, true);
+    this.#sizeGroup(signatures.equalSize, nodes, true, true);
   }
   equalWidth(nodes: Node[]) {
-    this.#sizeGroup("equalWidth", nodes, true, false);
+    this.#sizeGroup(signatures.equalWidth, nodes, true, false);
   }
   equalHeight(nodes: Node[]) {
-    this.#sizeGroup("equalHeight", nodes, false, true);
+    this.#sizeGroup(signatures.equalHeight, nodes, false, true);
   }
   /** A size group of the shapes in `nodes`; anything else is reported and left out. */
-  #sizeGroup(call: string, nodes: Node[], width: boolean, height: boolean) {
-    const members = nodes.filter((node, i) => {
-      if (node instanceof Node) return true;
-      this.#scene.report(
-        "INVALID_ARGUMENT",
-        isNamed(node) ? [node] : [],
-        () =>
-          `${call}: nodes[${i}] is ${quote(node)}, but ${call} takes shapes. The group leaves it out.`,
-        `nodes[${i}]`,
-      );
-      return false;
-    });
+  #sizeGroup(signature: Signature, nodes: unknown, width: boolean, height: boolean) {
+    const call = this.#check(signature);
+    const [members] = call.args([nodes]) as [Node[]];
     this.#scene.addSizeGroup({ members, width, height });
+    call.done();
   }
 
   point(x: number, y: number): Point {
-    return new Point({ k: "abs", x, y });
+    const call = this.#check(signatures.point);
+    const [px, py] = call.args([x, y]) as [number, number];
+    call.done();
+    return new Point({ k: "abs", x: px, y: py }, this.#scene.checkArgs);
   }
   /** The x coordinate of `x` combined with the y coordinate of `y`. */
   xy(x: PointLike, y: PointLike): Point {
-    return xy(x, y);
+    const call = this.#check(signatures.xy);
+    const [px, py] = call.args([x, y]) as [PointLike, PointLike];
+    call.done();
+    return new Point(xy(px, py).expr, this.#scene.checkArgs);
   }
   /** Linear interpolation: t = 0 at a, 1 at b. */
   lerp(a: PointLike, b: PointLike, t = 0.5): Point {
-    return lerp(a, b, t);
+    const call = this.#check(signatures.lerp);
+    const [pa, pb, at] = call.args([a, b, t]) as [PointLike, PointLike, number];
+    call.done();
+    return new Point(lerp(pa, pb, at).expr, this.#scene.checkArgs);
   }
 }
 
-/** Whether a value can be an end of an edge: an element, a point, or `[x, y]`. */
-function isEnd(value: unknown): value is PointLike {
-  if (Array.isArray(value)) return value.length === 2 && value.every((n) => typeof n === "number");
-  return (
-    value instanceof Point ||
-    value instanceof Node ||
-    value instanceof Grid ||
-    value instanceof Enclosure
-  );
-}
-
-/** The `viaX` or `viaY` of a route and its value, when the route has one. */
-function viaOf(route: unknown): { axis: "viaX" | "viaY"; value: unknown } | undefined {
-  if (!route || typeof route !== "object") return;
-  for (const axis of ["viaX", "viaY"] as const)
-    if (axis in route) return { axis, value: Reflect.get(route, axis) };
+/** The placement that checked `place` options state: next to an element, or at a point. */
+function placement(options: PlaceOptions): Placement | undefined {
+  for (const dir of Object.keys(directions) as Array<keyof typeof directions>) {
+    const ref = options[dir];
+    if (ref)
+      return {
+        kind: "relative",
+        dir,
+        ref,
+        gap: options.gap ?? defaultGap[directions[dir]],
+        align: options.align ?? "center",
+      };
+  }
+  if (options.at) return { kind: "at", at: options.at, anchor: options.anchor ?? "center" };
 }

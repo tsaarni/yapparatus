@@ -112,10 +112,6 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "An edge label names a segment the edge does not have.",
   },
-  INVALID_PLACEMENT: {
-    severity: "error",
-    meaning: "A placement does not name exactly one relation.",
-  },
   NOT_PLACEABLE: {
     severity: "error",
     meaning:
@@ -133,6 +129,10 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A call has an argument or an option with a value it cannot use.",
   },
+  UNKNOWN_OPTION: {
+    severity: "error",
+    meaning: "A call has an option it does not take.",
+  },
   UNKNOWN_PARTICIPANT: {
     severity: "error",
     meaning: "A sequence message or note names a shape that is not a participant.",
@@ -144,10 +144,6 @@ export const diagnosticCodes = {
   UNKNOWN_GUTTER: {
     severity: "error",
     meaning: "A gutter point names a grid track with no gap after it.",
-  },
-  INVALID_REPLICAS: {
-    severity: "error",
-    meaning: "A box or document has a number of replicas other than 2 to 4.",
   },
   UNKNOWN_ICON: {
     severity: "error",

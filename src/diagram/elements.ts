@@ -42,6 +42,15 @@ export type Reporter = (
   subject?: string,
 ) => void;
 
+/** An element's method whose arguments the scene checks. */
+export type Method = "port" | "element" | "label" | "offset";
+
+/**
+ * Checks the arguments of an element's method and gives the ones to use, or `undefined` for one
+ * that nothing stands in for. The scene sets it and reports the problems about the element.
+ */
+export type MethodCheck = (self: Named | undefined, method: Method, given: unknown[]) => unknown[];
+
 /** How a point is derived, resolved to coordinates at compile time. */
 export type PointExpr =
   | { k: "anchor"; el: Element; name: AnchorName }
@@ -56,12 +65,20 @@ export type PointExpr =
 /** A lazily resolved point. Coordinates are known only after compilation. */
 export class Point {
   readonly expr: PointExpr;
-  constructor(expr: PointExpr) {
+  /** The check of `offset`'s arguments, from the element or the call that made the point. */
+  readonly checkArgs: MethodCheck | undefined;
+  constructor(expr: PointExpr, checkArgs?: MethodCheck) {
     this.expr = expr;
+    this.checkArgs = checkArgs;
   }
   /** Shift by dx rightward and dy downward. */
   offset(dx: number, dy: number): Point {
-    return new Point({ k: "offset", base: this.expr, dx, dy });
+    const given = [dx, dy];
+    const [x = 0, y = 0] = (this.checkArgs?.(elementOf(this), "offset", given) ?? given) as [
+      number?,
+      number?,
+    ];
+    return new Point({ k: "offset", base: this.expr, dx: x, dy: y }, this.checkArgs);
   }
 }
 
@@ -78,8 +95,10 @@ abstract class Element {
     this.id = id;
     this.explicitId = explicit;
   }
+  /** Set by the scene: the check of a method's arguments. */
+  checkArgs?: MethodCheck;
   private a(name: AnchorName) {
-    return new Point({ k: "anchor", el: this, name });
+    return new Point({ k: "anchor", el: this, name }, this.checkArgs);
   }
   get center() {
     return this.a("center");
@@ -110,7 +129,9 @@ abstract class Element {
   }
   /** A point on one side: `t` runs 0→1 left→right on top and bottom, top→bottom on the sides. */
   port(side: Side, t = 0.5): Point {
-    return new Point({ k: "port", el: this, side, t });
+    const [s, at] = (this.checkArgs?.(this, "port", [side, t]) ?? [side, t]) as [Side?, number?];
+    if (s === undefined) return this.center;
+    return new Point({ k: "port", el: this, side: s, t: at ?? 0.5 }, this.checkArgs);
   }
 }
 
@@ -213,8 +234,9 @@ export interface CellOptions extends MemberOptions {
  */
 export type Cell = string | [label: string, span: number] | [label: string, options: CellOptions];
 
-/** Options of a record: a title over a grid of cells. */
-export interface RecordOptions extends Omit<NodeOptions, "sub"> {
+/** Options of a record: a title over a grid of cells. Its size comes from the cells and `width`. */
+export interface RecordOptions
+  extends Pick<NodeOptions, "id" | "role" | "category" | "width" | "mono" | "stepOnly"> {
   title?: string;
   /** Column names over the cells, separated by tabs like the cells: `"name\ttype"`. */
   header?: string;
@@ -228,7 +250,9 @@ export interface RecordOptions extends Omit<NodeOptions, "sub"> {
 }
 
 /** A highlighted span of a text: a substring that occurs once, or lines from 1 (`"2"`, `"2-4"`). */
-export type Mark = MemberOptions & ({ text: string } | { lines: string });
+export type Mark = Omit<MemberOptions, "id"> & ({ text: string } | { lines: string });
+/** A mark's options as one object, with one of `text` and `lines`. Its name is its id. */
+export type MarkOptions = Omit<MemberOptions, "id"> & { text?: string; lines?: string };
 
 /** Options of a text node, with its marked spans. */
 export interface TextOptions extends NodeOptions {
@@ -296,13 +320,15 @@ export class Node extends Element {
    * A missing member is reported, and the parent stands in for it.
    */
   element(id: string): Node {
-    const found = this.members.find((m) => m.member?.own === id);
+    const [own] = (this.checkArgs?.(this, "element", [id]) ?? [id]) as [string?];
+    if (own === undefined) return this;
+    const found = this.members.find((m) => m.member?.own === own);
     if (found) return found;
     this.report?.(
       "UNKNOWN_ELEMENT",
       [this],
       () =>
-        `${this.id} has no member "${id}". Members: ${this.members.map((m) => m.member?.own).join(", ") || "none"}.`,
+        `${this.id} has no member "${own}". Members: ${this.members.map((m) => m.member?.own).join(", ") || "none"}.`,
     );
     return this;
   }
@@ -376,7 +402,7 @@ export class Grid extends Element {
   /** A gutter, or the grid's center when no gap follows track `i`, which is reported. */
   private gutter(axis: "x" | "y", i: number, tracks: number): Point {
     if (Number.isInteger(i) && i >= 0 && i < tracks - 1)
-      return new Point({ k: "gutter", grid: this, axis, index: i });
+      return new Point({ k: "gutter", grid: this, axis, index: i }, this.checkArgs);
     const track = axis === "x" ? "column" : "row";
     const count = `${tracks} ${track}${tracks === 1 ? "" : "s"}`;
     const range =
@@ -388,7 +414,7 @@ export class Grid extends Element {
     this.report?.(
       "UNKNOWN_GUTTER",
       [this],
-      () => `${this.id} has ${count}, so gutter${axis.toUpperCase()} ${range}; got ${i}.`,
+      () => `${this.id} has ${count}, so gutter${axis.toUpperCase()} ${range}; got ${String(i)}.`,
     );
     return this.center;
   }
@@ -501,6 +527,8 @@ export class Edge {
   readonly passive: boolean;
   readonly stepOnly: boolean;
   readonly labels: LabelOptions[] = [];
+  /** Set by the scene: the check of a method's arguments. */
+  checkArgs?: MethodCheck;
   /** Whether the id joins the ids of the ends, which are final only at compile time. */
   readonly fromEnds: boolean;
   constructor(from: PointLike, to: PointLike, options: EdgeOptions, internals: EdgeInternals = {}) {
@@ -527,7 +555,11 @@ export class Edge {
   }
   /** Add a label. An edge can have several. */
   label(label: string | LabelOptions): this {
-    this.labels.push(typeof label === "string" ? { text: label } : label);
+    const [checked] = (this.checkArgs?.(this, "label", [label]) ?? [label]) as [
+      (string | LabelOptions)?,
+    ];
+    if (checked !== undefined)
+      this.labels.push(typeof checked === "string" ? { text: checked } : checked);
     return this;
   }
 }

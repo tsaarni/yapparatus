@@ -56,8 +56,7 @@ test("a size group leaves out what is not a shape and reports it with its final 
   assert.deepEqual(out.diagnostics, [
     {
       code: "INVALID_ARGUMENT",
-      message:
-        "equalSize: nodes[1] is row-1, a row, but equalSize takes shapes. The group leaves it out.",
+      message: "equalSize: nodes[1] is row-1, a row, but it takes a shape. nodes[1] is left out.",
       ids: ["row-1"],
       subject: "nodes[1]",
     },
@@ -82,16 +81,16 @@ test("a viaX or viaY that is not a number or a point is reported, and the edge i
     {
       code: "INVALID_ARGUMENT",
       message:
-        "arrow a->b: route viaX is c, but viaX takes a number or a point, such as grid.gutterX(0). The edge is drawn straight.",
-      ids: ["a->b"],
-      subject: "route",
+        "arrow a->b: route.viaX is c, but it takes a number or a point, such as grid.gutterX(0). The default is used.",
+      ids: ["a->b", "c"],
+      subject: "route.viaX",
     },
     {
       code: "INVALID_ARGUMENT",
       message:
-        "arrow b->c: route viaY is a list of 2, but viaY takes a number or a point, such as grid.gutterY(0). The edge is drawn straight.",
+        "arrow b->c: route.viaY is a list of 2, but it takes a number or a point, such as grid.gutterY(0). The default is used.",
       ids: ["b->c"],
-      subject: "route",
+      subject: "route.viaY",
     },
   ]);
   assert.deepEqual(
@@ -121,14 +120,14 @@ test("an edge that ends at a frame is reported and left out", () => {
     {
       code: "INVALID_ARGUMENT",
       message:
-        "arrow: to is group, a frame, but an edge ends at a shape, a grid, an enclosure, a point, or [x, y]. The edge is left out.",
+        "arrow: to is group, a frame, but it takes a point, a shape, a grid, an enclosure, or [x, y]. The edge is left out.",
       ids: ["a", "group"],
       subject: "to",
     },
     {
       code: "INVALID_ARGUMENT",
       message:
-        "line: from is group, a frame, but an edge ends at a shape, a grid, an enclosure, a point, or [x, y]. The edge is left out.",
+        "line: from is group, a frame, but it takes a point, a shape, a grid, an enclosure, or [x, y]. The edge is left out.",
       ids: ["group", "b"],
       subject: "from",
     },

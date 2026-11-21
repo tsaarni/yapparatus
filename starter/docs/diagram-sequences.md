@@ -55,6 +55,9 @@ d.sequence([app, queue, worker], [
 | `{ from, to, label, reply?, async?, id?, role?, category? }` | A message. Its id comes from the label: `get-item`, then `get-item-2` |
 | `{ note, over, id? }` | A note over one participant or between two |
 | `{ fragment, title?, steps, else?, id? }` | `alt`, `opt`, `loop`, `par`, or another operator, around steps |
+| `{ title?, steps }` | A branch in a fragment's `else` list |
+
+A message takes at most one of `reply` and `async`.
 
 | Option | Meaning |
 |---|---|
