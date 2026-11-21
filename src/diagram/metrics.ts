@@ -83,8 +83,11 @@ export const minScale = 0.75;
 /** Boundary title tabs. */
 export const tab = { height: 20, pad: 8 };
 
-/** Sequence fragment tabs: the operator at the top-left, with a slanted corner. */
-export const fragment = { padX: 8, slant: 6, tabHeight: 19, textY: 10 };
+/**
+ * Sequence fragments: the tab with the operator at the top-left, with a slanted corner, and the
+ * margin a frame keeps around the ink of its members.
+ */
+export const fragment = { padX: 8, slant: 6, tabHeight: 19, textY: 10, margin: 8 };
 
 /** Fonts that several steps use. */
 export function fontsOf(m: Metrics) {

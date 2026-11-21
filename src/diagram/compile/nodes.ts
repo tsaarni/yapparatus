@@ -4,7 +4,7 @@
 
 import type { CompiledEnclosure, CompiledFrame, CompiledNode, TextLine } from "../drawing.ts";
 import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "../elements.ts";
-import type { Rect, Vec } from "../geometry.ts";
+import { inflate, type Rect, union, type Vec } from "../geometry.ts";
 import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
 import type { Layout } from "./layout.ts";
 import { type Align, type Content, type Text, textLine } from "./text.ts";
@@ -115,15 +115,16 @@ export function createNodes(
     };
   }
 
-  function compileFrame(frame: Frame): CompiledFrame {
+  function compileFrame(frame: Frame, ink: Rect[]): CompiledFrame {
     const a = evalPoint(toExpr(frame.from));
     const b = evalPoint(toExpr(frame.to));
-    const rect = {
+    const corners = {
       x: Math.min(a.x, b.x),
       y: Math.min(a.y, b.y),
       width: Math.abs(b.x - a.x),
       height: Math.abs(b.y - a.y),
     };
+    const rect = union([corners, ...ink.map((r) => inflate(r, fragment.margin))]) ?? corners;
     const tabOf = frame.options.tab ? fragmentTab(frame.options.tab, rect.x, rect.y) : undefined;
     const titleX = rect.x + (tabOf ? tabOf.rect.width : 0) + fragment.padX;
     return {

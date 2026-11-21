@@ -14,7 +14,15 @@ import {
   type Side,
   toExpr,
 } from "../elements.ts";
-import { anchorOf, boundaryToward, distance, type Rect, round, type Vec } from "../geometry.ts";
+import {
+  anchorOf,
+  boundaryToward,
+  distance,
+  pathLength,
+  type Rect,
+  round,
+  type Vec,
+} from "../geometry.ts";
 import { corner, type Measure, type Metrics } from "../metrics.ts";
 import type { Layout } from "./layout.ts";
 import { type Report, textLine } from "./text.ts";
@@ -36,7 +44,29 @@ function dedupe(points: Vec[]): Vec[] {
   return points.filter((p, i) => i === 0 || distance(p, points[i - 1] as Vec) > 0.01);
 }
 
-/** The edge compiler over a layout: `compileEdge` gives an edge's route, heads, and labels. */
+/**
+ * Cut a line back by `cut` units from one end, along its last leg, so its stroke ends inside the
+ * arrowhead. Points of a curve that the cut passes are dropped.
+ */
+function trim(points: Vec[], at: "start" | "end", cut: number) {
+  if (at === "start") points.reverse();
+  const tip = points[points.length - 1] as Vec;
+  const prev = points[points.length - 2] as Vec;
+  const len = distance(prev, tip) || 1;
+  const end = {
+    x: tip.x - ((tip.x - prev.x) / len) * cut,
+    y: tip.y - ((tip.y - prev.y) / len) * cut,
+  };
+  while (points.length > 2 && distance(points[points.length - 2] as Vec, tip) <= cut)
+    points.splice(points.length - 2, 1);
+  points[points.length - 1] = end;
+  if (at === "start") points.reverse();
+}
+
+/**
+ * The edge compiler over a layout: `compileEdge` gives an edge's compiled form, with its heads and
+ * labels, and its route before the heads cut the line back.
+ */
 export function createEdges(
   m: Metrics,
   measure: Measure,
@@ -46,7 +76,7 @@ export function createEdges(
 ) {
   const { bounds, evalPoint, cellSide } = layout;
 
-  function compileEdge(edge: Edge): CompiledEdge {
+  function compileEdge(edge: Edge): { compiled: CompiledEdge; route: Vec[] } {
     const fromEl = edge.from instanceof Point || Array.isArray(edge.from) ? undefined : edge.from;
     const toEl = edge.to instanceof Point || Array.isArray(edge.to) ? undefined : edge.to;
     let shape: { points: Vec[]; label: Partial<LabelOptions>; radius: number };
@@ -74,15 +104,30 @@ export function createEdges(
     };
     if (points.length < 2) {
       report("DEGENERATE_EDGE", `${edge.id} starts and ends at the same point.`, [edge.id]);
-      return { ...base, labels: [], ariaLabel: edge.id };
+      return { compiled: { ...base, labels: [], ariaLabel: edge.id }, route: points };
     }
     const labels = edge.labels.map((l) => placeLabel(edge, points, { ...shape.label, ...l }));
-    const open = edge.head === "open";
-    if (edge.ends === "->" || edge.ends === "<->") heads.push(arrowHead(points, "end", open));
-    if (edge.ends === "<-" || edge.ends === "<->") heads.push(arrowHead(points, "start", open));
+    const route = [...points];
+    const curved = shape.radius === 0;
+    const tips: Array<"start" | "end"> = [];
+    if (edge.ends === "->" || edge.ends === "<->") tips.push("end");
+    if (edge.ends === "<-" || edge.ends === "<->") tips.push("start");
+    const made = tips.map((at) => arrowHead(route, at, edge.head === "open", curved));
+    const crowded = made.find((h) => h.room < h.needs);
+    if (crowded)
+      report(
+        "HEAD_CROWDED",
+        `${edge.id} has ${round(crowded.room)} units for its arrowhead, which needs ${Math.ceil(crowded.needs)}. Widen the gap.`,
+        [edge.id],
+      );
+    for (const h of made) {
+      heads.push(h.head);
+      trim(points, h.at, h.cut);
+    }
     const text = edge.labels.map((l) => l.text.split("\n").join(" ")).join(", ");
     const ends = `from ${endpointName(edge.from)} to ${endpointName(edge.to)}`;
-    return { ...base, labels, ariaLabel: text ? `${text}, ${ends}` : `Connection ${ends}` };
+    const ariaLabel = text ? `${text}, ${ends}` : `Connection ${ends}`;
+    return { compiled: { ...base, labels, ariaLabel }, route };
   }
 
   function routed(edge: Edge, fromEl?: Element, toEl?: Element): Vec[] {
@@ -195,27 +240,24 @@ export function createEdges(
     return within(toward.x, rect.x, rect.width) ? { ...middle, x: toward.x } : middle;
   }
 
-  function arrowHead(points: Vec[], at: "start" | "end", open = false): Vec[] {
-    const n = points.length;
-    const tip = (at === "end" ? points[n - 1] : points[0]) as Vec;
-    const prev = (at === "end" ? points[n - 2] : points[1]) as Vec;
+  function arrowHead(route: Vec[], at: "start" | "end", open: boolean, curved: boolean) {
+    const n = route.length;
+    const tip = (at === "end" ? route[n - 1] : route[0]) as Vec;
+    const prev = (at === "end" ? route[n - 2] : route[1]) as Vec;
     const len = distance(prev, tip) || 1;
+    const room = curved ? pathLength(route) : len;
+    const needs = m.headLength / 0.6;
     const ux = (tip.x - prev.x) / len;
     const uy = (tip.y - prev.y) / len;
-    const hl = Math.min(m.headLength, len * 0.6);
+    const hl = Math.min(m.headLength, room * 0.6);
     const base = { x: tip.x - ux * hl, y: tip.y - uy * hl };
-    const keep = open ? 0.08 : 0.55;
-    const end = { x: tip.x - ux * hl * keep, y: tip.y - uy * hl * keep };
-    if (at === "end") points[n - 1] = end;
-    else points[0] = end;
     const hw = m.headWidth / 2;
     const left = { x: base.x - uy * hw, y: base.y + ux * hw };
     const right = { x: base.x + uy * hw, y: base.y - ux * hw };
-    if (open) return [left, tip, right];
     const notch = { x: tip.x - ux * hl * 0.72, y: tip.y - uy * hl * 0.72 };
-    return [tip, left, notch, right];
+    const head = open ? [left, tip, right] : [tip, left, notch, right];
+    return { at, head, cut: hl * (open ? 0.08 : 0.55), room, needs };
   }
-
   function placeLabel(edge: Edge, points: Vec[], l: LabelOptions): CompiledLabel {
     const texts = l.text.split("\n");
     const quoted = texts.join(" ");

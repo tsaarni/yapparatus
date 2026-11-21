@@ -13,10 +13,10 @@ import {
   type LegendEntry,
   maxCategories,
 } from "../drawing.ts";
-import { type Diagnostic, slug } from "../elements.ts";
-import { inflate, rounded, union } from "../geometry.ts";
+import { type Diagnostic, Edge, type Element, Frame, slug } from "../elements.ts";
+import { inflate, type Rect, rounded, union, type Vec } from "../geometry.ts";
 import { defaultMetrics, type Measure, type Metrics } from "../metrics.ts";
-import { checkIds, checkPlaced, groupsOf, validate } from "./checks.ts";
+import { checkIds, checkOverlaps, checkPlaced, groupsOf, validate } from "./checks.ts";
 import { createEdges } from "./edges.ts";
 import { CycleError, createLayout } from "./layout.ts";
 import { createNodes } from "./nodes.ts";
@@ -56,12 +56,15 @@ export function compile(
   let enclosures: CompiledEnclosure[] = [];
   let edges: CompiledEdge[] = [];
   let frames: CompiledFrame[] = [];
+  let routes: Vec[][] = [];
   try {
     nodes = paintOrder(scene.nodes.map((node) => compileNode(node, layout.bounds(node))));
     for (const s of scene.stacks) layout.bounds(s);
     enclosures = scene.enclosures.map(compileEnclosure);
-    edges = scene.edges.map(compileEdge);
-    frames = scene.frames.map(compileFrame);
+    const compiledEdges = scene.edges.map(compileEdge);
+    edges = compiledEdges.map((e) => e.compiled);
+    routes = compiledEdges.map((e) => e.route);
+    frames = compileFrames(scene, nodes, edges, compileFrame, layout.bounds);
   } catch (error) {
     if (error instanceof CycleError) {
       report(
@@ -112,7 +115,45 @@ export function compile(
   }
 
   validate(scene, nodes, edges, enclosures, report);
+  checkOverlaps(edges, routes, report);
   return finish(true);
+}
+
+/**
+ * Compile the frames, each after the frames it holds, so that a frame covers the ink of its
+ * members: edge points, heads, and labels, node rectangles and labels, and inner frames.
+ */
+function compileFrames(
+  scene: DiagramBuilder,
+  nodes: CompiledNode[],
+  edges: CompiledEdge[],
+  compileFrame: (frame: Frame, ink: Rect[]) => CompiledFrame,
+  bounds: (el: Element) => Rect,
+): CompiledFrame[] {
+  const nodeById = new Map(nodes.map((n) => [n.id, n]));
+  const edgeOf = new Map(scene.edges.map((e, i) => [e, edges[i]]));
+  const done = new Map<Frame, CompiledFrame>();
+  const point = (p: Vec): Rect => ({ ...p, width: 0, height: 0 });
+  const inkOf = (member: Element | Edge | Frame): Rect[] => {
+    if (member instanceof Frame) return [frameOf(member).rect];
+    if (member instanceof Edge) {
+      const e = edgeOf.get(member);
+      return e
+        ? [...[...e.points, ...e.heads.flat()].map(point), ...e.labels.map((l) => l.rect)]
+        : [];
+    }
+    const n = nodeById.get(member.id);
+    if (!n) return [bounds(member)];
+    return n.labelRect ? [n.rect, n.labelRect] : [n.rect];
+  };
+  const frameOf = (frame: Frame): CompiledFrame => {
+    const known = done.get(frame);
+    if (known) return known;
+    const compiled = compileFrame(frame, (scene.groups.get(frame) ?? []).flatMap(inkOf));
+    done.set(frame, compiled);
+    return compiled;
+  };
+  return scene.frames.map(frameOf);
 }
 
 /** Nodes in paint order: passive decorations first, then the rest, each in creation order. */

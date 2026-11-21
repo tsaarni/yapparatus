@@ -143,11 +143,19 @@ export const diagnosticCodes = {
   },
   RULER_CROWDED: { severity: "warning", meaning: "A record's column labels run into each other." },
   LABEL_CROWDED: { severity: "warning", meaning: "An edge label has too little room." },
+  HEAD_CROWDED: {
+    severity: "warning",
+    meaning: "An arrowhead has too little room, so it is drawn smaller.",
+  },
   LABEL_OVERLAP: { severity: "warning", meaning: "A label overlaps another label or an element." },
   NODE_OVERLAP: { severity: "warning", meaning: "Two elements shown together overlap." },
   EDGE_NODE_INTERSECTION: {
     severity: "warning",
     meaning: "An edge crosses an element, or runs through one of its own ends.",
+  },
+  EDGE_OVERLAP: {
+    severity: "warning",
+    meaning: "Two edges run on top of each other, other than where they fork or merge.",
   },
   ENCLOSURE_TITLE_CROSSED: {
     severity: "warning",

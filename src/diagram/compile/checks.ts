@@ -7,11 +7,15 @@ import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } fro
 import { type Element, Enclosure, elementOf, Node, type PointLike, Stack } from "../elements.ts";
 import {
   contains,
+  distance,
   inflate,
   overlap,
+  pathLength,
+  pointAlong,
   type Rect,
   round,
   segmentHitsRect,
+  union,
   type Vec,
 } from "../geometry.ts";
 import type { Report } from "./text.ts";
@@ -116,7 +120,7 @@ export function validate(
     const self = elementOf(edge.from) !== undefined && elementOf(edge.from) === elementOf(edge.to);
     const last = compiled.points.length - 2;
     for (const node of nodes) {
-      if (node.shape === "text" || node.shape === "mark" || node.passive) continue;
+      if (node.shape === "mark" || node.passive) continue;
       if (compiled.stepOnly && node.stepOnly) continue;
       if (node.parent !== undefined) {
         const fromSibling = [edge.from, edge.to].some((p) => {
@@ -216,6 +220,109 @@ export function validate(
         );
     }
   });
+}
+
+/** How far apart two lines may be and still count as one. */
+const collinear = 0.5;
+/** The longest stretch two edges may share before they read as one line. */
+const sharedLimit = 4;
+
+/**
+ * Report edges that share a stretch of line, compared on their routes before arrowheads cut them
+ * back. A fork or a merge reads well: shared from the start or to the end, with both going on.
+ */
+export function checkOverlaps(edges: CompiledEdge[], routes: Vec[][], report: Report) {
+  const boxes = routes.map((route) =>
+    inflate(union(route.map((p) => ({ ...p, width: 0, height: 0 }))) ?? zero, collinear),
+  );
+  for (let i = 0; i < edges.length; i++)
+    for (let j = i + 1; j < edges.length; j++) {
+      const a = edges[i] as CompiledEdge;
+      const b = edges[j] as CompiledEdge;
+      if (a.passive || b.passive || (a.stepOnly && b.stepOnly)) continue;
+      if (!touching(boxes[i] ?? zero, boxes[j] ?? zero)) continue;
+      const shared = sharedStretch(routes[i] ?? [], routes[j] ?? []);
+      if (shared > sharedLimit)
+        report(
+          "EDGE_OVERLAP",
+          `${a.id} and ${b.id} run on top of each other for ${round(shared)} units, so they read as one line. Give one a bend, attach one at a port(), or draw one edge with ends: "<->".`,
+          [a.id, b.id],
+        );
+    }
+}
+
+/** The longest stretch two routes share that is neither a fork nor a merge, or 0. */
+function sharedStretch(a: Vec[], b: Vec[]): number {
+  if (a.length < 2 || b.length < 2) return 0;
+  const stretches: Array<{ length: number; onA: number[]; onB: number[] }> = [];
+  let startA = 0;
+  for (let i = 0; i < a.length - 1; i++) {
+    const p = a[i] as Vec;
+    const q = a[i + 1] as Vec;
+    const legA = distance(p, q);
+    const ux = (q.x - p.x) / (legA || 1);
+    const uy = (q.y - p.y) / (legA || 1);
+    const across = (v: Vec) => Math.abs((v.x - p.x) * uy - (v.y - p.y) * ux);
+    const along = (v: Vec) => (v.x - p.x) * ux + (v.y - p.y) * uy;
+    let startB = 0;
+    for (let j = 0; j < b.length - 1; j++) {
+      const r = b[j] as Vec;
+      const t = b[j + 1] as Vec;
+      const legB = distance(r, t);
+      if (legA > 0 && legB > 0 && across(r) <= collinear && across(t) <= collinear) {
+        const lo = Math.max(0, Math.min(along(r), along(t)));
+        const hi = Math.min(legA, Math.max(along(r), along(t)));
+        const onB = [startB + Math.abs(lo - along(r)), startB + Math.abs(hi - along(r))];
+        if (hi - lo > sharedLimit)
+          stretches.push({ length: hi - lo, onA: [startA + lo, startA + hi], onB });
+      }
+      startB += legB;
+    }
+    startA += legA;
+  }
+  if (stretches.length === 0) return 0;
+  const lengthA = pathLength(a);
+  const lengthB = pathLength(b);
+  const parts = (common: number) =>
+    common < Math.min(lengthA, lengthB) - collinear ? common + collinear : 0;
+  const fork = parts(commonStart(a, b));
+  const merge = parts(commonStart([...a].reverse(), [...b].reverse()));
+  const shared = stretches.filter(
+    ({ onA, onB }) =>
+      !(Math.max(...onA, ...onB) <= fork) &&
+      !(Math.min(...onA) >= lengthA - merge && Math.min(...onB) >= lengthB - merge),
+  );
+  return Math.max(0, ...shared.map((x) => x.length));
+}
+
+/** An empty rectangle at the origin, for a route with no points. */
+const zero: Rect = { x: 0, y: 0, width: 0, height: 0 };
+
+/** Whether two rectangles meet, edges included. */
+function touching(a: Rect, b: Rect): boolean {
+  return (
+    a.x <= b.x + b.width && b.x <= a.x + a.width && a.y <= b.y + b.height && b.y <= a.y + a.height
+  );
+}
+
+/** How far two routes run together from their first points, in the same direction. */
+function commonStart(a: Vec[], b: Vec[]): number {
+  if (distance(a[0] as Vec, b[0] as Vec) > collinear) return 0;
+  const end = Math.min(pathLength(a), pathLength(b));
+  const cuts = new Set<number>([end]);
+  for (const route of [a, b]) {
+    let at = 0;
+    for (let i = 0; i < route.length - 1; i++) {
+      at += distance(route[i] as Vec, route[i + 1] as Vec);
+      if (at < end) cuts.add(at);
+    }
+  }
+  let common = 0;
+  for (const at of [...cuts].sort((x, y) => x - y)) {
+    if (distance(pointAlong(a, at), pointAlong(b, at)) > collinear) return common;
+    common = at;
+  }
+  return common;
 }
 
 /** The direct members of every container, by id. Steps expand them recursively. */

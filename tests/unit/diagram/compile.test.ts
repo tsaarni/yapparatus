@@ -979,3 +979,143 @@ test("a run of spaces is measured as one space, as SVG text draws it", () => {
   };
   assert.equal(size("Read  model   cache"), size("Read model cache"));
 });
+
+test("an edge through free text is reported; an edge that ends at a text is not", () => {
+  const d = new DiagramBuilder();
+  const a = d.box("A");
+  const heading = d.text("Heading");
+  const b = d.box("B");
+  d.row([a, heading, b]);
+  const through = d.arrow(a, b);
+  const note = d.text("Note");
+  d.place(note, { below: a });
+  const toText = d.arrow(a, note);
+  const out = compile(d, measure);
+  const hits = out.diagnostics.filter((x) => x.code === "EDGE_NODE_INTERSECTION");
+  assert.deepEqual(
+    hits.map((x) => x.ids),
+    [[through.id, heading.id]],
+  );
+  assert.ok(!hits.some((x) => x.ids.includes(toText.id)));
+});
+
+/** The length of a compiled head: from its tip to the middle of its base. */
+function headLength(head: Array<{ x: number; y: number }>): number {
+  const [tip, left, , right] = head;
+  assert.ok(tip && left && right);
+  return Math.hypot(tip.x - (left.x + right.x) / 2, tip.y - (left.y + right.y) / 2);
+}
+
+test("a head with too little room shrinks and is reported; a curve carries a full head", () => {
+  const d = new DiagramBuilder();
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b], { gap: 4 });
+  const close = d.arrow(a, b);
+  const c = d.box("C");
+  const e = d.box("E");
+  d.place(d.row([c, e]), { below: a });
+  const curved = d.arrow(c, e, { bend: 20 });
+  const out = compile(d, measure);
+  const crowded = out.diagnostics.filter((x) => x.code === "HEAD_CROWDED");
+  assert.deepEqual(
+    crowded.map((x) => [x.ids, x.message]),
+    [[[close.id], "a->b has 4 units for its arrowhead, which needs 17. Widen the gap."]],
+  );
+  const head = (id: string) => out.edges.find((x) => x.id === id)?.heads[0] ?? [];
+  assert.ok(Math.abs(headLength(head(close.id)) - 2.4) < 0.01);
+  assert.ok(Math.abs(headLength(head(curved.id)) - 10) < 0.01);
+});
+
+test("a fragment widens to cover its members, and an outer one covers the inner", () => {
+  const d = new DiagramBuilder();
+  const a = d.box("A");
+  const b = d.box("B");
+  d.sequence(
+    [a, b],
+    [
+      {
+        fragment: "loop",
+        id: "outer",
+        steps: [
+          {
+            fragment: "opt",
+            id: "inner",
+            steps: [{ from: b, to: b, label: "a long self-message label", id: "self" }],
+          },
+        ],
+      },
+    ],
+  );
+  const out = compile(d, measure);
+  assert.deepEqual(codes(out), []);
+  const frame = (id: string) => out.frames.find((f) => f.id === id)?.rect;
+  const label = out.edges.find((x) => x.id === "self")?.labels[0]?.rect;
+  const inner = frame("inner");
+  const outer = frame("outer");
+  assert.ok(label && inner && outer);
+  assert.equal(inner.x + inner.width, label.x + label.width + 8);
+  assert.equal(outer.x + outer.width, inner.x + inner.width + 8);
+  assert.ok(outer.x <= inner.x && outer.y <= inner.y);
+  assert.ok(outer.y + outer.height >= inner.y + inner.height);
+});
+
+/** The pairs of edge ids that EDGE_OVERLAP reports for edges among a row of boxes S1, S2, T, U. */
+function overlapsIn(edges: (d: DiagramBuilder, s1: Node, s2: Node, t: Node, u: Node) => void) {
+  const d = new DiagramBuilder();
+  const boxes = ["S1", "S2", "T", "U"].map((label) => d.box(label));
+  const [s1, s2, t, u] = boxes;
+  assert.ok(s1 && s2 && t && u);
+  d.row(boxes);
+  edges(d, s1, s2, t, u);
+  const out = compile(d, measure);
+  const overlaps = out.diagnostics.filter((x) => x.code === "EDGE_OVERLAP");
+  if (overlaps[0])
+    assert.match(overlaps[0].message, /bend.*port\(\).*ends: "<->"/, "the message names the fixes");
+  return overlaps.map((x) => x.ids);
+}
+
+test("edges on top of each other are reported", () => {
+  assert.deepEqual(
+    overlapsIn((d, s1, s2) => {
+      d.arrow(s1, s2);
+      d.arrow(s2, s1);
+    }),
+    [["s1->s2", "s2->s1"]],
+  );
+  assert.deepEqual(
+    overlapsIn((d, s1, s2, t, u) => {
+      const route = { viaY: s1.bottom.offset(0, 30) };
+      d.arrow(s1.bottom, t.bottom, { route, id: "first" });
+      d.arrow(s2.bottom, u.bottom, { route, id: "second" });
+    }),
+    [["first", "second"]],
+  );
+  assert.deepEqual(
+    overlapsIn((d, s1, s2) => {
+      d.arrow(s1, s2, { id: "one" });
+      d.arrow(s1, s2, { id: "again" });
+    }),
+    [["one", "again"]],
+    "a route that lies wholly on another is neither a fork nor a merge",
+  );
+});
+
+test("edges that merge into one channel or fork from one are not reported", () => {
+  assert.deepEqual(
+    overlapsIn((d, s1, s2, t) => {
+      const route = { viaY: s1.bottom.offset(0, 30) };
+      d.arrow(s1.bottom, t.bottom, { route });
+      d.arrow(s2.bottom, t.bottom, { route });
+    }),
+    [],
+  );
+  assert.deepEqual(
+    overlapsIn((d, s1, s2, t) => {
+      const route = { viaY: s1.bottom.offset(0, 30) };
+      d.arrow(t.bottom, s1.bottom, { route });
+      d.arrow(t.bottom, s2.bottom, { route });
+    }),
+    [],
+  );
+});

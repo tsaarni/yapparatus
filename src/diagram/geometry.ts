@@ -176,6 +176,25 @@ export function distance(a: Vec, b: Vec): number {
   return Math.hypot(b.x - a.x, b.y - a.y);
 }
 
+/** The length of a polyline. */
+export function pathLength(points: Vec[]): number {
+  return points.slice(1).reduce((sum, p, i) => sum + distance(points[i] as Vec, p), 0);
+}
+
+/** The point at a distance along a polyline, or its last point past the end. */
+export function pointAlong(points: Vec[], at: number): Vec {
+  let left = at;
+  for (let i = 0; i < points.length - 1; i++) {
+    const a = points[i] as Vec;
+    const b = points[i + 1] as Vec;
+    const len = distance(a, b);
+    if (left <= len && len > 0)
+      return { x: a.x + ((b.x - a.x) * left) / len, y: a.y + ((b.y - a.y) * left) / len };
+    left -= len;
+  }
+  return points[points.length - 1] as Vec;
+}
+
 /** Round to hundredths, the precision a compiled drawing keeps. */
 export function round(n: number): number {
   return Math.round(n * 100) / 100;

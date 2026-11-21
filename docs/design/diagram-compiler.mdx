@@ -310,6 +310,8 @@ In the running example, "request" sits above the middle of its edge, centered at
 
 A head points along the last straight piece, with its tip on the end point. The line is shortened into the head, so the stroke does not show past the tip. In the running example, the line of `client->api` ends at x = 186.5, and the tip of its head is at x = 192.
 
+The piece that carries a head is the last leg of a route with corners, and the whole curve of a bent edge. The compiler samples a curve into short legs, and the head points along the last of them. A head is 10 units long and needs a piece of at least 17 units, because it takes at most 60% of the piece. On a shorter piece, the head shrinks to fit, and the compiler reports `HEAD_CROWDED` with the room the head has and the room it needs.
+
 ## Records and marked text
 
 The cells of a record and the marks of a text are elements of their own, so edges, steps, and links treat them like any other element. Their rectangles come from their parent's rectangle. <Ref to="dc-record" /> shows a record; the [structures reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagram-structures.md) lists the forms.
@@ -336,6 +338,8 @@ A mark highlights words or lines of a text. The compiler finds the marked words 
 
 A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A bar means that a participant is handling a call, so only a receiver gets one. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar, and an async message gets none. Sending opens no bar: a participant that only sends has a plain lifeline, and its messages start and end on it. A self-message on a participant with no bar starts from the lifeline and opens only its own short bar. Lifelines and bars are drawn, but the checks and the steps leave them out.
 
+A fragment is a frame whose corners the sequence sets from its participants, before anything is measured, so its members can reach past them: a self-message at the rightmost participant has its label to the right of that participant. The scene lists the members of each fragment: its messages, its notes, and the fragments inside it. The compiler compiles frames after nodes and edges, and a frame with members covers their ink: edge points, heads, and labels, node rectangles and labels, and inner frames. Where a member reaches past the corners, the frame keeps a margin of 8 units around it. Each frame compiles after the frames it holds, so an outer frame covers an inner frame that was widened. A frame that an author draws with `d.frame` has no members and lies exactly between its corners.
+
 ## Roles and categories
 
 The compiler gives every element a role and at most one category. The web app and the picture turn them into colors and strokes, as [the components page](components#roles-and-categories) shows.
@@ -356,8 +360,8 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 | Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT` |
 | Settle ids | `DUPLICATE_ID`, `UNPLACED` |
 | Measure, size, and place | `TEXT_OVERFLOW`, `FIXED_SIZE_IN_GROUP`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
-| Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED` |
-| Check | `NODE_OVERLAP`, `EDGE_NODE_INTERSECTION`, `LABEL_OVERLAP`, `ENCLOSURE_TITLE_CROSSED`, `ENCLOSURE_INTRUSION`, `ACCENT_OVERUSED` |
+| Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED`, `HEAD_CROWDED` |
+| Check | `NODE_OVERLAP`, `EDGE_NODE_INTERSECTION`, `EDGE_OVERLAP`, `LABEL_OVERLAP`, `ENCLOSURE_TITLE_CROSSED`, `ENCLOSURE_INTRUSION`, `ACCENT_OVERUSED` |
 | Finish | `TOO_MANY_CATEGORIES`, `DUPLICATE_ID`, `DIAGRAM_FAILED` |
 | Check steps | `UNKNOWN_ELEMENT`, `DUPLICATE_ID`, `STEP_ONLY_UNUSED`, `NODE_OVERLAP`, `BUILD_WITHOUT_STEPS`, `DIAGRAM_SCROLLS` |
 
@@ -367,7 +371,9 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 
 The collision checks run on the exact geometry, before rounding. Two rectangles overlap only when they share more than half a unit in both directions, and an edge hits a shape only when it passes more than one unit inside it. Shapes that touch, and an edge that ends on an outline, are therefore not reported. Edges also keep eight units away from enclosure titles.
 
-The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and a self-loop or a bent edge is not checked against its ends.
+The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. Free text is checked like any shape, because it has no fill and an edge through it shows through the words. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and a self-loop or a bent edge is not checked against its ends.
+
+Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel, and an edge that lies wholly on another are reported. The fixes are a `bend`, a `port()`, or one edge with `ends: "<->"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
 
 ### Steps and width
 

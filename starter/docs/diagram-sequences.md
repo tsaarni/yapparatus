@@ -45,7 +45,7 @@ d.sequence([app, queue, worker], [
 ```
 
 - `async: true` sends without waiting: an open arrowhead and no bar.
-- A message to the sender itself draws a loop and a short bar of its own.
+- A message to the sender itself draws a loop and a short bar of its own. A fragment grows to cover what it holds, such as the label of a self-message.
 - `numbered` numbers the messages. `id` on a fragment lets one step focus all its messages: `<Step focus="drain">`.
 
 ## Reference

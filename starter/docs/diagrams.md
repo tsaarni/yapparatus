@@ -115,7 +115,7 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 
 - **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
 - **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is `start-1`, `end-2`, and so on. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
-- **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element.
+- **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element. Text has no fill, so an edge through it is reported like an edge through a shape.
 
 Options:
 
@@ -331,6 +331,8 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
 | `BEND_WITH_ROUTE` | error | An edge has both `bend` and `route`. Keep one |
 | `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape. An edge that runs through its own end needs a straight route or another route form |
+| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one a `bend`, attach one at a `port()`, or draw one edge with `ends: "<->"`. Edges that fork from one point or merge into one point may share a stretch |
+| `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Widen the gap |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
