@@ -23,8 +23,6 @@ import type { ReportedDiagnostic, UncheckedPage } from "../protocol/rest-api.ts"
 
 const log = createLogger("diagnostics");
 
-/** How long an open browser needs after a file change to render the page and report. */
-const browserDelay = 1500;
 /**
  * How long an error must stay before it can wake the agent. Saving a file
  * half-written, or an edit across two files, shows errors that are gone a moment later.
@@ -69,7 +67,6 @@ export class DiagnosticStore {
   private settleTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly startedAt = Date.now();
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private lastFileChange = 0;
   private checking = false;
   /** When the last check of the sources started. */
   private checkStarted = 0;
@@ -171,7 +168,6 @@ export class DiagnosticStore {
 
   /** A file changed: the lists may differ, and the source is checked again shortly. */
   fileChanged() {
-    this.lastFileChange = Date.now();
     this.settleErrors();
     this.options.changed();
     clearTimeout(this.timer);
@@ -181,17 +177,14 @@ export class DiagnosticStore {
     }, 150);
   }
 
-  /**
-   * Whether the checks for the latest file changes are done: the server's own checks have run,
-   * and an open browser has had time to render the changed pages and report.
-   */
+  /** Whether the server's checks of the latest file changes are done. Browsers report later. */
   settled(): boolean {
-    return !this.timer && !this.checking && Date.now() - this.lastFileChange > browserDelay;
+    return !this.timer && !this.checking;
   }
 
   /**
-   * Wait a few seconds at most for the checks of recent edits. An agent often reads before the
-   * watcher reports its edit, so this finds such an edit itself and waits for its checks.
+   * Wait for the server's checks of recent edits. An agent often reads before the watcher
+   * reports its edit, so this finds such an edit itself and waits for its checks.
    */
   async settle() {
     if (this.savedSinceCheck()) this.fileChanged();

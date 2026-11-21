@@ -106,7 +106,7 @@ The agent reads diagnostics in the prompt of a wait, in the result of `checkDocu
 
 `new` marks an error the agent has not been given. The agent links the address in its reply. New errors come first, and the unchecked pages follow.
 
-[`checkDocument`](/agent-library#checkdocument) first checks again any file saved after the last check started, because the file watcher reports an edit a moment late. It then waits a few seconds at most, so an open web app can report. The errors it returns count as given.
+[`checkDocument`](/agent-library#checkdocument) first checks again any file saved after the last check started, because the file watcher reports an edit a moment late. It then waits until the server has checked the edits, and does not wait for a browser: a browser shows one page, often not the edited one. Pages no browser has rendered since they changed are listed as unchecked, and what a browser finds later ends the agent's next wait. The errors it returns count as given.
 
 [`waitForMessage`](/agent-library#waitformessage) returns reader messages and new errors. An error ends a wait when it has lasted 2 s and has not been given. Warnings never end a wait. An error that is fixed and comes back is new again.
 
@@ -117,5 +117,7 @@ In dev mode, the web app shows diagnostics under each diagram and chart, in plac
 ## Design decisions
 
 **Reports are tied to a revision and only add.** A report that replaced earlier findings would need the web app to know when a problem is fixed, and reports from several tabs would overwrite each other. With revisions, a report never has to be taken back.
+
+**`checkDocument` does not wait for browsers.** The server finds almost every problem itself. An open browser shows one page, often not the edited one, so a fixed wait would mostly wait for nothing, and the unchecked list already says what no browser has confirmed.
 
 **An error must last 2 s before it ends the agent's wait.** Otherwise the agent would spend a turn on each error that exists only while a file is half-written or an edit across two files is in progress.
