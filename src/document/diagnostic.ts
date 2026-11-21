@@ -132,6 +132,10 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A step or element() names an element the diagram does not have.",
   },
+  UNKNOWN_GUTTER: {
+    severity: "error",
+    meaning: "A gutter point names a grid track with no gap after it.",
+  },
   STEP_NOT_TEXT: {
     severity: "error",
     meaning: "A step's id or focus is computed; the compiler reads only plain text.",

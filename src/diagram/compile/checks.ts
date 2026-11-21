@@ -4,7 +4,7 @@
 
 import type { DiagramBuilder } from "../builder.ts";
 import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "../drawing.ts";
-import { type Element, Enclosure, elementOf, Node, type PointLike, Stack } from "../elements.ts";
+import { type Element, Enclosure, elementOf, Grid, Node, type PointLike } from "../elements.ts";
 import {
   contains,
   distance,
@@ -38,7 +38,7 @@ export function checkIds(scene: DiagramBuilder, report: Report) {
     }
   };
   const members = scene.nodes.filter((n) => n.member);
-  settle([...scene.nodes.filter((n) => !n.member), ...scene.stacks, ...scene.enclosures]);
+  settle([...scene.nodes.filter((n) => !n.member), ...scene.grids, ...scene.enclosures]);
   for (const m of members) if (m.member) m.id = `${m.member.parent.id}.${m.member.own}`;
   settle(members.map((m) => ({ id: m.id, explicitId: true })));
   for (const edge of scene.edges) edge.deriveId();
@@ -47,7 +47,7 @@ export function checkIds(scene: DiagramBuilder, report: Report) {
 
 /** Every element needs a position owner; all but the first without one are reported. */
 export function checkPlaced(scene: DiagramBuilder, report: Report) {
-  const roots = [...scene.nodes, ...scene.stacks].filter(
+  const roots = [...scene.nodes, ...scene.grids].filter(
     (el) => !scene.owner.has(el) && !(el instanceof Node && el.member),
   );
   const firstRoot = roots[0];
@@ -332,16 +332,16 @@ export function groupsOf(scene: DiagramBuilder): Record<string, string[]> {
     groups[id] = [...(groups[id] ?? []), ...members.map((m) => m.id)];
   };
   for (const e of scene.enclosures) add(e.id, e.members);
-  for (const s of scene.stacks) add(s.id, s.children);
+  for (const s of scene.grids) add(s.id, s.children);
   for (const [container, members] of scene.groups) add(container.id, members);
   for (const node of scene.nodes) if (node.members.length) add(node.id, node.members);
   return groups;
 }
 
-/** The ids of an enclosure's members, with stacks and nested enclosures expanded. */
+/** The ids of an enclosure's members, with grids and nested enclosures expanded. */
 function memberIds(e: Enclosure): string[] {
   const walk = (el: Element): string[] =>
-    el instanceof Stack
+    el instanceof Grid
       ? [el.id, ...el.children.flatMap(walk)]
       : el instanceof Enclosure
         ? [el.id, ...el.members.flatMap(walk)]

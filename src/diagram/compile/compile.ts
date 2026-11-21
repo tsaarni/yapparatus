@@ -59,7 +59,7 @@ export function compile(
   let routes: Vec[][] = [];
   try {
     nodes = paintOrder(scene.nodes.map((node) => compileNode(node, layout.bounds(node))));
-    for (const s of scene.stacks) layout.bounds(s);
+    for (const s of scene.grids) layout.bounds(s);
     enclosures = scene.enclosures.map(compileEnclosure);
     const compiledEdges = scene.edges.map(compileEdge);
     edges = compiledEdges.map((e) => e.compiled);
@@ -179,7 +179,7 @@ function legendOf(
   }));
   const taken = new Set([
     ...elements.map((p) => p.id),
-    ...scene.stacks.map((s) => s.id),
+    ...scene.grids.map((s) => s.id),
     ...Object.keys(groups),
   ]);
   const categoryGroups: Record<string, string[]> = {};

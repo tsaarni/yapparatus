@@ -88,14 +88,14 @@ export const Diagram: { ({ drawing, id, caption, description, build, children, d
 
 export class DiagramBuilder {
   readonly nodes: Node[] = [];
-  readonly stacks: Stack[] = [];
+  readonly grids: Grid[] = [];
   readonly enclosures: Enclosure[] = [];
   readonly edges: Edge[] = [];
   readonly frames: Frame[] = [];
-  readonly owner = new Map<Element, Stack | Placement>();
+  readonly owner = new Map<Element, Grid | Placement>();
   readonly sizeGroups: Array<{ members: Node[]; width: boolean; height: boolean }> = [];
   /**
-   * Elements a step focuses together with a container, beyond what it encloses or stacks:
+   * Elements a step focuses together with a container, beyond what it encloses or lays out:
    * a sequence's messages and notes, a fragment's messages.
    */
   readonly groups = new Map<Element | Frame, Array<Element | Edge | Frame>>();
@@ -207,11 +207,23 @@ export class DiagramBuilder {
     return frame;
   }
 
-  row(children: Element[], options: StackOptions = {}): Stack {
-    return this.stack("row", children, options);
+  /**
+   * Cells on shared tracks: each column as wide as its widest cell, each row as tall as its
+   * tallest. `null` is an empty cell. Gutters between the tracks carry edges.
+   */
+  grid(rows: Array<Array<Element | null>>, options: GridOptions = {}): Grid {
+    return this.layout("grid", rows, options);
   }
-  column(children: Element[], options: StackOptions = {}): Stack {
-    return this.stack("column", children, options);
+  /** Left to right: a grid of one row. `align` places the children vertically. */
+  row(children: Element[], options: LineOptions = {}): Grid {
+    const { gap = defaultGap.x, ...rest } = options;
+    return this.layout("row", [children], { ...rest, gap: [gap, defaultGap.y] });
+  }
+  /** Top to bottom: a grid of one column. `align` places the children horizontally. */
+  column(children: Element[], options: LineOptions = {}): Grid {
+    const { gap = defaultGap.y, ...rest } = options;
+    const rows = children.map((child) => [child]);
+    return this.layout("column", rows, { ...rest, gap: [defaultGap.x, gap] });
   }
 
   place(el: Element, options: PlaceOptions): Element {
@@ -233,7 +245,7 @@ export class DiagramBuilder {
             kind: "relative",
             dir,
             ref,
-            gap: options.gap ?? (dir === "below" || dir === "above" ? 64 : 88),
+            gap: options.gap ?? (dir === "below" || dir === "above" ? defaultGap.y : defaultGap.x),
             align: options.align ?? "center",
           }
         : { kind: "at", at: options.at ?? [0, 0], anchor: options.anchor ?? "center" };
@@ -300,7 +312,7 @@ export class DiagramBuilder {
       this.nodes.length +
       this.edges.length +
       this.frames.length +
-      this.stacks.length +
+      this.grids.length +
       this.enclosures.length;
     if (count >= maxElements) throw new Error(`The drawing has more than ${maxElements} elements.`);
   }
@@ -311,14 +323,15 @@ export class DiagramBuilder {
     this.noteCategory(node.options.category);
     return node;
   }
-  private stack(dir: "row" | "column", children: Element[], options: StackOptions): Stack {
+  private layout(kind: Grid["kind"], rows: Array<Array<Element | null>>, options: GridOptions) {
     this.grow();
-    const s = new Stack(dir, children, options, this.stacks.length + 1);
-    this.stacks.push(s);
-    for (const child of children) this.own(child, s, `${dir}(${s.id})`);
-    return s;
+    const g = new Grid(kind, rows, options, this.grids.length + 1);
+    g.report = (code, message, ids) => this.report(code, message, ids);
+    this.grids.push(g);
+    for (const child of g.children) this.own(child, g, `${kind}(${g.id})`);
+    return g;
   }
-  private own(el: Element, owner: Stack | Placement, by: string) {
+  private own(el: Element, owner: Grid | Placement, by: string) {
     if (el instanceof Enclosure) {
       this.report(
         "ENCLOSURE_PLACEMENT",
@@ -329,7 +342,7 @@ export class DiagramBuilder {
     }
     const existing = this.owner.get(el);
     if (existing) {
-      const prior = existing instanceof Stack ? `${existing.direction}(${existing.id})` : "place()";
+      const prior = existing instanceof Grid ? `${existing.kind}(${existing.id})` : "place()";
       this.report(
         "CONFLICTING_PLACEMENT",
         `${el.id} is positioned by both ${prior} and ${by}. Each element has one position owner.`,
@@ -552,7 +565,7 @@ export interface PlaceOptions {
   above?: Element;
   leftOf?: Element;
   rightOf?: Element;
-  /** Boundary-to-boundary distance. Default: 64 vertically, 88 horizontally. */
+  /** Boundary-to-boundary distance. Default: 64 vertically, 88 horizontally, as in a grid. */
   gap?: number;
   /** Cross-axis alignment with the reference. Default: center. */
   align?: Align;

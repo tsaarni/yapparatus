@@ -152,13 +152,13 @@ The draw program receives an object `d` whose functions record elements and arra
   ], { title: "Scene", header: "id\tkind\tposition", mono: true, id: "scene" })
 }} />
 
-A scene holds at most 2,000 elements, counting nodes with their cells and marks, edges, frames, rows and columns, and enclosures. The checks compare elements in pairs, so a larger scene would take minutes to check. The call that would create one more element throws, which is `DRAW_FAILED`.
+A scene holds at most 2,000 elements, counting nodes with their cells and marks, edges, frames, enclosures, and grids, which include rows and columns. The checks compare elements in pairs, so a larger scene would take minutes to check. The call that would create one more element throws, which is `DRAW_FAILED`.
 
 An element in the scene has no coordinates. A point on it, such as `api.bottom`, or a point computed from others, such as `api.bottom.offset(0, 20)`, is a description that the layout evaluates once the positions it names are known. The order of the statements therefore does not matter.
 
-Each element gets its position from exactly one source: the row or column it is in, or the `place()` call that places it. A second source is `CONFLICTING_PLACEMENT`, and the first one stays in force. Before layout, the compiler looks for elements with no source. The first one goes to the origin, and every other one is reported as `UNPLACED`. In the running example, only the row has no source, so it is at the origin.
+Each element gets its position from exactly one source: the grid it is in, or the `place()` call that places it. A second source is `CONFLICTING_PLACEMENT`, and the first one stays in force. Before layout, the compiler looks for elements with no source. The first one goes to the origin, and every other one is reported as `UNPLACED`. In the running example, only the row has no source, so it is at the origin.
 
-Rows and columns can be placed like any element, so they nest.
+A grid holds rows of cells, and each cell is an element or empty. A row is a grid of one row, and a column is a grid of one column, so one layout rule places all three. Grids can be placed like any element, so they nest.
 
 ## Ids
 
@@ -169,7 +169,7 @@ Every element has an id. The page uses it as the element's address, `/page#figur
 | Element | Derived id | Example |
 |---|---|---|
 | A shape with a label | The label as a slug: lowercase, with hyphens for everything else | `"Auth service"` → `auth-service` |
-| A row or column | The direction and its count among rows and columns | `row-1`, `column-2` |
+| A grid, row, or column | The call that made it and its count among grids, rows, and columns | `row-1`, `column-2`, `grid-3` |
 | An enclosure | Its title as a slug, or `boundary` and its count | `backend`, `boundary-1` |
 | An edge | The ids of its two ends, joined by `->` | `client->api` |
 | A cell or a mark | The parent's id, a dot, and its own name as a slug | `users.team-id` |
@@ -193,13 +193,27 @@ The layout answers three questions about any element: its size, its position, an
 
 ### Sizes
 
-A shape's size is its measured text plus padding on each side, and at least a minimum size. A fixed `width` or `height` replaces it. Shapes in a size group, such as `equalSize`, take the largest size in the group, fixed sizes included. A member with a fixed size on an axis of the group keeps it, and its text wraps at that width. When that size is smaller than the group's, the group is not equal, and the compiler reports `FIXED_SIZE_IN_GROUP`. A row is as wide as its children and the gaps between them, and as tall as its tallest child; a column is the same on the other axis. An enclosure surrounds its members with padding and a band for its title.
+A shape's size is its measured text plus padding on each side, and at least a minimum size. A fixed `width` or `height` replaces it. Shapes in a size group, such as `equalSize`, take the largest size in the group, fixed sizes included. A member with a fixed size on an axis of the group keeps it, and its text wraps at that width. When that size is smaller than the group's, the group is not equal, and the compiler reports `FIXED_SIZE_IN_GROUP`. A grid's columns are as wide as their widest cells, and its rows as tall as their tallest cells. The grid is as wide as its columns and the gaps between them, and as tall as its rows and the gaps between them. A row of a grid may be shorter than the others, and an empty cell adds nothing to its tracks. An enclosure surrounds its members with padding and a band for its title.
 
 In the running example, "Client" measures 38.0 by 18.6. With the padding, the box would be 70 by 40.6, so the minimum size of 104 by 46 applies. The cylinder adds 7.3 units of cap above and below its text and is 55.2 units tall.
 
 ### Positions
 
-A position is the top-left corner of an element's rectangle. A child of a row or column sits after the children before it, one gap apart. An element placed with `place()` sits at the gap from the rectangle of the element it names, or puts its anchor on the point it names.
+A position is the top-left corner of an element's rectangle. A grid's tracks follow each other, one gap apart, and a cell sits in its column and row at the alignment the grid sets: the start, the center, or the end of each. <Ref to="dc-grid" /> shows a grid with an empty cell, drawn with the `debug` prop.
+
+<Diagram id="dc-grid" caption="A grid of two rows with an empty cell. The database is taller than the boxes, so its row is taller, and the boxes in it are centered. Two edges run in the gutters." debug draw={(d) => {
+  const web = d.box("Web app")
+  const mobile = d.box("Mobile app")
+  const api = d.box("API")
+  const auth = d.box("Auth")
+  const db = d.cylinder("Database")
+  const g = d.grid([
+    [web, api, db],
+    [mobile, null, auth],
+  ])
+  d.arrow(mobile, api, { route: { viaX: g.gutterX(0) } })
+  d.arrow(api, auth, { route: { viaX: g.gutterX(1) } })
+}} /> An element placed with `place()` sits at the gap from the rectangle of the element it names, or puts its anchor on the point it names.
 
 <Ref to="dc-resolve" /> shows the values that the layout computes to place the database in the running example. Each is computed once, the first time it is needed.
 
@@ -261,42 +275,37 @@ Routing turns each edge into a list of points, its arrowheads, and its label box
 Each edge has a route form, and the compiler adds the corners that the form needs between the two ends. <Ref to="dc-routes" /> shows the forms: a straight line, one elbow, a channel at a given x or y, a list of points, a curve, and a loop.
 
 <Diagram id="dc-routes" caption="The route forms, a curve, and loops." draw={(d) => {
-  const panel = (title, at, draw) => {
+  const panel = (title, draw) => {
     const a = d.box("A", { width: 56, id: `${title}-a` })
     const b = d.box("B", { width: 56, id: `${title}-b` })
-    d.place(a, { at, anchor: "topLeft" })
+    const cells = d.grid([[a, null], [null, b]], { gap: [48, 56] })
     draw(a, b)
     d.enclose([a, b], { title, id: title })
+    return cells
   }
-  panel("straight", [0, 0], (a, b) => {
-    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
-    d.arrow(a, b, { id: "straight-edge" })
-  })
-  panel("hv", [240, 0], (a, b) => {
-    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
-    d.arrow(a, b, { id: "hv-edge", route: "hv" })
-  })
-  panel("viaY", [480, 0], (a, b) => {
-    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
-    d.arrow(a, b, { id: "viay-edge", route: { viaY: d.lerp(a.bottom, b.top) } })
-  })
-  panel("via", [0, 250], (a, b) => {
-    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
-    d.arrow(a, b, { id: "via-edge", route: { via: [a.right.offset(24, 0), b.top.offset(0, -24)] } })
-  })
-  panel("bend", [240, 250], (a, b) => {
-    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
-    d.arrow(a, b, { id: "bend-ab", bend: 20 })
-    d.arrow(b, a, { id: "bend-ba", bend: 20 })
-  })
-  panel("loop", [480, 250], (a, b) => {
-    d.place(b, { at: a.bottomRight.offset(48, 56), anchor: "topLeft" })
-    d.arrow(a, a, { id: "self-a" })
-    d.arrow(b, b, { id: "self-b", loop: "left" })
-  })
+  d.grid([
+    [
+      panel("straight", (a, b) => d.arrow(a, b, { id: "straight-edge" })),
+      panel("hv", (a, b) => d.arrow(a, b, { id: "hv-edge", route: "hv" })),
+      panel("viaY", (a, b) => d.arrow(a, b, { id: "viay-edge", route: { viaY: d.lerp(a.bottom, b.top) } })),
+    ],
+    [
+      panel("via", (a, b) => d.arrow(a, b, { id: "via-edge", route: { via: [a.right.offset(24, 0), b.top.offset(0, -24)] } })),
+      panel("bend", (a, b) => {
+        d.arrow(a, b, { id: "bend-ab", bend: 20 })
+        d.arrow(b, a, { id: "bend-ba", bend: 20 })
+      }),
+      panel("loop", (a, b) => {
+        d.arrow(a, a, { id: "self-a" })
+        d.arrow(b, b, { id: "self-b", loop: "left" })
+      }),
+    ],
+  ], { gap: [80, 102] })
 }} />
 
 A straight edge attaches where the line from the element's center toward the other end leaves the outline. An edge with corners attaches on the side that faces its adjacent route point, at the projection of that point onto the side, so it leaves the element at a right angle. When the projection falls outside the side, less the corner radius, the edge attaches at the middle of the side; on a diamond, a dot, or a ring it always does. For `hv`, `vh`, `viaX`, and `viaY`, the adjacent point lines up with the center, so these attach at the middle. An edge whose ends coincide is `DEGENERATE_EDGE`.
+
+A grid's gutters give `viaX` and `viaY` their channels. A gutter is a point in the middle of the gap after a column or a row, counted from 0, at the grid's center on the other axis. The layout evaluates it from the grid's tracks, like any other point. A gutter after the last track, or before the first, has no gap: the draw program records it as `UNKNOWN_GUTTER`, and the point stands at the grid's center so the compile goes on.
 
 In the running example, `client->api` is straight. Both elements are at the same height, so the line between their centers leaves Client at its right side, at (104, 23), and meets API at its left side, at (192, 23).
 
@@ -357,7 +366,7 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 | Stage | Codes |
 |---|---|
 | Running the draw program | `DRAW_FAILED`, `STEP_NOT_TEXT`, `FONT_FALLBACK` |
-| Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT` |
+| Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT`, `UNKNOWN_GUTTER` |
 | Settle ids | `DUPLICATE_ID`, `UNPLACED` |
 | Measure, size, and place | `TEXT_OVERFLOW`, `FIXED_SIZE_IN_GROUP`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
 | Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED`, `HEAD_CROWDED` |
@@ -373,7 +382,7 @@ The collision checks run on the exact geometry, before rounding. Two rectangles 
 
 The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. Free text is checked like any shape, because it has no fill and an edge through it shows through the words. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and a self-loop or a bent edge is not checked against its ends.
 
-Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel, and an edge that lies wholly on another are reported. The fixes are a `bend`, a `port()`, or one edge with `ends: "<->"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
+Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel such as a grid's gutter, and an edge that lies wholly on another are reported. The fixes are a `bend`, a `port()`, or one edge with `ends: "<->"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
 
 ### Steps and width
 

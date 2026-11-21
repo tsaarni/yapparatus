@@ -26,6 +26,130 @@ test("row places children with boundary gaps and centered cross-axis alignment",
   assert.equal(rb?.y, 0);
 });
 
+/** An empty box of a fixed size, so that track sizes are easy to state. */
+function sized(d: DiagramBuilder, id: string, width: number, height: number) {
+  return d.box("", { id, width, height });
+}
+
+/** The rectangles of a compiled diagram's nodes, by id. */
+function rects(out: ReturnType<typeof compile>) {
+  return Object.fromEntries(out.nodes.map((n) => [n.id, n.rect]));
+}
+
+test("a grid sizes each column to its widest cell and each row to its tallest", () => {
+  const d = new DiagramBuilder();
+  const a = sized(d, "a", 100, 40);
+  const b = sized(d, "b", 60, 80);
+  const c = sized(d, "c", 140, 50);
+  const e = sized(d, "e", 30, 30);
+  const g = d.grid(
+    [
+      [a, b],
+      [c, null, e],
+    ],
+    { gap: [20, 10] },
+  );
+  const x = sized(d, "x", 50, 50);
+  d.place(x, { rightOf: g, gap: 0 });
+  const out = compile(d, measure);
+  assert.deepEqual(out.diagnostics, []);
+  const r = rects(out);
+  assert.deepEqual(r.a, { x: 20, y: 20, width: 100, height: 40 }, "centered in its tracks");
+  assert.deepEqual(r.b, { x: 160, y: 0, width: 60, height: 80 });
+  assert.deepEqual(r.c, { x: 0, y: 90, width: 140, height: 50 });
+  assert.deepEqual(r.e, { x: 240, y: 100, width: 30, height: 30 }, "after an empty cell");
+  assert.equal(r.x?.x, 270, "the grid is 140 + 60 + 30 and two gaps wide");
+  assert.equal(r.x?.y, 45, "and 80 + 50 and one gap tall");
+  assert.deepEqual(out.groups[g.id], ["a", "b", "c", "e"], "a step focuses its cells");
+});
+
+test("a grid aligns cells in their tracks, one value or one for each direction", () => {
+  const layout = (align: "end" | ["start", "end"]) => {
+    const d = new DiagramBuilder();
+    const a = sized(d, "a", 100, 40);
+    const b = sized(d, "b", 60, 80);
+    const c = sized(d, "c", 140, 50);
+    d.grid(
+      [
+        [a, b],
+        [c, null],
+      ],
+      { gap: 10, align },
+    );
+    return rects(compile(d, measure));
+  };
+  assert.deepEqual(layout("end").a, { x: 40, y: 40, width: 100, height: 40 });
+  assert.deepEqual(layout(["start", "end"]).a, { x: 0, y: 40, width: 100, height: 40 });
+  assert.deepEqual(layout(["start", "end"]).c, { x: 0, y: 90, width: 140, height: 50 });
+});
+
+test("rows and columns are grids of one row and one column, with the default gaps", () => {
+  const d = new DiagramBuilder();
+  const a = sized(d, "a", 100, 40);
+  const b = sized(d, "b", 60, 80);
+  const c = sized(d, "c", 140, 50);
+  const e = sized(d, "e", 30, 30);
+  const f = sized(d, "f", 30, 30);
+  const row = d.row([a, b], { align: "end" });
+  const column = d.column([c, e], { align: "start" });
+  const grid = d.grid([[f]]);
+  d.place(d.column([row, column, grid]), { at: [0, 0], anchor: "topLeft" });
+  const out = compile(d, measure);
+  assert.deepEqual(out.diagnostics, []);
+  assert.deepEqual([row.id, column.id, grid.id], ["row-1", "column-2", "grid-3"]);
+  const r = rects(out);
+  assert.deepEqual(r.a, { x: 0, y: 40, width: 100, height: 40 }, "a row aligns vertically");
+  assert.equal(r.b?.x, 188, "88 between columns");
+  assert.deepEqual(r.c, { x: 54, y: 144, width: 140, height: 50 }, "64 below the row");
+  assert.deepEqual(r.e, { x: 54, y: 258, width: 30, height: 30 }, "a column aligns horizontally");
+});
+
+test("a grid nests in a row, and its gutters are the middle of its gaps", () => {
+  const d = new DiagramBuilder();
+  const a = sized(d, "a", 100, 40);
+  const b = sized(d, "b", 60, 80);
+  const c = sized(d, "c", 140, 50);
+  const g = d.grid(
+    [
+      [a, b],
+      [null, c],
+    ],
+    { gap: 40 },
+  );
+  const side = sized(d, "side", 40, 40);
+  d.row([side, g], { gap: 30 });
+  d.arrow(a, c, { id: "down", route: { viaX: g.gutterX(0) } });
+  d.arrow(a, b.bottom, { id: "under", route: { viaY: g.gutterY(0) } });
+  const out = compile(d, measure);
+  assert.deepEqual(out.diagnostics, []);
+  const r = rects(out);
+  assert.deepEqual(r.a, { x: 70, y: 20, width: 100, height: 40 });
+  assert.deepEqual(r.side, { x: 0, y: 65, width: 40, height: 40 });
+  const down = out.edges.find((e) => e.id === "down")?.points ?? [];
+  assert.equal(down[1]?.x, 70 + 100 + 20, "the gap after column 0");
+  const under = out.edges.find((e) => e.id === "under")?.points ?? [];
+  assert.equal(under[1]?.y, 80 + 20, "the gap after row 0");
+});
+
+test("a gutter after the last track, or before the first, is UNKNOWN_GUTTER", () => {
+  const d = new DiagramBuilder();
+  const a = sized(d, "a", 100, 40);
+  const b = sized(d, "b", 60, 80);
+  const g = d.grid([[a, b]]);
+  const row = d.row([d.box("C")]);
+  d.place(row, { below: g });
+  for (const p of [g.gutterX(1), g.gutterX(-1), g.gutterX(0.5), g.gutterY(0), row.gutterX(0)])
+    d.arrow(a, p, { route: "hv" });
+  d.arrow(a, b, { route: { viaX: g.gutterX(0) } });
+  const out = compile(d, measure);
+  assert.equal(out.ok, false);
+  const unknown = out.diagnostics.filter((x) => x.code === "UNKNOWN_GUTTER");
+  assert.equal(unknown.length, 5);
+  assert.equal(unknown[0]?.message, "grid-1 has 2 columns, so gutterX takes only 0; got 1.");
+  assert.equal(unknown[3]?.message, "grid-1 has 1 row, so gutterY has no gap to name; got 0.");
+  assert.deepEqual(unknown[4]?.ids, ["row-2"]);
+});
+
 test("the drawing keeps hundredths and leaves out false flags and centered alignment", () => {
   const d = new DiagramBuilder();
   const precise: Measure = (text) => text.length * 7.123456;
@@ -804,7 +928,7 @@ test("an enclosure title can sit in any corner", () => {
   assert.ok(e.titleRect.y > e.rect.y + e.rect.height / 2, "bottom edge");
 });
 
-test("containers list their members for steps: enclosures, stacks, sequences, fragments", () => {
+test("containers list their members for steps: enclosures, grids, sequences, fragments", () => {
   const d = new DiagramBuilder();
   const a = d.box("A");
   const b = d.box("B");

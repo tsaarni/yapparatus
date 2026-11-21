@@ -74,6 +74,9 @@ export const shapes = {
   bar: 10,
 } as const;
 
+/** Space between neighbors when an author sets none: across (`x`) and down (`y`). */
+export const defaultGap = { x: 88, y: 64 };
+
 /** Inner width of a figure in the wide track: text column plus breakout. */
 export const readingWidth = 960;
 

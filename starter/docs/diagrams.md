@@ -151,12 +151,13 @@ A link to an element is `/page#figure--element`, such as `/guide#request-flow--m
 
 ## Layout
 
-Each shape has exactly one position owner: a row, a column, or `place`. Statement order does not matter.
+Each shape has exactly one position owner: a grid, a row, a column, or `place`. Statement order does not matter.
 
 | Call | Meaning |
 |---|---|
-| `d.row([a, b], { gap?, align? })` | Left to right. Default gap: 88 |
-| `d.column([a, b], { gap?, align? })` | Top to bottom. Default gap: 64 |
+| `d.grid([[a, b], [null, c]], { gap?, align? })` | Rows of cells on shared tracks |
+| `d.row([a, b], { gap?, align? })` | Left to right: a grid of one row. Default gap: 88 |
+| `d.column([a, b], { gap?, align? })` | Top to bottom: a grid of one column. Default gap: 64 |
 | `d.place(b, { below: a, gap?, align? })` | Also `above`, `leftOf`, `rightOf` |
 | `d.place(b, { at: point, anchor? })` | Put the anchor of `b` (default `center`) on a point |
 | `d.enclose([a, b], { title?, titleAt?, padding?, role?, category? })` | A boundary around shapes. It never moves them |
@@ -164,10 +165,39 @@ Each shape has exactly one position owner: a row, a column, or `place`. Statemen
 
 - Gaps are measured between edges, not between centers.
 - A shape with a fixed `width` or `height` keeps it in a size group. A fixed size smaller than the group's is reported.
-- `align` is `start`, `center` (the default), or `end`.
-- Rows and columns are elements: they nest, and you can place them.
+- `align` is `start`, `center` (the default), or `end`. In a row it places the shapes vertically, in a column horizontally.
+- Grids, rows, and columns are elements: they nest, and you can place them.
 - `titleAt` is the corner that holds the title: `topLeft` (the default), `topRight`, `bottomLeft`, or `bottomRight`.
 - The first shape without a position goes at the origin.
+
+### Grids
+
+Use a grid when two or more rows must line up. A row of columns lines up only when every shape has the same size; a grid lines up whatever the sizes.
+
+```js
+const web = d.box("Web app")
+const mobile = d.box("Mobile app")
+const api = d.box("API", { role: "accent" })
+const auth = d.box("Auth")
+const db = d.cylinder("Database")
+d.equalSize([web, mobile, api, auth])
+const g = d.grid([
+  [web, api, db],
+  [mobile, null, auth],
+])
+d.arrow(web, api)
+d.arrow(mobile, api, { route: { viaX: g.gutterX(0) } })
+d.arrow(api, db, "SQL")
+d.arrow(api, auth, { route: { viaX: g.gutterX(1) }, label: "verify" })
+```
+
+- Each column is as wide as its widest shape, and each row as tall as its tallest. A shape sits in the middle of its cell unless `align` says otherwise.
+- `null` leaves a cell empty. Rows may have different lengths. No cell spans two tracks: to hold several shapes in one cell, put a row or column in it.
+- `gap` is one number, or `[columnGap, rowGap]`. Default: `[88, 64]`.
+- `align` is one value, or `[horizontal, vertical]`.
+- `g.gutterX(i)` is the middle of the gap after column `i`, and `g.gutterY(i)` after row `i`, counted from 0. Route edges through them with `viaX` and `viaY`, so they run between the shapes. Rows and columns have gutters too.
+- A gutter is a channel that edges share. Edges that leave one shape and fork, or that merge into one shape, may share it. Unrelated edges in one gutter are `EDGE_OVERLAP`: run them at different offsets, such as `g.gutterX(0).offset(8, 0)`.
+- Focusing a grid in a step focuses its cells.
 
 ## Points
 
@@ -179,6 +209,7 @@ Every element has nine anchors:
 There are also these points:
 
 - `port(side, t)`: a point along a side, such as `api.port("right", 0.25)`. `t` defaults to 0.5.
+- `g.gutterX(i)`, `g.gutterY(i)`: the middle of the gap after a grid's column or row `i`. See [Grids](#grids).
 
 Derived points:
 
@@ -210,7 +241,7 @@ d.line(from, to, ...)   // the same, without arrowheads
 Routes:
 
 - `"hv"` goes across, then down; `"vh"` goes down, then across.
-- `viaX` and `viaY` go through a channel at a given x or y. The value is a number or a point.
+- `viaX` and `viaY` go through a channel at a given x or y. The value is a number or a point, such as a grid's gutter.
 - `via` goes through the given points.
 - A route with corners leaves a shape at a right angle: in line with the first `via` point when the side reaches that far, and from the middle of the side otherwise. The last `via` point sets where it enters the other shape in the same way.
 
@@ -230,7 +261,8 @@ A label is a string or `{ text, segment, at, side, gap }`:
 ## Patterns
 
 - **Peers share a size.** Give shapes in the same row or column `equalSize`, so the figure reads as a grid. Leave decisions and start or end dots out.
-- **Elbows between columns use a channel halfway.** When several edges cross from one column to the next, route each through the same x: `route: { viaX: d.lerp(a.right, b.left, 0.5) }`. They then turn at one line instead of crossing each other.
+- **Rows that line up are a grid.** Put shapes that share columns across rows in one `d.grid`, not in rows aligned with `place` or `at`.
+- **Elbows between columns use a gutter.** When several edges cross from one column to the next, route each through the grid's gutter: `route: { viaX: g.gutterX(0) }`. They then turn at one line instead of crossing each other.
 - **Edges that would cross a node go around it.** Route through a channel above or below, such as `route: { viaY: group.bottom.offset(0, 28) }`, and give the label the leg it belongs on with `segment`.
 - **Parallel edges between the same shapes** leave from offset points, such as `a.top.offset(40, 0)`, or curve apart with the same `bend`.
 - **Enclosures name a boundary,** such as a process, a machine, or a network. Move the title with `titleAt` when an edge would cross it.
@@ -290,7 +322,7 @@ Steps tell the story of a figure in order. Each `<Step>` names the elements it i
 | Feature | Meaning |
 |---|---|
 | `focus` | Element ids, separated by spaces. Focused elements are highlighted; the others fade |
-| Containers | Focusing an enclosure, row, column, sequence, or sequence fragment focuses everything in it |
+| Containers | Focusing an enclosure, grid, row, column, sequence, or sequence fragment focuses everything in it |
 | Categories | Focusing a category's id focuses every element in it |
 | `build` | Each element stays hidden until the first step that focuses it |
 | `stepOnly` | A shape or edge option: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
@@ -320,7 +352,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | Code | Severity | Fix |
 |---|---|---|
 | `PLACEMENT_CYCLE` | error | Placements depend on each other. Place one of them independently |
-| `CONFLICTING_PLACEMENT` | error | A shape is in a row and also placed. Keep one |
+| `CONFLICTING_PLACEMENT` | error | A shape is in a grid, row, or column and also placed, or in two of them. Keep one |
 | `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
 | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT` | error | Check the `place()` options |
 | `DRAW_FAILED` | error | The `draw` function threw, at the line given, uses a name it does not define, ran longer than 1 second, or created more than 2000 elements |
@@ -331,7 +363,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
 | `BEND_WITH_ROUTE` | error | An edge has both `bend` and `route`. Keep one |
 | `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape. An edge that runs through its own end needs a straight route or another route form |
-| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one a `bend`, attach one at a `port()`, or draw one edge with `ends: "<->"`. Edges that fork from one point or merge into one point may share a stretch |
+| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one a `bend`, attach one at a `port()`, or draw one edge with `ends: "<->"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
 | `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Widen the gap |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |
@@ -339,7 +371,8 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `TEXT_OVERFLOW` | warning | Increase `width` or `height` |
 | `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
-| `UNPLACED` | error | Add the shape to a row or column, or `place()` it |
+| `UNPLACED` | error | Add the shape to a grid, row, or column, or `place()` it |
+| `UNKNOWN_GUTTER` | error | `gutterX(i)` or `gutterY(i)` names a gap that does not exist. A grid of n columns has gutters 0 to n - 2 |
 | `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `element()` names a member that does not. The message lists the valid ids |
 | `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |
 | `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |

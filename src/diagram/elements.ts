@@ -4,12 +4,13 @@
  */
 import type { DiagnosticCode } from "../document/diagnostic.ts";
 import type { AnchorName, Side } from "./geometry.ts";
+import { defaultGap } from "./metrics.ts";
 
 export type { AnchorName, Side };
 
 /** What an element is for: the one to look at, a risk, a quiet one, or one outside the system. */
 export type Role = "default" | "accent" | "muted" | "warning" | "external";
-/** Cross-axis alignment of a stack's children or a placed element with its reference. */
+/** Where a grid cell sits in its track, or a placed element across its reference. */
 export type Align = "start" | "center" | "end";
 /** A corner of an element, such as where an enclosure holds its title. */
 export type Corner = "topLeft" | "topRight" | "bottomLeft" | "bottomRight";
@@ -31,7 +32,9 @@ export type PointExpr =
   | { k: "abs"; x: number; y: number }
   | { k: "offset"; base: PointExpr; dx: number; dy: number }
   | { k: "xy"; x: PointExpr; y: PointExpr }
-  | { k: "lerp"; a: PointExpr; b: PointExpr; t: number };
+  | { k: "lerp"; a: PointExpr; b: PointExpr; t: number }
+  /** The middle of the gap after a grid's column (`x`) or row (`y`), at the grid's center. */
+  | { k: "gutter"; grid: Grid; axis: "x" | "y"; index: number };
 
 /** A lazily resolved point. Coordinates are known only after compilation. */
 export class Point {
@@ -266,25 +269,89 @@ export class Node extends Element {
   }
 }
 
-/** Options of a row or column. */
-export interface StackOptions {
+/** Options of a grid. */
+export interface GridOptions {
+  id?: string;
+  /** Space between columns and rows: one number, or `[columnGap, rowGap]`. Default: [88, 64]. */
+  gap?: number | [number, number];
+  /** A cell's place in its track: one value, or `[horizontal, vertical]`. Default: center. */
+  align?: Align | [Align, Align];
+}
+
+/** Options of a row or column: the gap between its cells, and their alignment across it. */
+export interface LineOptions {
   id?: string;
   gap?: number;
   align?: Align;
 }
 
-/** A row or column. It owns the positions of its children and is itself placeable. */
-export class Stack extends Element {
-  readonly direction: "row" | "column";
-  readonly children: Element[];
-  readonly gap: number;
-  readonly align: Align;
-  constructor(direction: "row" | "column", children: Element[], options: StackOptions, n: number) {
-    super(options.id ?? `${direction}-${n}`, options.id !== undefined);
-    this.direction = direction;
-    this.children = children;
-    this.gap = options.gap ?? (direction === "row" ? 88 : 64);
-    this.align = options.align ?? "center";
+/**
+ * Rows of cells on shared tracks: columns as wide as their widest cell, rows as tall as their
+ * tallest. A row and a column are grids too. It owns its cells' positions and is placeable.
+ */
+export class Grid extends Element {
+  /** The call that made it, which also names it: `grid`, `row`, or `column`. */
+  readonly kind: "grid" | "row" | "column";
+  /** The cells by row; `null` is an empty cell, and rows may differ in length. */
+  readonly rows: ReadonlyArray<ReadonlyArray<Element | null>>;
+  readonly gap: { x: number; y: number };
+  readonly align: { x: Align; y: Align };
+  constructor(
+    kind: Grid["kind"],
+    rows: ReadonlyArray<ReadonlyArray<Element | null>>,
+    options: GridOptions,
+    n: number,
+  ) {
+    super(options.id ?? `${kind}-${n}`, options.id !== undefined);
+    this.kind = kind;
+    this.rows = rows.map((row) => [...row]);
+    const [x, y] = Array.isArray(options.gap)
+      ? options.gap
+      : [options.gap ?? defaultGap.x, options.gap ?? defaultGap.y];
+    this.gap = { x, y };
+    const [ax, ay] = Array.isArray(options.align)
+      ? options.align
+      : [options.align ?? "center", options.align ?? "center"];
+    this.align = { x: ax, y: ay };
+  }
+  /** Set by the builder: where a gutter that does not exist is reported. */
+  report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
+  /** The cells that hold an element, row by row. */
+  get children(): Element[] {
+    return this.rows.flatMap((row) =>
+      row.filter((cell): cell is Element => cell !== null && cell !== undefined),
+    );
+  }
+  /** The number of columns: the length of the longest row. */
+  get columnCount(): number {
+    return Math.max(0, ...this.rows.map((row) => row.length));
+  }
+  /** A point in the middle of the gap after column `i`, from 0: an x for `viaX`. */
+  gutterX(i: number): Point {
+    return this.gutter("x", i, this.columnCount);
+  }
+  /** A point in the middle of the gap after row `i`, from 0: a y for `viaY`. */
+  gutterY(i: number): Point {
+    return this.gutter("y", i, this.rows.length);
+  }
+  /** A gutter, or the grid's center when no gap follows track `i`, which is reported. */
+  private gutter(axis: "x" | "y", i: number, tracks: number): Point {
+    if (Number.isInteger(i) && i >= 0 && i < tracks - 1)
+      return new Point({ k: "gutter", grid: this, axis, index: i });
+    const track = axis === "x" ? "column" : "row";
+    const count = `${tracks} ${track}${tracks === 1 ? "" : "s"}`;
+    const range =
+      tracks > 2
+        ? `takes 0 to ${tracks - 2}`
+        : tracks === 2
+          ? "takes only 0"
+          : "has no gap to name";
+    this.report?.(
+      "UNKNOWN_GUTTER",
+      `${this.id} has ${count}, so gutter${axis.toUpperCase()} ${range}; got ${i}.`,
+      [this.id],
+    );
+    return this.center;
   }
 }
 
@@ -467,7 +534,7 @@ export interface PlaceOptions {
   above?: Element;
   leftOf?: Element;
   rightOf?: Element;
-  /** Boundary-to-boundary distance. Default: 64 vertically, 88 horizontally. */
+  /** Boundary-to-boundary distance. Default: 64 vertically, 88 horizontally, as in a grid. */
   gap?: number;
   /** Cross-axis alignment with the reference. Default: center. */
   align?: Align;
@@ -494,6 +561,7 @@ export function elementOf(p: PointLike): Element | undefined {
     else if (e.k === "lerp") e = e.a;
     else break;
   }
+  if (e.k === "gutter") return e.grid;
   return e.k === "anchor" || e.k === "port" ? e.el : undefined;
 }
 
