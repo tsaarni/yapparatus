@@ -117,7 +117,7 @@ export class Scene {
     const node = new Node(shape, label, options, internals);
     node.report = this.report;
     node.checkArgs = this.checkArgs;
-    internals.member?.parent.members.push(node);
+    internals.membership?.parent.members.push(node);
     this.#nodes.push(node);
     this.#noteCategory(node.options.category);
     return node;
@@ -181,7 +181,7 @@ export class Scene {
   own(el: Element, owner: Grid | Placement) {
     if (!placeable(el)) {
       this.report("NOT_PLACEABLE", [el], () => {
-        const parent = el instanceof Node ? el.member?.parent : undefined;
+        const parent = el instanceof Node ? el.membership?.parent : undefined;
         const what = parent
           ? `a ${el instanceof Node ? el.shape : "member"} of ${parent.id}; its bounds come from its parent. Position ${parent.id} instead.`
           : el instanceof Frame
@@ -264,7 +264,9 @@ export class Scene {
  * a mark.
  */
 function placeable(el: Element): boolean {
-  return !(el instanceof Enclosure) && !(el instanceof Frame) && !(el instanceof Node && el.member);
+  return (
+    !(el instanceof Enclosure) && !(el instanceof Frame) && !(el instanceof Node && el.membership)
+  );
 }
 
 /** How a message names a position owner: `row(row-1)` or `place()`. */

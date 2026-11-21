@@ -138,7 +138,7 @@ export const diagnosticCodes = {
   },
   UNKNOWN_ELEMENT: {
     severity: "error",
-    meaning: "A step or element() names an element the diagram does not have.",
+    meaning: "A step or member() names an element the diagram does not have.",
   },
   UNKNOWN_GUTTER: {
     severity: "error",

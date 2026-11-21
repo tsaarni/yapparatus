@@ -115,10 +115,10 @@ The start prompt holds the instructions for the whole session: where the authori
     mono: true,
     id: "prompt",
     marks: {
-      message: { lines: "1-3", category: "The user's message" },
-      references: { lines: "4-8", category: "References" },
-      diagnostics: { lines: "10", category: "Diagnostics" },
-      next: { lines: "12-20", category: "What to run next" },
+      message: { lines: [1, 3], category: "The user's message" },
+      references: { lines: [4, 8], category: "References" },
+      diagnostics: { lines: 10, category: "Diagnostics" },
+      next: { lines: [12, 20], category: "What to run next" },
     },
   })
 }} />

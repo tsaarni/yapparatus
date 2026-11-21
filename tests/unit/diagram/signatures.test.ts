@@ -110,7 +110,7 @@ function callOptions(call: string): Options | undefined {
 }
 
 test("every call of d has a signature, and every signature of d is a call", () => {
-  const methods = ["port", "element", "label", "offset"];
+  const methods = ["port", "member", "label", "offset"];
   assert.deepEqual(
     Object.keys(signatures)
       .filter((name) => !methods.includes(name))
@@ -159,7 +159,7 @@ test("the methods of elements and points check their arguments", () => {
     const a = d.box("A");
     const r = d.record(["x"]);
     d.row([a, r]);
-    const edge = d.arrow(a.port("middle" as never, 2), r.element(5 as never));
+    const edge = d.arrow(a.port("middle" as never, 2), r.member(5 as never));
     edge.label({ text: "x", along: 0.5 } as never);
     d.arrow(a.bottom.offset("8" as never, 0), [0, 200]);
   });
@@ -280,7 +280,7 @@ test("each row of the item table gives its diagnostic", () => {
   );
   const marks = drawn((d) => {
     d.text("one two", {
-      marks: { both: { text: "one", lines: "1" }, neither: { role: "accent" } } as never,
+      marks: { both: { text: "one", lines: 1 }, neither: { role: "accent" } } as never,
     });
   });
   assert.deepEqual(

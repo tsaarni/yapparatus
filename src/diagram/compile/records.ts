@@ -3,7 +3,7 @@
  */
 
 import type { TextLine } from "../drawing.ts";
-import type { Element, Member, Node } from "../elements.ts";
+import type { Element, Membership, Node } from "../elements.ts";
 import { anchorOf, type Rect, round, type Side, sideToward, type Vec } from "../geometry.ts";
 import { type FontSpec, fontsOf, type Measure, type Metrics, shapes } from "../metrics.ts";
 import { quote } from "../signature.ts";
@@ -69,7 +69,7 @@ export function createRecords(
     let row = 0;
     let col = 0;
     const placed = cells.map((cell) => {
-      const span = cell.member?.kind === "cell" ? cell.member.span : 1;
+      const span = cell.membership?.kind === "cell" ? cell.membership.span : 1;
       if (col === 0 && span > columns && span % columns === 0) {
         const at = { row, col, span: columns, rows: span / columns };
         row += at.rows;
@@ -175,7 +175,7 @@ export function createRecords(
   function member(node: Node): { rect: Rect; lines: TextLine[] } {
     const cached = memberRects.get(node);
     if (cached) return cached;
-    const place = node.member;
+    const place = node.membership;
     if (!place) throw new Error(`${node.id} is not a member.`);
     const outer = bounds(place.parent);
     const result =
@@ -212,7 +212,7 @@ export function createRecords(
     return { rect, lines };
   }
 
-  function mark(node: Node, place: Extract<Member, { kind: "mark" }>, outer: Rect) {
+  function mark(node: Node, place: Extract<Membership, { kind: "mark" }>, outer: Rect) {
     const text = place.parent;
     const c = measureNode(text);
     const font = textFont(text);
@@ -225,9 +225,10 @@ export function createRecords(
       return { rect: { x: outer.x, y: outer.y, width: 0, height: 0 }, lines: [] };
     };
     if ("lines" in place) {
-      const [a = Number.NaN, b = a] = place.lines.split("-").map(Number);
-      if (!(a >= 1 && b >= a && b <= c.lines.length))
-        return unmatched(`lines "${place.lines}" are not within 1–${c.lines.length}.`);
+      const [a, b] = typeof place.lines === "number" ? [place.lines, place.lines] : place.lines;
+      if (a > b) return unmatched(`lines [${a}, ${b}] start after they end. Write [${b}, ${a}].`);
+      const written = typeof place.lines === "number" ? `line ${a} is` : `lines [${a}, ${b}] are`;
+      if (b > c.lines.length) return unmatched(`${written} not within 1–${c.lines.length}.`);
       const pad = shapes.mark.linesPad;
       const rect = {
         x: outer.x - pad,
@@ -327,7 +328,7 @@ export function createRecords(
   }
 
   function outlineSides(cell: Node, rect: Rect): Side[] {
-    const record = cell.member?.parent;
+    const record = cell.membership?.parent;
     const outer = record ? bounds(record) : rect;
     const bandAbove = record ? grid(record).top > 0 : false;
     const near = (a: number, b: number) => Math.abs(a - b) < 0.5;

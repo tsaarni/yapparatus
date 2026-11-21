@@ -110,7 +110,7 @@ The web app reads the list of pages from one module, which the compiler writes f
     "module, error\tset when loading ends",
   ], { title: "Page entry", id: "page-entry" })
   d.row([exports, entry], { gap: 80, align: "start" })
-  d.arrow(exports.element("pages"), entry)
+  d.arrow(exports.member("pages"), entry)
 }} />
 
 The compiler first checks `document.json` and its page list against the files on disk, and reports errors as `PAGE_LIST`.

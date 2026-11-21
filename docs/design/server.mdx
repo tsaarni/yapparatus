@@ -102,8 +102,8 @@ The chat of a document is a log in `.yapparatus/<directory>/chat.jsonl`, with on
   ], { title: "reference", id: "reference", mono: true })
   d.row([reader, reply], { gap: 96, align: "start" })
   d.place(item, { below: reader, gap: 56, align: "start" })
-  d.arrow(reply.element("in-reply-to"), reader.element("seq"), { id: "replies-to", label: "replies to" })
-  d.arrow(reader.element("references").left, item.left, { id: "holds", route: { viaX: reader.left.offset(-28, 0) } })
+  d.arrow(reply.member("in-reply-to"), reader.member("seq"), { id: "replies-to", label: "replies to" })
+  d.arrow(reader.member("references").left, item.left, { id: "holds", route: { viaX: reader.left.offset(-28, 0) } })
 }} />
 
 `seq` is the message's place in the log, starting at 1. A reply names in `inReplyTo` the newest reader message it answers, and the earlier unanswered reader messages count as answered too. `repliedTo` is the highest `inReplyTo` in the log. The reader messages after it are unanswered.

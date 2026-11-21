@@ -185,7 +185,7 @@ export function createLayout(
     if (cached) return cached;
     return guard(`size(${el.id})`, () => {
       let s: { width: number; height: number };
-      if (el instanceof Node && el.member) {
+      if (el instanceof Node && el.membership) {
         const r = member(el).rect;
         s = { width: r.width, height: r.height };
       } else if (el instanceof Node) {
@@ -238,7 +238,7 @@ export function createLayout(
       if (el instanceof Enclosure || el instanceof Frame) {
         const r = bounds(el);
         p = { x: r.x, y: r.y };
-      } else if (el instanceof Node && el.member) {
+      } else if (el instanceof Node && el.membership) {
         const r = member(el).rect;
         p = { x: r.x, y: r.y };
       } else if (owner instanceof Grid) {

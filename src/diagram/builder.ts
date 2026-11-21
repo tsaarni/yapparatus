@@ -89,7 +89,7 @@ export class DiagramBuilder {
         ...o
       }: MarkOptions = typeof mark === "string" ? { text: mark } : mark;
       const place: Place =
-        span !== undefined ? { kind: "mark", text: span } : { kind: "mark", lines: lines ?? "" };
+        span !== undefined ? { kind: "mark", text: span } : { kind: "mark", lines: lines ?? 1 };
       this.#member(node, span ?? "", { ...o, id }, place);
     }
     call.done([node]);
@@ -168,7 +168,7 @@ export class DiagramBuilder {
   }
   /**
    * Cells on a grid under an optional title: a type, a table, a packet header, a register,
-   * an array. Each cell is a member: `rec.element("id")`.
+   * an array. Each cell is a member: `rec.member("id")`.
    */
   record(cells: Cell[], options: RecordOptions = {}): Node {
     const call = this.#check(signatures.record);
@@ -188,13 +188,14 @@ export class DiagramBuilder {
   }
   /**
    * A member's id is its parent's, then its own from the first tab-separated column of its
-   * label, such as `users.team-id`. The parent's part is joined in once it is final.
+   * label, such as `users.team_id`. The parent's part is joined in once it is final.
    */
   #member(parent: Node, label: string, options: MemberOptions, place: Place) {
     const { id, pin, ...rest } = options;
     const base = id ?? slug(label.split("\t")[0] ?? "");
     let own = base;
-    for (let n = 2; parent.members.some((m) => m.member?.own === own); n++) own = `${base}-${n}`;
+    for (let n = 2; parent.members.some((m) => m.membership?.own === own); n++)
+      own = `${base}-${n}`;
     this.#scene.addNode(
       place.kind,
       label,
@@ -202,7 +203,7 @@ export class DiagramBuilder {
       {
         id: `${parent.id}.${own}`,
         explicit: id !== undefined,
-        member: { ...place, parent, own, ...(pin !== undefined ? { pin } : {}) },
+        membership: { ...place, parent, own, ...(pin !== undefined ? { pin } : {}) },
       },
     );
   }

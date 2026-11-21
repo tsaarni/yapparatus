@@ -99,14 +99,14 @@ An address names something that the user can open, link to, or attach to a messa
   const top = d.row([page, figure, elementId], { gap: 48 })
   const bottom = d.row([prefix, directory, path, lines, words], { gap: 24 })
   d.column([top, element, file, bottom], { gap: 48 })
-  d.arrow(page, element.element("page"))
-  d.arrow(figure, element.element("figure"))
-  d.arrow(elementId, element.element("element"))
-  d.arrow(prefix, file.element("prefix"))
-  d.arrow(directory, file.element("directory"))
-  d.arrow(path, file.element("path"))
-  d.arrow(lines, file.element("lines"))
-  d.arrow(words, file.element("words"))
+  d.arrow(page, element.member("page"))
+  d.arrow(figure, element.member("figure"))
+  d.arrow(elementId, element.member("element"))
+  d.arrow(prefix, file.member("prefix"))
+  d.arrow(directory, file.member("directory"))
+  d.arrow(path, file.member("path"))
+  d.arrow(lines, file.member("lines"))
+  d.arrow(words, file.member("words"))
 }} />
 
 Everything that is not a page is under `/-/`, such as external files and the REST API. A page name starts with a letter or a digit, so the two never collide.

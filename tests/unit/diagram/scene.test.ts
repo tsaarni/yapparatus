@@ -23,7 +23,7 @@ test("a placed cell is NOT_PLACEABLE, and it stays in its record", () => {
     const rec = d.record(["a", "b"]);
     const x = d.box("X");
     d.place(x, { rightOf: rec });
-    d.place(rec.element("a"), { below: x });
+    d.place(rec.member("a"), { below: x });
   });
   assert.deepEqual(out.diagnostics, [
     {
@@ -43,7 +43,7 @@ test("an enclosure or a mark in a row is NOT_PLACEABLE, and the row leaves its c
     const a = d.box("A");
     const t = d.text("one two", { marks: { two: "two" } });
     const group = d.enclose([a], { title: "Group" });
-    d.column([d.row([a, group, t.element("two")]), t]);
+    d.column([d.row([a, group, t.member("two")]), t]);
   });
   assert.deepEqual(out.diagnostics, [
     {

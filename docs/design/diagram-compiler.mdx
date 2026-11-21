@@ -148,7 +148,7 @@ A sequence and a tree add their elements through the same functions, with what a
 
 A call reports a problem with the elements it is about and a message that is written later. The ids of those elements are not final while the draw program runs, so the compiler writes every message and the diagnostic's ids after the id check, from the final ids. A box with `replicas: 9` that settles as `a-2` is reported as `a-2`.
 
-Each call has a signature: its arguments in order, and the options it takes, each with the values it takes. A value is one of a list, a number in a range, text, `true` or `false`, a point, an element of given kinds, a function, a list of values, a list of fixed length such as `[x, y]`, an object of options with their own values, or any one of several values. The signatures are the one list of what each call takes, and the diagram reference names the same options, which a test compares in both directions. The option types of the library are checked against the signatures when the library is compiled, so the two cannot drift apart. The methods of elements and points, such as `port()`, `element()`, `offset()`, and an edge's `label()`, have signatures too.
+Each call has a signature: its arguments in order, and the options it takes, each with the values it takes. A value is one of a list, a number in a range, text, `true` or `false`, a point, an element of given kinds, a function, a list of values, a list of fixed length such as `[x, y]`, an object of options with their own values, or any one of several values. The signatures are the one list of what each call takes, and the diagram reference names the same options, which a test compares in both directions. The option types of the library are checked against the signatures when the library is compiled, so the two cannot drift apart. The methods of elements and points, such as `port()`, `member()`, `offset()`, and an edge's `label()`, have signatures too.
 
 One check runs every call against its signature before the call records anything. It turns each disagreement into a diagnostic and gives the value to use in its place, so no call throws for what it is given:
 
@@ -191,7 +191,7 @@ Every element has an id. The page uses it as the element's address, `/page#figur
 
 | Element | Derived id | Example |
 |---|---|---|
-| A shape with a label | The label as a slug: lowercase, with hyphens for everything else | `"Auth service"` → `auth-service` |
+| A shape with a label | The label as a slug | `"Auth service"` → `auth-service`, `"user_id"` → `user_id` |
 | A start or an end without a label | The call and its count among the author's calls of that kind | `start-1`, `end-1` |
 | A record without a title | `record` and its count among the author's records | `record-1` |
 | A grid, row, or column | The call that made it and its count among the author's calls of that kind | `row-1`, `column-1`, `grid-1` |
@@ -202,10 +202,12 @@ Every element has an id. The page uses it as the element's address, `/page#figur
 | A lifeline or an activation bar | The participant's id and `-lifeline`, or `-active-` and its count on that participant | `api-lifeline`, `api-active-2` |
 | A tree container | The node's id and `-tree`, or `-children` for the container of its subtrees, or `-left` and `-right` for the sides of the root in `both` | `platform-tree`, `platform-children` |
 | An edge | The ids of its two ends, joined by `->` | `client->api` |
-| A cell or a mark | The parent's id, a dot, and its own name as a slug | `users.team-id` |
+| A cell or a mark | The parent's id, a dot, and its own name as a slug | `users.team_id` |
 | A category | Its name as a slug | `to-be-removed` |
 
 </Table>
+
+A slug keeps lowercase letters, digits, and underscores, turns every other run of characters into one hyphen, and drops hyphens at either end, so `"Auth service"` is `auth-service`, `"user_id"` is `user_id`, and text with none of these characters is `node`. An author who writes an identifier, such as a column name, reaches its member by that name.
 
 Each call of the author's counts among the calls of its kind, whether or not the element has text or an `id`. A sequence and a tree make their rows, columns, and frames without counting, so they never change the numbers of the author's elements. An element that a sequence or a tree makes is named after its owner: the scene records the owner and the suffix, and the id check joins them once the owner's id is final.
 
@@ -374,7 +376,7 @@ The piece that carries a head is the last leg of a route with corners, and the w
 
 ## Records and marked text
 
-The cells of a record and the marks of a text are elements of their own, so edges, steps, and links treat them like any other element. Their rectangles come from their parent's rectangle. A ruler's functions run when the record is measured, after the ids are final. A function that throws or gives anything other than text or a number is `INVALID_ARGUMENT` about the record, with the subject `ruler.top` or `ruler.left` and a message that names the first such column or row; that label is empty, and the rest of the record is drawn. <Ref to="dc-record" /> shows a record; the [structures reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagram-structures.md) lists the forms.
+The cells of a record and the marks of a text are elements of their own, so edges, steps, and links treat them like any other element. A draw program reaches one with its parent's `member()` and its own id, such as `rec.member("payload")`, and a missing one is `UNKNOWN_ELEMENT`, with its parent standing in. Their rectangles come from their parent's rectangle. A ruler's functions run when the record is measured, after the ids are final. A function that throws or gives anything other than text or a number is `INVALID_ARGUMENT` about the record, with the subject `ruler.top` or `ruler.left` and a message that names the first such column or row; that label is empty, and the rest of the record is drawn. <Ref to="dc-record" /> shows a record; the [structures reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagram-structures.md) lists the forms.
 
 <Diagram id="dc-record" caption="A record on a grid of eight columns: cells of several spans, an inner cell with a pin, and an edge that enters a cell on the outline." draw={(d) => {
   const rec = d.record([
@@ -385,14 +387,14 @@ The cells of a record and the marks of a text are elements of their own, so edge
   const pin = d.note("1  An inner cell: no free side", { id: "pin-note" })
   const outline = d.note("A cell on the outline", { id: "outline-note" })
   d.place(d.column([pin, outline], { gap: 24, align: "start" }), { rightOf: rec, gap: 64, align: "start" })
-  d.arrow(outline, rec.element("payload"))
+  d.arrow(outline, rec.member("payload"))
 }} />
 
 The grid lays out a record's cells row by row on equal columns, as wide as the widest text needs. A cell can span several columns, and a cell that starts a row and spans a multiple of the row covers several rows, as Payload does. A cell that does not fit in its row is `CELL_SPAN`.
 
 An edge at a cell attaches at the middle of a side on the record's outline, so that it crosses no other cell. A cell with no such side, such as Flags, cannot take an edge without crossing its neighbors, so a pin gives it a numbered badge that a note can refer to.
 
-A mark highlights words or lines of a text. The compiler finds the marked words in the measured lines and computes their rectangle from the measured widths. Words that do not occur exactly once on one line are `MARK_UNMATCHED`.
+A mark highlights words or lines of a text. The compiler finds the marked words in the measured lines and computes their rectangle from the measured widths. Words that do not occur exactly once on one line are `MARK_UNMATCHED`. Lines are a line number from 1, or the first and the last line, such as `[2, 4]`. The signature checks that they are whole numbers of 1 or more, and the compiler that they lie within the measured lines with the first not after the last; lines that do not are `MARK_UNMATCHED`.
 
 ## Sequences
 

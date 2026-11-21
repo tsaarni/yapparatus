@@ -43,7 +43,7 @@ export type Reporter = (
 ) => void;
 
 /** An element's method whose arguments the scene checks. */
-export type Method = "port" | "element" | "label" | "offset";
+export type Method = "port" | "member" | "label" | "offset";
 
 /**
  * Checks the arguments of an element's method and gives the ones to use, or `undefined` for one
@@ -249,14 +249,16 @@ export interface RecordOptions
   ruler?: { top?: (column: number) => string | number; left?: (row: number) => string | number };
 }
 
-/** A highlighted span of a text: a substring that occurs once, or lines from 1 (`"2"`, `"2-4"`). */
-export type Mark = Omit<MemberOptions, "id"> & ({ text: string } | { lines: string });
+/** Whole lines of a text, from 1: one line, or the first and the last, such as `[2, 4]`. */
+export type Lines = number | [number, number];
+/** A highlighted span of a text: a substring that occurs once, or whole lines. */
+export type Mark = Omit<MemberOptions, "id"> & ({ text: string } | { lines: Lines });
 /** A mark's options as one object, with one of `text` and `lines`. Its name is its id. */
-export type MarkOptions = Omit<MemberOptions, "id"> & { text?: string; lines?: string };
+export type MarkOptions = Omit<MemberOptions, "id"> & { text?: string; lines?: Lines };
 
 /** Options of a text node, with its marked spans. */
 export interface TextOptions extends NodeOptions {
-  /** Named spans or lines, each a member: `t.element("path")`. A string is the text to mark. */
+  /** Named spans or lines, each a member: `t.member("path")`. A string is the text to mark. */
   marks?: Record<string, string | Mark>;
 }
 
@@ -267,7 +269,7 @@ export interface NodeInternals {
   /** Whether that id is the author's: a member's own id, given in its options. */
   explicit?: boolean;
   /** The shape this one is a member of, and its place there. */
-  member?: Member;
+  membership?: Membership;
   /** Decoration only: excluded from overlap and crossing checks, never interactive. */
   passive?: boolean;
   /** A decoration that steps show and fade with this edge, such as an activation bar. */
@@ -278,9 +280,9 @@ export interface NodeInternals {
 export type Place =
   | { kind: "cell"; span: number }
   | { kind: "mark"; text: string }
-  | { kind: "mark"; lines: string };
+  | { kind: "mark"; lines: Lines };
 /** A member's place, its parent, its own id there, and its badge number. */
-export type Member = Place & { parent: Node; own: string; pin?: number };
+export type Membership = Place & { parent: Node; own: string; pin?: number };
 
 /** A drawn shape with a label, such as a box, a record, or a text, and its members. */
 export class Node extends Element {
@@ -293,7 +295,7 @@ export class Node extends Element {
   readonly passive: boolean;
   readonly follows: Edge | undefined;
   /** Set on a member: its parent and its place there. */
-  readonly member: Member | undefined;
+  readonly membership: Membership | undefined;
   /** Record cells or text marks, in order. */
   readonly members: Node[] = [];
   constructor(
@@ -311,24 +313,24 @@ export class Node extends Element {
     this.options = options;
     this.passive = internals.passive ?? false;
     this.follows = internals.follows;
-    this.member = internals.member;
+    this.membership = internals.membership;
   }
   /** Set by the scene: where a missing member is reported. */
   report?: Reporter;
   /**
-   * A member by its own id, such as `users.element("team-id")`, usable like any element.
+   * A member by its own id, such as `users.member("team_id")`, usable like any element.
    * A missing member is reported, and the parent stands in for it.
    */
-  element(id: string): Node {
-    const [own] = (this.checkArgs?.(this, "element", [id]) ?? [id]) as [string?];
+  member(id: string): Node {
+    const [own] = (this.checkArgs?.(this, "member", [id]) ?? [id]) as [string?];
     if (own === undefined) return this;
-    const found = this.members.find((m) => m.member?.own === own);
+    const found = this.members.find((m) => m.membership?.own === own);
     if (found) return found;
     this.report?.(
       "UNKNOWN_ELEMENT",
       [this],
       () =>
-        `${this.id} has no member "${own}". Members: ${this.members.map((m) => m.member?.own).join(", ") || "none"}.`,
+        `${this.id} has no member "${own}". Members: ${this.members.map((m) => m.membership?.own).join(", ") || "none"}.`,
     );
     return this;
   }
@@ -676,12 +678,12 @@ function refName(p: PointLike): string {
   return elementOf(p)?.id ?? "point";
 }
 
-/** An id from a label: lowercase letters and digits joined by dashes, or "node". */
+/** An id from a label: lowercase letters, digits, and underscores joined by dashes, or "node". */
 export function slug(text: string): string {
   return (
     text
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/[^a-z0-9_]+/g, "-")
       .replace(/^-|-$/g, "") || "node"
   );
 }

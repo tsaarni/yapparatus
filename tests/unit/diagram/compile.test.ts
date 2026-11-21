@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
 import type { CompiledEdge } from "../../../src/diagram/drawing.ts";
-import type { BoxOptions, Node, Route } from "../../../src/diagram/elements.ts";
+import { type BoxOptions, type Node, type Route, slug } from "../../../src/diagram/elements.ts";
 import { type Rect, round } from "../../../src/diagram/geometry.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { attachment, stack } from "../../../src/diagram/outlines.ts";
@@ -165,6 +165,15 @@ test("an id named after an owner gets a number when another element already has 
   assert.deepEqual(
     out.edges.filter((e) => e.passive).map((e) => e.id),
     ["client-lifeline", "api-lifeline-2"],
+  );
+});
+
+test("a slug keeps underscores and joins every other run of characters with one dash", () => {
+  assert.deepEqual(
+    ["Auth service", "user_id", "__init__", "a__b", "a _ b", "___", "--", "Hello, World!"].map(
+      slug,
+    ),
+    ["auth-service", "user_id", "__init__", "a__b", "a-_-b", "___", "node", "hello-world"],
   );
 });
 
@@ -1123,7 +1132,7 @@ test("record cells are elements; an edge from a row leaves the record's side", (
   const rec = d.record(["seq", "author", "text"], { title: "Message", id: "message" });
   const choice = d.decision("Same page?", { id: "choice" });
   d.row([rec, choice], { gap: 80 });
-  const link = d.arrow(rec.element("text"), choice, { id: "link" });
+  const link = d.arrow(rec.member("text"), choice, { id: "link" });
   const out = compile(scene, lookups);
   const r = out.nodes.find((n) => n.id === "message")?.rect;
   const cell = out.nodes.find((n) => n.id === "message.text");
@@ -1191,7 +1200,7 @@ test("member ids follow their record's id, even when it is derived and repeated"
   const a = d.record(["key", "next"], { title: "entry" });
   const b = d.record(["key", "next"], { title: "entry" });
   d.row([a, b]);
-  const link = d.arrow(a.element("next"), b.element("key"));
+  const link = d.arrow(a.member("next"), b.member("key"));
   const untitled = d.record(["x"]);
   d.place(untitled, { below: a });
   const out = compile(scene, lookups);
@@ -1216,7 +1225,7 @@ test("a missing member is reported, and its parent stands in", () => {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
   const rec = d.record(["id"], { id: "users" });
-  assert.equal(rec.element("email"), rec);
+  assert.equal(rec.member("email"), rec);
   const out = compile(scene, lookups);
   const missing = out.diagnostics.find((x) => x.code === "UNKNOWN_ELEMENT");
   assert.match(missing?.message ?? "", /no member "email"\. Members: id\./);
@@ -1247,10 +1256,10 @@ test("text marks are elements over their substring; unmatched marks are reported
     mono: true,
     marks: {
       path: "/users/42",
-      header: { lines: "2" },
+      header: { lines: 2 },
       nope: "absent",
       twice: "e",
-      far: { lines: "4" },
+      far: { lines: 4 },
     },
   });
   const centered = d.text("one two\nthree", { id: "c", marks: { two: "two" } });
@@ -1260,7 +1269,7 @@ test("text marks are elements over their substring; unmatched marks are reported
   const width = (s: string) => measure(s, { family: "", size: 0, weight: 0 });
   const path = node("req.path");
   const text = node("req")?.rect;
-  assert.ok(path && text && t.element("path") !== t);
+  assert.ok(path && text && t.member("path") !== t);
   assert.equal(path.rect.x, text.x + width("GET "));
   assert.equal(path.lines[0]?.text, "/users/42");
   const unmatched = out.diagnostics.filter((x) => x.code === "MARK_UNMATCHED");
@@ -1273,6 +1282,61 @@ test("text marks are elements over their substring; unmatched marks are reported
   const c = node("c")?.rect;
   assert.ok(two && c);
   assert.equal(two.rect.x, c.x + (c.width - width("one two")) / 2 + width("one "));
+});
+
+test("a mark's lines are one line or [first, last]; lines outside the text are MARK_UNMATCHED", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  d.text("one\ntwo\nthree\nfour", {
+    id: "t",
+    mono: true,
+    marks: {
+      third: { lines: 3 },
+      middle: { lines: [2, 4] },
+      past: { lines: [3, 5] },
+      reversed: { lines: [4, 2] },
+      written: { lines: "2-4" as never },
+    },
+  });
+  const out = compile(scene, lookups);
+  const node = (id: string) => out.nodes.find((n) => n.id === id);
+  assert.deepEqual(
+    node("t.third")?.lines.map((l) => l.text),
+    ["three"],
+  );
+  assert.deepEqual(
+    node("t.middle")?.lines.map((l) => l.text),
+    ["two", "three", "four"],
+  );
+  assert.equal(node("t.middle")?.rect.height, round(3 * (node("t.third")?.rect.height ?? 0)));
+  const problems = out.diagnostics.filter((x) => x.code !== "NODE_OVERLAP");
+  assert.deepEqual(
+    problems.map((x) => [x.code, x.ids, x.subject]),
+    [
+      ["INVALID_ARGUMENT", ["t"], "marks.written.lines"],
+      ["MARK_UNMATCHED", ["t.past"], undefined],
+      ["MARK_UNMATCHED", ["t.reversed"], undefined],
+    ],
+  );
+  assert.deepEqual(
+    problems.slice(1).map((x) => x.message),
+    [
+      "t.past: lines [3, 5] are not within 1–4.",
+      "t.reversed: lines [4, 2] start after they end. Write [2, 4].",
+    ],
+  );
+});
+
+test("a member keeps the underscores of its label, so member() finds it by them", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const orders = d.record(["id\tuuid", "user_id\tuuid"], { title: "orders" });
+  const cell = orders.member("user_id");
+  const out = compile(scene, lookups);
+  assert.deepEqual(codes(out), []);
+  assert.notEqual(cell, orders);
+  assert.equal(cell.id, "orders.user_id");
+  assert.equal(out.nodes.find((n) => n.id === "orders.user_id")?.label, "user_id\tuuid");
 });
 
 test("a marked substring split by wrapping says so", () => {
@@ -1634,7 +1698,7 @@ test("an edge leaves a wide cell through the side its line crosses first", () =>
   const rec = d.record([["Options", 32]], { columns: 32, width: 420, id: "tcp" });
   const note = d.note("Up to 40 bytes", { id: "note" });
   d.place(note, { below: rec, gap: 40, align: "end" });
-  d.arrow(note, rec.element("options"));
+  d.arrow(note, rec.member("options"));
   const out = compile(scene, lookups);
   const cell = out.nodes.find((n) => n.id === "tcp.options")?.rect;
   const tip = out.edges[0]?.head?.points[0];

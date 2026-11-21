@@ -105,11 +105,13 @@ const cell = either(
   tuple("[label, span]", text, standIn(span, 1, "A span of 1 stands in.")),
   tuple("[label, options]", text, options<CellOptions>()({ ...member, id: text, span })),
 );
+/** A line of a text, counted from 1. */
+const lineNumber = number({ min: 1, whole: true });
 /** A text's mark: the text it highlights, or its lines. */
 const mark = either(
   text,
   options<MarkOptions>()(
-    { ...member, text, lines: text },
+    { ...member, text, lines: either(lineNumber, tuple("[first, last]", lineNumber, lineNumber)) },
     { forms: { keys: { text: [], lines: [] }, required: true } },
   ),
 );
@@ -479,7 +481,7 @@ export const signatures = {
       arg("dy", standIn(number(), 0, "0 stands in.")),
     ],
   },
-  element: { name: "element", args: [arg("id", text, "The shape stands in.")] },
+  member: { name: "member", args: [arg("id", text, "The shape stands in.")] },
   label: { name: "label", args: [arg("label", edgeLabel, "It is left out.")] },
 } satisfies Record<string, Signature>;
 

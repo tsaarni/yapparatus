@@ -52,8 +52,8 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   ], { title: "users", header: "column\ttype\tkey", mono: true })
   const teams = d.record(["id\tuuid\tPK", "name\ttext"], { title: "teams", header: "column\ttype\tkey", mono: true, category: "New" })
   d.row([orders, users, teams], { gap: 80, align: "start" })
-  d.arrow(orders.element("user-id"), users.element("id"))
-  d.arrow(users.element("team-id"), teams.element("id"))
+  d.arrow(orders.member("user_id"), users.member("id"))
+  d.arrow(users.member("team_id"), teams.member("id"))
 }} />
 
 <Diagram id="tcp-header" caption="A protocol header with a ruler and a pinned field." draw={(d) => {
@@ -66,7 +66,7 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   const flags = d.note("1  CWR and ECE signal congestion")
   const options = d.note("Up to 40 bytes")
   d.place(d.row([flags, options], { gap: 40 }), { below: tcp, gap: 40 })
-  d.arrow(options, tcp.element("options-variable-length"))
+  d.arrow(options, tcp.member("options-variable-length"))
 }} />
 
 <Diagram id="hash-table" caption="An array of buckets and a linked list." draw={(d) => {
@@ -75,9 +75,9 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   const cat = d.record(["key: \"cat\"", "next"], { title: "entry", mono: true, category: "Collision" })
   const bee = d.record(["key: \"bee\"", "next"], { title: "entry", mono: true })
   d.place(d.row([ant, cat, bee], { gap: 40, align: "start" }), { below: buckets, gap: 56 })
-  d.arrow(buckets.element("2"), ant)
-  d.arrow(buckets.element("6"), bee)
-  d.arrow(ant.element("next"), cat.element("key-cat"))
+  d.arrow(buckets.member("2"), ant)
+  d.arrow(buckets.member("6"), bee)
+  d.arrow(ant.member("next"), cat.member("key-cat"))
 }} />
 
 ## Marked text
@@ -89,15 +89,15 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
     marks: {
       path: { text: "/users/42", role: "accent" },
       host: { text: "api.example.com", category: "Picks the site" },
-      auth: { lines: "3", category: "Credential" },
+      auth: { lines: 3, category: "Credential" },
     },
   })
   const routing = d.note("Routes to a\nvirtual host")
   const secret = d.note("Never logged")
   d.place(routing, { rightOf: req, gap: 64, align: "start" })
   d.place(secret, { below: routing, gap: 24 })
-  d.arrow(routing, req.element("host"))
-  d.arrow(secret, req.element("auth"))
+  d.arrow(routing, req.member("host"))
+  d.arrow(secret, req.member("auth"))
 }}>
   <Step focus="req.host">The host picks the site.</Step>
 </Diagram>

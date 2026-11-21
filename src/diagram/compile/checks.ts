@@ -62,9 +62,9 @@ export function checkIds(scene: Scene, report: Report) {
     if (d) el.id = `${d.owner.id}${d.suffix}`;
     return el;
   };
-  const members = scene.nodes.filter((n) => n.member);
+  const members = scene.nodes.filter((n) => n.membership);
   const shapes = [
-    ...scene.nodes.filter((n) => !n.member),
+    ...scene.nodes.filter((n) => !n.membership),
     ...scene.grids,
     ...scene.enclosures,
     ...scene.frames,
@@ -72,7 +72,7 @@ export function checkIds(scene: Scene, report: Report) {
   const deepest = Math.max(0, ...shapes.map(depth));
   for (let level = 0; level <= deepest; level++)
     settle(shapes.filter((el) => depth(el) === level).map(named));
-  for (const m of members) if (m.member) m.id = `${m.member.parent.id}.${m.member.own}`;
+  for (const m of members) if (m.membership) m.id = `${m.membership.parent.id}.${m.membership.own}`;
   settle(members.map((m) => ({ id: m.id, explicitId: true })));
   for (const edge of scene.edges) if (!derived.has(edge)) edge.deriveId();
   settle(scene.edges.map(named));
@@ -81,7 +81,7 @@ export function checkIds(scene: Scene, report: Report) {
 /** Every element needs a position owner; all but the first without one are reported. */
 export function checkPlaced(scene: Scene, report: Report) {
   const roots = [...scene.nodes, ...scene.grids].filter(
-    (el) => !scene.owner.has(el) && !(el instanceof Node && el.member),
+    (el) => !scene.owner.has(el) && !(el instanceof Node && el.membership),
   );
   const firstRoot = roots[0];
   if (roots.length > 1)
@@ -143,7 +143,7 @@ export function validate(
   const endOf = (p: PointLike) => {
     const el = elementOf(p);
     const ids = new Set(el ? [el.id] : []);
-    if (el instanceof Node && el.member) ids.add(el.member.parent.id);
+    if (el instanceof Node && el.membership) ids.add(el.membership.parent.id);
     return ids;
   };
   scene.edges.forEach((edge, k) => {
@@ -160,7 +160,7 @@ export function validate(
       if (node.parent !== undefined) {
         const fromSibling = [edge.from, edge.to].some((p) => {
           const el = elementOf(p);
-          return el instanceof Node && el.member?.parent.id === node.parent;
+          return el instanceof Node && el.membership?.parent.id === node.parent;
         });
         if (!fromSibling) continue;
       }

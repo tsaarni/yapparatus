@@ -208,9 +208,10 @@ Long text wraps at spaces into lines of similar length: at 220 units in boxes, c
 Every element has an id. Steps, links, and the reader's comments use it.
 
 - A shape's id comes from its label: `"Auth service"` → `auth-service`. A labelled start or end too: `d.start("Request received")` → `request-received`.
+- Lowercase letters, digits, and underscores stay, every other run of characters becomes one hyphen, and hyphens at the ends are dropped: `"user_id"` → `user_id`, `"GET /items"` → `get-items`.
 - An edge's id joins the ids of its ends: `client->api`. With a box labelled "Get an answer", the edge from `ask` is `ask->get-an-answer`.
 - A category's id comes from its name: `"To be removed"` → `to-be-removed`.
-- A record cell or text mark has its parent's id, a dot, and its own: `users.team-id`. See [Members](diagram-structures.md#members).
+- A record cell or text mark has its parent's id, a dot, and its own: `users.team_id`. See [Members](diagram-structures.md#members).
 - An enclosure's id comes from its title, and a frame's from its tab and title: `d.frame(a, b, { tab: "loop", title: "until empty" })` → `loop-until-empty`.
 - An element without text has the name of its call and its count among the calls of that kind: `row-1`, `column-1`, `grid-1`, `start-1`, `end-1`, `record-1`, `enclosure-1`, `frame-1`, `sequence-1`. Only your calls count, so the rows inside a tree or a sequence do not change these numbers.
 - An element that a sequence or a tree makes has its owner's id and a suffix, such as the lifeline `api-lifeline` or the branch `platform-tree`. See [Sequences](diagram-sequences.md#reference) and [Trees](diagram-trees.md#reference).
@@ -481,7 +482,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or draw a shape to itself, which loops |
 | `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |
-| `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are out of range. Mark a longer text or whole lines, or break the text's lines with `\n` |
+| `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are past the last line or start after they end. Mark a longer text or whole lines, break the text's lines with `\n`, or count the lines from 1 |
 | `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
 | `EDGE_NODE_INTERSECTION` | warning | Give the edge the route `{ viaX: x }`, `{ viaY: y }`, `{ via: [points] }`, or `{ bend: units }`, or move the shape. An edge that runs through its own end needs a straight route or another route form |
 | `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one the route `{ bend: units }`, attach one at a `port()`, or draw one edge with `tail: "filled"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
@@ -495,7 +496,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `UNPLACED` | error | Add the shape to a grid, row, or column, or `place()` it |
 | `UNKNOWN_ICON` | error | The icon name is not a Lucide icon, so nothing is drawn. Use a name from the message, or find one as [Icons](icons.md#find-names) shows, without the `lucide:` prefix |
 | `UNKNOWN_GUTTER` | error | `gutterX(i)` or `gutterY(i)` names a gap that does not exist. A grid of n columns has gutters 0 to n - 2 |
-| `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `element()` names a member that does not. The message lists the valid ids |
+| `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `member()` names a member that does not. The message lists the valid ids |
 | `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |
 | `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |
 | `STEP_ONLY_UNUSED` | warning | A `stepOnly` element that no step focuses is never shown |

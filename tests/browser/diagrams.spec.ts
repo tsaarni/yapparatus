@@ -73,6 +73,13 @@ test("every diagram form compiles without diagnostics and draws in the browser",
   await expect(page.getByRole("list", { name: "Diagram diagnostics" })).toHaveCount(0);
 });
 
+test("a link to a member whose id keeps an underscore opens the element", async ({ page }) => {
+  await page.goto("/diagrams#tables--orders.user_id");
+  const cell = page.locator('[id="tables--orders.user_id"]');
+  await expect(cell).toHaveAttribute("data-element-id", "orders.user_id");
+  await expect(cell).toBeInViewport();
+});
+
 test("frames keep their look without a role; step-only frames and enclosures show in steps", async ({
   page,
 }) => {
