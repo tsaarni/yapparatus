@@ -250,7 +250,7 @@ export function titleCrossings(
       edge.points.slice(1).some((b, i) => segmentHitsRect(edge.points[i] as Vec, b, clear))
         ? [
             [
-              `${edge.id} crosses the title of ${e.id}. Move the title with titleAt, or move the edge.`,
+              `${edge.id} crosses the title of ${e.id}. Move the title with titleCorner, or move the edge.`,
               [edge.id, e.id],
             ],
           ]

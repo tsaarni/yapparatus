@@ -131,7 +131,6 @@ export class Scene {
   ): Edge {
     this.#grow();
     const edge = new Edge(from, to, options, internals);
-    edge.checkArgs = this.checkArgs;
     this.#edges.push(edge);
     this.#noteCategory(edge.category);
     return edge;

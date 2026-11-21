@@ -95,7 +95,7 @@ export const shapes = {
    * A decision's rhombus: the room added to its text on each axis, the factors that grow the sum
    * to the rhombus, and its least size.
    */
-  diamond: { padX: 28, padY: 14, growX: 1.5, growY: 1.7, minWidth: 80, minHeight: 52 },
+  decision: { padX: 28, padY: 14, growX: 1.5, growY: 1.7, minWidth: 80, minHeight: 52 },
   /** How far an input or output's top edge is shifted right of its bottom edge. */
   io: { slant: 14 },
   /** How far a document's wavy bottom rises above and dips below its bottom line. */
@@ -119,8 +119,9 @@ export const shapes = {
   },
   /** How far a mark's highlight reaches past its text. */
   mark: { linesPad: 5 },
-  dot: 16,
-  ring: 20,
+  /** The diameters of a start's dot and an end's ring. */
+  start: 16,
+  end: 20,
   /** Between a start or end dot and its label. */
   terminalGap: 8,
   bar: 10,

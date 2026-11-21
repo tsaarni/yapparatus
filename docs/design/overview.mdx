@@ -49,8 +49,8 @@ A finished document can be built as a static website or as one HTML file, withou
   d.place(agent, { rightOf: api, gap: 120 })
 
   d.enclose([browserRow], { id: "browser", title: "Browser: web app" })
-  d.enclose([serverRow], { id: "server", title: "Server", titleAt: "bottomLeft" })
-  const project = d.enclose([filesRow], { id: "project", title: "Project directory", titleAt: "bottomRight" })
+  d.enclose([serverRow], { id: "server", title: "Server", titleCorner: "bottomLeft" })
+  const project = d.enclose([filesRow], { id: "project", title: "Project directory", titleCorner: "bottomRight" })
 
   d.arrow(pages.top.offset(40, 0), compiler.bottom.offset(40, 0), { id: "reads", label: "MDX" })
   d.arrow(compiler, page, { id: "modules", label: "page modules" })
@@ -60,7 +60,7 @@ A finished document can be built as a static website or as one HTML file, withou
   d.arrow(agent.bottom, pages.bottom, {
     id: "edits",
     route: { viaY: project.bottom.offset(0, 28) },
-    label: { text: "edits pages", segment: 1, side: "below" },
+    label: { text: "edits pages", segment: 1, side: "bottom" },
     role: "accent",
   })
 }}>
@@ -144,7 +144,7 @@ The source code is split into directories. Code in each directory runs in Node, 
   const lower = d.row([diagram, chart, protocol], { gap: 56 })
   d.place(lower, { below: upper, gap: 104 })
   d.place(doc, { below: chart, gap: 64 })
-  const shared = d.enclose([lower, doc], { id: "shared", title: "Shared code", titleAt: "bottomLeft" })
+  const shared = d.enclose([lower, doc], { id: "shared", title: "Shared code", titleCorner: "bottomLeft" })
   d.arrow(vite, server)
   d.arrow(server, compiler)
   d.arrow(vite, compiler, { route: { bend: 40 } })

@@ -119,10 +119,10 @@ export function createLayout(
       height: o.height ?? Math.max(height, o.minHeight ?? 0),
     });
     switch (node.shape) {
-      case "dot":
-        return fixed(shapes.dot, shapes.dot);
-      case "ring":
-        return fixed(shapes.ring, shapes.ring);
+      case "start":
+        return fixed(shapes.start, shapes.start);
+      case "end":
+        return fixed(shapes.end, shapes.end);
       case "bar":
         return fixed(shapes.bar, 0);
       case "actor":
@@ -140,8 +140,8 @@ export function createLayout(
           c.width + 2 * shapes.note.padX + shapes.note.fold / 2,
           c.height + 2 * shapes.note.padY,
         );
-      case "diamond": {
-        const r = shapes.diamond;
+      case "decision": {
+        const r = shapes.decision;
         return fixed(
           Math.max((c.width + r.padX) * r.growX, r.minWidth),
           Math.max((c.height + r.padY) * r.growY, r.minHeight),
@@ -333,12 +333,12 @@ export function createLayout(
   }
 
   function terminalLabel(node: Node, rect: Rect): Rect | undefined {
-    if ((node.shape !== "dot" && node.shape !== "ring") || !node.label) return undefined;
+    if ((node.shape !== "start" && node.shape !== "end") || !node.label) return undefined;
     const c = measureNode(node);
     const gap = shapes.terminalGap;
     const cx = rect.x + rect.width / 2;
     const cy = rect.y + rect.height / 2;
-    switch (node.options.side ?? "right") {
+    switch (node.options.labelSide ?? "right") {
       case "right":
         return {
           x: rect.x + rect.width + gap,
@@ -353,14 +353,14 @@ export function createLayout(
           width: c.width,
           height: c.height,
         };
-      case "above":
+      case "top":
         return {
           x: cx - c.width / 2,
           y: rect.y - gap - c.height,
           width: c.width,
           height: c.height,
         };
-      case "below":
+      case "bottom":
         return {
           x: cx - c.width / 2,
           y: rect.y + rect.height + gap,
@@ -381,7 +381,7 @@ export function createLayout(
       const width = Math.max(inner.width + 2 * pad, titleWidth);
       const r = {
         x: inner.x + inner.width / 2 - width / 2,
-        y: inner.y - pad - (e.options.titleAt?.startsWith("bottom") ? 0 : titleBand),
+        y: inner.y - pad - (e.options.titleCorner?.startsWith("bottom") ? 0 : titleBand),
         width,
         height: inner.height + 2 * pad + titleBand,
       };

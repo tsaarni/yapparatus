@@ -139,7 +139,7 @@ d.arrow(busy, busy, { label: "retry", route: { loop: "top" } })
 | `d.text(label, options?)` | Text without an outline; with `marks`, see [Marked text](diagram-structures.md#marked-text) |
 
 - **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
-- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is the call and its count: `start-1`, `start-2`, and `end-1`.
+- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `labelSide` given (`right` by default, or `left`, `top`, `bottom`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is the call and its count: `start-1`, `start-2`, and `end-1`.
 - **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element. Text has no fill, so an edge through it is reported like an edge through a shape.
 - **Replicas:** `replicas` on `d.box` or `d.doc` draws a stack of 2 to 4 boxes or pages, for pods, shards, workers, or several documents. The stack has exactly that many, so two pods are `replicas: 2`. For a larger or unknown number, put the number in the label of a stack of 4. Any other value is `INVALID_ARGUMENT`, and the shape is drawn alone. Each shape behind adds 5 units to the width and the height, and the text sits on the front shape. A fixed `width` or `height` is the front shape's.
 
@@ -184,7 +184,7 @@ The shapes take these options. "All" is every shape in the table above but `d.re
 | `mono` | all but `start` and `end` | Monospace text |
 | `replicas` | `box`, `doc` | A stack of 2 to 4. See Replicas above |
 | `icon` | `box` | An icon left of the label. See Icons above |
-| `side` | `start`, `end` | Where the label sits beside the dot |
+| `labelSide` | `start`, `end` | The side of the dot where the label sits |
 | `marks` | `text` | Marked spans and lines. See [Marked text](diagram-structures.md#marked-text) |
 
 `role` is one of these:
@@ -236,7 +236,7 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 | `d.column([a, b], { gap?, align? })` | Top to bottom: a grid of one column. Default gap: 64 |
 | `d.place(b, { below: a, gap?, align? })` | Also `above`, `leftOf`, `rightOf` |
 | `d.place(b, { at: point, anchor? })` | Put the anchor of `b` (default `center`) on a point |
-| `d.enclose([a, b], { id?, title?, titleAt?, padding?, role?, category?, stepOnly? })` | A boundary around shapes. It never moves them |
+| `d.enclose([a, b], { id?, title?, titleCorner?, padding?, role?, category?, stepOnly? })` | A boundary around shapes. It never moves them |
 | `d.equalSize([a, b])`, `equalWidth`, `equalHeight` | Share the largest measured size |
 
 | Option | Calls | Meaning |
@@ -246,7 +246,7 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 | `align` | `grid`, `row`, `column`, `place` | `start`, `center` (the default), or `end` |
 | `below`, `above`, `leftOf`, `rightOf` | `place` | The element to place the shape next to |
 | `at`, `anchor` | `place` | A point, and the anchor of the shape that goes on it |
-| `title`, `titleAt`, `padding` | `enclose` | The title, the corner that holds it, and the space around the members |
+| `title`, `titleCorner`, `padding` | `enclose` | The title, the corner that holds it, and the space around the members |
 | `role`, `category`, `stepOnly` | `enclose` | As on shapes. Without a `role`, an enclosure is `muted` |
 
 - Gaps are measured between edges, not between centers.
@@ -255,7 +255,7 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 - In a row, `align` places the shapes vertically, and in a column horizontally.
 - `place` takes exactly one of `below`, `above`, `leftOf`, `rightOf`, and `at`. The first four take `gap` and `align`, and `at` takes `anchor`.
 - Grids, rows, and columns are elements: they nest, and you can place them.
-- `titleAt` is `topLeft` (the default), `topRight`, `bottomLeft`, or `bottomRight`.
+- `titleCorner` is `topLeft` (the default), `topRight`, `bottomLeft`, or `bottomRight`.
 - The first shape without a position goes at the origin.
 
 ### Grids
@@ -304,7 +304,7 @@ Derived points:
 - `p.offset(dx, dy)`: a shift; y grows downward.
 - `d.xy(a, b)`: the x of `a` with the y of `b`.
 - `d.lerp(a, b, t)`: between two points.
-- `d.point(x, y)` or `[x, y]`: absolute coordinates.
+- `[x, y]`: absolute coordinates.
 
 ## Edges
 
@@ -320,7 +320,7 @@ d.line(from, to, ...)   // the same, with no arrowhead unless head or tail gives
 | Option | Values |
 |---|---|
 | `id` | See [Ids](#ids) |
-| `label` | A string, or a label's options, as below |
+| `label` | A string, a label's options, or a list of either, as below |
 | `route` | `"straight"` (default), `"hv"`, `"vh"`, `{ viaX: x }`, `{ viaY: y }`, `{ via: [p1, p2] }`, `{ bend: units }`, `{ loop: side }` |
 | `head` | The arrowhead at `to`: `"filled"` (default on `d.arrow`), `"open"`, or `"none"` (default on `d.line`) |
 | `tail` | The arrowhead at `from`: `"filled"`, `"open"`, or `"none"` (default) |
@@ -343,13 +343,13 @@ Routes:
 - `bend` curves the edge this many units to the left of the direction of travel. Give an A→B edge and a B→A edge the same `bend`, and they curve apart.
 - `loop` is the route of an edge from a shape to itself, `d.arrow(a, a)`, and leaves and returns on the given side. Such an edge has `{ loop: "right" }` unless it gives a side, and takes no other route.
 
-A label is a string or `{ text, segment, at, side, gap }`:
+A label is a string or `{ text, segment, along, side, gap }`:
 
 - `segment` is the leg of the route, from 0.
-- `at` is the position along the leg, from 0 to 1.
-- `side` is `above`, `below`, `left`, or `right`.
+- `along` is the position along the leg, from 0 to 1.
+- `side` is `top`, `bottom`, `left`, or `right`: `top` puts the label above the leg.
 - Default position: the middle of the longest leg, above a horizontal leg and to the right of a vertical one. On curves and loops, the label goes outside.
-- `edge.label(...)` adds another label.
+- An edge with several labels takes a list: `label: ["request", { text: "retry", segment: 2 }]`.
 
 ## Patterns
 
@@ -358,7 +358,7 @@ A label is a string or `{ text, segment, at, side, gap }`:
 - **Elbows between columns use a gutter.** When several edges cross from one column to the next, route each through the grid's gutter: `route: { viaX: g.gutterX(0) }`. They then turn at one line instead of crossing each other.
 - **Edges that would cross a node go around it.** Route through a channel above or below, such as `route: { viaY: group.bottom.offset(0, 28) }`, and give the label the leg it belongs on with `segment`.
 - **Parallel edges between the same shapes** leave from offset points, such as `a.top.offset(40, 0)`, or curve apart with the same `bend` route.
-- **Enclosures name a boundary,** such as a process, a machine, or a network. Move the title with `titleAt` when an edge would cross it.
+- **Enclosures name a boundary,** such as a process, a machine, or a network. Move the title with `titleCorner` when an edge would cross it.
 - **Gaps carry meaning.** Use the defaults, and widen a gap only to make room for an edge label or to separate groups.
 
 ## Frames
@@ -488,9 +488,9 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `EDGE_NODE_INTERSECTION` | warning | Give the edge the route `{ viaX: x }`, `{ viaY: y }`, `{ via: [points] }`, or `{ bend: units }`, or move the shape. An edge that runs through its own end needs a straight route or another route form |
 | `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one the route `{ bend: units }`, attach one at a `port()`, or draw one edge with `tail: "filled"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
 | `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Each end is reported by itself. Widen the gap |
-| `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
+| `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `along`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements, enclosures included, overlap only if one step shows both |
-| `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
+| `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleCorner`, or move the edge |
 | `TEXT_OVERFLOW` | warning | A word is wider than a fixed `width`, a record cell is wider than its cell, or the text is taller than a fixed `height`. Increase `width` or `height` |
 | `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |

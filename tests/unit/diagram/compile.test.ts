@@ -331,6 +331,62 @@ test("elbow route keeps anchors and labels a vertical leg on its right", () => {
   assert.ok(label && p0 && label.rect.x > p0.x, "label sits right of the vertical leg");
 });
 
+test("an edge with a list of two labels places both", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b], { gap: 200 });
+  d.arrow(a, b, { label: ["send", { text: "retry", side: "bottom" }] });
+  const out = compile(scene, lookups);
+  assert.deepEqual(codes(out), []);
+  const [send, retry] = out.edges[0]?.labels ?? [];
+  assert.ok(send && retry);
+  assert.deepEqual(
+    [send, retry].map((l) => l.lines.map((line) => line.text)),
+    [["send"], ["retry"]],
+  );
+  const y = out.edges[0]?.points[0]?.y ?? 0;
+  assert.ok(send.rect.y + send.rect.height < y, "the first label sits above the edge");
+  assert.ok(retry.rect.y > y, "the second label sits below it");
+  assert.equal(out.edges[0]?.ariaLabel, "send, retry, from A to B");
+});
+
+test("an empty text adds no label, as a string, an object, or in a list", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const [a, b] = [d.box("A"), d.box("B")];
+  d.row([a, b], { gap: 200 });
+  d.arrow(a, b, "");
+  d.arrow(a, b, { id: "object", label: { text: "" } });
+  d.arrow(a, b, { id: "list", label: ["", { text: "" }, "kept"] });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.edges.map((e) => e.labels.map((l) => l.lines.map((line) => line.text).join(" "))),
+    [[], [], ["kept"]],
+  );
+});
+
+test("a label's top and bottom sides and its along sit where above, below, and at put it", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  const c = d.box("C");
+  d.row([a, b], { gap: 200 });
+  d.place(c, { below: b, gap: 200 });
+  d.arrow(a, b, { label: { text: "x", side: "top", along: 0.25 } });
+  d.arrow(b, c, { label: { text: "y", side: "bottom", along: 0.25 } });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.edges.map((e) => e.labels.map((l) => l.rect)),
+    [
+      [{ x: 146.5, y: -1.56, width: 15, height: 18.56 }],
+      [{ x: 348.5, y: 102, width: 15, height: 18.56 }],
+    ],
+  );
+});
+
 test("an edge with corners leaves at a right angle, at the projection of its next point", () => {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
@@ -1519,7 +1575,7 @@ test("an enclosure title can sit in any corner", () => {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
   const a = d.box("A");
-  d.enclose([a], { title: "Group", titleAt: "bottomRight" });
+  d.enclose([a], { title: "Group", titleCorner: "bottomRight" });
   const out = compile(scene, lookups);
   const e = out.enclosures[0];
   assert.ok(e?.titleRect);
@@ -1645,7 +1701,7 @@ test("start and end labels sit beside the dot without moving it, and are checked
   const eScene = new Scene();
 
   const e = new DiagramBuilder(eScene);
-  const s = e.start("Go", { side: "below" });
+  const s = e.start("Go", { labelSide: "bottom" });
   const b = e.box("Next");
   e.column([s, b]);
   e.arrow(s, b);

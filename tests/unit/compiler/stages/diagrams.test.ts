@@ -122,7 +122,7 @@ test("a diagram without draw is an error", async () => {
 test("a draw program that does not end is stopped after 1 second", async () => {
   const started = Date.now();
   const { issues } = await compilePage(`<Diagram id="endless" draw={(d) => {
-  for (;;) d.point(0, 0)
+  for (;;) d.xy([0, 0], [0, 0])
 }} />
 `);
   assert.ok(Date.now() - started < 3000);

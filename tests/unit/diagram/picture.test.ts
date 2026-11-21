@@ -92,6 +92,27 @@ const everything = (d: DiagramBuilder) => {
   d.place(flow, { below: sequence, gap: 40 });
 };
 
+test("a decision, a start, and an end have their calls' names and draw as before", () => {
+  const drawing = compileFigure(
+    { draw: (d) => void d.row([d.start(), d.decision("Ok?"), d.end()]), steps: [], build: false },
+    lookups,
+  );
+  assert.deepEqual(
+    drawing.nodes.map((n) => n.shape),
+    ["start", "decision", "end"],
+  );
+  const { svg } = pictureOf(drawing, {}, { measure, outline }, lightPaint);
+  const { text, surfaceRaised, borderControl } = lightColors;
+  assert.deepEqual(
+    [...svg.matchAll(/<g data-element-id=.*?<\/g>/g)].map((m) => m[0]),
+    [
+      `<g data-element-id="start-1" data-shape="start"><circle cx="8" cy="27.74" r="8" fill="${text}"/></g>`,
+      `<g data-element-id="ok" data-shape="decision"><polygon points="144,0 184,27.735 144,55.47 104,27.735" fill="${surfaceRaised}" stroke="${borderControl}" stroke-width="1.5" stroke-linejoin="round"/><path d="M133.5 27.74h3" fill="${text}"/></g>`,
+      `<g data-element-id="end-1" data-shape="end"><circle cx="282" cy="27.74" r="9.25" fill="none" stroke="${text}" stroke-width="1.5"/><circle cx="282" cy="27.74" r="5" fill="${text}"/></g>`,
+    ],
+  );
+});
+
 test("the picture is well formed and draws every shape the figure has", () => {
   const { svg, width, height } = draw({ draw: everything, steps: [], build: false });
   assertWellFormed(svg);
@@ -104,9 +125,9 @@ test("the picture is well formed and draws every shape the figure has", () => {
     "io",
     "doc",
     "queue",
-    "diamond",
-    "dot",
-    "ring",
+    "decision",
+    "start",
+    "end",
     "note",
     "record",
     "cell",

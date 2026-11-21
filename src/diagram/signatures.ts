@@ -14,7 +14,6 @@ import type {
   GridOptions,
   HeadKind,
   LabelOptions,
-  LabelSide,
   LineOptions,
   MarkOptions,
   NodeOptions,
@@ -63,8 +62,6 @@ const role = oneOf<Role>()("default", "accent", "muted", "warning", "external");
 const align = oneOf<Align>()("start", "center", "end");
 /** A side of an element. */
 const side = oneOf<Side>()("top", "bottom", "left", "right");
-/** The side of an edge leg or a terminal's dot where a label sits. */
-const labelSide = oneOf<LabelSide>()("above", "below", "left", "right");
 /** A size, in units: 0 or more. */
 const size = number({ min: 0 });
 /** A gap, in units. A negative gap overlaps what it separates. */
@@ -123,13 +120,15 @@ const edgeLabel = either(
     {
       text,
       segment: number({ min: 0, whole: true }),
-      at: number({ min: 0, max: 1 }),
-      side: labelSide,
+      along: number({ min: 0, max: 1 }),
+      side,
       gap,
     },
     { required: ["text"] },
   ),
 );
+/** An edge's labels: one label, or a list of them. */
+const edgeLabels = either(edgeLabel, list(edgeLabel));
 /** How an edge travels. */
 const route = either(
   oneOf<Extract<Route, string>>()("straight", "hv", "vh"),
@@ -171,7 +170,7 @@ const edgeOptions = either(
   options<EdgeOptions>()({
     ...edgeStyle,
     id: text,
-    label: edgeLabel,
+    label: edgeLabels,
     route,
   }),
 );
@@ -435,7 +434,7 @@ export const signatures = {
         options<EncloseOptions>()({
           id: text,
           title: text,
-          titleAt: oneOf<Corner>()("topLeft", "topRight", "bottomLeft", "bottomRight"),
+          titleCorner: oneOf<Corner>()("topLeft", "topRight", "bottomLeft", "bottomRight"),
           padding: size,
           role,
           category: text,
@@ -450,13 +449,6 @@ export const signatures = {
   equalSize: sizeGroup("equalSize"),
   equalWidth: sizeGroup("equalWidth"),
   equalHeight: sizeGroup("equalHeight"),
-  point: {
-    name: "point",
-    args: [
-      arg("x", standIn(number(), 0, "0 stands in.")),
-      arg("y", standIn(number(), 0, "0 stands in.")),
-    ],
-  },
   xy: {
     name: "xy",
     args: [
@@ -487,7 +479,6 @@ export const signatures = {
     ],
   },
   member: { name: "member", args: [arg("id", text, "The shape stands in.")] },
-  label: { name: "label", args: [arg("label", edgeLabel, "It is left out.")] },
 } satisfies Record<string, Signature>;
 
 /** The name of a call or a method that has a signature. */
@@ -512,7 +503,7 @@ function terminal(name: string): Signature {
           role,
           category: text,
           stepOnly: boolean,
-          side: labelSide,
+          labelSide: side,
         }),
         {},
       ),

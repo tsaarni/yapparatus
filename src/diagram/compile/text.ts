@@ -107,13 +107,13 @@ const labelShapes = new Set<Shape>([
   "queue",
   "doc",
   "io",
-  "diamond",
+  "decision",
   "actor",
   "icon",
 ]);
 
 /** The shapes whose text wraps at `textWrapWidth` when no width is fixed. */
-const textShapes = new Set<Shape>(["note", "text", "dot", "ring"]);
+const textShapes = new Set<Shape>(["note", "text", "start", "end"]);
 
 /** Text measuring for one compile, with each node's measured content cached. */
 export function createText(m: Metrics, measure: Measure, report: Report, icons: Icons) {
@@ -136,8 +136,8 @@ export function createText(m: Metrics, measure: Measure, report: Report, icons: 
       node.shape === "actor" ||
       node.shape === "icon" ||
       node.shape === "bar" ||
-      node.shape === "dot" ||
-      node.shape === "ring"
+      node.shape === "start" ||
+      node.shape === "end"
         ? 0
         : node.shape === "note"
           ? shapes.note.padX

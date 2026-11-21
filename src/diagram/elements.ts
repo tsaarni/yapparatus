@@ -43,7 +43,7 @@ export type Reporter = (
 ) => void;
 
 /** An element's method whose arguments the scene checks. */
-export type Method = "port" | "member" | "label" | "offset";
+export type Method = "port" | "member" | "offset";
 
 /**
  * Checks the arguments of an element's method and gives the ones to use, or `undefined` for one
@@ -149,9 +149,9 @@ export type Shape =
   /** An icon above its label. */
   | "icon"
   | "note"
-  | "diamond"
-  | "dot"
-  | "ring"
+  | "decision"
+  | "start"
+  | "end"
   | "record"
   /** A member of a record: one cell of its grid. */
   | "cell"
@@ -204,8 +204,8 @@ export interface BoxOptions extends StackOptions {
 /** Options for `start()` and `end()`. Their size is fixed, so they take no size options. */
 export interface TerminalOptions
   extends Pick<NodeOptions, "id" | "sub" | "role" | "category" | "stepOnly"> {
-  /** Where the label sits next to the dot. Default: right. */
-  side?: LabelSide;
+  /** The side of the dot where the label sits. Default: right. */
+  labelSide?: Side;
 }
 
 /** Options of one member: a record cell or a text mark. */
@@ -290,7 +290,7 @@ export class Node extends Element {
   readonly label: string;
   readonly options: NodeOptions &
     Pick<BoxOptions, "replicas" | "icon"> &
-    Pick<TerminalOptions, "side"> &
+    Pick<TerminalOptions, "labelSide"> &
     Pick<RecordOptions, "columns" | "ruler" | "header">;
   readonly passive: boolean;
   readonly follows: Edge | undefined;
@@ -427,7 +427,7 @@ export interface EncloseOptions {
   id?: string;
   title?: string;
   /** The corner that holds the title. Default: topLeft. */
-  titleAt?: Corner;
+  titleCorner?: Corner;
   padding?: number;
   /** Default: muted. */
   role?: Role;
@@ -469,18 +469,18 @@ export type Route =
   /** Leave and return on this side: the route of an edge from an element to itself. */
   | { loop: Side };
 
-/** The side of an edge leg, or of a terminal's dot, where a label sits. */
-export type LabelSide = "above" | "below" | "left" | "right";
-
 /** An edge label and where on the route it sits. */
 export interface LabelOptions {
   text: string;
   /** Zero-based leg of the route. Default: the longest leg. */
   segment?: number;
   /** Position along that leg, 0→1. Default: 0.5. */
-  at?: number;
-  /** Default: above horizontal legs, right of vertical legs, outside curves and loops. */
-  side?: LabelSide;
+  along?: number;
+  /**
+   * The side of the leg where the label sits: `top` is above it. Default: top of horizontal legs,
+   * right of vertical legs, outside curves and loops.
+   */
+  side?: Side;
   gap?: number;
 }
 
@@ -490,7 +490,8 @@ export type HeadKind = "filled" | "open" | "none";
 /** Options of an edge. */
 export interface EdgeOptions {
   id?: string;
-  label?: string | LabelOptions;
+  /** The edge's label, or a list of its labels: each is its text or its text with options. */
+  label?: string | LabelOptions | Array<string | LabelOptions>;
   /** Default: `{ loop: "right" }` from an element to itself, else `"straight"`. */
   route?: Route;
   role?: Role;
@@ -531,9 +532,7 @@ export class Edge {
   readonly tail: HeadKind;
   readonly passive: boolean;
   readonly stepOnly: boolean;
-  readonly labels: LabelOptions[] = [];
-  /** Set by the scene: the check of a method's arguments. */
-  checkArgs?: MethodCheck;
+  readonly labels: readonly LabelOptions[];
   /** Whether the id joins the ids of the ends, which are final only at compile time. */
   readonly fromEnds: boolean;
   constructor(from: PointLike, to: PointLike, options: EdgeOptions, internals: EdgeInternals = {}) {
@@ -550,20 +549,14 @@ export class Edge {
     this.tail = options.tail ?? "none";
     this.passive = internals.passive ?? false;
     this.stepOnly = options.stepOnly ?? false;
-    if (options.label) this.label(options.label);
+    this.labels = [options.label ?? []]
+      .flat()
+      .map((l) => (typeof l === "string" ? { text: l } : l))
+      .filter((l) => l.text !== "");
   }
   /** Join the ids of the ends again, once they are final. */
   deriveId() {
     if (this.fromEnds) this.id = `${refName(this.from)}->${refName(this.to)}`;
-  }
-  /** Add a label. An edge can have several. */
-  label(label: string | LabelOptions): this {
-    const [checked] = (this.checkArgs?.(this, "label", [label]) ?? [label]) as [
-      (string | LabelOptions)?,
-    ];
-    if (checked !== undefined)
-      this.labels.push(typeof checked === "string" ? { text: checked } : checked);
-    return this;
   }
 }
 

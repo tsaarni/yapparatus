@@ -54,10 +54,10 @@ export function createNodes(
       case "mark":
         lines = member(node).lines;
         break;
-      case "dot":
-      case "ring":
+      case "start":
+      case "end":
         lines = labelRect
-          ? node.options.side === undefined || node.options.side === "right"
+          ? node.options.labelSide === undefined || node.options.labelSide === "right"
             ? stackLines(c.lines, labelRect.y, labelRect.x, "start")
             : stackLines(c.lines, labelRect.y, labelRect.x + labelRect.width / 2, "middle")
           : [];
@@ -199,7 +199,7 @@ export function createNodes(
       ...categoryOf(e.options.category),
       ...(e.options.stepOnly ? { stepOnly: true } : {}),
       rect,
-      ...(e.options.title ? titleGeometry(e.options.title, rect, e.options.titleAt) : {}),
+      ...(e.options.title ? titleGeometry(e.options.title, rect, e.options.titleCorner) : {}),
     };
   }
 

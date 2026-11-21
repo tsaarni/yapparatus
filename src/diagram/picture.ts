@@ -203,11 +203,11 @@ export function pictureOf(
           `<path${attrs({ d: fold, ...style, fill: color.diagramShade, "stroke-dasharray": undefined })}/>`
         );
       }
-      case "diamond":
+      case "decision":
         return `<polygon${attrs({ points: shape.pointList(shape.diamond(r)), ...style })}/>`;
-      case "dot":
+      case "start":
         return `<circle${attrs({ cx: r.x + r.width / 2, cy: r.y + r.height / 2, r: r.width / 2, fill: color.text })}/>`;
-      case "ring": {
+      case "end": {
         const center = { cx: r.x + r.width / 2, cy: r.y + r.height / 2 };
         return (
           `<circle${attrs({ ...center, r: r.width / 2 - 0.75, fill: "none", stroke: color.text, "stroke-width": stroke.line })}/>` +

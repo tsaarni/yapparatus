@@ -37,7 +37,7 @@ The server is the dev server: Vite with the `yapparatus()` plugin, serving one d
   d.place(docs, { below: compiler, gap: 88 })
   d.place(external, { at: d.xy(files.bottom, docs.top), anchor: "top" })
 
-  d.enclose([router, modules, prompt, log, compiler], { id: "server", title: "Server", titleAt: "bottomLeft" })
+  d.enclose([router, modules, prompt, log, compiler], { id: "server", title: "Server", titleCorner: "bottomLeft" })
 
   d.arrow(web, router, { id: "web-http", tail: "filled", label: "HTTP, updates" })
   d.arrow(library, router, { id: "agent-http", label: "HTTP" })
@@ -133,7 +133,7 @@ The server computes the agent state from the agent's requests and two time limit
   d.arrow(working.bottom, away.bottom, {
     id: "give-up",
     route: { viaY: waiting.bottom.offset(0, 120) },
-    label: { text: "nothing unanswered, 10 min, or chat cleared", segment: 1, side: "below" },
+    label: { text: "nothing unanswered, 10 min, or chat cleared", segment: 1, side: "bottom" },
   })
 }}>
   <Step focus="away connect waiting idle">An empty read ends after at most 25 s, and the library opens the next one at once, so the agent stays waiting.</Step>

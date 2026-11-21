@@ -42,8 +42,8 @@ function endpointName(p: PointLike): string {
 }
 
 /**
- * Where the line at a right angle to `side`, through `at` on that side, meets the circle of a dot
- * or a ring drawn in `rect`.
+ * Where the line at a right angle to `side`, through `at` on that side, meets the circle of a
+ * start or an end drawn in `rect`.
  */
 function circleExit(rect: Rect, side: Side, at: Vec): Vec {
   const n = normalOf(side);
@@ -187,15 +187,15 @@ export function createEdges(
       });
     }
     const out = { x: normal.x * Math.sign(bend), y: normal.y * Math.sign(bend) };
-    const side: LabelOptions["side"] =
+    const side: Side =
       Math.abs(out.y) >= Math.abs(out.x)
         ? out.y < 0
-          ? "above"
-          : "below"
+          ? "top"
+          : "bottom"
         : out.x < 0
           ? "left"
           : "right";
-    return { points, label: { segment: curveLegs / 2, at: 0, side }, radius: 0 };
+    return { points, label: { segment: curveLegs / 2, along: 0, side }, radius: 0 };
   }
 
   function loop(rect: Rect, side: Side) {
@@ -213,9 +213,6 @@ export function createEdges(
       x: base.x + along.x * s + out.x * o,
       y: base.y + along.y * s + out.y * o,
     });
-    const labelSide = ({ top: "above", bottom: "below", left: "left", right: "right" } as const)[
-      side
-    ];
     return {
       points: [
         at(-spread, 0),
@@ -223,7 +220,7 @@ export function createEdges(
         at(spread, selfLoop.size),
         at(spread, 0),
       ],
-      label: { segment: 1, side: labelSide },
+      label: { segment: 1, side },
       radius: corner.edge,
     };
   }
@@ -231,7 +228,7 @@ export function createEdges(
   function snap(el: Element, rect: Rect, center: Vec, toward: Vec, route: Route): Vec {
     const shape = el instanceof Node ? el.shape : "box";
     const form = { shape, replicas: el instanceof Node ? el.options.replicas : undefined };
-    const circular = shape === "dot" || shape === "ring";
+    const circular = shape === "start" || shape === "end";
     if (route === "straight") {
       const c = anchorOf(rect, "center");
       const dir = { x: toward.x - c.x, y: toward.y - c.y };
@@ -314,10 +311,10 @@ export function createEdges(
     }
     const a = points[segment] as Vec;
     const b = points[segment + 1] as Vec;
-    const t = l.at ?? 0.5;
+    const t = l.along ?? 0.5;
     const p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
     const vertical = Math.abs(b.x - a.x) < Math.abs(b.y - a.y);
-    const side = l.side ?? (vertical ? "right" : "above");
+    const side = l.side ?? (vertical ? "right" : "top");
     const gap = l.gap ?? edgeLabel.gap;
     const font = { family: m.sans, size: m.smallSize, weight: m.edgeWeight };
     const lineHeight = font.size * m.lineHeight;
@@ -325,10 +322,10 @@ export function createEdges(
     const height = texts.length * lineHeight + 2 * edgeLabel.padY;
     let center: Vec;
     switch (side) {
-      case "above":
+      case "top":
         center = { x: p.x, y: p.y - gap - height / 2 };
         break;
-      case "below":
+      case "bottom":
         center = { x: p.x, y: p.y + gap + height / 2 };
         break;
       case "left":
@@ -338,16 +335,16 @@ export function createEdges(
         center = { x: p.x + gap + width / 2, y: p.y };
         break;
     }
-    const along = vertical ? height : width;
+    const extent = vertical ? height : width;
     const leg = distance(a, b);
     if (
       legs === 1 &&
-      (side === "above" || side === "below") !== vertical &&
-      along + edgeLabel.room > leg
+      (side === "top" || side === "bottom") !== vertical &&
+      extent + edgeLabel.room > leg
     )
       report(
         "LABEL_CROWDED",
-        `${edge.id} label "${quoted}" needs ${round(along + edgeLabel.room)} units along segment ${segment}, which is ${round(leg)} long. Widen the gap or move the label.`,
+        `${edge.id} label "${quoted}" needs ${round(extent + edgeLabel.room)} units along segment ${segment}, which is ${round(leg)} long. Widen the gap or move the label.`,
         [edge.id],
       );
     const top = center.y - (texts.length * lineHeight) / 2;

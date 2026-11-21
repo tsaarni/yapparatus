@@ -273,7 +273,7 @@ function stackOutline(kind: Shape, rects: Rect[]): Vec[] {
 }
 
 /**
- * The outline that edges attach to, as a polygon that follows the drawn outline. Dots and rings
+ * The outline that edges attach to, as a polygon that follows the drawn outline. Starts and ends
  * attach to their circle, so they and every shape without an outline of its own give the bounds.
  */
 export function attachment(form: Form, r: Rect): Vec[] {
@@ -282,7 +282,7 @@ export function attachment(form: Form, r: Rect): Vec[] {
     case "box":
     case "doc":
       return stackOutline(kind, stack(r, form.replicas));
-    case "diamond":
+    case "decision":
       return diamond(r);
     case "note":
       return noteOutline(r);

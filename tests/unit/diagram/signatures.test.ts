@@ -68,7 +68,6 @@ const calls: Record<string, (d: DiagramBuilder) => unknown[]> = {
   equalSize: (d) => [[d.box("A")]],
   equalWidth: (d) => [[d.box("A")]],
   equalHeight: (d) => [[d.box("A")]],
-  point: () => [1, 2],
   xy: () => [
     [0, 0],
     [1, 1],
@@ -110,7 +109,7 @@ function callOptions(call: string): Options | undefined {
 }
 
 test("every call of d has a signature, and every signature of d is a call", () => {
-  const methods = ["port", "member", "label", "offset"];
+  const methods = ["port", "member", "offset"];
   assert.deepEqual(
     Object.keys(signatures)
       .filter((name) => !methods.includes(name))
@@ -159,8 +158,7 @@ test("the methods of elements and points check their arguments", () => {
     const a = d.box("A");
     const r = d.record(["x"]);
     d.row([a, r]);
-    const edge = d.arrow(a.port("middle" as never, 2), r.member(5 as never));
-    edge.label({ text: "x", along: 0.5 } as never);
+    d.arrow(a.port("middle" as never, 2), r.member(5 as never));
     d.arrow(a.bottom.offset("8" as never, 0), [0, 200]);
   });
   assert.deepEqual(
@@ -169,15 +167,56 @@ test("the methods of elements and points check their arguments", () => {
       ["INVALID_ARGUMENT", ["a"], "side"],
       ["INVALID_ARGUMENT", ["a"], "t"],
       ["INVALID_ARGUMENT", ["record-1"], "id"],
-      ["UNKNOWN_OPTION", ["a->record-1"], "label.along"],
       ["INVALID_ARGUMENT", ["a"], "dx"],
     ],
   );
   assert.deepEqual(
-    out.edges.map((e) => [e.id, e.labels.length]),
+    out.edges.map((e) => e.id),
+    ["a->record-1", "a->0,200"],
+  );
+});
+
+test("the old spellings of points, labels, sides, and title corners are reported", () => {
+  const removed = (draw: (d: DiagramBuilder) => void) =>
+    drawn(draw).diagnostics.map((x) => [x.code, x.message]);
+  assert.deepEqual(
+    removed((d) => {
+      d.place(d.box("A"), { at: (d as unknown as { point: AnyCall }).point(0, 0) as never });
+    }),
+    [["DRAW_FAILED", "d.point is not a function"]],
+  );
+  assert.deepEqual(
+    removed((d) => {
+      const edge = d.arrow(d.box("A"), [0, 100]);
+      (edge as unknown as { label: AnyCall }).label("more");
+    }),
+    [["DRAW_FAILED", "edge.label is not a function"]],
+  );
+  const old = drawn((d) => {
+    const [a, b, c] = [d.box("A"), d.box("B"), d.box("C")];
+    d.row([d.start("Go", { side: "left" } as never), a, b, c]);
+    d.arrow(a, b, { label: { text: "x", side: "above", at: 0.25 } } as never);
+    d.arrow(b, c, { label: ["y", { text: "z", side: "below" }] } as never);
+    d.enclose([a], { title: "Group", titleAt: "bottomLeft" } as never);
+  }).diagnostics.filter((x) => x.code === "UNKNOWN_OPTION" || x.code === "INVALID_ARGUMENT");
+  assert.deepEqual(
+    old.map((x) => [x.code, x.ids, x.subject]),
     [
-      ["a->record-1", 1],
-      ["a->0,200", 0],
+      ["UNKNOWN_OPTION", ["go"], "side"],
+      ["UNKNOWN_OPTION", ["a->b"], "label.at"],
+      ["INVALID_ARGUMENT", ["a->b"], "label.side"],
+      ["INVALID_ARGUMENT", ["b->c"], "label[1].side"],
+      ["UNKNOWN_OPTION", ["group"], "titleAt"],
+    ],
+  );
+  assert.deepEqual(
+    old.map((x) => x.message),
+    [
+      "start go: side is not an option. start takes id, sub, role, category, stepOnly, labelSide. It is ignored.",
+      "arrow a->b: label.at is not an option. label takes gap, text, segment, along, side. It is ignored.",
+      'arrow a->b: label.side is "above", but it takes "top", "bottom", "left", or "right". The default is used.',
+      'arrow b->c: label[1].side is "below", but it takes "top", "bottom", "left", or "right". The default is used.',
+      "enclose group: titleAt is not an option. enclose takes title, id, titleCorner, padding, role, category, stepOnly. It is ignored.",
     ],
   );
 });
@@ -491,18 +530,18 @@ test("an option that has no effect in its form is INVALID_ARGUMENT, and the figu
     d.sequence([d.box("P")], [{ from: d.box("P"), to: d.box("P"), label: "x" }]);
   });
   const out = drawn((d) => {
-    const s = d.start("", { side: "left" });
+    const s = d.start("", { labelSide: "left" });
     const b = d.box("B");
     d.row([s, b]);
-    d.enclose([b], { titleAt: "topRight" });
+    d.enclose([b], { titleCorner: "topRight" });
     d.tree(d.box("R"), [d.box("L")], { layout: "indent", levelGap: 4 });
     d.sequence([d.box("P")], [{ from: d.box("P"), to: d.box("P"), label: "x", reply: true }]);
   });
   assert.deepEqual(
     out.diagnostics.filter((x) => x.code === "INVALID_ARGUMENT").map((x) => [x.ids, x.subject]),
     [
-      [["start-1"], "side"],
-      [["enclosure-1"], "titleAt"],
+      [["start-1"], "labelSide"],
+      [["enclosure-1"], "titleCorner"],
       [["r-tree"], "levelGap"],
     ],
   );
@@ -569,7 +608,7 @@ function codes(cell: string): string[] {
   return [...cell.matchAll(/`([^`]+)`/g)].map(([, code = ""]) => code);
 }
 
-/** The names an object written in the reference has, such as `{ text, side?, at: 0.5 }`. */
+/** The names an object written in the reference has, such as `{ text, side?, along: 0.5 }`. */
 function names(object: string): string[] {
   const body = object.slice(object.indexOf("{") + 1, object.lastIndexOf("}"));
   const parts: string[] = [];

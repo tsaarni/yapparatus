@@ -257,11 +257,11 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
         </>
       );
     }
-    case "diamond":
+    case "decision":
       return <polygon points={shape.pointList(shape.diamond(r))} {...outlined} />;
-    case "dot":
+    case "start":
       return <circle cx={x + w / 2} cy={y + h / 2} r={w / 2} {...stylex.props(styles.solid)} />;
-    case "ring":
+    case "end":
       return (
         <>
           <circle cx={x + w / 2} cy={y + h / 2} r={w / 2 - 0.75} {...stylex.props(styles.ring)} />

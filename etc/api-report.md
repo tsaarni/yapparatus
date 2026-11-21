@@ -169,18 +169,18 @@ export class DiagramBuilder {
   }
   /** A decision: a diamond around a short question. */
   decision(label: string, options: NodeOptions = {}): Node {
-    return this.#shape(signatures.decision, "diamond", label, options);
+    return this.#shape(signatures.decision, "decision", label, options);
   }
   /**
    * A start point: a filled dot. A label, such as the event that starts the flow, sits
    * outside the dot and does not move it: layout and gaps use the dot alone.
    */
   start(label = "", options: TerminalOptions = {}): Node {
-    return this.#terminal(signatures.start, "dot", label, options);
+    return this.#terminal(signatures.start, "start", label, options);
   }
   /** An end point: a ringed dot, with an optional label outside it, as for `start`. */
   end(label = "", options: TerminalOptions = {}): Node {
-    return this.#terminal(signatures.end, "ring", label, options);
+    return this.#terminal(signatures.end, "end", label, options);
   }
   /** A shape from its label and options, which its signature checks. */
   #shape(signature: Signature, shape: Shape, label: unknown, options: unknown): Node {
@@ -196,11 +196,11 @@ export class DiagramBuilder {
     const [text, o] = call.args([label, options]) as [string, TerminalOptions];
     const name = this.#name(signature.name);
     const node = this.#scene.addNode(shape, text, o, text ? {} : { id: name });
-    if (!text && o.side !== undefined)
+    if (!text && o.labelSide !== undefined)
       call.ignore(
-        "side",
-        o.side,
-        () => `side is ${quote(o.side)}, but ${node.id} has no label for it to place.`,
+        "labelSide",
+        o.labelSide,
+        () => `labelSide is ${quote(o.labelSide)}, but ${node.id} has no label for it to place.`,
       );
     call.done([node]);
     return node;
@@ -348,11 +348,11 @@ export class DiagramBuilder {
     const call = this.#check(signatures.enclose);
     const [m, o] = call.args([members, options]) as [Element[], EncloseOptions];
     const enclosure = this.#scene.addEnclosure(m, o, this.#name("enclosure"));
-    if (o.titleAt !== undefined && !o.title)
+    if (o.titleCorner !== undefined && !o.title)
       call.ignore(
-        "titleAt",
-        o.titleAt,
-        () => `titleAt is ${quote(o.titleAt)}, but the enclosure has no title.`,
+        "titleCorner",
+        o.titleCorner,
+        () => `titleCorner is ${quote(o.titleCorner)}, but the enclosure has no title.`,
       );
     call.done([enclosure]);
     return enclosure;
@@ -424,12 +424,6 @@ export class DiagramBuilder {
     call.done();
   }
 
-  point(x: number, y: number): Point {
-    const call = this.#check(signatures.point);
-    const [px, py] = call.args([x, y]) as [number, number];
-    call.done();
-    return new Point({ k: "abs", x: px, y: py }, this.#scene.checkArgs);
-  }
   /** The x coordinate of `x` combined with the y coordinate of `y`. */
   xy(x: PointLike, y: PointLike): Point {
     const call = this.#check(signatures.xy);
@@ -493,7 +487,8 @@ export interface DocumentSettings {
 
 export interface EdgeOptions {
   id?: string;
-  label?: string | LabelOptions;
+  /** The edge's label, or a list of its labels: each is its text or its text with options. */
+  label?: string | LabelOptions | Array<string | LabelOptions>;
   /** Default: `{ loop: "right" }` from an element to itself, else `"straight"`. */
   route?: Route;
   role?: Role;
@@ -515,7 +510,7 @@ export interface EncloseOptions {
   id?: string;
   title?: string;
   /** The corner that holds the title. Default: topLeft. */
-  titleAt?: Corner;
+  titleCorner?: Corner;
   padding?: number;
   /** Default: muted. */
   role?: Role;
@@ -592,9 +587,12 @@ export interface LabelOptions {
   /** Zero-based leg of the route. Default: the longest leg. */
   segment?: number;
   /** Position along that leg, 0→1. Default: 0.5. */
-  at?: number;
-  /** Default: above horizontal legs, right of vertical legs, outside curves and loops. */
-  side?: LabelSide;
+  along?: number;
+  /**
+   * The side of the leg where the label sits: `top` is above it. Default: top of horizontal legs,
+   * right of vertical legs, outside curves and loops.
+   */
+  side?: Side;
   gap?: number;
 }
 
@@ -809,8 +807,8 @@ export type TargetKind =
 
 export interface TerminalOptions
   extends Pick<NodeOptions, "id" | "sub" | "role" | "category" | "stepOnly"> {
-  /** Where the label sits next to the dot. Default: right. */
-  side?: LabelSide;
+  /** The side of the dot where the label sits. Default: right. */
+  labelSide?: Side;
 }
 
 export type TreeChild = Node | [node: Node, children: TreeChild[]];
