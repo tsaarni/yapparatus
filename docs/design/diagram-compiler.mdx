@@ -193,7 +193,7 @@ The layout answers three questions about any element: its size, its position, an
 
 ### Sizes
 
-A shape's size is its measured text plus padding on each side, and at least a minimum size. A fixed `width` or `height` replaces it, and shapes in a size group, such as `equalSize`, take the largest size in the group. A row is as wide as its children and the gaps between them, and as tall as its tallest child; a column is the same on the other axis. An enclosure surrounds its members with padding and a band for its title.
+A shape's size is its measured text plus padding on each side, and at least a minimum size. A fixed `width` or `height` replaces it. Shapes in a size group, such as `equalSize`, take the largest size in the group, fixed sizes included. A member with a fixed size on an axis of the group keeps it, and its text wraps at that width. When that size is smaller than the group's, the group is not equal, and the compiler reports `FIXED_SIZE_IN_GROUP`. A row is as wide as its children and the gaps between them, and as tall as its tallest child; a column is the same on the other axis. An enclosure surrounds its members with padding and a band for its title.
 
 In the running example, "Client" measures 38.0 by 18.6. With the padding, the box would be 70 by 40.6, so the minimum size of 104 by 46 applies. The cylinder adds 7.3 units of cap above and below its text and is 55.2 units tall.
 
@@ -296,7 +296,7 @@ Each edge has a route form, and the compiler adds the corners that the form need
   })
 }} />
 
-A straight edge attaches where the line from the element's center toward the other end leaves the outline. An edge with corners attaches at the middle of the side that faces its first or last straight piece, so it leaves the element at a right angle. An edge whose ends coincide is `DEGENERATE_EDGE`.
+A straight edge attaches where the line from the element's center toward the other end leaves the outline. An edge with corners attaches on the side that faces its adjacent route point, at the projection of that point onto the side, so it leaves the element at a right angle. When the projection falls outside the side, less the corner radius, the edge attaches at the middle of the side; on a diamond, a dot, or a ring it always does. For `hv`, `vh`, `viaX`, and `viaY`, the adjacent point lines up with the center, so these attach at the middle. An edge whose ends coincide is `DEGENERATE_EDGE`.
 
 In the running example, `client->api` is straight. Both elements are at the same height, so the line between their centers leaves Client at its right side, at (104, 23), and meets API at its left side, at (192, 23).
 
@@ -334,7 +334,7 @@ A mark highlights words or lines of a text. The compiler finds the marked words 
 
 ## Sequences
 
-A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar. Lifelines and bars are drawn, but the checks and the steps leave them out.
+A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A bar means that a participant is handling a call, so only a receiver gets one. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar, and an async message gets none. Sending opens no bar: a participant that only sends has a plain lifeline, and its messages start and end on it. A self-message on a participant with no bar starts from the lifeline and opens only its own short bar. Lifelines and bars are drawn, but the checks and the steps leave them out.
 
 ## Roles and categories
 
@@ -355,7 +355,7 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 | Running the draw program | `DRAW_FAILED`, `STEP_NOT_TEXT`, `FONT_FALLBACK` |
 | Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT` |
 | Settle ids | `DUPLICATE_ID`, `UNPLACED` |
-| Measure, size, and place | `TEXT_OVERFLOW`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
+| Measure, size, and place | `TEXT_OVERFLOW`, `FIXED_SIZE_IN_GROUP`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
 | Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED` |
 | Check | `NODE_OVERLAP`, `EDGE_NODE_INTERSECTION`, `LABEL_OVERLAP`, `ENCLOSURE_TITLE_CROSSED`, `ENCLOSURE_INTRUSION`, `ACCENT_OVERUSED` |
 | Finish | `TOO_MANY_CATEGORIES`, `DUPLICATE_ID`, `DIAGRAM_FAILED` |
@@ -367,7 +367,7 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 
 The collision checks run on the exact geometry, before rounding. Two rectangles overlap only when they share more than half a unit in both directions, and an edge hits a shape only when it passes more than one unit inside it. Shapes that touch, and an edge that ends on an outline, are therefore not reported. Edges also keep eight units away from enclosure titles.
 
-The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, an edge and its own ends, lifelines and activation bars, and pairs of step-only elements, which the step checks compare.
+The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and a self-loop or a bent edge is not checked against its ends.
 
 ### Steps and width
 

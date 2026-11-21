@@ -133,8 +133,8 @@ export function createLayout(
         for (const group of scene.sizeGroups) {
           if (!group.members.includes(el)) continue;
           const all = group.members.map(intrinsicSize);
-          if (group.width) s = { ...s, width: Math.max(...all.map((a) => a.width)) };
-          if (group.height) s = { ...s, height: Math.max(...all.map((a) => a.height)) };
+          if (group.width) s = { ...s, width: grouped(el, "width", all) };
+          if (group.height) s = { ...s, height: grouped(el, "height", all) };
         }
       } else if (el instanceof Stack) {
         const kids = el.children.map(size);
@@ -156,6 +156,23 @@ export function createLayout(
       sizes.set(el, s);
       return s;
     });
+  }
+
+  function grouped(
+    node: Node,
+    axis: "width" | "height",
+    all: Array<{ width: number; height: number }>,
+  ) {
+    const largest = Math.max(...all.map((a) => a[axis]));
+    const fixed = node.options[axis];
+    if (fixed === undefined) return largest;
+    if (fixed < largest - 0.5)
+      report(
+        "FIXED_SIZE_IN_GROUP",
+        `${node.id} has a fixed ${axis} of ${round(fixed)}, but its size group is ${round(largest)}. Remove the fixed size or take the element out of the group.`,
+        [node.id],
+      );
+    return fixed;
   }
 
   function position(el: Element): Vec {

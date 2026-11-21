@@ -23,7 +23,8 @@ d.sequence([you, api, db], [
 ])
 ```
 
-- A call opens an activation bar on the receiver; its `reply` closes it.
+- A call opens an activation bar on the receiver; its `reply` closes it. A call with no reply gets a short bar.
+- Only a receiver gets a bar. The Reader only sends, so its lifeline stays plain.
 - `alt` with `else` shows exclusive branches; each takes a `title`.
 - A note sits `over` one participant, or spans two: `over: [api, db]`.
 
@@ -44,7 +45,7 @@ d.sequence([app, queue, worker], [
 ```
 
 - `async: true` sends without waiting: an open arrowhead and no bar.
-- A message to the sender itself draws a loop.
+- A message to the sender itself draws a loop and a short bar of its own.
 - `numbered` numbers the messages. `id` on a fragment lets one step focus all its messages: `<Step focus="drain">`.
 
 ## Reference

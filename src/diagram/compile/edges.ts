@@ -15,7 +15,7 @@ import {
   toExpr,
 } from "../elements.ts";
 import { anchorOf, boundaryToward, distance, type Rect, round, type Vec } from "../geometry.ts";
-import type { Measure, Metrics } from "../metrics.ts";
+import { corner, type Measure, type Metrics } from "../metrics.ts";
 import type { Layout } from "./layout.ts";
 import { type Report, textLine } from "./text.ts";
 
@@ -166,8 +166,8 @@ export function createEdges(
   }
 
   function snap(el: Element, rect: Rect, center: Vec, toward: Vec, route: Edge["route"]): Vec {
+    const shape = el instanceof Node ? el.shape : "box";
     if (route === "straight") {
-      const shape = el instanceof Node ? el.shape : "box";
       const c = anchorOf(rect, "center");
       const dx = toward.x - c.x;
       const dy = toward.y - c.y;
@@ -184,8 +184,15 @@ export function createEdges(
     }
     const dx = toward.x - center.x;
     const dy = toward.y - center.y;
-    if (Math.abs(dx) >= Math.abs(dy)) return anchorOf(rect, dx >= 0 ? "right" : "left");
-    return anchorOf(rect, dy >= 0 ? "bottom" : "top");
+    const across = Math.abs(dx) >= Math.abs(dy);
+    const middle = across
+      ? anchorOf(rect, dx >= 0 ? "right" : "left")
+      : anchorOf(rect, dy >= 0 ? "bottom" : "top");
+    if (shape === "diamond" || shape === "dot" || shape === "ring") return middle;
+    const within = (at: number, start: number, length: number) =>
+      at >= start + corner.shape && at <= start + length - corner.shape;
+    if (across) return within(toward.y, rect.y, rect.height) ? { ...middle, y: toward.y } : middle;
+    return within(toward.x, rect.x, rect.width) ? { ...middle, x: toward.x } : middle;
   }
 
   function arrowHead(points: Vec[], at: "start" | "end", open = false): Vec[] {

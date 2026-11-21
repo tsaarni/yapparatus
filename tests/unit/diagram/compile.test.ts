@@ -113,6 +113,36 @@ test("elbow route keeps anchors and labels a vertical leg on its right", () => {
   assert.ok(label && p0 && label.rect.x > p0.x, "label sits right of the vertical leg");
 });
 
+test("an edge with corners leaves at a right angle, at the projection of its next point", () => {
+  const d = new DiagramBuilder();
+  const a = d.box("A");
+  const b = d.box("B");
+  d.place(a, { at: [0, 0], anchor: "topLeft" });
+  d.place(b, { at: [300, 0], anchor: "topLeft" });
+  const near = d.arrow(a, b, {
+    route: {
+      via: [
+        [82, -40],
+        [382, -40],
+      ],
+    },
+  });
+  const beyond = d.arrow(a, b, {
+    route: {
+      via: [
+        [101, -60],
+        [352, -60],
+      ],
+    },
+  });
+  const out = compile(d, measure);
+  const points = (id: string) => out.edges.find((e) => e.id === id)?.points;
+  assert.deepEqual(points(near.id)?.[0], { x: 82, y: 0 });
+  assert.deepEqual(points(near.id)?.at(-1), { x: 382, y: -5.5 }, "the head shortens the end");
+  assert.deepEqual(points(beyond.id)?.[0], { x: 52, y: 0 }, "past the corner, the middle");
+  assert.deepEqual(points(beyond.id)?.at(-1), { x: 352, y: -5.5 });
+});
+
 test("\\n in an edge label starts a new line; the rect covers every line", () => {
   const d = new DiagramBuilder();
   const a = d.box("A");
@@ -194,6 +224,30 @@ test("element endpoints snap to facing sides; obstacles are reported, not avoide
   assert.equal(out.ok, true, "warnings do not fail compilation");
 });
 
+test("an edge that runs through its own end is reported; the legs that touch an end are not", () => {
+  const d = new DiagramBuilder();
+  const source = d.box("Source");
+  const target = d.box("Target");
+  const other = d.box("Other");
+  d.row([source, other], { gap: 120 });
+  d.place(target, { below: source });
+  const through = d.arrow(source, target, { route: "vh" });
+  const around = d.arrow(source, other, {
+    route: { via: [source.top.offset(0, -30), other.top.offset(0, -30)] },
+  });
+  const diamond = d.decision("Ok?");
+  d.place(diamond, { below: other });
+  const straight = d.arrow(other, diamond);
+  const out = compile(d, measure);
+  const hits = out.diagnostics.filter((x) => x.code === "EDGE_NODE_INTERSECTION");
+  assert.deepEqual(
+    hits.map((x) => x.ids),
+    [[through.id, "target"]],
+  );
+  assert.match(hits[0]?.message ?? "", /runs through its own end target/);
+  assert.ok(![around.id, straight.id].some((id) => hits.some((x) => x.ids.includes(id))));
+});
+
 test("equalSize, fixed-width wrapping, and overflow", () => {
   const d = new DiagramBuilder();
   const a = d.box("Short");
@@ -215,7 +269,41 @@ test("an overflowing member of a size group is reported once", () => {
   const c = d.box("C");
   d.equalSize([a, b, c]);
   d.row([a, b, c]);
-  assert.deepEqual(codes(compile(d, measure)), ["TEXT_OVERFLOW"]);
+  assert.deepEqual(codes(compile(d, measure)), ["TEXT_OVERFLOW", "FIXED_SIZE_IN_GROUP"]);
+});
+
+test("a fixed size in a size group is kept, and a smaller one is reported", () => {
+  const d = new DiagramBuilder();
+  const fixed = d.box("wrap these words please", { width: 120, id: "fixed" });
+  const wide = d.box("A much much longer label than that", { id: "wide" });
+  d.equalSize([fixed, wide]);
+  d.row([fixed, wide]);
+  const out = compile(d, measure);
+  const rect = (id: string) => out.nodes.find((n) => n.id === id)?.rect;
+  assert.equal(rect("fixed")?.width, 120);
+  assert.equal(rect("wide")?.width, 34 * 7 + 2 * 16);
+  assert.equal(rect("fixed")?.height, rect("wide")?.height);
+  const lines = out.nodes.find((n) => n.id === "fixed")?.lines ?? [];
+  assert.ok(lines.length > 1 && lines.every((l) => l.text.length * 7 <= 120 - 2 * 16));
+  assert.deepEqual(codes(out), ["FIXED_SIZE_IN_GROUP"]);
+  assert.match(out.diagnostics[0]?.message ?? "", /fixed has a fixed width of 120.*270/);
+});
+
+test("a fixed size that is the largest sets its group's size; other axes are free", () => {
+  const d = new DiagramBuilder();
+  const big = d.box("Big", { width: 300 });
+  const small = d.box("Small");
+  d.equalSize([big, small]);
+  const a = d.box("A", { width: 80 });
+  const b = d.box("B", { width: 140, sub: "two\nlines" });
+  d.equalHeight([a, b]);
+  d.column([d.row([big, small]), d.row([a, b])]);
+  const out = compile(d, measure);
+  assert.deepEqual(codes(out), []);
+  const rect = (id: string) => out.nodes.find((n) => n.id === id)?.rect;
+  assert.equal(rect("small")?.width, 300);
+  assert.equal(rect("a")?.width, 80);
+  assert.equal(rect("a")?.height, rect("b")?.height);
 });
 
 test("enclosure wraps members with title band and flags intruders", () => {
@@ -295,8 +383,7 @@ test("sequence: a reply closes the bar its call opened", () => {
     { from: b, to: a, label: "done", reply: true },
   ]);
   assert.deepEqual(rects, {
-    "a-active-1": { x: 43, y: 73, width: 10, height: 65.4 },
-    "b-active-2": { x: 179, y: 79, width: 10, height: 44 },
+    "b-active-1": { x: 179, y: 79, width: 10, height: 44 },
   });
 });
 
@@ -308,9 +395,8 @@ test("sequence: nested calls stack their bars and replies close them inside out"
     { from: b, to: a, label: "outer done", reply: true },
   ]);
   assert.deepEqual(rects, {
-    "a-active-1": { x: 43, y: 73, width: 10, height: 153.4 },
-    "b-active-2": { x: 179, y: 79, width: 10, height: 132 },
-    "c-active-3": { x: 315, y: 123, width: 10, height: 44 },
+    "b-active-1": { x: 179, y: 79, width: 10, height: 132 },
+    "c-active-2": { x: 315, y: 123, width: 10, height: 44 },
   });
 });
 
@@ -321,9 +407,8 @@ test("sequence: a self-message opens a nested bar beside the caller's bar", () =
     { from: b, to: a, label: "done", reply: true },
   ]);
   assert.deepEqual(rects, {
-    "a-active-1": { x: 43, y: 73, width: 10, height: 120.4 },
-    "b-active-2": { x: 179, y: 79, width: 10, height: 99 },
-    "b-active-3": { x: 185, y: 142.8, width: 10, height: 22 },
+    "b-active-1": { x: 179, y: 79, width: 10, height: 99 },
+    "b-active-2": { x: 185, y: 142.8, width: 10, height: 22 },
   });
   assert.deepEqual(out.edges.find((e) => e.id === "think")?.points, [
     { x: 189, y: 123 },
@@ -337,9 +422,9 @@ test("sequence: an async message opens no bar on its receiver", () => {
   const { out, rects } = sequenceRects((a, b) => [
     { from: a, to: b, label: "fire", async: true, id: "fire" },
   ]);
-  assert.deepEqual(rects, { "a-active-1": { x: 43, y: 73, width: 10, height: 22 } });
+  assert.deepEqual(rects, {});
   assert.deepEqual(out.edges.find((e) => e.id === "fire")?.points, [
-    { x: 53, y: 79 },
+    { x: 48, y: 79 },
     { x: 183.2, y: 79 },
   ]);
 });
@@ -366,9 +451,8 @@ test("sequence: a fragment with an else branch frames both branches with a divid
     },
   ]);
   assert.deepEqual(rects, {
-    "a-active-1": { x: 43, y: 97.2, width: 10, height: 80.8 },
-    "b-active-2": { x: 179, y: 103.2, width: 10, height: 24.2 },
-    "b-active-3": { x: 179, y: 162.6, width: 10, height: 24.2 },
+    "b-active-1": { x: 179, y: 103.2, width: 10, height: 24.2 },
+    "b-active-2": { x: 179, y: 162.6, width: 10, height: 24.2 },
   });
   const frame = out.frames.find((f) => f.id === "alt");
   assert.deepEqual(frame?.rect, { x: -38, y: 59.2, width: 308, height: 134.2 });
@@ -385,9 +469,8 @@ test("sequence: a reply closes the last call from its receiver, and an earlier c
     { from: b, to: a, label: "done", reply: true },
   ]);
   assert.deepEqual(rects, {
-    "a-active-1": { x: 43, y: 73, width: 10, height: 109.4 },
-    "b-active-2": { x: 179, y: 79, width: 10, height: 24.2 },
-    "b-active-3": { x: 179, y: 123, width: 10, height: 44 },
+    "b-active-1": { x: 179, y: 79, width: 10, height: 24.2 },
+    "b-active-2": { x: 179, y: 123, width: 10, height: 44 },
   });
 });
 
@@ -398,10 +481,63 @@ test("sequence: an inner unanswered call does not take the reply to the outer ca
     { from: b, to: a, label: "done", reply: true },
   ]);
   assert.deepEqual(rects, {
-    "a-active-1": { x: 43, y: 73, width: 10, height: 109.4 },
-    "b-active-2": { x: 179, y: 79, width: 10, height: 88 },
-    "c-active-3": { x: 315, y: 117, width: 10, height: 22 },
-    "b-active-4": { x: 185, y: 123, width: 10, height: 24.2 },
+    "b-active-1": { x: 179, y: 79, width: 10, height: 88 },
+    "b-active-2": { x: 185, y: 123, width: 10, height: 24.2 },
+  });
+});
+
+test("sequence: only receivers get bars; a sender without one sends from its lifeline", () => {
+  const { out, rects } = sequenceRects((a, b, c) => [
+    { from: a, to: b, label: "call", id: "call" },
+    { from: b, to: c, label: "ask", id: "ask" },
+    { from: c, to: b, label: "answer", reply: true, id: "answer" },
+    { from: b, to: a, label: "done", reply: true, id: "done" },
+    { from: c, to: c, label: "tidy", id: "tidy" },
+  ]);
+  assert.deepEqual(rects, {
+    "b-active-1": { x: 179, y: 79, width: 10, height: 132 },
+    "c-active-2": { x: 315, y: 123, width: 10, height: 44 },
+    "c-active-3": { x: 315, y: 274.8, width: 10, height: 22 },
+  });
+  const points = (id: string) => out.edges.find((e) => e.id === id)?.points;
+  assert.deepEqual(points("call")?.[0], { x: 48, y: 79 }, "the client's call leaves its lifeline");
+  assert.deepEqual(points("done")?.at(-1), { x: 48.8, y: 211 }, "the reply ends at its lifeline");
+  assert.deepEqual(
+    points("ask")?.[0],
+    { x: 189, y: 123 },
+    "a caller that handles a call keeps its bar",
+  );
+  assert.deepEqual(points("tidy"), [
+    { x: 320, y: 255 },
+    { x: 351, y: 255 },
+    { x: 351, y: 279.2 },
+    { x: 330.5, y: 279.2 },
+  ]);
+});
+
+test("sequence: a bar ends at its reply or after a short length, never at the last message", () => {
+  const d = new DiagramBuilder();
+  const envoy = d.box("Envoy");
+  const contour = d.box("Contour");
+  d.sequence(
+    [envoy, contour],
+    [
+      { from: contour, to: envoy, label: "Cluster B (CDS)", id: "cds" },
+      { from: envoy, to: contour, label: "request ClusterLoadAssignment B", id: "eds-req" },
+      { note: "B warms: waits for endpoints", over: envoy, id: "warm" },
+      { from: contour, to: envoy, label: "ClusterLoadAssignment B (EDS)", id: "eds" },
+    ],
+    { gap: 280, numbered: true, step: 64 },
+  );
+  const out = compile(d, measure);
+  assert.deepEqual(codes(out), []);
+  const bars = Object.fromEntries(
+    out.nodes.filter((n) => n.shape === "bar").map((n) => [n.id, n.rect]),
+  );
+  assert.deepEqual(bars, {
+    "envoy-active-1": { x: 43, y: 94, width: 10, height: 35.2 },
+    "contour-active-2": { x: 419, y: 158, width: 10, height: 35.2 },
+    "envoy-active-3": { x: 43, y: 295.6, width: 10, height: 35.2 },
   });
 });
 

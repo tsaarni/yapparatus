@@ -137,13 +137,17 @@ export const diagnosticCodes = {
     meaning: "A step's id or focus is computed; the compiler reads only plain text.",
   },
   TEXT_OVERFLOW: { severity: "warning", meaning: "Text does not fit its box." },
+  FIXED_SIZE_IN_GROUP: {
+    severity: "warning",
+    meaning: "A member of a size group has a fixed size smaller than the group's.",
+  },
   RULER_CROWDED: { severity: "warning", meaning: "A record's column labels run into each other." },
   LABEL_CROWDED: { severity: "warning", meaning: "An edge label has too little room." },
   LABEL_OVERLAP: { severity: "warning", meaning: "A label overlaps another label or an element." },
   NODE_OVERLAP: { severity: "warning", meaning: "Two elements shown together overlap." },
   EDGE_NODE_INTERSECTION: {
     severity: "warning",
-    meaning: "An edge crosses an element it does not connect.",
+    meaning: "An edge crosses an element, or runs through one of its own ends.",
   },
   ENCLOSURE_TITLE_CROSSED: {
     severity: "warning",

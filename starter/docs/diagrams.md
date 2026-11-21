@@ -163,6 +163,7 @@ Each shape has exactly one position owner: a row, a column, or `place`. Statemen
 | `d.equalSize([a, b])`, `equalWidth`, `equalHeight` | Share the largest measured size |
 
 - Gaps are measured between edges, not between centers.
+- A shape with a fixed `width` or `height` keeps it in a size group. A fixed size smaller than the group's is reported.
 - `align` is `start`, `center` (the default), or `end`.
 - Rows and columns are elements: they nest, and you can place them.
 - `titleAt` is the corner that holds the title: `topLeft` (the default), `topRight`, `bottomLeft`, or `bottomRight`.
@@ -211,6 +212,7 @@ Routes:
 - `"hv"` goes across, then down; `"vh"` goes down, then across.
 - `viaX` and `viaY` go through a channel at a given x or y. The value is a number or a point.
 - `via` goes through the given points.
+- A route with corners leaves a shape at a right angle: in line with the first `via` point when the side reaches that far, and from the middle of the side otherwise. The last `via` point sets where it enters the other shape in the same way.
 
 Curves and loops:
 
@@ -328,11 +330,12 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are out of range. Mark a longer text, or whole lines |
 | `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
 | `BEND_WITH_ROUTE` | error | An edge has both `bend` and `route`. Keep one |
-| `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape |
+| `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape. An edge that runs through its own end needs a straight route or another route form |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
 | `TEXT_OVERFLOW` | warning | Increase `width` or `height` |
+| `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a row or column, or `place()` it |
 | `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `element()` names a member that does not. The message lists the valid ids |

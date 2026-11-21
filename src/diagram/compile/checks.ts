@@ -4,7 +4,7 @@
 
 import type { DiagramBuilder } from "../builder.ts";
 import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "../drawing.ts";
-import { type Edge, type Element, Enclosure, elementOf, Node, Stack } from "../elements.ts";
+import { type Element, Enclosure, elementOf, Node, type PointLike, Stack } from "../elements.ts";
 import {
   contains,
   inflate,
@@ -102,16 +102,19 @@ export function validate(
         );
     }
 
-  const endpointsOf = (edge: Edge) => {
-    const ends = [edge.from, edge.to].flatMap((p) => elementOf(p) ?? []);
-    const own = new Set(ends.map((e) => e.id));
-    for (const e of ends) if (e instanceof Node && e.member) own.add(e.member.parent.id);
-    return own;
+  const endOf = (p: PointLike) => {
+    const el = elementOf(p);
+    const ids = new Set(el ? [el.id] : []);
+    if (el instanceof Node && el.member) ids.add(el.member.parent.id);
+    return ids;
   };
   scene.edges.forEach((edge, k) => {
     const compiled = edges[k];
     if (!compiled || compiled.passive) return;
-    const own = endpointsOf(edge);
+    const from = endOf(edge.from);
+    const to = endOf(edge.to);
+    const self = elementOf(edge.from) !== undefined && elementOf(edge.from) === elementOf(edge.to);
+    const last = compiled.points.length - 2;
     for (const node of nodes) {
       if (node.shape === "text" || node.shape === "mark" || node.passive) continue;
       if (compiled.stepOnly && node.stepOnly) continue;
@@ -122,14 +125,21 @@ export function validate(
         });
         if (!fromSibling) continue;
       }
-      const hit = own.has(node.id) ? (node.labelRect ? [node.labelRect] : []) : rects(node);
+      const own = from.has(node.id) || to.has(node.id);
+      const touches = (i: number) =>
+        (own && (self || edge.bend !== 0)) ||
+        (i === 0 && from.has(node.id)) ||
+        (i === last && to.has(node.id));
       for (let i = 0; i < compiled.points.length - 1; i++) {
         const a = compiled.points[i] as Vec;
         const b = compiled.points[i + 1] as Vec;
+        const hit = touches(i) ? (node.labelRect ? [node.labelRect] : []) : rects(node);
         if (hit.some((r) => segmentHitsRect(a, b, r))) {
           report(
             "EDGE_NODE_INTERSECTION",
-            `${compiled.id} crosses ${node.id}. Route it (via, viaX, viaY), bend it, or move ${node.id}.`,
+            own && !touches(i)
+              ? `${compiled.id} runs through its own end ${node.id}. Use a straight route or another route form.`
+              : `${compiled.id} crosses ${node.id}. Route it (via, viaX, viaY), bend it, or move ${node.id}.`,
             [compiled.id, node.id],
           );
           break;

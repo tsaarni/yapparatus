@@ -182,7 +182,7 @@ export function sequence(
   walk(steps, 0, []);
   const bottom = y + step * 0.1;
 
-  const answered = new Set<Event>();
+  const answers = new Map<Event, Event>();
   const pending = new Map<Node, Array<Event & { kind: "message" }>>();
   for (const e of events) {
     if (e.kind !== "message" || e.m.async || e.m.from === e.m.to) continue;
@@ -196,18 +196,14 @@ export function sequence(
     const i = calls.findLastIndex((call) => call.m.from === e.m.to);
     const call = calls[i];
     if (!call) continue;
-    answered.add(call);
+    answers.set(e, call);
     calls.splice(i);
   }
 
   const stacks = new Map<Node, Bar[]>(participants.map((n) => [n, []]));
   const bars: Array<{ owner: Node; bar: Bar }> = [];
-  const lastSeen = new Map<Node, number>();
-  for (const e of events)
-    if (e.kind === "message") {
-      lastSeen.set(e.m.from, e.y);
-      lastSeen.set(e.m.to, e.y);
-    }
+  const answered = new Set(answers.values());
+  const barOf = new Map<Event, Bar>();
   let opened: Bar[] = [];
   const open = (owner: Node, start: number) => {
     const stack = stacks.get(owner) ?? [];
@@ -245,28 +241,23 @@ export function sequence(
       ...(m.category ? { category: m.category } : {}),
     };
     if (from === to) {
-      if (depthOf(from) === 0) open(from, e.y - 6);
       const outer = depthOf(from);
       const inner = open(from, e.y + step * 0.45);
       inner.end = e.y + step * 0.95;
       stacks.get(from)?.pop();
-      const start = d.xy(from.center.offset(offset(outer) + barHalf, 0), at(e.y));
+      const start = d.xy(from.center.offset(edgeX(outer, 1), 0), at(e.y));
       const back = d.xy(
         from.center.offset(offset(inner.depth) + barHalf, 0),
         at(e.y + step * 0.55),
       );
+      const reach = from.center.offset(offset(outer) + barHalf + 26, 0);
       add(
         arrow(
           start,
           back,
           {
             ...id,
-            route: {
-              via: [
-                start.offset(26, 0),
-                back.offset(26 - (offset(inner.depth) - offset(outer)), 0),
-              ],
-            },
+            route: { via: [d.xy(reach, start), d.xy(reach, back)] },
             label: { text: label, segment: 1, side: "right", gap: 8 },
             ...role,
           },
@@ -278,8 +269,13 @@ export function sequence(
     const toward = participants.indexOf(to) - participants.indexOf(from);
     if (m.reply) {
       const x1 = edgeX(depthOf(from), toward);
-      const bar = stacks.get(from)?.pop();
-      if (bar) bar.end = e.y;
+      const call = answers.get(e);
+      const bar = call && barOf.get(call);
+      const stack = stacks.get(from) ?? [];
+      if (bar && stack.includes(bar)) {
+        bar.end = e.y;
+        stack.splice(stack.indexOf(bar), 1);
+      }
       const x2 = edgeX(depthOf(to), -toward);
       add(
         arrow(
@@ -291,13 +287,13 @@ export function sequence(
       );
       continue;
     }
-    if (depthOf(from) === 0) open(from, e.y - 6);
     const x1 = edgeX(depthOf(from), toward);
     let x2: number;
     if (m.async) {
       x2 = edgeX(depthOf(to), -toward);
     } else {
       const bar = open(to, e.y);
+      barOf.set(e, bar);
       if (!answered.has(e)) {
         bar.end = e.y + step * 0.55;
         stacks.get(to)?.pop();
@@ -318,9 +314,6 @@ export function sequence(
       ),
     );
   }
-  for (const { owner, bar } of bars)
-    bar.end ??= Math.max(bar.start + step * 0.5, (lastSeen.get(owner) ?? bar.start) + step * 0.35);
-
   for (const n of participants)
     arrow(
       n.bottom,
