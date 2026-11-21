@@ -2,7 +2,6 @@
  * `<Chart>` data, read and checked at compile time. A data block or page table becomes the `data`
  * prop; a file, which can be large, is loaded from its own module through the `load` prop.
  */
-import vm from "node:vm";
 import * as Plot from "@observablehq/plot";
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
@@ -20,6 +19,7 @@ import {
   typeTable,
 } from "../../chart/table.ts";
 import { type FileAddress, parseFileAddress } from "../../document/file-address.ts";
+import { authorFunction, timedOut } from "../author-function.ts";
 import type { ExternalFiles, SourceFile } from "../external-files.ts";
 import { revision } from "../revision.ts";
 import { codeLanguageOf, contentIssues } from "./conventions.ts";
@@ -78,13 +78,19 @@ export function dataModuleCode(data: ChartData) {
  * Node's, and return what the checked Plot library and the returned spec show is wrong.
  */
 export function plotProblems(source: string, data: ChartData): ChartProblem[] {
-  let plot: unknown;
+  const late: ChartProblem = {
+    code: "CHART_PLOT",
+    subject: "plot",
+    message: "plot did not finish in 1 second. Check its loops.",
+  };
+  let plot: ReturnType<typeof authorFunction>;
   try {
-    plot = vm.runInContext(`"use strict";(${source})`, vm.createContext());
+    plot = authorFunction(source, "yapparatus:plot");
   } catch (error) {
+    if (timedOut(error)) return [late];
     return [{ code: "CHART_PLOT", subject: "plot", message: `plot does not compile: ${error}` }];
   }
-  if (typeof plot !== "function")
+  if (!plot)
     return [
       {
         code: "CHART_PLOT",
@@ -92,7 +98,20 @@ export function plotProblems(source: string, data: ChartData): ChartProblem[] {
         message: "plot is a function that returns the marks: (Plot, rows) => ({ marks: [...] }).",
       },
     ];
-  return runPlot(Plot, plot as PlotFunction, rowObjects(data)).problems;
+  let stopped = false;
+  const { problems } = runPlot(
+    Plot,
+    (library, rows) => {
+      try {
+        return plot(library, rows) as ReturnType<PlotFunction>;
+      } catch (error) {
+        stopped = timedOut(error);
+        throw error;
+      }
+    },
+    rowObjects(data),
+  );
+  return stopped ? [late] : problems;
 }
 
 /** The JSX attribute of an element with a name, if the author wrote one. */

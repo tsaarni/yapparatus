@@ -78,7 +78,10 @@ export const diagnosticCodes = {
     meaning: "An <Excerpt> has an invalid from or attributes.",
   },
   /** Charts. */
-  CHART_PLOT: { severity: "error", meaning: "A <Chart> has no plot function." },
+  CHART_PLOT: {
+    severity: "error",
+    meaning: "A <Chart> has no plot function, or plot ran too long.",
+  },
   CHART_DATA: { severity: "error", meaning: "A chart's data is missing, unreadable, or mistyped." },
   CHART_OPTION: { severity: "error", meaning: "plot returns or calls something the chart owns." },
   CHART_COLOR: {
@@ -89,7 +92,7 @@ export const diagnosticCodes = {
   CHART_FAILED: { severity: "error", meaning: "Drawing the chart threw." },
   CHART_OVERLAP: { severity: "warning", meaning: "Tick labels on an axis overlap." },
   /** Diagrams. */
-  DRAW_FAILED: { severity: "error", meaning: "The diagram's draw function threw." },
+  DRAW_FAILED: { severity: "error", meaning: "The diagram's draw function threw or ran too long." },
   DIAGRAM_FAILED: { severity: "error", meaning: "The diagram compiler threw." },
   MARK_UNMATCHED: {
     severity: "error",

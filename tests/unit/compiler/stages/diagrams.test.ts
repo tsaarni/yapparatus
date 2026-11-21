@@ -118,3 +118,27 @@ test("a diagram without draw is an error", async () => {
   assert.equal(issues[0]?.code, "DRAW_FAILED");
   assert.match(issues[0]?.message ?? "", /needs draw/);
 });
+
+test("a draw program that does not end is stopped after 1 second", async () => {
+  const started = Date.now();
+  const { issues } = await compilePage(`<Diagram id="endless" draw={(d) => {
+  for (;;) d.point(0, 0)
+}} />
+`);
+  assert.ok(Date.now() - started < 3000);
+  assert.deepEqual(
+    issues.map(({ code, message }) => ({ code, message })),
+    [{ code: "DRAW_FAILED", message: "draw did not finish in 1 second. Check its loops." }],
+  );
+});
+
+test("a drawing of more than 2000 elements is an error", async () => {
+  const { issues } = await compilePage(`<Diagram id="many" draw={(d) => {
+  for (let i = 0; i < 3000; i++) d.box(\`Box \${i}\`)
+}} />
+`);
+  assert.deepEqual(
+    issues.map(({ code, message, line }) => ({ code, message, line })),
+    [{ code: "DRAW_FAILED", message: "The drawing has more than 2000 elements.", line: 4 }],
+  );
+});

@@ -33,6 +33,9 @@ import {
 } from "./elements.ts";
 import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
 
+/** The most elements a drawing may have, so that the checks, which compare pairs, stay fast. */
+const maxElements = 2000;
+
 /** The scene an author's diagram function builds: its elements, relations, and diagnostics. */
 export class DiagramBuilder {
   readonly nodes: Node[] = [];
@@ -149,6 +152,7 @@ export class DiagramBuilder {
   }
   /** A titled region between two corners, such as a UML fragment. */
   frame(from: PointLike, to: PointLike, options: FrameOptions = {}): Frame {
+    this.grow();
     const frame = new Frame(from, to, options, this.frames.length + 1);
     this.frames.push(frame);
     return frame;
@@ -189,6 +193,7 @@ export class DiagramBuilder {
   }
 
   enclose(members: Element[], options: EncloseOptions = {}): Enclosure {
+    this.grow();
     const e = new Enclosure(members, options, this.enclosures.length + 1);
     this.enclosures.push(e);
     this.noteCategory(options.category);
@@ -197,6 +202,7 @@ export class DiagramBuilder {
 
   /** An arrow. A string third argument is its label. `d.arrow(a, a)` draws a self-loop. */
   arrow(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
+    this.grow();
     const edge = new Edge(from, to, typeof options === "string" ? { label: options } : options);
     this.edges.push(edge);
     this.noteCategory(edge.category);
@@ -239,13 +245,25 @@ export class DiagramBuilder {
       this.categories.push(category);
   }
 
+  /** Throws when the drawing already has the most elements it may have. */
+  private grow() {
+    const count =
+      this.nodes.length +
+      this.edges.length +
+      this.frames.length +
+      this.stacks.length +
+      this.enclosures.length;
+    if (count >= maxElements) throw new Error(`The drawing has more than ${maxElements} elements.`);
+  }
   private add(node: Node): Node {
+    this.grow();
     node.report = (code, message, ids) => this.report(code, message, ids);
     this.nodes.push(node);
     this.noteCategory(node.options.category);
     return node;
   }
   private stack(dir: "row" | "column", children: Element[], options: StackOptions): Stack {
+    this.grow();
     const s = new Stack(dir, children, options, this.stacks.length + 1);
     this.stacks.push(s);
     for (const child of children) this.own(child, s, `${dir}(${s.id})`);

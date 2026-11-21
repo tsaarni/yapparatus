@@ -152,6 +152,8 @@ The draw program receives an object `d` whose functions record elements and arra
   ], { title: "Scene", header: "id\tkind\tposition", mono: true, id: "scene" })
 }} />
 
+A scene holds at most 2,000 elements, counting nodes with their cells and marks, edges, frames, rows and columns, and enclosures. The checks compare elements in pairs, so a larger scene would take minutes to check. The call that would create one more element throws, which is `DRAW_FAILED`.
+
 An element in the scene has no coordinates. A point on it, such as `api.bottom`, or a point computed from others, such as `api.bottom.offset(0, 20)`, is a description that the layout evaluates once the positions it names are known. The order of the statements therefore does not matter.
 
 Each element gets its position from exactly one source: the row or column it is in, or the `place()` call that places it. A second source is `CONFLICTING_PLACEMENT`, and the first one stays in force. Before layout, the compiler looks for elements with no source. The first one goes to the origin, and every other one is reported as `UNPLACED`. In the running example, only the row has no source, so it is at the origin.

@@ -21,6 +21,7 @@ function files(dir: string, extensions: string[]): string[] {
 const notCodes = new Set([
   "DELETE",
   "ECONNREFUSED",
+  "ERR_SCRIPT_EXECUTION_TIMEOUT",
   "HTML",
   "HTTP",
   "JSON",

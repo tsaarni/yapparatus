@@ -22,9 +22,10 @@
 
 `id` and `caption` make a numbered figure. `description` is the accessible description. `debug` shows bounds, ids, and route points.
 
-The page compiler runs `draw` when it compiles the page, and the browser only draws the result. Three rules follow:
+The page compiler runs `draw` when it compiles the page, and the browser only draws the result. Four rules follow:
 
 - `draw` uses only `d` and the values it defines itself. A page's imports and constants do not exist where it runs, and a name from outside is a `DRAW_FAILED` error that names it.
+- `draw` finishes within 1 second and creates at most 2000 elements. Past either limit it stops with a `DRAW_FAILED` error.
 - Write `<Diagram>` in a page or a reply. One inside a `.tsx` component is not compiled.
 - Write a `<Step>`'s `id` and `focus` as plain text, such as `focus="client api"`. A computed value, `focus={…}`, is a `STEP_NOT_TEXT` error.
 
@@ -320,7 +321,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `CONFLICTING_PLACEMENT` | error | A shape is in a row and also placed. Keep one |
 | `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
 | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT` | error | Check the `place()` options |
-| `DRAW_FAILED` | error | The `draw` function threw, at the line given, or it uses a name it does not define |
+| `DRAW_FAILED` | error | The `draw` function threw, at the line given, uses a name it does not define, ran longer than 1 second, or created more than 2000 elements |
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or use `loop` |
 | `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |

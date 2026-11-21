@@ -85,6 +85,7 @@ plot={(Plot, rows) => ({
 - `plot` may also return `x`, `y`, `fx`, `fy`, and `r`: the options of those scales, such as `{ type: "log" }`, `{ type: "utc" }` for times written with `Z`, `{ grid: true }`, `{ label: "…" }`, `{ ticks: 5 }`, or `{ tickRotate: -30 }`. Use `fx` or `fy` to split a chart into small multiples.
 - Yapparatus sets the width, height, margins, fonts, and colors. `plot` returns nothing else, and does not call `Plot.plot` or `Plot.legend`.
 - `plot` uses only `Plot`, `rows`, and values written inside it.
+- `plot` finishes within 1 second.
 
 ## Color
 
@@ -105,7 +106,7 @@ Problems with the data and with what `plot` names are found when the page is com
 
 | Code | Severity | Meaning |
 |---|---|---|
-| `CHART_PLOT` | error | The chart has no `plot` function |
+| `CHART_PLOT` | error | The chart has no `plot` function, or `plot` ran longer than 1 second |
 | `CHART_DATA` | error | The data is missing, comes from two places, names no table on the page, is not in a known format, has a column problem, or could not load |
 | `CHART_FIELD` | error | A mark names a field that is not a column of its data |
 | `CHART_COLOR` | error | A mark has a literal color |

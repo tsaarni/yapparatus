@@ -2,7 +2,6 @@
  * `<Diagram>` drawings, compiled with the page: `draw` runs in the server and the measured, checked
  * drawing replaces it as the `drawing` prop, so the browser only draws it.
  */
-import vm from "node:vm";
 import type { Root } from "hast";
 import type {
   MdxJsxAttribute,
@@ -13,6 +12,7 @@ import { visit } from "unist-util-visit";
 import type { DiagramBuilder } from "../../diagram/builder.ts";
 import type { CompiledDiagram } from "../../diagram/drawing.ts";
 import { compileFigure, drawFailed, type FigureStep } from "../../diagram/figure.ts";
+import { authorFunction, timedOut } from "../author-function.ts";
 import { fontMeasure } from "../font-measure.ts";
 import { type ContentIssue, compiledAttribute, contentIssues } from "./conventions.ts";
 
@@ -191,17 +191,17 @@ function compileDiagram(source: string, steps: FigureStep[], build: boolean): Co
 }
 
 /**
- * Evaluate `draw` in its own context, with JavaScript's globals and none of Node's, and compile it.
- * The context only keeps out names; it does not protect the server from the code.
+ * Run `draw` in its own context, with JavaScript's globals and none of Node's, and compile it. The
+ * context keeps out names and endless loops; it does not protect the server from an attack.
  */
 function run(source: string, steps: FigureStep[], build: boolean): Compiled {
-  let draw: unknown;
+  let draw: ReturnType<typeof authorFunction>;
   try {
-    draw = vm.runInContext(`"use strict";(${source})`, vm.createContext(), { filename: drawFile });
+    draw = authorFunction(source, drawFile);
   } catch (error) {
     return { drawing: drawFailed(explain(error)), ...lineOf(error) };
   }
-  if (typeof draw !== "function")
+  if (!draw)
     return { drawing: drawFailed("draw is a function that builds the drawing: (d) => { … }.") };
   let thrown: unknown;
   const { measure, uncovered } = fontMeasure();
@@ -246,6 +246,7 @@ function asError(error: unknown): { name: string; message: string; stack?: strin
 function explain(thrown: unknown): string {
   const error = asError(thrown);
   if (!error) return String(thrown);
+  if (timedOut(error)) return "draw did not finish in 1 second. Check its loops.";
   const name = error.name === "ReferenceError" && /^(\S+) is not defined$/.exec(error.message)?.[1];
   if (name)
     return `draw uses ${name}, which it does not define. A draw program uses only its parameter and the values it defines itself: define ${name} inside draw.`;

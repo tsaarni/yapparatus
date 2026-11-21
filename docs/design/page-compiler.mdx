@@ -149,7 +149,7 @@ For each `<Icon name="collection:name">`, the icon stage imports that one icon, 
 
 ## Diagrams
 
-The diagram stage runs each draw program in a fresh JavaScript context without Node's names or the page's, and hands the result and the steps to the [diagram compiler](diagram-compiler). The context keeps names out but is not a sandbox. A program that throws is `DRAW_FAILED` at the page's line.
+The diagram stage runs each draw program in a fresh JavaScript context without Node's names or the page's, and hands the result and the steps to the [diagram compiler](diagram-compiler). The stage evaluates the call `draw(d)` inside the context with a time limit of 1 second, so an endless loop does not stop the server. The context keeps out names and mistakes but is not a sandbox against an attack. A program that throws is `DRAW_FAILED` at the page's line, and a program that runs past the time limit is `DRAW_FAILED` too.
 
 The compiled diagram replaces the draw program, so the browser receives only data, and its diagnostics become issues of the page. Compiled diagrams are cached by their source, so an edit elsewhere on the page does not compile them again.
 

@@ -142,3 +142,15 @@ test("the stage runs plot and reports what its marks name, before any browser dr
   const clean = await build(source('Plot.dot(rows, { x: "a", y: "b", fill: "kind" })'));
   assert.deepEqual(clean.issues, []);
 });
+
+test("a plot that does not end is stopped after 1 second", async () => {
+  const started = Date.now();
+  const { issues } = await build(
+    `<Chart id="endless" plot={(Plot, rows) => { for (;;) Plot.dot(rows, { x: "a" }) }}>\n\n\`\`\`csv\na\n1\n\`\`\`\n\n</Chart>\n`,
+  );
+  assert.ok(Date.now() - started < 3000);
+  assert.deepEqual(
+    issues.map((i) => [i.code, i.subject, i.message]),
+    [["CHART_PLOT", "plot", "plot did not finish in 1 second. Check its loops."]],
+  );
+});

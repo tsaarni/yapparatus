@@ -181,7 +181,7 @@ A chart's `fill` or `stroke` names the column of categories. The colors are the 
 
 ## Checks on the marks
 
-The library that `plot` receives checks each call before it calls Plot. The page compiler runs `plot` with this library in a fresh JavaScript context, as it runs a diagram's draw program, so `plot` uses only `Plot`, `rows`, and the values it defines itself. <Ref to="charts-mark-checks" /> lists the checks and where each is found.
+The library that `plot` receives checks each call before it calls Plot. The page compiler runs `plot` with this library in a fresh JavaScript context with a time limit of 1 second, as it runs a diagram's draw program, so `plot` uses only `Plot`, `rows`, and the values it defines itself. A `plot` that runs past the time limit is `CHART_PLOT`. <Ref to="charts-mark-checks" /> lists the checks and where each is found.
 
 <Table id="charts-mark-checks" caption="The checks on what plot asks of Plot. All are errors except CHART_OVERLAP.">
 
