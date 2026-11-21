@@ -218,15 +218,67 @@ const flow: Figure = {
     d.arrow(a, b);
     d.arrow(b, c);
     d.place(d.note("Only now", { id: "aside", stepOnly: true }), { below: b });
+    d.frame(c.topLeft.offset(-8, -8), c.bottomRight.offset(8, 8), {
+      id: "later",
+      tab: "later",
+      stepOnly: true,
+    });
+    d.enclose([a], { id: "first", stepOnly: true });
   },
-  steps: [{ focus: ["a"] }, { focus: ["b", "a->b", "aside"] }, { focus: ["c", "b->c"] }],
+  steps: [
+    { focus: ["a", "first"] },
+    { focus: ["b", "a->b", "aside"] },
+    { focus: ["c", "b->c", "later"] },
+  ],
   build: true,
 };
 
 test("every element is drawn plainly, and step-only elements are left out", () => {
   const { svg } = draw(flow);
   assert.deepEqual(elements(svg).sort(), ["a", "a->b", "b", "b->c", "c"]);
+  assert.doesNotMatch(svg, /h5"/, "the step-only frame's tab");
   assert.doesNotMatch(svg, /opacity=/);
+});
+
+test("a frame without a role draws its own look, and a role or a category replaces it", () => {
+  const framed = (options: Record<string, unknown>) =>
+    draw({
+      draw: (d) => {
+        const a = d.box("A");
+        d.row([a]);
+        d.frame(a.topLeft.offset(-10, -30), a.bottomRight.offset(10, 10), {
+          id: "zone",
+          tab: "opt",
+          title: "t",
+          ...options,
+        });
+      },
+      steps: [],
+      build: false,
+    }).svg;
+  const { borderControl, surfaceRaised, text, accent, accentSurface } = lightColors;
+  assert.ok(
+    framed({}).includes(
+      `<g data-element-id="zone" data-shape="frame"><rect x="-10" y="-30" width="124" height="86" rx="4" fill="none" stroke="${borderControl}" stroke-width="1"/></g>`,
+    ),
+  );
+  assert.match(
+    framed({}),
+    new RegExp(
+      `<g><path d="[^"]+" fill="${surfaceRaised}" stroke="${borderControl}" stroke-width="1"/><path d="M-2 -20h3" fill="${text}"/>`,
+    ),
+  );
+  const accented = framed({ role: "accent" });
+  assert.match(accented, new RegExp(`rx="4" fill="none" stroke="${accent}" stroke-width="2"/>`));
+  assert.match(accented, new RegExp(`fill="${accentSurface}" stroke="${accent}" stroke-width="2"`));
+  const external = framed({ role: "external" });
+  assert.match(external, /rx="4" fill="none" stroke="[^"]+" stroke-width="1.5" stroke-dasharray/);
+  const category = framed({ category: "New" });
+  assert.match(
+    category,
+    new RegExp(`rx="4" fill="none" stroke="${lightColors.category1}" stroke-width="1"/>`),
+  );
+  assert.match(category, /<g data-layer="legend">/);
 });
 
 test("the id overlay labels each element and outlines the elements diagnostics name", () => {

@@ -15,7 +15,7 @@ import {
 import { type Rect, union } from "./geometry.ts";
 import { badge, corner, defaultMetrics, type FontSpec, iconGrid, type Measure } from "./metrics.ts";
 import * as shape from "./outlines.ts";
-import { categories, haloWidth, type Paint, roles } from "./paint.ts";
+import { categories, frameLook, haloWidth, type Paint, type RolePaint, roles } from "./paint.ts";
 
 /** Text as glyph outlines: path data for text that starts at x with its central baseline at y. */
 export type TextOutline = (text: string, font: FontSpec, x: number, y: number) => string;
@@ -78,11 +78,13 @@ interface Ink {
   weight: number;
 }
 
-/** The ink of an element under the given paint values. */
-function inkOf(element: { role: string; category?: number }, paint: Paint): Ink {
+/** The ink of an element under the given paint values. A frame without a role has its own look. */
+function inkOf(element: { role?: string; category?: number }, paint: Paint): Ink {
   const { colors: color, stroke } = paint;
-  const role =
-    roles[element.role === "external" ? "default" : (element.role as keyof typeof roles)];
+  const role: RolePaint =
+    element.role === undefined
+      ? frameLook
+      : roles[element.role === "external" ? "default" : (element.role as keyof typeof roles)];
   const category = element.category === undefined ? undefined : categories[element.category - 1];
   const fill = category?.fill ?? role.fill;
   return {
@@ -326,13 +328,17 @@ export function pictureOf(
 
   const out: string[] = [];
   for (const f of diagram.frames) {
-    const hairline = { fill: "none", stroke: color.borderControl, "stroke-width": stroke.hairline };
+    const k = inkOf(f, paint);
+    const line = { fill: "none", stroke: k.ink, "stroke-width": k.weight };
     const body =
-      rect(f.rect, corner.frame, hairline) +
+      rect(f.rect, corner.frame, {
+        ...line,
+        "stroke-dasharray": f.role === "external" ? dash.dashed : undefined,
+      }) +
       f.dividers
         .map(
           (divider) =>
-            `<path${attrs({ d: shape.rule(f.rect, divider.y), ...hairline, "stroke-dasharray": dash.dashed })}/>`,
+            `<path${attrs({ d: shape.rule(f.rect, divider.y), ...line, "stroke-dasharray": dash.dashed })}/>`,
         )
         .join("");
     out.push(group(shown(f.id), body, { "element-id": f.id, shape: "frame" }));
@@ -360,13 +366,14 @@ export function pictureOf(
   for (const node of diagram.nodes) if (node.pin !== undefined) out.push(pin(node));
   for (const edge of diagram.edges) if (!edge.passive) out.push(edgeOf(edge));
   for (const f of diagram.frames) {
+    const k = inkOf(f, paint);
     const labels = (line: TextLine | undefined) =>
-      line ? text(line, line.muted ? color.textMuted : color.text, true) : "";
+      line ? text(line, line.muted ? color.textMuted : k.label, true) : "";
     let body = "";
     if (f.tab)
       body +=
-        `<path${attrs({ d: shape.fragmentTab(f.tab.rect), fill: color.surfaceRaised, stroke: color.borderControl, "stroke-width": stroke.hairline })}/>` +
-        text(f.tab.line, f.tab.line.muted ? color.textMuted : color.text);
+        `<path${attrs({ d: shape.fragmentTab(f.tab.rect), fill: k.fill, stroke: k.ink, "stroke-width": k.weight })}/>` +
+        text(f.tab.line, f.tab.line.muted ? color.textMuted : k.label);
     body += labels(f.title) + f.dividers.map((divider) => labels(divider.label)).join("");
     out.push(group(shown(f.id), body));
   }

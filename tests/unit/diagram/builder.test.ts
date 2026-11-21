@@ -81,14 +81,14 @@ test("a viaX or viaY that is not a number or a point is reported, and the edge i
     {
       code: "INVALID_ARGUMENT",
       message:
-        'arrow a->b: route.viaX is "c", but it takes a number or a point, a shape, a grid, an enclosure, or [x, y]. The default is used.',
+        'arrow a->b: route.viaX is "c", but it takes a number or a point, a shape, a grid, an enclosure, a frame, or [x, y]. The default is used.',
       ids: ["a->b"],
       subject: "route.viaX",
     },
     {
       code: "INVALID_ARGUMENT",
       message:
-        "arrow b->c: route.viaY is a list of 2, but it takes a number or a point, a shape, a grid, an enclosure, or [x, y]. The default is used.",
+        "arrow b->c: route.viaY is a list of 2, but it takes a number or a point, a shape, a grid, an enclosure, a frame, or [x, y]. The default is used.",
       ids: ["b->c"],
       subject: "route.viaY",
     },
@@ -106,38 +106,30 @@ test("a viaX or viaY that is not a number or a point is reported, and the edge i
   );
 });
 
-test("an edge that ends at a frame is reported and left out", () => {
+test("an edge that ends at a frame attaches to the frame's outline", () => {
   const out = drawn((d) => {
     const a = d.box("A");
     const b = d.box("B");
+    const c = d.box("C");
     d.row([a, b]);
-    const frame = d.frame(a.topLeft, b.bottomRight, { tab: "group" });
-    d.arrow(a, frame as never);
-    d.line(frame as never, b);
-    d.arrow(a, b);
+    const frame = d.frame(a.topLeft.offset(-10, -30), b.bottomRight.offset(10, 10), {
+      tab: "group",
+    });
+    d.place(c, { below: frame, gap: 40 });
+    d.arrow(c, frame);
+    d.line(frame.port("left"), [-100, 13]);
   });
-  assert.deepEqual(out.diagnostics, [
-    {
-      code: "INVALID_ARGUMENT",
-      message:
-        "arrow: to is group, a frame, but it takes a point, a shape, a grid, an enclosure, or [x, y]. The edge is left out.",
-      ids: ["a", "group"],
-      subject: "to",
-    },
-    {
-      code: "INVALID_ARGUMENT",
-      message:
-        "line: from is group, a frame, but it takes a point, a shape, a grid, an enclosure, or [x, y]. The edge is left out.",
-      ids: ["group", "b"],
-      subject: "from",
-    },
-  ]);
+  assert.deepEqual(out.diagnostics, []);
+  const rect = out.frames.find((f) => f.id === "group")?.rect;
+  assert.deepEqual(rect, { x: -10, y: -30, width: 316, height: 86 });
+  assert.equal(out.nodes.find((n) => n.id === "c")?.rect.y, 56 + 40);
   assert.deepEqual(
-    out.edges.map((e) => e.id),
-    ["a->b"],
+    out.edges.map((e) => [e.id, e.points[0], e.points.at(-1)]),
+    [
+      ["c->group", { x: 148, y: 96 }, { x: 148, y: 61.5 }],
+      ["group->-100,13", { x: -10, y: 13 }, { x: -100, y: 13 }],
+    ],
   );
-  assert.deepEqual(
-    out.frames.map((f) => f.id),
-    ["group"],
-  );
+  const tip = out.edges[0]?.head?.points[0];
+  assert.deepEqual(tip, { x: 148, y: 56 });
 });

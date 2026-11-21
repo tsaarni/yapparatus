@@ -33,6 +33,7 @@ test("every diagram form compiles without diagnostics and draws in the browser",
     "hash-table",
     "marked-request",
     "token-flow",
+    "frame-steps",
     "worker-states",
     "report-flow",
     "service-grid",
@@ -70,6 +71,47 @@ test("every diagram form compiles without diagnostics and draws in the browser",
     page.locator('figure#team-tree [data-element-id*="->"] :is(polygon, polyline)'),
   ).toHaveCount(0);
   await expect(page.getByRole("list", { name: "Diagram diagnostics" })).toHaveCount(0);
+});
+
+test("frames keep their look without a role; step-only frames and enclosures show in steps", async ({
+  page,
+}) => {
+  await page.goto("/diagrams");
+  const flow = page.locator("figure#token-flow");
+  const box = flow.locator('[data-element-id="check-token"] rect').first();
+  const style = (locator: typeof box, property: "stroke" | "fill") =>
+    locator.evaluate((e, p) => getComputedStyle(e)[p], property);
+  for (const [figure, id] of [
+    ["token-flow", "opt-token-present"],
+    ["queue-sequence", "drain"],
+  ]) {
+    const outline = page.locator(`figure#${figure} [data-element-id="${id}"] > rect`);
+    await expect(outline).toHaveCSS("stroke-width", "1px");
+    await expect(outline).toHaveCSS("stroke", await style(box, "stroke"));
+    await expect(outline).toHaveCSS("fill", "none");
+  }
+  const tab = flow.locator("svg[data-diagram] > g:last-child > path");
+  await expect(tab).toHaveCSS("fill", await style(box, "fill"));
+  await expect(tab).toHaveCSS("stroke", await style(box, "stroke"));
+  await expect(tab).toHaveCSS("stroke-width", "1px");
+
+  const figure = page.locator("figure#frame-steps");
+  const element = (id: string) => figure.locator(`[data-element-id="${id}"]`);
+  await expect(element("client->zone")).toBeVisible();
+  await expect(figure.getByRole("button", { name: "Private" })).toBeVisible();
+  await expect(element("api-callout")).toHaveCSS("opacity", "0");
+  await expect(element("store")).toHaveCSS("opacity", "0");
+  await figure.getByRole("button", { name: "Start steps" }).click();
+  await expect(element("api-callout")).toHaveCSS("opacity", "1");
+  await expect(element("store")).toHaveCSS("opacity", "0");
+  await figure.getByRole("button", { name: "Next step" }).click();
+  await expect(element("api-callout")).toHaveCSS("opacity", "0");
+  await expect(element("store")).toHaveCSS("opacity", "1");
+  await figure.getByRole("button", { name: "Show all" }).click();
+  await page.emulateMedia({ media: "print" });
+  await expect(element("store")).toHaveCSS("opacity", "0");
+  await expect(element("api-callout")).toHaveCSS("opacity", "0");
+  await expect(element("zone")).toHaveCSS("opacity", "1");
 });
 
 test("the server checks a diagram on a page no browser has open", async ({ page }) => {

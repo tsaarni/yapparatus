@@ -72,6 +72,12 @@ export interface CompiledNode {
 /** A frame with its rectangle, operator tab, title, and dividers placed. */
 export interface CompiledFrame {
   id: string;
+  /** Set when the frame has a role. Without one, the frame keeps its own hairline look. */
+  role?: Role;
+  /** The category color slot, when the element has a category. */
+  category?: number;
+  /** Shown only while a step focuses it. */
+  stepOnly?: true;
   rect: Rect;
   /** The operator, such as "loop", in a tab at the top-left corner. */
   tab?: { rect: Rect; line: TextLine };
@@ -124,6 +130,8 @@ export interface CompiledEnclosure {
   role: Role;
   /** The category color slot, when the element has a category. */
   category?: number;
+  /** Shown only while a step focuses it. */
+  stepOnly?: true;
   rect: Rect;
   title?: TextLine;
   /** Painted area of the title tab, for collision checks. */
@@ -182,8 +190,9 @@ export interface StepView {
 /** The elements shown only while a step focuses them. */
 export function stepOnlyElements(diagram: CompiledDiagram): Set<string> {
   return new Set([
-    ...diagram.nodes.filter((n) => n.stepOnly).map((n) => n.id),
-    ...diagram.edges.filter((e) => e.stepOnly).map((e) => e.id),
+    ...[...diagram.nodes, ...diagram.edges, ...diagram.enclosures, ...diagram.frames]
+      .filter((element) => element.stepOnly)
+      .map((element) => element.id),
   ]);
 }
 

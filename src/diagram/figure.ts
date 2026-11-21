@@ -4,6 +4,7 @@
  */
 import type { DiagnosticCode } from "../document/diagnostic.ts";
 import { DiagramBuilder } from "./builder.ts";
+import { intrusions, titleCrossings } from "./compile/checks.ts";
 import { compile } from "./compile/compile.ts";
 import { type CompiledDiagram, expand } from "./drawing.ts";
 import type { Diagnostic } from "./elements.ts";
@@ -133,7 +134,15 @@ function checkSteps(
     ids.add(step.id);
   }
   const stepOnly = diagram.nodes.filter((n) => n.stepOnly);
-  for (const element of [...stepOnly, ...diagram.edges.filter((e) => e.stepOnly)])
+  const stepOnlyEdges = diagram.edges.filter((e) => e.stepOnly);
+  const stepOnlyEnclosures = diagram.enclosures.filter((e) => e.stepOnly);
+  const unused = [
+    ...stepOnly,
+    ...stepOnlyEdges,
+    ...stepOnlyEnclosures,
+    ...diagram.frames.filter((f) => f.stepOnly),
+  ];
+  for (const element of unused)
     if (!steps.some((step) => step.elements.has(element.id)))
       diagnostics.push(
         diagnostic("STEP_ONLY_UNUSED", `${element.id} is stepOnly, but no step focuses it.`, [
@@ -154,6 +163,18 @@ function checkSteps(
             ),
           );
       }
+    const shown = <T extends { id: string }>(all: T[]) =>
+      all.filter((x) => step.elements.has(x.id));
+    const add =
+      (code: DiagnosticCode) =>
+      ([message, ids]: [string, string[]]) =>
+        diagnostics.push(diagnostic(code, `${message} Step ${i + 1} shows both.`, ids));
+    for (const e of shown(stepOnlyEnclosures)) {
+      titleCrossings(e, shown(stepOnlyEdges)).forEach(add("ENCLOSURE_TITLE_CROSSED"));
+      intrusions(e, expand([e.id], diagram.groups), shown(stepOnly)).forEach(
+        add("ENCLOSURE_INTRUSION"),
+      );
+    }
   });
   if (build && !steps.length)
     diagnostics.push(

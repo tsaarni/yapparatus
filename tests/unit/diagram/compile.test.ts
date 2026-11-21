@@ -1933,3 +1933,100 @@ test("every gap takes a negative number, and sizes and padding do not", () => {
   );
   assert.ok(!JSON.stringify(out).includes("NaN"));
 });
+
+test("a frame has anchors and ports from its rectangle, and shapes are placed next to it", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b]);
+  const zone = d.frame(a.topLeft.offset(-10, -30), b.bottomRight.offset(10, 10), { id: "zone" });
+  const below = d.box("Below");
+  const corner = d.box("Corner");
+  d.place(below, { below: zone, gap: 20, align: "start" });
+  d.place(corner, { at: zone.port("right", 0.25), anchor: "left" });
+  const around = d.enclose([zone, corner], { id: "around", padding: 10 });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.diagnostics.map((x) => [x.code, x.ids]),
+    [
+      ["ENCLOSURE_INTRUSION", ["a", "around"]],
+      ["ENCLOSURE_INTRUSION", ["b", "around"]],
+    ],
+  );
+  const zoneRect = { x: -10, y: -30, width: 316, height: 86 };
+  assert.deepEqual(out.frames[0]?.rect, zoneRect);
+  assert.deepEqual(rects(out).below, { x: -10, y: 76, width: 104, height: 46 });
+  assert.deepEqual(rects(out).corner, { x: 306, y: -31.5, width: 104, height: 46 });
+  assert.deepEqual(out.enclosures.find((e) => e.id === around.id)?.rect, {
+    x: -20,
+    y: -41.5,
+    width: 440,
+    height: 107.5,
+  });
+});
+
+test("a frame with a role, a category, and stepOnly carries them; a frame without keeps none", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  d.row([a]);
+  d.frame(a.topLeft, a.bottomRight, { id: "plain" });
+  d.frame(a.topLeft, a.bottomRight, { id: "marked", role: "accent", category: "New" });
+  d.frame(a.topLeft, a.bottomRight, { id: "aside", stepOnly: true });
+  d.enclose([a], { id: "group", stepOnly: true });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.frames.map(({ id, role, category, stepOnly }) => ({ id, role, category, stepOnly })),
+    [
+      { id: "plain", role: undefined, category: undefined, stepOnly: undefined },
+      { id: "marked", role: "accent", category: 1, stepOnly: undefined },
+      { id: "aside", role: undefined, category: undefined, stepOnly: true },
+    ],
+  );
+  assert.equal(out.enclosures[0]?.stepOnly, true);
+  assert.deepEqual(out.legend, [{ name: "New", id: "new", slot: 1, elements: ["marked"] }]);
+  assert.deepEqual(out.groups.new, ["marked"]);
+});
+
+test("an edge among a frame's members that ends at the frame is PLACEMENT_CYCLE", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b]);
+  const frame = scene.addFrame(a.topLeft, b.bottomRight, { tab: "loop" });
+  const edge = d.arrow(a, frame);
+  scene.addGroup(frame, [a, edge]);
+  const out = compile(scene, lookups);
+  assert.equal(out.ok, false);
+  assert.deepEqual(out.diagnostics, [
+    {
+      code: "PLACEMENT_CYCLE",
+      message:
+        "route(a->loop) → bounds(loop) → route(a->loop). These placements depend on each other; anchor one of them independently.",
+      ids: ["a->loop", "loop"],
+    },
+  ]);
+});
+
+test("a step-only enclosure is not checked against step-only shapes and edges", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.row([a, b], { gap: 40 });
+  d.place(d.note("Aside", { id: "aside", stepOnly: true }), { at: a.bottom.offset(0, 30) });
+  d.place(d.note("Other", { id: "other", stepOnly: true }), { at: b.bottom.offset(0, 30) });
+  d.enclose([a], { id: "only-a", title: "Only A", stepOnly: true });
+  d.enclose([b], { id: "only-b", title: "Only B" });
+  d.arrow(a.top.offset(0, -40), b.top.offset(0, -40), { id: "over", stepOnly: true });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.diagnostics.map((x) => [x.code, x.ids]),
+    [
+      ["ENCLOSURE_TITLE_CROSSED", ["over", "only-b"]],
+      ["ENCLOSURE_INTRUSION", ["other", "only-b"]],
+    ],
+  );
+});

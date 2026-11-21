@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { DiagramBuilder } from "../../../src/diagram/builder.ts";
-import { expand } from "../../../src/diagram/drawing.ts";
+import { elementState, expand, stepOnlyElements } from "../../../src/diagram/drawing.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { fixedIcons } from "./fixed-icons.ts";
@@ -102,6 +102,72 @@ test("step-only elements: unused ones and those a step shows on top of each othe
       ids: ["one", "two"],
     },
   ]);
+});
+
+test("a step-only frame and enclosure appear only in their steps, and unused ones are reported", () => {
+  const draw = (d: DiagramBuilder) => {
+    const a = d.box("A");
+    const b = d.box("B");
+    d.row([a, b]);
+    d.frame(a.topLeft.offset(-8, -8), a.bottomRight.offset(8, 8), { id: "mark", stepOnly: true });
+    d.enclose([b], { id: "group", stepOnly: true });
+    d.frame(b.topLeft, b.bottomRight, { id: "spare", stepOnly: true });
+    d.enclose([a], { id: "unused", stepOnly: true });
+  };
+  const out = compileFigure(
+    { draw, steps: [{ focus: ["a", "mark"] }, { focus: ["group"] }], build: false },
+    lookups,
+  );
+  assert.deepEqual(
+    out.diagnostics.map((d) => [d.code, d.ids]),
+    [
+      ["STEP_ONLY_UNUSED", ["unused"]],
+      ["STEP_ONLY_UNUSED", ["spare"]],
+    ],
+  );
+  const steps = [expand(["a", "mark"], out.groups), expand(["group"], out.groups)];
+  const stepOnly = stepOnlyElements(out);
+  assert.deepEqual([...stepOnly].sort(), ["group", "mark", "spare", "unused"]);
+  const states = (active: number | undefined) =>
+    ["mark", "group", "b"].map((id) => elementState(id, { steps, active, build: false, stepOnly }));
+  assert.deepEqual(states(undefined), ["absent", "absent", undefined]);
+  assert.deepEqual(states(0), ["focus", "absent", "dim"]);
+  assert.deepEqual(states(1), ["absent", "focus", "focus"]);
+});
+
+test("a step that shows a step-only enclosure checks the step-only shapes and edges it shows", () => {
+  const draw = (d: DiagramBuilder) => {
+    const a = d.box("A");
+    const b = d.box("B");
+    d.row([a, b], { gap: 40 });
+    d.enclose([a], { id: "only-a", title: "Only A", stepOnly: true });
+    d.place(d.note("Aside", { id: "aside", stepOnly: true }), { at: a.bottom.offset(0, 30) });
+    d.arrow(a.top.offset(0, -40), b.top.offset(0, -40), { id: "over", stepOnly: true });
+  };
+  const steps = [
+    { focus: ["only-a"] },
+    { focus: ["aside", "over"] },
+    { focus: ["only-a", "aside"] },
+  ];
+  const out = compileFigure({ draw, steps, build: false }, lookups);
+  assert.deepEqual(out.diagnostics, [
+    {
+      code: "ENCLOSURE_INTRUSION",
+      message: "aside is not a member of only-a but overlaps its boundary. Step 3 shows both.",
+      ids: ["aside", "only-a"],
+    },
+  ]);
+  const both = compileFigure(
+    { draw, steps: [{ focus: ["only-a", "aside", "over"] }], build: false },
+    lookups,
+  );
+  assert.deepEqual(
+    both.diagnostics.map((d) => [d.code, d.ids]),
+    [
+      ["ENCLOSURE_TITLE_CROSSED", ["over", "only-a"]],
+      ["ENCLOSURE_INTRUSION", ["aside", "only-a"]],
+    ],
+  );
 });
 
 test("a step focuses a container's contents", () => {

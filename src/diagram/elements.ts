@@ -1,5 +1,5 @@
 /**
- * The handles an author holds while drawing: elements, points, edges, frames, and their options.
+ * The handles an author holds while drawing: elements, points, edges, and their options.
  * Nothing is measured or positioned here; `compile` resolves geometry later.
  */
 import type { DiagnosticCode } from "../document/diagnostic.ts";
@@ -29,7 +29,7 @@ export interface Diagnostic {
 }
 
 /** Anything with an id that the id check settles, which a diagnostic can be about. */
-export type Named = Element | Edge | Frame;
+export type Named = Element | Edge;
 
 /**
  * Reports a problem that a call finds. `message` is written once the ids of the elements in
@@ -85,7 +85,7 @@ export class Point {
 /** Anything an edge or placement accepts as a point: a point, an element's center, or [x, y]. */
 export type PointLike = Point | Element | [number, number];
 
-/** A placeable element: an id, and named anchors and ports on its outline. */
+/** An element: an id, and named anchors and ports on its outline. */
 abstract class Element {
   /** Explicit ids are fixed; derived ids get a numeric suffix when they collide. */
   id: string;
@@ -427,12 +427,15 @@ export interface EncloseOptions {
   /** The corner that holds the title. Default: topLeft. */
   titleAt?: Corner;
   padding?: number;
+  /** Default: muted. */
   role?: Role;
   /**
    * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
+  /** Show only while a step focuses it, such as a boundary that one step points out. */
+  stepOnly?: boolean;
 }
 
 /** A boundary drawn around elements positioned elsewhere. It never moves them. */
@@ -571,23 +574,28 @@ export interface FrameOptions {
   title?: string;
   /** Dashed horizontal dividers, each with an optional label, at these points' y. */
   dividers?: Array<{ at: PointLike; label?: string }>;
+  /** Default: none, which draws the frame's own hairline look. */
+  role?: Role;
+  /**
+   * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
+   * the same category share a color, and a legend under the figure explains each color.
+   */
+  category?: string;
+  /** Show only while a step focuses it, such as a region that one step points out. */
+  stepOnly?: boolean;
 }
 
 /**
  * A titled region between two corner points. It neither owns nor moves anything. Its derived
  * id is its tab and title as a slug, such as `loop-until-empty`, or `name` without them.
  */
-export class Frame {
-  /** Explicit ids are fixed; derived ids get a numeric suffix when they collide. */
-  id: string;
-  readonly explicitId: boolean;
+export class Frame extends Element {
   readonly from: PointLike;
   readonly to: PointLike;
   readonly options: FrameOptions;
   constructor(from: PointLike, to: PointLike, options: FrameOptions, name: string) {
     const text = [options.tab, options.title].filter(Boolean).join(" ");
-    this.id = options.id ?? (text ? slug(text) : name);
-    this.explicitId = options.id !== undefined;
+    super(options.id ?? (text ? slug(text) : name), options.id !== undefined);
     this.from = from;
     this.to = to;
     this.options = options;

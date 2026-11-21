@@ -62,6 +62,17 @@ export const roles: Record<Exclude<Role, "external">, RolePaint> = {
   muted: { ink: "borderStrong", fill: "transparent", label: "textMuted", weight: "hairline" },
 };
 
+/**
+ * What a frame without a role paints: a hairline in the control border color, and its tab on
+ * the raised surface. A role replaces it, and a category replaces its ink and fill.
+ */
+export const frameLook: RolePaint = {
+  ink: "borderControl",
+  fill: "surfaceRaised",
+  label: "text",
+  weight: "hairline",
+};
+
 /** Each category's ink and fill, by its slot: they replace the role's. */
 export const categories: Array<{ ink: ColorToken; fill: ColorToken }> = [
   { ink: "category1", fill: "category1Surface" },

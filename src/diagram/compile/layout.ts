@@ -5,16 +5,18 @@
 
 import {
   type Align,
+  Edge,
   type Element,
   Enclosure,
+  Frame,
   Grid,
   Node,
   type Placement,
   type PointExpr,
   toExpr,
 } from "../elements.ts";
-import { anchorOf, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
-import { enclosure, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { anchorOf, inflate, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
+import { enclosure, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
 import { room, stackRoom } from "../outlines.ts";
 import type { Scene } from "../scene.ts";
 import { createRecords } from "./records.ts";
@@ -57,23 +59,33 @@ function span(lengths: number[], gap: number): number {
 /** The layout functions the node and edge compilers read positions and sizes from. */
 export type Layout = ReturnType<typeof createLayout>;
 
-/** Lay out a scene: memoized sizes, positions, and points that resolve on first use. */
+/**
+ * Lay out a scene: memoized sizes, positions, and points that resolve on first use. `edgeInk`
+ * gives what an edge paints, which a frame with members covers, so a frame's bounds can wait on it.
+ */
 export function createLayout(
   scene: Scene,
   m: Metrics,
   measure: Measure,
   report: Report,
   text: Text,
+  edgeInk: (edge: Edge) => Rect[],
 ) {
   const { measureNode, tabWidth } = text;
   const records = createRecords(m, measure, report, text, bounds);
   const { grid, member } = records;
-  const known = new Set<Element>([...scene.nodes, ...scene.grids, ...scene.enclosures]);
+  const known = new Set<Element>([
+    ...scene.nodes,
+    ...scene.grids,
+    ...scene.enclosures,
+    ...scene.frames,
+  ]);
   const intrinsicSizes = new Map<Node, { width: number; height: number }>();
   const sizes = new Map<Element, { width: number; height: number }>();
   const positions = new Map<Element, Vec>();
   const gridTracks = new Map<Grid, Tracks>();
   const enclosureRects = new Map<Enclosure, Rect>();
+  const frameRects = new Map<Frame, Rect>();
   const resolving: string[] = [];
 
   function guard<T>(key: string, fn: () => T): T {
@@ -187,8 +199,8 @@ export function createLayout(
       } else if (el instanceof Grid) {
         const t = tracks(el);
         s = { width: t.width, height: t.height };
-      } else if (el instanceof Enclosure) {
-        const r = enclosureRect(el);
+      } else if (el instanceof Enclosure || el instanceof Frame) {
+        const r = bounds(el);
         s = { width: r.width, height: r.height };
       } else {
         throw new Error(`Unknown element ${el.id}`);
@@ -223,8 +235,8 @@ export function createLayout(
     return guard(`position(${el.id})`, () => {
       let p: Vec;
       const owner = scene.owner.get(el);
-      if (el instanceof Enclosure) {
-        const r = enclosureRect(el);
+      if (el instanceof Enclosure || el instanceof Frame) {
+        const r = bounds(el);
         p = { x: r.x, y: r.y };
       } else if (el instanceof Node && el.member) {
         const r = member(el).rect;
@@ -306,6 +318,7 @@ export function createLayout(
 
   function bounds(el: Element): Rect {
     if (el instanceof Enclosure) return enclosureRect(el);
+    if (el instanceof Frame) return frameRect(el);
     return { ...position(el), ...size(el) };
   }
 
@@ -377,6 +390,32 @@ export function createLayout(
     });
   }
 
+  function frameRect(frame: Frame): Rect {
+    const cached = frameRects.get(frame);
+    if (cached) return cached;
+    return guard(`bounds(${frame.id})`, () => {
+      const a = evalPoint(toExpr(frame.from));
+      const b = evalPoint(toExpr(frame.to));
+      const corners = {
+        x: Math.min(a.x, b.x),
+        y: Math.min(a.y, b.y),
+        width: Math.abs(b.x - a.x),
+        height: Math.abs(b.y - a.y),
+      };
+      const ink = (scene.groups.get(frame) ?? []).flatMap(memberInk);
+      const r = union([corners, ...ink.map((i) => inflate(i, fragment.margin))]) ?? corners;
+      frameRects.set(frame, r);
+      return r;
+    });
+  }
+
+  function memberInk(member: Element | Edge): Rect[] {
+    if (member instanceof Edge) return edgeInk(member);
+    const r = bounds(member);
+    const label = member instanceof Node ? terminalLabel(member, r) : undefined;
+    return label ? [r, label] : [r];
+  }
+
   function evalPoint(e: PointExpr): Vec {
     switch (e.k) {
       case "abs":
@@ -401,5 +440,5 @@ export function createLayout(
     }
   }
 
-  return { bounds, terminalLabel, enclosureRect, evalPoint, ...records };
+  return { bounds, terminalLabel, enclosureRect, evalPoint, guard, ...records };
 }

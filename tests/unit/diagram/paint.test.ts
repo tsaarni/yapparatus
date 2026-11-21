@@ -9,6 +9,7 @@ import {
   type ColorToken,
   categories,
   type DashToken,
+  frameLook,
   haloWidth,
   roles,
   type StrokeToken,
@@ -65,6 +66,18 @@ test("each role paints with the tokens the web app's role style sets", () => {
       role,
     );
   }
+});
+
+test("a frame without a role paints with the tokens of the web app's frame look", () => {
+  assert.deepEqual(
+    {
+      ink: token("frameLook", "--ink", "theme"),
+      fill: token("frameLook", "--fill", "theme"),
+      label: token("frameLook", "--label", "theme"),
+      weight: token("frameLook", "--weight", "stroke"),
+    },
+    frameLook,
+  );
 });
 
 test("each category paints with the tokens the web app's category style sets", () => {

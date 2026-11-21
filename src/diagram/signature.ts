@@ -18,8 +18,8 @@ import {
 /** A value that one of a list of values can be. */
 type Literal = string | number | boolean;
 
-/** What an element argument may be: a shape, a grid (or a row or column), or an enclosure. */
-export type ElementKind = "shape" | "grid" | "enclosure";
+/** What an element argument may be: a shape, a grid, a row, a column, an enclosure, or a frame. */
+export type ElementKind = "shape" | "grid" | "enclosure" | "frame";
 
 /** What stands in for a value that is rejected, and the sentence that says so. */
 interface StandIn {
@@ -58,7 +58,7 @@ interface PointValue extends Described {
   kind: "point";
 }
 
-/** An element of the given kinds. A frame is none of them. */
+/** An element of the given kinds. */
 interface ElementValue extends Described {
   kind: "element";
   of: readonly ElementKind[];
@@ -196,8 +196,8 @@ export const empty: Value = { kind: "empty", noun: "null", nouns: "null" };
 /** A point, or an element or `[x, y]`, which stand for points. */
 export const point: Value = {
   kind: "point",
-  noun: "a point, a shape, a grid, an enclosure, or [x, y]",
-  nouns: "points, shapes, grids, enclosures, or [x, y]",
+  noun: "a point, a shape, a grid, an enclosure, a frame, or [x, y]",
+  nouns: "points, shapes, grids, enclosures, frames, or [x, y]",
 };
 
 /** An element of the given kinds. */
@@ -211,9 +211,14 @@ export function element(...of: ElementKind[]): Value {
 }
 
 /** How a message names one element of a kind. */
-const elementNoun = { shape: "a shape", grid: "a grid", enclosure: "an enclosure" };
+const elementNoun = {
+  shape: "a shape",
+  grid: "a grid",
+  enclosure: "an enclosure",
+  frame: "a frame",
+};
 /** How a message names elements of a kind. */
-const elementNouns = { shape: "shapes", grid: "grids", enclosure: "enclosures" };
+const elementNouns = { shape: "shapes", grid: "grids", enclosure: "enclosures", frame: "frames" };
 
 /** An element that must be one of the elements an earlier argument lists. */
 export function among(of: ElementKind, among: Among): Value {
@@ -351,7 +356,8 @@ function isElement(value: unknown, of: readonly ElementKind[]): boolean {
   return (
     (value instanceof Node && of.includes("shape")) ||
     (value instanceof Grid && of.includes("grid")) ||
-    (value instanceof Enclosure && of.includes("enclosure"))
+    (value instanceof Enclosure && of.includes("enclosure")) ||
+    (value instanceof Frame && of.includes("frame"))
   );
 }
 
@@ -379,7 +385,7 @@ function accepts(takes: Value, value: unknown): boolean {
     case "point":
       return (
         value instanceof Point ||
-        isElement(value, ["shape", "grid", "enclosure"]) ||
+        isElement(value, ["shape", "grid", "enclosure", "frame"]) ||
         (Array.isArray(value) &&
           value.length === 2 &&
           value.every((n) => typeof n === "number" && Number.isFinite(n)))

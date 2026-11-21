@@ -296,47 +296,73 @@ test("each row of the item table gives its diagnostic", () => {
   );
 });
 
-test("a frame or a value of the wrong kind is INVALID_ARGUMENT, and the rest compiles", () => {
+test("a value of the wrong kind is INVALID_ARGUMENT, and the rest compiles", () => {
   const out = drawn((d) => {
     const a = d.box("A");
     const b = d.box("B");
     const all = d.column([d.row([a, b])]);
     const f = d.frame(a.topLeft, b.bottomRight, { tab: "group" });
+    const e = d.enclose([a]);
     const c = d.box("C");
-    d.place(c, { below: f as never });
-    d.place(d.box("E"), { at: f as never });
-    const g = d.grid([[f as never, d.box("G")]]);
-    const r = d.row([d.box("R"), f as never]);
-    d.enclose([f as never]);
-    d.arrow(a, b, { route: { via: [f as never] } });
-    d.tree(d.box("Root"), ["leaf" as never, d.box("Leaf")]);
+    d.equalSize([c, f as never, e as never]);
+    d.tree(f as never, [d.box("Leaf")]);
+    d.tree(d.box("Root"), ["leaf" as never, d.box("Twig")]);
     const x = d.box(5 as never);
     const notAList = d.row(7 as never);
     d.sequence("x" as never, "y" as never);
-    d.place(d.column([c, d.box("E2"), g, r, x, notAList]), { below: all });
+    d.place(d.column([c, x, notAList]), { below: all });
   });
   assert.deepEqual(
     out.diagnostics
       .filter((x) => x.code === "INVALID_ARGUMENT")
       .map((x) => [x.code, x.ids, x.subject]),
     [
-      ["INVALID_ARGUMENT", ["c", "group"], "below"],
-      ["INVALID_ARGUMENT", ["e", "group"], "at"],
-      ["INVALID_ARGUMENT", ["grid-1", "group"], "rows[0][0]"],
-      ["INVALID_ARGUMENT", ["row-2", "group"], "children[1]"],
-      ["INVALID_ARGUMENT", ["enclosure-1", "group"], "members[0]"],
-      ["INVALID_ARGUMENT", ["a->b", "group"], "route.via[0]"],
+      ["INVALID_ARGUMENT", ["group"], "nodes[1]"],
+      ["INVALID_ARGUMENT", ["enclosure-1"], "nodes[2]"],
+      ["INVALID_ARGUMENT", ["tree", "group"], "root"],
       ["INVALID_ARGUMENT", ["root-tree"], "children[0]"],
       ["INVALID_ARGUMENT", ["node"], "label"],
-      ["INVALID_ARGUMENT", ["row-3"], "children"],
+      ["INVALID_ARGUMENT", ["row-2"], "children"],
       ["INVALID_ARGUMENT", ["sequence-1"], "participants"],
       ["INVALID_ARGUMENT", ["sequence-1"], "steps"],
     ],
   );
   assert.ok(!out.diagnostics.some((x) => x.code === "DRAW_FAILED" || x.code === "DIAGRAM_FAILED"));
+});
+
+test("a frame is taken wherever an enclosure is, and positioning it is NOT_PLACEABLE", () => {
+  const out = drawn((d) => {
+    const a = d.box("A");
+    const b = d.box("B");
+    const all = d.column([d.row([a, b])]);
+    const f = d.frame(a.topLeft.offset(-8, -8), b.bottomRight.offset(8, 8), { tab: "group" });
+    const c = d.box("C");
+    d.place(c, { below: f });
+    d.place(d.box("E"), { at: f.topRight.offset(200, 0) });
+    d.enclose([f], { id: "outer", padding: 8 });
+    d.arrow(c, f, { route: { viaX: f.right.offset(40, 0) } });
+    const g = d.grid([[f, d.box("G")]]);
+    const r = d.row([d.box("R"), f]);
+    d.place(f, { below: all });
+    d.place(d.column([g, r]), { below: c });
+  });
   assert.deepEqual(
-    out.nodes.filter((n) => !n.passive).map((n) => n.id),
-    ["a", "b", "c", "e", "g", "r", "root", "leaf", "node", "e2"],
+    out.diagnostics.map((x) => [x.code, x.ids, x.subject]),
+    [
+      ["NOT_PLACEABLE", ["group"], undefined],
+      ["NOT_PLACEABLE", ["group"], undefined],
+      ["NOT_PLACEABLE", ["group"], undefined],
+      ["ENCLOSURE_INTRUSION", ["a", "outer"], undefined],
+      ["ENCLOSURE_INTRUSION", ["b", "outer"], undefined],
+    ],
+  );
+  assert.deepEqual(
+    out.diagnostics.slice(0, 3).map((x) => x.message),
+    [
+      "grid(grid-1) positions group, which is a frame; its bounds come from its corners. Position what its corners name instead.",
+      "row(row-2) positions group, which is a frame; its bounds come from its corners. Position what its corners name instead.",
+      "place() positions group, which is a frame; its bounds come from its corners. Position what its corners name instead.",
+    ],
   );
 });
 

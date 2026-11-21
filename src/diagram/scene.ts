@@ -63,7 +63,7 @@ export class Scene {
   readonly #frames: Frame[] = [];
   readonly #owner = new Map<Element, Grid | Placement>();
   readonly #sizeGroups: SizeGroup[] = [];
-  readonly #groups = new Map<Element | Frame, Array<Element | Edge | Frame>>();
+  readonly #groups = new Map<Element, Array<Element | Edge>>();
   readonly #problems: Problem[] = [];
   readonly #categories: string[] = [];
   readonly #derivedIds = new Map<Named, DerivedId>();
@@ -94,7 +94,7 @@ export class Scene {
    * Elements a step focuses together with a container, beyond what it encloses or lays out:
    * a sequence's messages and notes, a fragment's messages, a tree branch's lines.
    */
-  get groups(): ReadonlyMap<Element | Frame, ReadonlyArray<Element | Edge | Frame>> {
+  get groups(): ReadonlyMap<Element, ReadonlyArray<Element | Edge>> {
     return this.#groups;
   }
   /** Categories in the order the drawing first uses them, which sets their colors. */
@@ -168,7 +168,9 @@ export class Scene {
   addFrame(from: PointLike, to: PointLike, options: FrameOptions, name = "frame"): Frame {
     this.#grow();
     const frame = new Frame(from, to, options, name);
+    frame.checkArgs = this.checkArgs;
     this.#frames.push(frame);
+    this.#noteCategory(options.category);
     return frame;
   }
 
@@ -182,7 +184,9 @@ export class Scene {
         const parent = el instanceof Node ? el.member?.parent : undefined;
         const what = parent
           ? `a ${el instanceof Node ? el.shape : "member"} of ${parent.id}; its bounds come from its parent. Position ${parent.id} instead.`
-          : "an enclosure; its bounds come from its members. Position the members instead.";
+          : el instanceof Frame
+            ? "a frame; its bounds come from its corners. Position what its corners name instead."
+            : "an enclosure; its bounds come from its members. Position the members instead.";
         return `${ownerName(owner)} positions ${el.id}, which is ${what}`;
       });
       return;
@@ -212,7 +216,7 @@ export class Scene {
     this.#sizeGroups.push(group);
   }
   /** The elements that a step focuses together with `container`. */
-  addGroup(container: Element | Frame, members: Array<Element | Edge | Frame>) {
+  addGroup(container: Element, members: Array<Element | Edge>) {
     this.#groups.set(container, [...members]);
   }
   /** Check a method's arguments against its signature, and report its problems about `self`. */
@@ -255,9 +259,12 @@ export class Scene {
   }
 }
 
-/** Whether a grid or a placement can position an element: not an enclosure, a cell, or a mark. */
+/**
+ * Whether a grid or a placement can position an element: not an enclosure, a frame, a cell, or
+ * a mark.
+ */
 function placeable(el: Element): boolean {
-  return !(el instanceof Enclosure) && !(el instanceof Node && el.member);
+  return !(el instanceof Enclosure) && !(el instanceof Frame) && !(el instanceof Node && el.member);
 }
 
 /** How a message names a position owner: `row(row-1)` or `place()`. */

@@ -2,7 +2,13 @@
  * Checks over the scene and the compiled drawing: ids, positions, overlaps, crossings.
  */
 
-import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "../drawing.ts";
+import type {
+  CompiledEdge,
+  CompiledEnclosure,
+  CompiledFrame,
+  CompiledLabel,
+  CompiledNode,
+} from "../drawing.ts";
 import {
   type Element,
   Enclosure,
@@ -97,9 +103,10 @@ export function validate(
   nodes: CompiledNode[],
   edges: CompiledEdge[],
   enclosures: CompiledEnclosure[],
+  frames: CompiledFrame[],
   report: Report,
 ) {
-  const accented = [...nodes, ...edges, ...enclosures]
+  const accented = [...nodes, ...edges, ...enclosures, ...frames]
     .filter((element) => element.role === "accent" && !("passive" in element && element.passive))
     .map((element) => element.id);
   if (accented.length > 1)
@@ -217,40 +224,55 @@ export function validate(
         );
     }
 
-  for (const e of enclosures) {
-    if (!e.titleRect) continue;
-    for (const edge of edges)
-      for (let i = 0; i < edge.points.length - 1; i++)
-        if (
-          segmentHitsRect(
-            edge.points[i] as Vec,
-            edge.points[i + 1] as Vec,
-            inflate(e.titleRect, enclosure.titleClearance),
-          )
-        ) {
-          report(
-            "ENCLOSURE_TITLE_CROSSED",
-            `${edge.id} crosses the title of ${e.id}. Move the title with titleAt, or move the edge.`,
-            [edge.id, e.id],
-          );
-          break;
-        }
-  }
-
+  const apart = (e: CompiledEnclosure) => (other: { stepOnly?: true }) =>
+    !(e.stepOnly && other.stepOnly);
+  for (const e of enclosures)
+    for (const [message, ids] of titleCrossings(e, edges.filter(apart(e))))
+      report("ENCLOSURE_TITLE_CROSSED", message, ids);
   scene.enclosures.forEach((e, k) => {
     const compiled = enclosures[k];
     if (!compiled) return;
     const members = new Set(memberIds(e));
-    for (const node of nodes) {
-      if (members.has(node.id) || node.passive) continue;
-      if (node.parent !== undefined && members.has(node.parent)) continue;
-      if (rects(node).some((r) => overlap(r, compiled.rect) && !contains(r, compiled.rect)))
-        report(
-          "ENCLOSURE_INTRUSION",
-          `${node.id} is not a member of ${e.id} but overlaps its boundary.`,
-          [node.id, e.id],
-        );
-    }
+    for (const [message, ids] of intrusions(compiled, members, nodes.filter(apart(compiled))))
+      report("ENCLOSURE_INTRUSION", message, ids);
+  });
+}
+
+/** The edges that cross an enclosure's title, each as a message and the ids it is about. */
+export function titleCrossings(
+  e: CompiledEnclosure,
+  edges: CompiledEdge[],
+): Array<[string, string[]]> {
+  if (!e.titleRect) return [];
+  const clear = inflate(e.titleRect, enclosure.titleClearance);
+  return edges.flatMap(
+    (edge): Array<[string, string[]]> =>
+      edge.points.slice(1).some((b, i) => segmentHitsRect(edge.points[i] as Vec, b, clear))
+        ? [
+            [
+              `${edge.id} crosses the title of ${e.id}. Move the title with titleAt, or move the edge.`,
+              [edge.id, e.id],
+            ],
+          ]
+        : [],
+  );
+}
+
+/**
+ * The shapes that are not members of an enclosure but overlap its boundary, each as a message
+ * and the ids it is about. `members` holds the ids of the members, nested ones included.
+ */
+export function intrusions(
+  e: CompiledEnclosure,
+  members: ReadonlySet<string>,
+  nodes: CompiledNode[],
+): Array<[string, string[]]> {
+  return nodes.flatMap((node): Array<[string, string[]]> => {
+    if (members.has(node.id) || node.passive) return [];
+    if (node.parent !== undefined && members.has(node.parent)) return [];
+    const rects = node.labelRect ? [node.rect, node.labelRect] : [node.rect];
+    if (!rects.some((r) => overlap(r, e.rect) && !contains(r, e.rect))) return [];
+    return [[`${node.id} is not a member of ${e.id} but overlaps its boundary.`, [node.id, e.id]]];
   });
 }
 

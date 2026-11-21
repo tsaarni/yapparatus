@@ -121,6 +121,21 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   d.frame(check.topLeft.offset(-120, -24), d.xy(reject.right.offset(24, 0), valid.bottom.offset(0, 8)), { tab: "opt", title: "token present" })
 }} />
 
+<Diagram id="frame-steps" caption="An arrow at a frame, and a frame and an enclosure that one step each shows." draw={(d) => {
+  const api = d.box("API")
+  const db = d.cylinder("Database")
+  const client = d.box("Client")
+  d.row([api, db])
+  const zone = d.frame(api.topLeft.offset(-24, -64), db.bottomRight.offset(24, 24), { tab: "zone", category: "Private" })
+  d.place(client, { below: zone, gap: 48 })
+  d.arrow(client, zone, "calls")
+  d.frame(api.topLeft.offset(-8, -8), api.bottomRight.offset(8, 8), { id: "api-callout", stepOnly: true, role: "accent" })
+  d.enclose([db], { id: "store", title: "Store", stepOnly: true })
+}}>
+  <Step focus="api api-callout">The API answers.</Step>
+  <Step focus="store">The store keeps the rows.</Step>
+</Diagram>
+
 <Diagram id="worker-states" caption="A state machine with bends and a loop." draw={(d) => {
   const idle = d.box("Idle")
   const busy = d.box("Busy", { role: "accent" })

@@ -69,8 +69,11 @@ const labelSide = oneOf<LabelSide>()("above", "below", "left", "right");
 const size = number({ min: 0 });
 /** A gap, in units. A negative gap overlaps what it separates. */
 const gap = number();
-/** An element that a grid, a placement, or an enclosure takes. */
-const anyElement = element("shape", "grid", "enclosure");
+/**
+ * An element that a grid, a placement, or an enclosure takes. A grid or a placement that positions
+ * an enclosure or a frame is reported when the call records it.
+ */
+const anyElement = element("shape", "grid", "enclosure", "frame");
 /** Text that names something, which stands in empty when it is not text. */
 const label = standIn(text, "", "Empty text stands in.");
 
@@ -324,6 +327,9 @@ export const signatures = {
           id: text,
           tab: text,
           title: text,
+          role,
+          category: text,
+          stepOnly: boolean,
           dividers: list(
             options<NonNullable<FrameOptions["dividers"]>[number]>()(
               { at: point, label: text },
@@ -426,6 +432,7 @@ export const signatures = {
           padding: size,
           role,
           category: text,
+          stepOnly: boolean,
         }),
         {},
       ),

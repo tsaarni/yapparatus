@@ -195,7 +195,7 @@ The shapes take these options. "All" is every shape in the table above but `d.re
 - `external`: an element outside the system, drawn dashed.
 - `default`: the role without the option.
 
-`role` and `category` also work on arrows, enclosures, and sequence messages. There is no option for a color: colors come from the theme.
+`role` and `category` also work on arrows, enclosures, frames, and sequence messages. There is no option for a color: colors come from the theme.
 
 A misspelled option is `UNKNOWN_OPTION`, and a value that the option does not take is `INVALID_ARGUMENT`. Both list what the call takes.
 
@@ -235,7 +235,7 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 | `d.column([a, b], { gap?, align? })` | Top to bottom: a grid of one column. Default gap: 64 |
 | `d.place(b, { below: a, gap?, align? })` | Also `above`, `leftOf`, `rightOf` |
 | `d.place(b, { at: point, anchor? })` | Put the anchor of `b` (default `center`) on a point |
-| `d.enclose([a, b], { id?, title?, titleAt?, padding?, role?, category? })` | A boundary around shapes. It never moves them |
+| `d.enclose([a, b], { id?, title?, titleAt?, padding?, role?, category?, stepOnly? })` | A boundary around shapes. It never moves them |
 | `d.equalSize([a, b])`, `equalWidth`, `equalHeight` | Share the largest measured size |
 
 | Option | Calls | Meaning |
@@ -246,7 +246,7 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 | `below`, `above`, `leftOf`, `rightOf` | `place` | The element to place the shape next to |
 | `at`, `anchor` | `place` | A point, and the anchor of the shape that goes on it |
 | `title`, `titleAt`, `padding` | `enclose` | The title, the corner that holds it, and the space around the members |
-| `role`, `category` | `enclose` | As on shapes |
+| `role`, `category`, `stepOnly` | `enclose` | As on shapes. Without a `role`, an enclosure is `muted` |
 
 - Gaps are measured between edges, not between centers.
 - A gap may be negative, to overlap shapes. The overlap is then reported as a warning.
@@ -362,7 +362,21 @@ A label is a string or `{ text, segment, at, side, gap }`:
 
 ## Frames
 
-`d.frame(topLeft, bottomRight, options?)` draws a titled region between two points, such as a UML fragment. It does not own or move anything. A frame is not an element: grids, `place`, `enclose`, and edges do not take it.
+`d.frame(topLeft, bottomRight, options?)` draws a titled region between two points, such as a network zone or a UML fragment. A frame is an element: it has the nine anchors and `port()`, an edge that ends at it meets its outline, and `place` and `enclose` take it. It does not own or move anything.
+
+```js
+const client = d.actor("Client", { role: "external" })
+const api = d.box("API")
+const db = d.cylinder("Database")
+d.row([api, db])
+const zone = d.frame(api.topLeft.offset(-24, -40), db.bottomRight.offset(24, 24), {
+  tab: "zone",
+  title: "private network",
+})
+d.place(client, { leftOf: zone, gap: 72 })
+d.arrow(client, zone, "VPN")
+d.arrow(api, db)
+```
 
 | Option | Meaning |
 |---|---|
@@ -370,6 +384,12 @@ A label is a string or `{ text, segment, at, side, gap }`:
 | `tab` | The label in the top-left corner, such as `loop` |
 | `title` | The text after the tab |
 | `dividers` | A list of `{ at, label? }`: a dashed line at the y of the point `at`, with an optional label |
+| `role`, `category` | As on shapes. Without a `role`, a frame has a thin line and a tab on a raised fill |
+| `stepOnly` | Shown only in the steps that focus it |
+
+- The two points set the frame's bounds, so a grid, a row, a column, or `place` cannot position it: that is `NOT_PLACEABLE`. Move a frame by moving its points.
+- A shape can be placed next to a frame, as `client` is with `leftOf`.
+- A frame does not hold the shapes it covers: a step that focuses it focuses the frame alone. To group shapes for steps, use `enclose`.
 
 ## Categories
 
@@ -424,7 +444,7 @@ Steps tell the story of a figure in order. Each `<Step>` names the elements it i
 | Containers | Focusing an enclosure, grid, row, column, sequence, sequence fragment, or tree branch focuses everything in it |
 | Categories | Focusing a category's id focuses every element in it |
 | `build` | Each element stays hidden until the first step that focuses it |
-| `stepOnly` | A shape or edge option: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
+| `stepOnly` | An option of shapes, record cells, text marks, edges, enclosures, and frames: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
 | `id` | A step's address: `/page#cached-read--lookup`. Unique among the figure's elements and steps |
 
 To tell a story:
@@ -453,7 +473,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `PLACEMENT_CYCLE` | error | Placements depend on each other. Place one of them independently |
 | `CONFLICTING_PLACEMENT` | error | A shape is in a grid, row, or column and also placed, or in two of them. Keep one |
 | `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
-| `NOT_PLACEABLE` | error | An enclosure, a cell, or a mark is in a grid, row, or column, or placed. Position its members or its parent instead |
+| `NOT_PLACEABLE` | error | An enclosure, a frame, a cell, or a mark is in a grid, row, or column, or placed. Position its members, the elements its points name, or its parent instead |
 | `UNKNOWN_OPTION` | error | A call has an option it does not take, so the option is ignored. The message lists the options it takes, the nearest first |
 | `INVALID_ARGUMENT` | error | A call has a value it cannot use, an option of another form, such as `anchor` with `below`, an option that has no effect, or a route the edge cannot take, such as `{ loop: side }` between two shapes. The message names the call, the value, and the values it takes; the call uses the default or a stand-in |
 | `UNKNOWN_PARTICIPANT` | error | A sequence message or note names a shape that is not in the participants, so it is skipped. Add the shape to the participants |
@@ -467,7 +487,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one the route `{ bend: units }`, attach one at a `port()`, or draw one edge with `tail: "filled"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
 | `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Each end is reported by itself. Widen the gap |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
-| `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |
+| `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements, enclosures included, overlap only if one step shows both |
 | `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleAt`, or move the edge |
 | `TEXT_OVERFLOW` | warning | A word is wider than a fixed `width`, a record cell is wider than its cell, or the text is taller than a fixed `height`. Increase `width` or `height` |
 | `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |

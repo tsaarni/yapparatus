@@ -146,7 +146,10 @@ export function EnclosureView({
   );
 }
 
-/** Frames paint in two layers: the outline under everything, the labels above it. */
+/**
+ * Frames paint in two layers: the outline under everything, the labels above it. A frame without
+ * a role has its own look, which a role replaces.
+ */
 export function FrameView({
   frame: f,
   layer,
@@ -156,12 +159,24 @@ export function FrameView({
   layer: "outline" | "labels";
   state: ElementState;
 }) {
-  const fade = stylex.props(elementStyles.fade, stateStyle(state));
+  const fade = stylex.props(
+    f.role ? roleStyle(f.role) : elementStyles.frameLook,
+    categoryStyle(f.category),
+    elementStyles.fade,
+    stateStyle(state),
+  );
   const { x, y, width: w, height: h } = f.rect;
   if (layer === "outline")
     return (
       <g data-element-id={f.id} {...fade}>
-        <rect x={x} y={y} width={w} height={h} rx={corner.frame} {...stylex.props(styles.frame)} />
+        <rect
+          x={x}
+          y={y}
+          width={w}
+          height={h}
+          rx={corner.frame}
+          {...stylex.props(styles.frame, f.role === "external" && elementStyles.dashed)}
+        />
         {f.dividers.map((divider, i) => (
           <path
             // biome-ignore lint/suspicious/noArrayIndexKey: Dividers are positional.
@@ -233,12 +248,12 @@ const styles = stylex.create({
   },
   frame: {
     fill: "none",
-    stroke: theme.borderControl,
-    strokeWidth: stroke.hairline,
+    stroke: "var(--ink)",
+    strokeWidth: "var(--weight)",
   },
   frameTab: {
-    fill: theme.surfaceRaised,
-    stroke: theme.borderControl,
-    strokeWidth: stroke.hairline,
+    fill: "var(--fill)",
+    stroke: "var(--ink)",
+    strokeWidth: "var(--weight)",
   },
 });

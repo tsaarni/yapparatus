@@ -13,7 +13,7 @@ import {
   type LegendEntry,
   maxCategories,
 } from "../drawing.ts";
-import { type Diagnostic, Edge, type Element, Frame, slug } from "../elements.ts";
+import { type Diagnostic, type Edge, slug } from "../elements.ts";
 import { inflate, type Rect, rounded, union, type Vec } from "../geometry.ts";
 import { defaultMetrics, type Lookups, type Measure, type Metrics } from "../metrics.ts";
 import type { Scene } from "../scene.ts";
@@ -46,7 +46,7 @@ export function compile(
 
   const icons = createIcons(lookups.icons, scene.nodes, report);
   const text = createText(m, measure, report, icons);
-  const layout = createLayout(scene, m, measure, report, text);
+  const layout = createLayout(scene, m, measure, report, text, (edge) => inkOf(routeOf(edge)));
   const { compileNode, compileFrame, compileEnclosure } = createNodes(
     m,
     measure,
@@ -56,6 +56,14 @@ export function compile(
     icons,
   );
   const { compileEdge } = createEdges(m, measure, report, layout, categoryOf);
+  const routed = new Map<Edge, ReturnType<typeof compileEdge>>();
+  const routeOf = (edge: Edge) => {
+    const known = routed.get(edge);
+    if (known) return known;
+    const made = layout.guard(`route(${edge.id})`, () => compileEdge(edge));
+    routed.set(edge, made);
+    return made;
+  };
 
   let nodes: CompiledNode[] = [];
   let enclosures: CompiledEnclosure[] = [];
@@ -66,10 +74,10 @@ export function compile(
     nodes = paintOrder(scene.nodes.map((node) => compileNode(node, layout.bounds(node))));
     for (const s of scene.grids) layout.bounds(s);
     enclosures = scene.enclosures.map(compileEnclosure);
-    const compiledEdges = scene.edges.map(compileEdge);
+    const compiledEdges = scene.edges.map(routeOf);
     edges = compiledEdges.map((e) => e.compiled);
     routes = compiledEdges.map((e) => e.route);
-    frames = compileFrames(scene, nodes, edges, compileFrame, layout.bounds);
+    frames = scene.frames.map(compileFrame);
   } catch (error) {
     if (error instanceof CycleError) {
       report(
@@ -87,7 +95,7 @@ export function compile(
     const groups = groupsOf(scene);
     const { legend, categoryGroups } = legendOf(
       scene,
-      [...nodes, ...edges, ...enclosures],
+      [...nodes, ...edges, ...enclosures, ...frames],
       groups,
       report,
     );
@@ -124,49 +132,18 @@ export function compile(
     };
   }
 
-  validate(scene, nodes, edges, enclosures, report);
+  validate(scene, nodes, edges, enclosures, frames, report);
   checkOverlaps(edges, routes, report);
   return finish(true);
 }
 
-/**
- * Compile the frames, each after the frames it holds, so that a frame covers the ink of its
- * members: edge points, heads, and labels, node rectangles and labels, and inner frames.
- */
-function compileFrames(
-  scene: Scene,
-  nodes: CompiledNode[],
-  edges: CompiledEdge[],
-  compileFrame: (frame: Frame, ink: Rect[]) => CompiledFrame,
-  bounds: (el: Element) => Rect,
-): CompiledFrame[] {
-  const nodeById = new Map(nodes.map((n) => [n.id, n]));
-  const edgeOf = new Map(scene.edges.map((e, i) => [e, edges[i]]));
-  const done = new Map<Frame, CompiledFrame>();
+/** What a compiled edge paints: its points, its heads, and its labels. */
+function inkOf({ compiled }: { compiled: CompiledEdge }): Rect[] {
   const point = (p: Vec): Rect => ({ ...p, width: 0, height: 0 });
-  const inkOf = (member: Element | Edge | Frame): Rect[] => {
-    if (member instanceof Frame) return [frameOf(member).rect];
-    if (member instanceof Edge) {
-      const e = edgeOf.get(member);
-      return e
-        ? [
-            ...[...e.points, ...headsOf(e).flatMap((h) => h.points)].map(point),
-            ...e.labels.map((l) => l.rect),
-          ]
-        : [];
-    }
-    const n = nodeById.get(member.id);
-    if (!n) return [bounds(member)];
-    return n.labelRect ? [n.rect, n.labelRect] : [n.rect];
-  };
-  const frameOf = (frame: Frame): CompiledFrame => {
-    const known = done.get(frame);
-    if (known) return known;
-    const compiled = compileFrame(frame, (scene.groups.get(frame) ?? []).flatMap(inkOf));
-    done.set(frame, compiled);
-    return compiled;
-  };
-  return scene.frames.map(frameOf);
+  return [
+    ...[...compiled.points, ...headsOf(compiled).flatMap((h) => h.points)].map(point),
+    ...compiled.labels.map((l) => l.rect),
+  ];
 }
 
 /** Nodes in paint order: passive decorations first, then the rest, each in creation order. */

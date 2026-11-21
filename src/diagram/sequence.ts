@@ -6,7 +6,6 @@ import {
   type Edge,
   type EdgeOptions,
   type Element,
-  type Frame,
   lerp,
   type Node,
   type PointLike,
@@ -19,7 +18,7 @@ import type { Scene } from "./scene.ts";
 import type { CallCheck } from "./signature.ts";
 
 /** Elements a fragment or a whole sequence holds, for steps that focus it. */
-type Members = Array<Element | Edge | Frame>;
+type Members = Array<Element | Edge>;
 
 /** A message from one participant to another, in time order. */
 export interface SequenceMessage {

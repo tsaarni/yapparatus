@@ -4,7 +4,7 @@
 
 import type { CompiledEnclosure, CompiledFrame, CompiledNode, TextLine } from "../drawing.ts";
 import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "../elements.ts";
-import { inflate, type Rect, union, type Vec } from "../geometry.ts";
+import type { Rect, Vec } from "../geometry.ts";
 import {
   enclosure,
   fontsOf,
@@ -30,7 +30,7 @@ export function createNodes(
 ) {
   const fonts = fontsOf(m);
   const { measureNode, textAt, tabWidth } = text;
-  const { terminalLabel, member, recordLines, evalPoint, enclosureRect } = layout;
+  const { terminalLabel, member, recordLines, evalPoint, enclosureRect, bounds } = layout;
 
   function compileNode(node: Node, rect: Rect): CompiledNode {
     const c = measureNode(node);
@@ -148,20 +148,16 @@ export function createNodes(
     };
   }
 
-  function compileFrame(frame: Frame, ink: Rect[]): CompiledFrame {
-    const a = evalPoint(toExpr(frame.from));
-    const b = evalPoint(toExpr(frame.to));
-    const corners = {
-      x: Math.min(a.x, b.x),
-      y: Math.min(a.y, b.y),
-      width: Math.abs(b.x - a.x),
-      height: Math.abs(b.y - a.y),
-    };
-    const rect = union([corners, ...ink.map((r) => inflate(r, fragment.margin))]) ?? corners;
+  function compileFrame(frame: Frame): CompiledFrame {
+    const rect = bounds(frame);
+    const { role, category, stepOnly } = frame.options;
     const tabOf = frame.options.tab ? fragmentTab(frame.options.tab, rect.x, rect.y) : undefined;
     const titleX = rect.x + (tabOf ? tabOf.rect.width : 0) + fragment.padX;
     return {
       id: frame.id,
+      ...(role ? { role } : {}),
+      ...categoryOf(category),
+      ...(stepOnly ? { stepOnly: true } : {}),
       rect,
       ...(tabOf ? { tab: tabOf } : {}),
       ...(frame.options.title
@@ -201,6 +197,7 @@ export function createNodes(
       id: e.id,
       role: e.options.role ?? "muted",
       ...categoryOf(e.options.category),
+      ...(e.options.stepOnly ? { stepOnly: true } : {}),
       rect,
       ...(e.options.title ? titleGeometry(e.options.title, rect, e.options.titleAt) : {}),
     };

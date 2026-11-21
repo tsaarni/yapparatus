@@ -181,6 +181,13 @@ export const elementStyles = stylex.create({
     "--label": theme.text,
     "--weight": stroke.line,
   },
+  /** A frame without a role: a hairline in the control border color, its tab raised. */
+  frameLook: {
+    "--ink": theme.borderControl,
+    "--fill": theme.surfaceRaised,
+    "--label": theme.text,
+    "--weight": stroke.hairline,
+  },
   /** Category colors: they replace a role's hue and keep its weight, badge, and dashes. */
   category1: { "--ink": theme.category1, "--fill": theme.category1Surface },
   category2: { "--ink": theme.category2, "--fill": theme.category2Surface },

@@ -103,7 +103,7 @@ A step focuses some elements, fades the others, and shows a short text under the
   <Step focus="database miss">On a miss, the cache reads the database.</Step>
 </Diagram>
 
-A focused element has a heavier line. With `build`, an element stays hidden until the first step that focuses it. A step-only element, such as the note, appears only in its steps. Focusing a container or a category focuses its elements. The layout is the same in every step.
+A focused element has a heavier line. With `build`, an element stays hidden until the first step that focuses it. A step-only element, such as the note, appears only in its steps, on screen and in print. Shapes, edges, enclosures, and frames can be step-only. Focusing a container or a category focuses its elements. The layout is the same in every step.
 
 ### Interaction
 
@@ -139,7 +139,7 @@ An element's color comes from its role or its category, which the [diagram compi
   <Step focus="new to-be-removed">A category replaces the color and keeps the role's weight, badge, and dashes. The legend names each category.</Step>
 </Diagram>
 
-A role sets the line color, fill, label color, and line weight that every kind of element reads, so a role looks the same on a box, an arrow, and an enclosure. The view puts an icon's markup from the diagram's icon table in a nested `svg` at its rectangle, whose text color is the label color on a box and the line color on an icon shape, which has no outline, as an actor's figure. The markup's `currentColor` then follows the role, the category on an icon shape, the theme, and a step's fading. A category sets only the colors, from the theme's four category colors. Focus and pointing add line weight, so weight shows state and color shows meaning.
+A role sets the line color, fill, label color, and line weight that every kind of element reads, so a role looks the same on a box, an arrow, an enclosure, and a frame. A frame without a role sets the same four values to its own look: the control border color, the raised surface for its tab, the text color, and a hairline. A frame's line keeps its weight when a step focuses it. The view puts an icon's markup from the diagram's icon table in a nested `svg` at its rectangle, whose text color is the label color on a box and the line color on an icon shape, which has no outline, as an actor's figure. The markup's `currentColor` then follows the role, the category on an icon shape, the theme, and a step's fading. A category sets only the colors, from the theme's four category colors. Focus and pointing add line weight, so weight shows state and color shows meaning.
 
 Pointing at a legend entry highlights its category's elements as a step does. In dev mode, an element that a warning names gets a dotted outline.
 

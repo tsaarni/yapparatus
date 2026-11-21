@@ -516,12 +516,15 @@ export interface EncloseOptions {
   /** The corner that holds the title. Default: topLeft. */
   titleAt?: Corner;
   padding?: number;
+  /** Default: muted. */
   role?: Role;
   /**
    * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
    * the same category share a color, and a legend under the figure explains each color.
    */
   category?: string;
+  /** Show only while a step focuses it, such as a boundary that one step points out. */
+  stepOnly?: boolean;
 }
 
 export const Excerpt: { ({ from, wrap, children }: ExcerptProps): Element; breakout: boolean; };
