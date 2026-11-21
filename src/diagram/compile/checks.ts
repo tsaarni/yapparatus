@@ -18,12 +18,12 @@ import {
   type Vec,
 } from "../geometry.ts";
 import { enclosure } from "../metrics.ts";
-import type { Scene } from "../scene.ts";
+import type { Named, Scene } from "../scene.ts";
 import type { Report } from "./text.ts";
 
 /**
- * Settle ids in dependency order: shapes and containers, then members, then edges.
- * Explicit ids are fixed; derived ids get a numeric suffix when they collide.
+ * Settle ids in dependency order: shapes and containers, then those named after an owner, then
+ * members, then edges. Explicit ids are fixed; derived ids get a numeric suffix when they collide.
  */
 export function checkIds(scene: Scene, report: Report) {
   const taken = new Set<string>();
@@ -38,12 +38,30 @@ export function checkIds(scene: Scene, report: Report) {
       taken.add(el.id);
     }
   };
+  const derived = scene.derivedIds;
+  const depth = (el: Named): number => {
+    const owner = derived.get(el)?.owner;
+    return owner ? 1 + depth(owner) : 0;
+  };
+  const named = (el: Named) => {
+    const d = derived.get(el);
+    if (d) el.id = `${d.owner.id}${d.suffix}`;
+    return el;
+  };
   const members = scene.nodes.filter((n) => n.member);
-  settle([...scene.nodes.filter((n) => !n.member), ...scene.grids, ...scene.enclosures]);
+  const shapes = [
+    ...scene.nodes.filter((n) => !n.member),
+    ...scene.grids,
+    ...scene.enclosures,
+    ...scene.frames,
+  ];
+  const deepest = Math.max(0, ...shapes.map(depth));
+  for (let level = 0; level <= deepest; level++)
+    settle(shapes.filter((el) => depth(el) === level).map(named));
   for (const m of members) if (m.member) m.id = `${m.member.parent.id}.${m.member.own}`;
   settle(members.map((m) => ({ id: m.id, explicitId: true })));
-  for (const edge of scene.edges) edge.deriveId();
-  settle(scene.edges);
+  for (const edge of scene.edges) if (!derived.has(edge)) edge.deriveId();
+  settle(scene.edges.map(named));
 }
 
 /** Every element needs a position owner; all but the first without one are reported. */

@@ -2,7 +2,16 @@
  * Trees from the diagram primitives: each subtree is a row or column of its root and its
  * children's subtrees, with lines from the root to each child that share one trunk.
  */
-import type { Align, EdgeOptions, Element, Grid, Node, PointLike, Route } from "./elements.ts";
+import type {
+  Align,
+  EdgeOptions,
+  Element,
+  Grid,
+  GridOptions,
+  Node,
+  PointLike,
+  Route,
+} from "./elements.ts";
 import { defaultGap, treeSpacing } from "./metrics.ts";
 import type { Scene } from "./scene.ts";
 
@@ -14,6 +23,8 @@ export type TreeChild = Node | [node: Node, children: TreeChild[]];
 
 /** Options of a tree. */
 export interface TreeOptions {
+  /** The outermost branch's id. Default: the root's id followed by `-tree`. */
+  id?: string;
   /** Default: down. */
   layout?: TreeLayout;
   /** Space between siblings. Default: 24. */
@@ -33,7 +44,10 @@ type Branch = (i: number) => [PointLike, Route];
 /** The layouts, to check one from a draw program, which has no types. */
 const layouts: readonly TreeLayout[] = ["down", "right", "both", "indent"];
 
-/** Draw a tree into the scene and return the row or column that holds it all. */
+/**
+ * Draw a tree into the scene and return the row or column that holds it all. Each branch is
+ * named after its node: `-tree`, with its subtrees in `-children`, or `-left` and `-right`.
+ */
 export function tree(
   scene: Scene,
   root: Node,
@@ -45,19 +59,29 @@ export function tree(
     throw new Error(`Tree layout "${layout}" is not one of ${layouts.join(", ")}.`);
   const gap = options.gap ?? treeSpacing.gap;
   const levelGap = options.levelGap ?? treeSpacing.levelGap;
-  const row = (cells: Element[], cellGap: number, align: Align = "center") =>
-    scene.addGrid("row", [cells], { gap: [cellGap, defaultGap.y], align });
-  const column = (cells: Element[], cellGap: number, align: Align = "center") =>
+  const outer: GridOptions = options.id !== undefined ? { id: options.id } : {};
+  const row = (cells: Element[], cellGap: number, align: Align = "center", o: GridOptions = {}) =>
+    scene.addGrid("row", [cells], { ...o, gap: [cellGap, defaultGap.y], align });
+  const column = (
+    cells: Element[],
+    cellGap: number,
+    align: Align = "center",
+    o: GridOptions = {},
+  ) =>
     scene.addGrid(
       "column",
       cells.map((cell) => [cell]),
-      { gap: [defaultGap.x, cellGap], align },
+      { ...o, gap: [defaultGap.x, cellGap], align },
     );
   const split = (child: TreeChild): [Node, TreeChild[]] =>
     Array.isArray(child) ? child : [child, []];
+  const named = (grid: Grid, owner: Node, suffix: string) => {
+    scene.nameAfter(grid, owner, suffix);
+    return grid;
+  };
 
   const join = (container: Grid, parent: Node, kids: TreeChild[], branch: Branch) => {
-    container.id = `${parent.id}-tree`;
+    scene.nameAfter(container, parent, "-tree");
     const lines = kids.map((kid, i) => {
       const [from, route] = branch(i);
       return scene.addEdge(from, split(kid)[0], { ends: "--", ...options.edge, route });
@@ -75,20 +99,19 @@ export function tree(
     const [node, kids] = split(kid);
     return kids.length ? grow(node, kids, growth) : node;
   };
-  const grow = (node: Node, kids: TreeChild[], growth: Growth): Grid => {
+  const grow = (node: Node, kids: TreeChild[], growth: Growth, o: GridOptions = {}): Grid => {
     const subtrees = () => kids.map((kid) => subtree(kid, growth));
     switch (growth) {
       case "down": {
-        const levels = column([node, row(subtrees(), gap, "start")], levelGap);
+        const below = named(row(subtrees(), gap, "start"), node, "-children");
+        const levels = column([node, below], levelGap, "center", o);
         return join(levels, node, kids, () => [node, { viaY: levels.gutterY(0) }]);
       }
       case "right":
       case "left": {
-        const subtreeColumn = side(kids, growth);
-        const levels = row(
-          growth === "left" ? [subtreeColumn, node] : [node, subtreeColumn],
-          levelGap,
-        );
+        const subtreeColumn = named(side(kids, growth), node, "-children");
+        const cells = growth === "left" ? [subtreeColumn, node] : [node, subtreeColumn];
+        const levels = row(cells, levelGap, "center", o);
         return join(levels, node, kids, () => [node, { viaX: levels.gutterX(0) }]);
       }
       case "indent": {
@@ -97,7 +120,8 @@ export function tree(
           subtrees().map((s) => [null, s]),
           { gap: [treeSpacing.indent, gap], align: "start" },
         );
-        const levels = column([node, indented], gap, "start");
+        named(indented, node, "-children");
+        const levels = column([node, indented], gap, "start", o);
         const trunk = node.bottomLeft.offset(treeSpacing.trunk, 0);
         return join(levels, node, kids, () => [trunk, "vh"]);
       }
@@ -105,18 +129,16 @@ export function tree(
   };
 
   if (children.length === 0)
-    return join(column([root], defaultGap.y), root, [], () => [root, "straight"]);
-  if (layout !== "both") return grow(root, children, layout);
+    return join(column([root], defaultGap.y, "center", outer), root, [], () => [root, "straight"]);
+  if (layout !== "both") return grow(root, children, layout, outer);
   const lefts = children.filter((_, i) => i % 2 === 1);
+  const rights = children.filter((_, i) => i % 2 === 0);
   const cells = [
-    ...(lefts.length ? [side(lefts, "left")] : []),
+    ...(lefts.length ? [named(side(lefts, "left"), root, "-left")] : []),
     root,
-    side(
-      children.filter((_, i) => i % 2 === 0),
-      "right",
-    ),
+    named(side(rights, "right"), root, "-right"),
   ];
-  const halves = row(cells, levelGap);
+  const halves = row(cells, levelGap, "center", outer);
   const at = cells.indexOf(root);
   return join(halves, root, children, (i) => [root, { viaX: halves.gutterX(i % 2 ? 0 : at) }]);
 }

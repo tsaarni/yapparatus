@@ -46,7 +46,7 @@ d.sequence([app, queue, worker], [
 
 - `async: true` sends without waiting: an open arrowhead and no bar.
 - A message to the sender itself draws a loop and a short bar of its own. A fragment grows to cover what it holds, such as the label of a self-message.
-- `numbered` numbers the messages. `id` on a fragment lets one step focus all its messages: `<Step focus="drain">`.
+- `numbered` numbers the messages. A step that focuses a fragment focuses all its messages: `<Step focus="drain">`. Without `id`, the fragment's id is its operator and title as a slug, here `loop-until-empty`.
 
 ## Reference
 
@@ -61,8 +61,9 @@ d.sequence([app, queue, worker], [
 | `gap` | Space between participants. Default: 40 |
 | `step` | Vertical space per message. Default: 44 |
 | `numbered` | Number the messages |
-| `id` | The sequence element's id |
+| `id` | The sequence element's id. Default: `sequence-1`, `sequence-2`, and so on |
 
 - The participants are ordinary shapes, laid out in a row by the sequence; time runs downward.
-- `d.sequence` returns one element, so you can place it like any other.
+- `d.sequence` returns one element, so you can place it like any other. The row of participants in it is the sequence's id followed by `-participants`, such as `sequence-1-participants`.
+- Each participant's lifeline is its id followed by `-lifeline`, and its activation bars are `-active-1`, `-active-2`, and so on: `api-lifeline`, `api-active-1`. Steps leave lifelines and bars out.
 - Keep each message label shorter than the space between its two lifelines, or widen `gap`.

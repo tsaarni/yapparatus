@@ -98,6 +98,7 @@ export const Diagram: { ({ drawing, id, caption, description, build, children, d
 
 export class DiagramBuilder {
   readonly #scene: Scene;
+  readonly #counts = new Map<string, number>();
   constructor(scene: Scene) {
     this.#scene = scene;
   }
@@ -184,8 +185,14 @@ export class DiagramBuilder {
     return node;
   }
   #terminal(shape: Shape, kind: string, label: string, options: TerminalOptions): Node {
-    const id = label ? {} : { id: `${kind}-${this.#scene.nodes.length + 1}` };
-    return this.#scene.addNode(shape, label, options, id);
+    const name = this.#name(kind);
+    return this.#scene.addNode(shape, label, options, label ? {} : { id: name });
+  }
+  /** The id of an element without text: the call's name and its count, such as `row-1`. */
+  #name(call: string): string {
+    const n = (this.#counts.get(call) ?? 0) + 1;
+    this.#counts.set(call, n);
+    return `${call}-${n}`;
   }
   /**
    * Cells on a grid under an optional title: a type, a table, a packet header, a register,
@@ -193,8 +200,8 @@ export class DiagramBuilder {
    */
   record(cells: Cell[], options: RecordOptions = {}): Node {
     const { title = "", ...rest } = options;
-    const n = this.#scene.nodes.filter((x) => x.shape === "record").length + 1;
-    const node = this.#scene.addNode("record", title, rest, title ? {} : { id: `record-${n}` });
+    const name = this.#name("record");
+    const node = this.#scene.addNode("record", title, rest, title ? {} : { id: name });
     for (const cell of cells) {
       const [label, o] = typeof cell === "string" ? [cell, {}] : cell;
       const { span = 1, ...options } = typeof o === "number" ? { span: o } : o;
@@ -227,7 +234,7 @@ export class DiagramBuilder {
    * Returns one element that can be placed like any other.
    */
   sequence(participants: Node[], steps: SequenceStep[], options: SequenceOptions = {}): Element {
-    return sequence(this.#scene, participants, steps, options);
+    return sequence(this.#scene, participants, steps, options, this.#name("sequence"));
   }
   /**
    * A tree: the root over its subtrees, joined by lines. A child is a node or `[node, children]`.
@@ -238,7 +245,7 @@ export class DiagramBuilder {
   }
   /** A titled region between two corners, such as a UML fragment. */
   frame(from: PointLike, to: PointLike, options: FrameOptions = {}): Frame {
-    return this.#scene.addFrame(from, to, options);
+    return this.#scene.addFrame(from, to, options, this.#name("frame"));
   }
 
   /**
@@ -246,18 +253,20 @@ export class DiagramBuilder {
    * tallest. `null` is an empty cell. Gutters between the tracks carry edges.
    */
   grid(rows: Array<Array<Element | null>>, options: GridOptions = {}): Grid {
-    return this.#scene.addGrid("grid", rows, options);
+    return this.#scene.addGrid("grid", rows, options, this.#name("grid"));
   }
   /** Left to right: a grid of one row. `align` places the children vertically. */
   row(children: Element[], options: LineOptions = {}): Grid {
     const { gap = defaultGap.x, ...rest } = options;
-    return this.#scene.addGrid("row", [children], { ...rest, gap: [gap, defaultGap.y] });
+    const name = this.#name("row");
+    return this.#scene.addGrid("row", [children], { ...rest, gap: [gap, defaultGap.y] }, name);
   }
   /** Top to bottom: a grid of one column. `align` places the children horizontally. */
   column(children: Element[], options: LineOptions = {}): Grid {
     const { gap = defaultGap.y, ...rest } = options;
     const rows = children.map((child) => [child]);
-    return this.#scene.addGrid("column", rows, { ...rest, gap: [defaultGap.x, gap] });
+    const name = this.#name("column");
+    return this.#scene.addGrid("column", rows, { ...rest, gap: [defaultGap.x, gap] }, name);
   }
 
   place(el: Element, options: PlaceOptions): Element {
@@ -288,7 +297,7 @@ export class DiagramBuilder {
   }
 
   enclose(members: Element[], options: EncloseOptions = {}): Enclosure {
-    return this.#scene.addEnclosure(members, options);
+    return this.#scene.addEnclosure(members, options, this.#name("enclosure"));
   }
 
   /** An arrow. A string third argument is its label. `d.arrow(a, a)` draws a self-loop. */
@@ -700,6 +709,8 @@ export type TreeChild = Node | [node: Node, children: TreeChild[]];
 export type TreeLayout = "down" | "right" | "both" | "indent";
 
 export interface TreeOptions {
+  /** The outermost branch's id. Default: the root's id followed by `-tree`. */
+  id?: string;
   /** Default: down. */
   layout?: TreeLayout;
   /** Space between siblings. Default: 24. */

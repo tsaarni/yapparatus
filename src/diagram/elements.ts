@@ -321,9 +321,9 @@ export class Grid extends Element {
     kind: Grid["kind"],
     rows: ReadonlyArray<ReadonlyArray<Element | null>>,
     options: GridOptions,
-    n: number,
+    name: string,
   ) {
-    super(options.id ?? `${kind}-${n}`, options.id !== undefined);
+    super(options.id ?? name, options.id !== undefined);
     this.kind = kind;
     this.rows = rows.map((row) => [...row]);
     const [x, y] = Array.isArray(options.gap)
@@ -395,8 +395,9 @@ export interface EncloseOptions {
 export class Enclosure extends Element {
   readonly members: Element[];
   readonly options: EncloseOptions;
-  constructor(members: Element[], options: EncloseOptions, n: number) {
-    super(options.id ?? (options.title ? slug(options.title) : `boundary-${n}`), !!options.id);
+  /** `name` is the id without an `id` or a title, such as `enclosure-1`. */
+  constructor(members: Element[], options: EncloseOptions, name: string) {
+    super(options.id ?? (options.title ? slug(options.title) : name), !!options.id);
     this.members = members;
     this.options = options;
   }
@@ -524,14 +525,21 @@ export interface FrameOptions {
   dividers?: Array<{ at: PointLike; label?: string }>;
 }
 
-/** A titled region between two corner points. It neither owns nor moves anything. */
+/**
+ * A titled region between two corner points. It neither owns nor moves anything. Its derived
+ * id is its tab and title as a slug, such as `loop-until-empty`, or `name` without them.
+ */
 export class Frame {
-  readonly id: string;
+  /** Explicit ids are fixed; derived ids get a numeric suffix when they collide. */
+  id: string;
+  readonly explicitId: boolean;
   readonly from: PointLike;
   readonly to: PointLike;
   readonly options: FrameOptions;
-  constructor(from: PointLike, to: PointLike, options: FrameOptions, n: number) {
-    this.id = options.id ?? `frame-${n}`;
+  constructor(from: PointLike, to: PointLike, options: FrameOptions, name: string) {
+    const text = [options.tab, options.title].filter(Boolean).join(" ");
+    this.id = options.id ?? (text ? slug(text) : name);
+    this.explicitId = options.id !== undefined;
     this.from = from;
     this.to = to;
     this.options = options;

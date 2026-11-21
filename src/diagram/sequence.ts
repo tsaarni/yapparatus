@@ -81,12 +81,16 @@ interface Bar {
 /** Half an activation bar's width: how far a message stops short of the bar's center line. */
 const barHalf = shapes.bar / 2;
 
-/** Draw a sequence diagram into the scene and return the column that holds it all. */
+/**
+ * Draw a sequence diagram into the scene and return the column that holds it all. `name` is
+ * its id without an `id`, such as `sequence-1`.
+ */
 export function sequence(
   scene: Scene,
   participants: Node[],
   steps: SequenceStep[],
-  options: SequenceOptions = {},
+  options: SequenceOptions,
+  name: string,
 ): Element {
   const step = options.step ?? sequenceSpacing.step;
   const boxes = participants.filter((n) => n.shape !== "actor" && n.shape !== "icon");
@@ -318,40 +322,41 @@ export function sequence(
       ),
     );
   }
-  for (const n of participants)
-    arrow(
+  for (const n of participants) {
+    const lifeline = arrow(
       n.bottom,
       xy(n.bottom, at(bottom)),
-      { id: `${n.id}-lifeline`, dashed: true, role: "muted", ends: "--" },
+      { dashed: true, role: "muted", ends: "--" },
       "",
       true,
     );
-  bars.forEach(({ owner, bar }, i) => {
+    scene.nameAfter(lifeline, n, "-lifeline");
+  }
+  const barCount = new Map<Node, number>();
+  for (const { owner, bar } of bars) {
     const shape = scene.addNode(
       "bar",
       "",
-      {
-        id: `${owner.id}-active-${i + 1}`,
-        width: shapes.bar,
-        height: (bar.end ?? bar.start) - bar.start,
-      },
+      { width: shapes.bar, height: (bar.end ?? bar.start) - bar.start },
       { passive: true, ...(bar.edge ? { follows: bar.edge } : {}) },
     );
+    const n = (barCount.get(owner) ?? 0) + 1;
+    barCount.set(owner, n);
+    scene.nameAfter(shape, owner, `-active-${n}`);
     const top = xy(owner.center.offset(offset(bar.depth), 0), at(bar.start));
     scene.own(shape, { kind: "at", at: top, anchor: "top" }, "place()");
-  });
+  }
   for (const make of frames) make();
 
-  const space = scene.addNode(
-    "space",
-    "",
-    { id: `${options.id ?? header.id}-space`, width: 0, height: bottom },
-    { passive: true },
+  const space = scene.addNode("space", "", { width: 0, height: bottom }, { passive: true });
+  const sequence = scene.addGrid(
+    "column",
+    [[header], [space]],
+    { gap: [defaultGap.x, 0], ...(options.id ? { id: options.id } : {}) },
+    name,
   );
-  const sequence = scene.addGrid("column", [[header], [space]], {
-    gap: [defaultGap.x, 0],
-    ...(options.id ? { id: options.id } : {}),
-  });
+  scene.nameAfter(header, sequence, "-participants");
+  scene.nameAfter(space, sequence, "-space");
   scene.addGroup(sequence, all);
   return sequence;
 }

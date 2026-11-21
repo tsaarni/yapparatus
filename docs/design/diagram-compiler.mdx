@@ -141,7 +141,7 @@ The sections below follow one small diagram through the stages. <Ref to="dc-exam
 
 The draw program records elements and arrangements in a scene, which the compiler then lays out. The scene and the object `d` that the draw program receives are two separate things:
 
-- The scene holds the elements, the position owner of each element, the size groups, the groups that steps focus, the categories, and the diagnostics. It has one function for adding each kind of element: a node, an edge, a grid, an enclosure, and a frame. That function applies the element limit, registers the element's category, and connects the element to the diagnostics, so that the element can report a problem such as a missing member.
+- The scene holds the elements, the position owner of each element, the size groups, the groups that steps focus, the categories, the owner and suffix of each element named after another, and the diagnostics. It has one function for adding each kind of element: a node, an edge, a grid, an enclosure, and a frame. That function applies the element limit, registers the element's category, and connects the element to the diagnostics, so that the element can report a problem such as a missing member.
 - `d` has only the calls that the diagram reference documents, and each call adds elements through the scene's functions. The draw program cannot reach the scene or change its lists.
 
 A sequence and a tree add their elements through the same functions, with what an author cannot set: a passive element, such as a lifeline, an element that follows an edge, such as an activation bar, and an id derived from another element. Their elements therefore count against the limit and register their categories as the author's elements do.
@@ -176,15 +176,24 @@ Every element has an id. The page uses it as the element's address, `/page#figur
 | Element | Derived id | Example |
 |---|---|---|
 | A shape with a label | The label as a slug: lowercase, with hyphens for everything else | `"Auth service"` → `auth-service` |
-| A grid, row, or column | The call that made it and its count among grids, rows, and columns | `row-1`, `column-2`, `grid-3` |
-| An enclosure | Its title as a slug, or `boundary` and its count | `backend`, `boundary-1` |
+| A start or an end without a label | The call and its count among the author's calls of that kind | `start-1`, `end-1` |
+| A record without a title | `record` and its count among the author's records | `record-1` |
+| A grid, row, or column | The call that made it and its count among the author's calls of that kind | `row-1`, `column-1`, `grid-1` |
+| An enclosure | Its title as a slug, or `enclosure` and its count | `backend`, `enclosure-1` |
+| A frame | Its tab and title as a slug, or `frame` and its count among the author's frames | `loop-until-empty`, `frame-1` |
+| A sequence | `sequence` and its count | `sequence-1` |
+| A sequence's row of participants and its spacer | The sequence's id and `-participants` or `-space` | `sequence-1-participants` |
+| A lifeline or an activation bar | The participant's id and `-lifeline`, or `-active-` and its count on that participant | `api-lifeline`, `api-active-2` |
+| A tree container | The node's id and `-tree`, or `-children` for the container of its subtrees, or `-left` and `-right` for the sides of the root in `both` | `platform-tree`, `platform-children` |
 | An edge | The ids of its two ends, joined by `->` | `client->api` |
 | A cell or a mark | The parent's id, a dot, and its own name as a slug | `users.team-id` |
 | A category | Its name as a slug | `to-be-removed` |
 
 </Table>
 
-The id check makes the ids final before layout. A repeated explicit id is `DUPLICATE_ID`, and a repeated derived id gets `-2`, `-3`, in the order of creation. Cells, marks, and edges are settled last, because their ids are built from the final ids of their parents and ends.
+Each call of the author's counts among the calls of its kind, whether or not the element has text or an `id`. A sequence and a tree make their rows, columns, and frames without counting, so they never change the numbers of the author's elements. An element that a sequence or a tree makes is named after its owner: the scene records the owner and the suffix, and the id check joins them once the owner's id is final.
+
+The id check makes the ids final before layout. A repeated explicit id is `DUPLICATE_ID`, and a repeated derived id gets `-2`, `-3`, in the order of creation. Shapes, containers, and frames are settled first. Elements named after an owner are settled after it, so a branch over the root `team-2` is `team-2-tree`. Cells, marks, and edges are settled last, because their ids are built from the final ids of their parents and ends. A lifeline is an edge named after its participant, and it is settled with the edges.
 
 A derived id changes when its label changes. The link check verifies only the figure part of an address, so the [diagram reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagrams.md#ids) asks for an explicit id on any element that something outside points at.
 
@@ -360,7 +369,7 @@ A mark highlights words or lines of a text. The compiler finds the marked words 
 
 ## Sequences
 
-A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A bar means that a participant is handling a call, so only a receiver gets one. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar, and an async message gets none. Sending opens no bar: a participant that only sends has a plain lifeline, and its messages start and end on it. A self-message on a participant with no bar starts from the lifeline and opens only its own short bar. Lifelines and bars are drawn, but the checks and the steps leave them out.
+A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A bar means that a participant is handling a call, so only a receiver gets one. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar, and an async message gets none. Sending opens no bar: a participant that only sends has a plain lifeline, and its messages start and end on it. A self-message on a participant with no bar starts from the lifeline and opens only its own short bar. Lifelines and bars are drawn, but the checks and the steps leave them out. The sequence is a column of the row of participants and a spacer, an empty shape as tall as the lifelines, so that an element placed below the sequence clears them.
 
 A fragment is a frame whose corners the sequence sets from its participants, before anything is measured, so its members can reach past them: a self-message at the rightmost participant has its label to the right of that participant. The scene lists the members of each fragment: its messages, its notes, and the fragments inside it. The compiler compiles frames after nodes and edges, and a frame with members covers their ink: edge points, heads, and labels, node rectangles and labels, and inner frames. Where a member reaches past the corners, the frame keeps a margin of 8 units around it. Each frame compiles after the frames it holds, so an outer frame covers an inner frame that was widened. A frame that an author draws with `d.frame` has no members and lies exactly between its corners.
 
@@ -377,7 +386,7 @@ A container centers its node across the container, so a node is centered on the 
 
 Every line from one parent starts at the same point and runs down or across the same trunk before it turns to its child, so two lines share a stretch from their first points and part. That is a fork, which the `EDGE_OVERLAP` check allows. The lines are ordinary edges, so the other checks apply to them as to any edge. A node that already has a position owner is `CONFLICTING_PLACEMENT` when the tree puts it in a container, as in any row or column.
 
-A container's id is its node's id followed by `-tree`. It is derived, so it gets a suffix only when another element already has it. The scene lists each container's lines as its members, and a container lists its node and its inner row, column, or grid. A step that focuses a container therefore focuses the branch below it: its nodes, its lines, and the lines of every subtree in it. The line into the branch belongs to the parent's container.
+A container's id is its node's final id followed by `-tree`, and the row, column, or grid of the node's subtrees is the node's id followed by `-children`. In the `both` layout, the two columns beside the root are the root's id followed by `-left` and `-right`. The tree's `id` names the outermost container in place of the root's id followed by `-tree`. These ids are derived from the node's, so a repeated one gets a number, as any derived id does. The scene lists each container's lines as its members, and a container lists its node and its inner row, column, or grid. A step that focuses a container therefore focuses the branch below it: its nodes, its lines, and the lines of every subtree in it. The line into the branch belongs to the parent's container.
 
 ## Roles and categories
 

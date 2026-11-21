@@ -139,7 +139,7 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 | `d.text(label, options?)` | Text without an outline; with `marks`, see [Marked text](diagram-structures.md#marked-text) |
 
 - **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
-- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is `start-1`, `end-2`, and so on. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
+- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is the call and its count: `start-1`, `start-2`, and `end-1`. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
 - **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element. Text has no fill, so an edge through it is reported like an edge through a shape.
 - **Replicas:** `replicas` on `d.box` or `d.doc` draws a stack of 2 to 4 boxes or pages, for pods, shards, workers, or several documents. The stack has exactly that many, so two pods are `replicas: 2`. For a larger or unknown number, put the number in the label of a stack of 4. Each shape behind adds 5 units to the width and the height, and the text sits on the front shape. A fixed `width` or `height` is the front shape's.
 
@@ -193,7 +193,10 @@ Every element has an id. Steps, links, and the reader's comments use it.
 - An edge's id joins the ids of its ends: `client->api`. With a box labelled "Get an answer", the edge from `ask` is `ask->get-an-answer`.
 - A category's id comes from its name: `"To be removed"` → `to-be-removed`.
 - A record cell or text mark has its parent's id, a dot, and its own: `users.team-id`. See [Members](diagram-structures.md#members).
-- Repeated ids get a number: `box`, `box-2`.
+- An enclosure's id comes from its title, and a frame's from its tab and title: `d.frame(a, b, { tab: "loop", title: "until empty" })` → `loop-until-empty`.
+- An element without text has the name of its call and its count among the calls of that kind: `row-1`, `column-1`, `grid-1`, `start-1`, `end-1`, `record-1`, `enclosure-1`, `frame-1`, `sequence-1`. Only your calls count, so the rows inside a tree or a sequence do not change these numbers.
+- An element that a sequence or a tree makes has its owner's id and a suffix, such as the lifeline `api-lifeline` or the branch `platform-tree`. See [Sequences](diagram-sequences.md#reference) and [Trees](diagram-trees.md#reference).
+- Repeated ids get a number: `box`, `box-2`. An element named after a repeated id follows it: `box-2-tree`.
 
 Set `id` when:
 

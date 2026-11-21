@@ -184,10 +184,21 @@ test("the lines from one parent share a trunk, which is not EDGE_OVERLAP, in eve
 
 test("a subtree's container groups its lines, so a step on it focuses the whole branch", () => {
   const { out } = uneven("down");
-  assert.deepEqual(
-    [...expand(["a-tree"], out.groups)].filter((id) => !/^(row|column|grid)-/.test(id)).sort(),
-    ["a", "a->a1", "a->a2", "a-tree", "a1", "a2", "a2->x", "a2->y", "a2-tree", "x", "y"],
-  );
+  assert.deepEqual([...expand(["a-tree"], out.groups)].sort(), [
+    "a",
+    "a->a1",
+    "a->a2",
+    "a-children",
+    "a-tree",
+    "a1",
+    "a2",
+    "a2->x",
+    "a2->y",
+    "a2-children",
+    "a2-tree",
+    "x",
+    "y",
+  ]);
   assert.ok(expand(["r-tree"], out.groups).has("r->b"));
   assert.ok(!expand(["a-tree"], out.groups).has("r->a"), "the line into a branch is its parent's");
 });
@@ -208,6 +219,36 @@ test("edge options apply to every line, and an explicit root id names the contai
       ["top->b", true, "muted", 1],
     ],
   );
+});
+
+test("a branch is named after its root's final id, and the tree's id names the outermost", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const other = d.box("Team");
+  const team = d.box("Team");
+  const branch = d.tree(team, [d.box("A")]);
+  const org = d.tree(d.box("Root"), [d.box("B"), [d.box("C"), [d.box("D")]]], { id: "org" });
+  d.column([other, branch, org]);
+  const out = compile(scene, lookups);
+  assert.deepEqual(out.diagnostics, []);
+  assert.deepEqual([team.id, branch.id, org.id], ["team-2", "team-2-tree", "org"]);
+  assert.deepEqual(
+    scene.grids.map((g) => g.id),
+    ["team-2-children", "team-2-tree", "c-children", "c-tree", "root-children", "org", "column-1"],
+  );
+});
+
+test("each layout names a node's subtrees after it, and both names the root's two sides", () => {
+  const names = (layout: TreeLayout) => {
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
+    d.tree(d.box("R"), [[d.box("A"), [d.box("A1")]], d.box("B")], { layout });
+    compile(scene, lookups);
+    return scene.grids.map((g) => g.id);
+  };
+  for (const layout of ["down", "right", "indent"] as const)
+    assert.deepEqual(names(layout), ["a-children", "a-tree", "r-children", "r-tree"], layout);
+  assert.deepEqual(names("both"), ["r-left", "a-children", "a-tree", "r-right", "r-tree"]);
 });
 
 test("a tree nests in a row like any element, and its own gaps are kept", () => {
@@ -258,7 +299,10 @@ test("a node placed elsewhere is CONFLICTING_PLACEMENT, as in any row or column"
   d.column([d.row([a, b]), t]);
   const out = compile(scene, lookups);
   const conflict = out.diagnostics.find((x) => x.code === "CONFLICTING_PLACEMENT");
-  assert.match(conflict?.message ?? "", /^a is positioned by both row\(row-\d+\) and row/);
+  assert.match(
+    conflict?.message ?? "",
+    /^a is positioned by both row\(r-children\) and row\(row-1\)/,
+  );
 });
 
 test("a layout that is not one of the four stops the draw program", () => {

@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
+import { compile } from "../../../src/diagram/compile/compile.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
@@ -68,4 +69,69 @@ test("a sequence with more messages than the element limit is DRAW_FAILED when c
   assert.ok(first && "from" in first);
   assert.throws(() => d.sequence([first.from, first.to], steps));
   assert.equal(scene.nodes.length + scene.edges.length + scene.grids.length, 2000);
+});
+
+test("two participants with the same label have their own lifelines", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("API");
+  const b = d.box("API");
+  d.sequence([a, b], [{ from: a, to: b, label: "call" }]);
+  const out = compile(scene, lookups);
+  assert.deepEqual(out.diagnostics, []);
+  assert.deepEqual(
+    out.edges.filter((e) => e.passive).map((e) => e.id),
+    ["api-lifeline", "api-2-lifeline"],
+  );
+});
+
+test("a sequence's elements are named after their owners", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const client = d.box("Client");
+  const api = d.box("API");
+  const db = d.cylinder("DB");
+  const first = d.sequence(
+    [client, api, db],
+    [
+      { from: client, to: api, label: "get" },
+      { from: api, to: db, label: "read" },
+      { from: db, to: api, label: "rows", reply: true },
+      { from: api, to: client, label: "item", reply: true },
+      { from: client, to: api, label: "put" },
+      {
+        fragment: "loop",
+        title: "until empty",
+        steps: [{ from: api, to: db, label: "drain" }],
+      },
+    ],
+  );
+  const x = d.box("X");
+  const y = d.box("Y");
+  const second = d.sequence([x, y], [{ from: x, to: y, label: "ping" }], { id: "pings" });
+  d.column([first, second]);
+  const out = compile(scene, lookups);
+  assert.deepEqual(out.diagnostics, []);
+  assert.deepEqual([first.id, second.id], ["sequence-1", "pings"]);
+  assert.deepEqual(
+    out.nodes.filter((n) => n.passive).map((n) => n.id),
+    [
+      "api-active-1",
+      "db-active-1",
+      "api-active-2",
+      "db-active-2",
+      "sequence-1-space",
+      "y-active-1",
+      "pings-space",
+    ],
+  );
+  assert.deepEqual(
+    scene.grids.map((g) => g.id),
+    ["sequence-1-participants", "sequence-1", "pings-participants", "pings", "column-1"],
+  );
+  assert.deepEqual(
+    out.frames.map((f) => f.id),
+    ["loop-until-empty"],
+  );
+  assert.ok(out.groups["loop-until-empty"]?.includes("drain"));
 });

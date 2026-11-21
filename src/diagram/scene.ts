@@ -25,6 +25,15 @@ import {
 /** The most elements a drawing may have, so that the checks, which compare pairs, stay fast. */
 const maxElements = 2000;
 
+/** Anything with an id that the id check settles. */
+export type Named = Element | Edge | Frame;
+
+/** An id that is its owner's final id followed by a suffix, such as `api-lifeline`. */
+export interface DerivedId {
+  owner: Element;
+  suffix: string;
+}
+
 /** Nodes that share the largest measured width, height, or both. */
 export interface SizeGroup {
   members: Node[];
@@ -47,6 +56,7 @@ export class Scene {
   readonly #groups = new Map<Element | Frame, Array<Element | Edge | Frame>>();
   readonly #diagnostics: Diagnostic[] = [];
   readonly #categories: string[] = [];
+  readonly #derivedIds = new Map<Named, DerivedId>();
 
   get nodes(): readonly Node[] {
     return this.#nodes;
@@ -84,6 +94,10 @@ export class Scene {
   get categories(): readonly string[] {
     return this.#categories;
   }
+  /** The elements whose ids the id check builds from their owners' final ids. */
+  get derivedIds(): ReadonlyMap<Named, DerivedId> {
+    return this.#derivedIds;
+  }
 
   /** A node, with what only the library sets in `internals`. */
   addNode(
@@ -113,25 +127,35 @@ export class Scene {
     this.#noteCategory(edge.category);
     return edge;
   }
-  /** A grid, a row, or a column, which becomes the position owner of its cells. */
-  addGrid(kind: Grid["kind"], rows: Array<Array<Element | null>>, options: GridOptions): Grid {
+  /**
+   * A grid, a row, or a column, which becomes the position owner of its cells. `name` is its
+   * id without an `id`, such as `row-1`, and defaults to its kind, as for every add function.
+   */
+  addGrid(
+    kind: Grid["kind"],
+    rows: Array<Array<Element | null>>,
+    options: GridOptions,
+    name: string = kind,
+  ): Grid {
     this.#grow();
-    const grid = new Grid(kind, rows, options, this.#grids.length + 1);
+    const grid = new Grid(kind, rows, options, name);
     grid.report = (code, message, ids) => this.report(code, message, ids);
     this.#grids.push(grid);
     for (const child of grid.children) this.own(child, grid, `${kind}(${grid.id})`);
     return grid;
   }
-  addEnclosure(members: Element[], options: EncloseOptions): Enclosure {
+  /** An enclosure; `name` is its id without an `id` or a title, such as `enclosure-1`. */
+  addEnclosure(members: Element[], options: EncloseOptions, name = "enclosure"): Enclosure {
     this.#grow();
-    const enclosure = new Enclosure(members, options, this.#enclosures.length + 1);
+    const enclosure = new Enclosure(members, options, name);
     this.#enclosures.push(enclosure);
     this.#noteCategory(options.category);
     return enclosure;
   }
-  addFrame(from: PointLike, to: PointLike, options: FrameOptions): Frame {
+  /** A frame; `name` is its id without an `id`, a tab, or a title, such as `frame-1`. */
+  addFrame(from: PointLike, to: PointLike, options: FrameOptions, name = "frame"): Frame {
     this.#grow();
-    const frame = new Frame(from, to, options, this.#frames.length + 1);
+    const frame = new Frame(from, to, options, name);
     this.#frames.push(frame);
     return frame;
   }
@@ -157,6 +181,15 @@ export class Scene {
       return;
     }
     this.#owner.set(el, owner);
+  }
+  /**
+   * Name an element after its owner: its id becomes the owner's final id and `suffix`, settled
+   * after the owner's. An element with an explicit id keeps it.
+   */
+  nameAfter(el: Named, owner: Element, suffix: string) {
+    if (el.explicitId) return;
+    el.id = `${owner.id}${suffix}`;
+    this.#derivedIds.set(el, { owner, suffix });
   }
   addSizeGroup(group: SizeGroup) {
     this.#sizeGroups.push(group);

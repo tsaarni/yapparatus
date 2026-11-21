@@ -105,12 +105,80 @@ test("rows and columns are grids of one row and one column, with the default gap
   d.place(d.column([row, column, grid]), { at: [0, 0], anchor: "topLeft" });
   const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
-  assert.deepEqual([row.id, column.id, grid.id], ["row-1", "column-2", "grid-3"]);
+  assert.deepEqual([row.id, column.id, grid.id], ["row-1", "column-1", "grid-1"]);
   const r = rects(out);
   assert.deepEqual(r.a, { x: 0, y: 40, width: 100, height: 40 }, "a row aligns vertically");
   assert.equal(r.b?.x, 188, "88 between columns");
   assert.deepEqual(r.c, { x: 54, y: 144, width: 140, height: 50 }, "64 below the row");
   assert.deepEqual(r.e, { x: 54, y: 258, width: 30, height: 30 }, "a column aligns horizontally");
+});
+
+test("unnamed elements count per kind, among the author's calls only", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const box = d.box("Step");
+  const start = d.start();
+  const end = d.end();
+  const tree = d.tree(d.box("Root"), [[d.box("A"), [d.box("A1")]], d.box("B")]);
+  const client = d.box("Client");
+  const api = d.box("API");
+  const sequence = d.sequence([client, api], [{ from: client, to: api, label: "call" }]);
+  const row = d.row([box, start, end]);
+  const enclosure = d.enclose([box]);
+  const frame = d.frame(box.topLeft, box.bottomRight);
+  d.column([row, tree, sequence]);
+  const out = compile(scene, lookups);
+  assert.deepEqual(codes(out), []);
+  assert.deepEqual(
+    [start.id, end.id, row.id, enclosure.id, frame.id],
+    ["start-1", "end-1", "row-1", "enclosure-1", "frame-1"],
+  );
+  assert.deepEqual(
+    scene.grids.map((g) => g.id),
+    [
+      "a-children",
+      "a-tree",
+      "root-children",
+      "root-tree",
+      "sequence-1-participants",
+      "sequence-1",
+      "row-1",
+      "column-1",
+    ],
+  );
+});
+
+test("an id named after an owner gets a number when another element already has it", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const box = d.box("API lifeline");
+  const client = d.box("Client");
+  const api = d.box("API");
+  const sequence = d.sequence([client, api], [{ from: client, to: api, label: "call" }]);
+  const rTree = d.box("R tree");
+  const branch = d.tree(d.box("R"), [d.box("A")]);
+  d.column([box, sequence, rTree, branch]);
+  const out = compile(scene, lookups);
+  assert.deepEqual(codes(out), []);
+  assert.deepEqual([box.id, rTree.id, branch.id], ["api-lifeline", "r-tree", "r-tree-2"]);
+  assert.deepEqual(
+    out.edges.filter((e) => e.passive).map((e) => e.id),
+    ["client-lifeline", "api-lifeline-2"],
+  );
+});
+
+test("a frame with text has its tab and title as a slug", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const tabbed = d.frame(a.topLeft, a.bottomRight, { tab: "opt", title: "[token present]" });
+  const repeated = d.frame(a.topLeft, a.bottomRight, { tab: "opt", title: "[token present]" });
+  const plain = d.frame(a.topLeft, a.bottomRight);
+  assert.deepEqual(codes(compile(scene, lookups)), []);
+  assert.deepEqual(
+    [tabbed.id, repeated.id, plain.id],
+    ["opt-token-present", "opt-token-present-2", "frame-3"],
+  );
 });
 
 test("a grid nests in a row, and its gutters are the middle of its gaps", () => {
@@ -158,7 +226,7 @@ test("a gutter after the last track, or before the first, is UNKNOWN_GUTTER", ()
   assert.equal(unknown.length, 5);
   assert.equal(unknown[0]?.message, "grid-1 has 2 columns, so gutterX takes only 0; got 1.");
   assert.equal(unknown[3]?.message, "grid-1 has 1 row, so gutterY has no gap to name; got 0.");
-  assert.deepEqual(unknown[4]?.ids, ["row-2"]);
+  assert.deepEqual(unknown[4]?.ids, ["row-1"]);
 });
 
 test("the drawing keeps hundredths and leaves out false flags and centered alignment", () => {
@@ -883,7 +951,7 @@ test("sequence: nested calls stack their bars and replies close them inside out"
   ]);
   assert.deepEqual(rects, {
     "b-active-1": { x: 179, y: 79, width: 10, height: 132 },
-    "c-active-2": { x: 315, y: 123, width: 10, height: 44 },
+    "c-active-1": { x: 315, y: 123, width: 10, height: 44 },
   });
 });
 
@@ -983,8 +1051,8 @@ test("sequence: only receivers get bars; a sender without one sends from its lif
   ]);
   assert.deepEqual(rects, {
     "b-active-1": { x: 179, y: 79, width: 10, height: 132 },
-    "c-active-2": { x: 315, y: 123, width: 10, height: 44 },
-    "c-active-3": { x: 315, y: 274.8, width: 10, height: 22 },
+    "c-active-1": { x: 315, y: 123, width: 10, height: 44 },
+    "c-active-2": { x: 315, y: 274.8, width: 10, height: 22 },
   });
   const points = (id: string) => out.edges.find((e) => e.id === id)?.points;
   assert.deepEqual(points("call")?.[0], { x: 48, y: 79 }, "the client's call leaves its lifeline");
@@ -1024,8 +1092,8 @@ test("sequence: a bar ends at its reply or after a short length, never at the la
   );
   assert.deepEqual(bars, {
     "envoy-active-1": { x: 43, y: 94, width: 10, height: 35.2 },
-    "contour-active-2": { x: 419, y: 158, width: 10, height: 35.2 },
-    "envoy-active-3": { x: 43, y: 295.6, width: 10, height: 35.2 },
+    "contour-active-1": { x: 419, y: 158, width: 10, height: 35.2 },
+    "envoy-active-2": { x: 43, y: 295.6, width: 10, height: 35.2 },
   });
 });
 
@@ -1419,7 +1487,7 @@ test("start and end labels sit beside the dot without moving it, and are checked
   assert.equal(dot.labelRect.x, dot.rect.x + dot.rect.width + 8);
   assert.equal(dot.lines[0]?.text, "Clicked");
   assert.ok(out.viewBox.x + out.viewBox.width >= dot.labelRect.x + dot.labelRect.width);
-  assert.ok(node("end-3"), "an unlabeled end keeps its numbered id");
+  assert.ok(node("end-1"), "an unlabeled end is numbered among the ends");
 
   const eScene = new Scene();
 
