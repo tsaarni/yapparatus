@@ -1798,3 +1798,44 @@ test("edges that merge into one channel or fork from one are not reported", () =
     [],
   );
 });
+
+test("a negative gap overlaps what it separates, and the overlap is a warning", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = sized(d, "a", 100, 40);
+  const b = sized(d, "b", 60, 40);
+  d.place(b, { below: a, gap: -10 });
+  const out = compile(scene, lookups);
+  const r = rects(out);
+  assert.equal(r.b?.y, (r.a?.y ?? 0) + 40 - 10, "b sits 10 units into a");
+  assert.deepEqual(
+    out.diagnostics.map((x) => [x.code, x.ids]),
+    [["NODE_OVERLAP", ["a", "b"]]],
+  );
+});
+
+test("every gap takes a negative number, and sizes and padding do not", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const box = (label: string) => d.box(label);
+  const placed = box("Placed");
+  d.place(placed, { below: box("Base"), gap: -4 });
+  const row = d.row([box("R1"), box("R2")], { gap: -4 });
+  const column = d.column([box("C1"), box("C2")], { gap: -4 });
+  const one = d.grid([[box("G1"), box("G2")]], { gap: -4 });
+  const two = d.grid([[box("H1"), box("H2")]], { gap: [-4, -6] });
+  d.arrow(one, two, { label: { text: "on", gap: -4 } });
+  const tree = d.tree(box("Root"), [box("K1"), box("K2")], { gap: -4, levelGap: -4 });
+  const p = box("P");
+  const q = box("Q");
+  const sequence = d.sequence([p, q], [{ from: p, to: q, label: "hi" }], { gap: -4 });
+  d.column([row, column, one, two, tree, sequence], { gap: 40 });
+  d.box("W", { width: -1 });
+  d.enclose([p, q], { padding: -1 });
+  const out = compile(scene, lookups);
+  assert.deepEqual(
+    out.diagnostics.filter((x) => x.code === "INVALID_ARGUMENT").map((x) => x.subject),
+    ["width", "padding"],
+  );
+  assert.ok(!JSON.stringify(out).includes("NaN"));
+});

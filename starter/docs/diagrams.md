@@ -249,6 +249,7 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 | `role`, `category` | `enclose` | As on shapes |
 
 - Gaps are measured between edges, not between centers.
+- A gap may be negative, to overlap shapes. The overlap is then reported as a warning.
 - A shape with a fixed `width` or `height` keeps it in a size group. A fixed size smaller than the group's is reported.
 - In a row, `align` places the shapes vertically, and in a column horizontally.
 - `place` takes exactly one of `below`, `above`, `leftOf`, `rightOf`, and `at`. The first four take `gap` and `align`, and `at` takes `anchor`.

@@ -65,8 +65,10 @@ const align = oneOf<Align>()("start", "center", "end");
 const side = oneOf<Side>()("top", "bottom", "left", "right");
 /** The side of an edge leg or a terminal's dot where a label sits. */
 const labelSide = oneOf<LabelSide>()("above", "below", "left", "right");
-/** A size or a gap, in units. */
+/** A size, in units: 0 or more. */
 const size = number({ min: 0 });
+/** A gap, in units. A negative gap overlaps what it separates. */
+const gap = number();
 /** An element that a grid, a placement, or an enclosure takes. */
 const anyElement = element("shape", "grid", "enclosure");
 /** Text that names something, which stands in empty when it is not text. */
@@ -118,7 +120,7 @@ const edgeLabel = either(
       segment: number({ min: 0, whole: true }),
       at: number({ min: 0, max: 1 }),
       side: labelSide,
-      gap: size,
+      gap,
     },
     { required: ["text"] },
   ),
@@ -286,7 +288,7 @@ export const signatures = {
       arg("steps", steps),
       optional(
         "options",
-        options<SequenceOptions>()({ id: text, gap: size, step: size, numbered: boolean }),
+        options<SequenceOptions>()({ id: text, gap, step: size, numbered: boolean }),
         {},
       ),
     ],
@@ -301,8 +303,8 @@ export const signatures = {
         options<TreeOptions>()({
           id: text,
           layout: oneOf<TreeLayout>()("down", "right", "both", "indent"),
-          gap: size,
-          levelGap: size,
+          gap,
+          levelGap: gap,
           edge: options<NonNullable<TreeOptions["edge"]>>()(edgeStyle),
         }),
         {},
@@ -355,7 +357,7 @@ export const signatures = {
         "options",
         options<GridOptions>()({
           id: text,
-          gap: either(size, tuple("[columnGap, rowGap]", size, size)),
+          gap: either(gap, tuple("[columnGap, rowGap]", gap, gap)),
           align: either(align, tuple("[horizontal, vertical]", align, align)),
         }),
         {},
@@ -376,7 +378,7 @@ export const signatures = {
             above: anyElement,
             leftOf: anyElement,
             rightOf: anyElement,
-            gap: size,
+            gap,
             align,
             at: point,
             anchor: oneOf<AnchorName>()(
@@ -508,7 +510,7 @@ function line(name: string): Signature {
     name,
     args: [
       arg("children", standIn(list(anyElement), [], "An empty list stands in.")),
-      optional("options", options<LineOptions>()({ id: text, gap: size, align }), {}),
+      optional("options", options<LineOptions>()({ id: text, gap, align }), {}),
     ],
   };
 }
