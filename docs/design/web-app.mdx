@@ -55,9 +55,9 @@ The router is the part of the web app that turns an [address](documents#addresse
     { from: router, to: code, label: "wait for code", id: "await" },
     { from: code, to: router, label: "page code", reply: true, id: "loaded" },
     { from: router, to: screen, label: "new page", id: "route" },
-    { fragment: "alt", title: "Back or Forward", id: "scroll", steps: [
+    { fragment: "alt", title: "Back or Forward", id: "scroll", messages: [
       { from: screen, to: screen, label: "restore", id: "restore" },
-    ], else: [{ title: "other", steps: [
+    ], else: [{ title: "other", messages: [
       { from: screen, to: screen, label: "to target", id: "to-id" },
     ] }] },
   ], { gap: 64 })

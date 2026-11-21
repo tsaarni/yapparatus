@@ -83,7 +83,7 @@ const everything = (d: DiagramBuilder) => {
   const sequence = d.sequence(
     [a, b],
     [
-      { fragment: "loop", title: "each", steps: [{ from: a, to: b, label: "ask" }] },
+      { fragment: "loop", title: "each", messages: [{ from: a, to: b, label: "ask" }] },
       { from: b, to: a, label: "answer", reply: true },
     ],
   );

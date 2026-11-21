@@ -231,11 +231,11 @@ test("each row of the item table gives its diagnostic", () => {
   assert.deepEqual(
     problems((d) => {
       const [a, b] = [d.box("A"), d.box("B")];
-      d.sequence([a, b], [{ from: a, to: b, label: "x", stepOnly: true, dashed: true } as never]);
+      d.sequence([a, b], [{ from: a, to: b, label: "x", head: "none", route: "hv" } as never]);
     }),
     [
-      ["UNKNOWN_OPTION", ["sequence-1"], "steps[0].stepOnly"],
-      ["UNKNOWN_OPTION", ["sequence-1"], "steps[0].dashed"],
+      ["UNKNOWN_OPTION", ["sequence-1"], "messages[0].head"],
+      ["UNKNOWN_OPTION", ["sequence-1"], "messages[0].route"],
     ],
   );
   assert.deepEqual(
@@ -324,7 +324,7 @@ test("a value of the wrong kind is INVALID_ARGUMENT, and the rest compiles", () 
       ["INVALID_ARGUMENT", ["node"], "label"],
       ["INVALID_ARGUMENT", ["row-2"], "children"],
       ["INVALID_ARGUMENT", ["sequence-1"], "participants"],
-      ["INVALID_ARGUMENT", ["sequence-1"], "steps"],
+      ["INVALID_ARGUMENT", ["sequence-1"], "messages"],
     ],
   );
   assert.ok(!out.diagnostics.some((x) => x.code === "DRAW_FAILED" || x.code === "DIAGRAM_FAILED"));
@@ -515,8 +515,8 @@ test("an option that has no effect in its form is INVALID_ARGUMENT, and the figu
     [
       [
         "INVALID_ARGUMENT",
-        "steps[0].reply",
-        "sequence sequence-1: steps[0].reply is true, but a message from a participant to itself is drawn as a call. It is ignored.",
+        "messages[0].reply",
+        "sequence sequence-1: messages[0].reply is true, but a message from a participant to itself is drawn as a call. It is ignored.",
       ],
     ],
   );
@@ -643,7 +643,7 @@ test("the reference's option tables name exactly the options each call takes", (
   }
 });
 
-test("the reference names exactly the options of labels, routes, cells, marks, and steps", () => {
+test("the reference names exactly the options of labels, routes, cells, marks, and entries", () => {
   const diagrams = page("diagrams.md");
   const edges = section(diagrams, "## Edges");
   const structures = page("diagram-structures.md");
@@ -651,9 +651,9 @@ test("the reference names exactly the options of labels, routes, cells, marks, a
   const trees = section(page("diagram-trees.md"), "## Reference");
   const edgeOptions = callOptions("arrow")?.options ?? {};
   const sequenceArgs = signatures.sequence.args[1]?.takes;
-  const step = sequenceArgs?.kind === "list" ? sequenceArgs.of : undefined;
-  const stepForms = step?.kind === "either" ? step.of.flatMap((s) => optionsIn(s) ?? []) : [];
-  const fragment = stepForms[2];
+  const entry = sequenceArgs?.kind === "list" ? sequenceArgs.of : undefined;
+  const entryForms = entry?.kind === "either" ? entry.of.flatMap((s) => optionsIn(s) ?? []) : [];
+  const fragment = entryForms[2];
   const recordOptions = callOptions("record")?.options ?? {};
   const frameOptions = callOptions("frame")?.options ?? {};
   const cell = signatures.record.args[0]?.takes;
@@ -661,7 +661,7 @@ test("the reference names exactly the options of labels, routes, cells, marks, a
   const textMarks = callOptions("text")?.options.marks;
   const keys = (value: Value | undefined) => Object.keys(optionsIn(value)?.options ?? {}).sort();
   const sorted = (list: string[]) => [...new Set(list)].sort();
-  const stepTable = tables(sequences).find((t) => t.header[0] === "Step")?.rows ?? [];
+  const entryTable = tables(sequences).find((t) => t.header[0] === "Entry")?.rows ?? [];
   const row = (rows: string[][], first: string) => rows.find((r) => codes(r[0] ?? "")[0] === first);
   const edgeTable = tables(edges)[0]?.rows ?? [];
   const pairs: Array<[string, string[], string[]]> = [
@@ -701,16 +701,16 @@ test("the reference names exactly the options of labels, routes, cells, marks, a
       ),
       keys(recordOptions.ruler),
     ],
-    ...stepForms
+    ...entryForms
       .slice(0, 3)
       .map((form, i): [string, string[], string[]] => [
-        `sequence step ${i + 1}`,
-        names(codes(stepTable[i]?.[0] ?? "")[0] ?? ""),
+        `sequence entry ${i + 1}`,
+        names(codes(entryTable[i]?.[0] ?? "")[0] ?? ""),
         Object.keys(form.options),
       ]),
     [
       "fragment branch",
-      names(codes(stepTable[3]?.[0] ?? "")[0] ?? ""),
+      names(codes(entryTable[3]?.[0] ?? "")[0] ?? ""),
       keys(fragment?.options.else),
     ],
     [

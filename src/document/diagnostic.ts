@@ -153,6 +153,10 @@ export const diagnosticCodes = {
     meaning: "A step's id or focus is computed; the compiler reads only plain text.",
   },
   TEXT_OVERFLOW: { severity: "warning", meaning: "Text does not fit its box." },
+  REPLY_WITHOUT_CALL: {
+    severity: "warning",
+    meaning: "A sequence reply has no open call from the participant it returns to.",
+  },
   FIXED_SIZE_IN_GROUP: {
     severity: "warning",
     meaning: "A member of a size group has a fixed size smaller than the group's.",

@@ -182,14 +182,16 @@ const participant = among("shape", {
   noun: "participant",
   code: "UNKNOWN_PARTICIPANT",
 });
-/** A list of sequence steps, which a fragment holds too. */
-const steps: ValueOf = standIn(
-  list(() => step, "a list of messages, notes, and fragments"),
+/** The options every entry of a sequence takes, as every drawn element does. */
+const entry = { id: text, role, category: text, stepOnly: boolean };
+/** A list of sequence entries, which a fragment and its branches hold too. */
+const messages: ValueOf = standIn(
+  list(() => sequenceEntry, "a list of messages, notes, and fragments"),
   [],
   "An empty list stands in.",
 );
-/** A step of a sequence: a message, a note, or a fragment. */
-const step: ValueOf = either(
+/** An entry of a sequence: a message, a note, or a fragment. */
+const sequenceEntry: ValueOf = either(
   options<SequenceMessage>()(
     {
       from: participant,
@@ -197,9 +199,8 @@ const step: ValueOf = either(
       label: text,
       reply: boolean,
       async: boolean,
-      id: text,
-      role,
-      category: text,
+      dashed: boolean,
+      ...entry,
     },
     {
       required: ["from", "to", "label"],
@@ -212,7 +213,7 @@ const step: ValueOf = either(
     {
       note: text,
       over: either(participant, tuple("[shape, shape]", participant, participant)),
-      id: text,
+      ...entry,
     },
     { required: ["note", "over"], tag: "note", noun: "a note { note, over }" },
   ),
@@ -220,11 +221,15 @@ const step: ValueOf = either(
     {
       fragment: text,
       title: text,
-      steps,
-      else: list(options<SequenceBranch>()({ title: text, steps }, { required: ["steps"] })),
-      id: text,
+      messages,
+      else: list(options<SequenceBranch>()({ title: text, messages }, { required: ["messages"] })),
+      ...entry,
     },
-    { required: ["fragment", "steps"], tag: "fragment", noun: "a fragment { fragment, steps }" },
+    {
+      required: ["fragment", "messages"],
+      tag: "fragment",
+      noun: "a fragment { fragment, messages }",
+    },
   ),
 );
 
@@ -292,10 +297,10 @@ export const signatures = {
     name: "sequence",
     args: [
       arg("participants", standIn(list(element("shape")), [], "An empty list stands in.")),
-      arg("steps", steps),
+      arg("messages", messages),
       optional(
         "options",
-        options<SequenceOptions>()({ id: text, gap, step: size, numbered: boolean }),
+        options<SequenceOptions>()({ id: text, gap, rowHeight: size, numbered: boolean }),
         {},
       ),
     ],

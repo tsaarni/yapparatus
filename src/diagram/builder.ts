@@ -38,7 +38,7 @@ import {
 } from "./elements.ts";
 import { defaultGap } from "./metrics.ts";
 import type { Scene } from "./scene.ts";
-import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
+import { type SequenceEntry, type SequenceOptions, sequence } from "./sequence.ts";
 import { CallCheck, isNamed, quote, type Signature } from "./signature.ts";
 import { signatures } from "./signatures.ts";
 import { type TreeChild, type TreeOptions, tree } from "./tree.ts";
@@ -209,16 +209,16 @@ export class DiagramBuilder {
   }
   /**
    * A sequence diagram: the participants in a row, lifelines, and messages in time order.
-   * Returns one element that can be placed like any other.
+   * Returns the column that holds it, which can be placed like any other element.
    */
-  sequence(participants: Node[], steps: SequenceStep[], options: SequenceOptions = {}): Element {
+  sequence(participants: Node[], messages: SequenceEntry[], options: SequenceOptions = {}): Grid {
     const call = this.#check(signatures.sequence);
-    const [p, s, o] = call.args([participants, steps, options]) as [
+    const [p, m, o] = call.args([participants, messages, options]) as [
       Node[],
-      SequenceStep[],
+      SequenceEntry[],
       SequenceOptions,
     ];
-    return sequence(this.#scene, call, p, s, o, this.#name("sequence"));
+    return sequence(this.#scene, call, p, m, o, this.#name("sequence"));
   }
   /**
    * A tree: the root over its subtrees, joined by lines. A child is a node or `[node, children]`.

@@ -6,10 +6,11 @@ import {
   type Edge,
   type EdgeOptions,
   type Element,
+  type Grid,
   lerp,
   type Node,
+  type NodeOptions,
   type PointLike,
-  type Role,
   slug,
   xy,
 } from "./elements.ts";
@@ -20,8 +21,15 @@ import type { CallCheck } from "./signature.ts";
 /** Elements a fragment or a whole sequence holds, for steps that focus it. */
 type Members = Array<Element | Edge>;
 
-/** A message from one participant to another, in time order. */
-export interface SequenceMessage {
+/** What every entry of a sequence takes, as every drawn element does. */
+type EntryOptions = Pick<NodeOptions, "id" | "role" | "category" | "stepOnly">;
+
+/**
+ * A message from one participant to another, in time order. Without `id`, its id is its label
+ * as a slug, such as `get-item`.
+ */
+export interface SequenceMessage
+  extends Pick<NodeOptions, "id" | "role" | "category" | "stepOnly"> {
   from: Node;
   to: Node;
   label: string;
@@ -29,41 +37,37 @@ export interface SequenceMessage {
   reply?: boolean;
   /** Fire and forget: open arrowhead, no activation on the receiver. */
   async?: boolean;
-  /** Default: derived from the label, such as `get-item`. */
-  id?: string;
-  role?: Role;
-  /** See `category` on shapes: a color shared with the elements of the same category. */
-  category?: string;
+  /** A dashed line. Default: true for a reply, false otherwise. */
+  dashed?: boolean;
 }
 
 /** A note over one participant or spanning two. */
-export interface SequenceNote {
+export interface SequenceNote extends Pick<NodeOptions, "id" | "role" | "category" | "stepOnly"> {
   note: string;
   /** One participant, or two to span between them. */
   over: Node | [Node, Node];
-  id?: string;
 }
 
-/** A framed group of steps, such as an alt with its else branches or a loop. */
-export interface SequenceFragment {
+/** A framed group of messages, such as an alt with its else branches or a loop. */
+export interface SequenceFragment
+  extends Pick<NodeOptions, "id" | "role" | "category" | "stepOnly"> {
   /** The operator in the tab: alt, opt, loop, par, critical… */
   fragment: string;
   /** Guard or description, shown in brackets after the tab. */
   title?: string;
-  steps: SequenceStep[];
+  messages: SequenceEntry[];
   /** Alternative branches, separated by dashed dividers. */
   else?: SequenceBranch[];
-  id?: string;
 }
 
 /** An alternative branch of a fragment, after a dashed divider. */
 export interface SequenceBranch {
   title?: string;
-  steps: SequenceStep[];
+  messages: SequenceEntry[];
 }
 
-/** One step of a sequence: a message, a note, or a fragment. */
-export type SequenceStep = SequenceMessage | SequenceNote | SequenceFragment;
+/** One entry of a sequence's list: a message, a note, or a fragment. */
+export type SequenceEntry = SequenceMessage | SequenceNote | SequenceFragment;
 
 /** Options of a sequence diagram. */
 export interface SequenceOptions {
@@ -71,7 +75,7 @@ export interface SequenceOptions {
   /** Space between participants. Default: 40. */
   gap?: number;
   /** Vertical space per message. Default: 44. */
-  step?: number;
+  rowHeight?: number;
   /** Prefix messages with 1, 2, 3… Default: false. */
   numbered?: boolean;
 }
@@ -89,17 +93,17 @@ const barHalf = shapes.bar / 2;
 
 /**
  * Draw a sequence diagram into the scene and return the column that holds it all. `name` is
- * its id without an `id`, such as `sequence-1`. `call` checked the steps and reports about it.
+ * its id without an `id`, such as `sequence-1`. `call` checked the entries and reports about it.
  */
 export function sequence(
   scene: Scene,
   call: CallCheck,
   participants: Node[],
-  steps: SequenceStep[],
+  messages: SequenceEntry[],
   options: SequenceOptions,
   name: string,
-): Element {
-  const step = options.step ?? sequenceSpacing.step;
+): Grid {
+  const row = options.rowHeight ?? sequenceSpacing.rowHeight;
   const boxes = participants.filter((n) => n.shape !== "actor" && n.shape !== "icon");
   for (const n of boxes) n.options.minWidth ??= sequenceSpacing.minWidth;
   if (boxes.length > 1) scene.addSizeGroup({ members: boxes, width: true, height: true });
@@ -122,9 +126,9 @@ export function sequence(
     | { kind: "note"; s: SequenceNote; y: number; within: Members[] };
   const events: Event[] = [];
   const frames: Array<() => void> = [];
-  let y = step * sequenceSpacing.start;
+  let y = row * sequenceSpacing.start;
   let count = 0;
-  const involved = (list: SequenceStep[]): Node[] =>
+  const involved = (list: SequenceEntry[]): Node[] =>
     list.flatMap((s) =>
       "from" in s
         ? [s.from, s.to]
@@ -132,45 +136,45 @@ export function sequence(
           ? Array.isArray(s.over)
             ? s.over
             : [s.over]
-          : [...involved(s.steps), ...(s.else ?? []).flatMap((b) => involved(b.steps))],
+          : [...involved(s.messages), ...(s.else ?? []).flatMap((b) => involved(b.messages))],
     );
-  const walk = (list: SequenceStep[], depth: number, within: Members[]) => {
+  const walk = (list: SequenceEntry[], depth: number, within: Members[]) => {
     for (const s of list) {
       if ("from" in s) {
         if (s.from === s.to) ignoreForm(call, s);
         events.push({ kind: "message", m: s, y, n: ++count, within });
-        y += s.from === s.to ? step * sequenceSpacing.self.step : step;
+        y += s.from === s.to ? row * sequenceSpacing.self.rows : row;
       } else if ("note" in s) {
-        events.push({ kind: "note", s, y: y + step * sequenceSpacing.note.drop, within });
-        y += step * sequenceSpacing.note.step;
+        events.push({ kind: "note", s, y: y + row * sequenceSpacing.note.drop, within });
+        y += row * sequenceSpacing.note.rows;
       } else {
         const indexes = involved([s]).map((n) => participants.indexOf(n));
         const left = participants[Math.min(...indexes)] ?? participants[0];
         const right = participants[Math.max(...indexes)] ?? left;
-        const top = y - step * sequenceSpacing.fragment.top;
-        y += step * sequenceSpacing.fragment.head;
+        const top = y - row * sequenceSpacing.fragment.top;
+        y += row * sequenceSpacing.fragment.head;
         const members: Members = [];
-        walk(s.steps, depth + 1, [...within, members]);
+        walk(s.messages, depth + 1, [...within, members]);
         const dividers: Array<{ y: number; label?: string }> = [];
         for (const branch of s.else ?? []) {
           dividers.push({
-            y: y - step * sequenceSpacing.fragment.divider,
+            y: y - row * sequenceSpacing.fragment.divider,
             ...(branch.title ? { label: `[${branch.title}]` } : {}),
           });
-          y += step * sequenceSpacing.fragment.divider;
-          walk(branch.steps, depth + 1, [...within, members]);
+          y += row * sequenceSpacing.fragment.divider;
+          walk(branch.messages, depth + 1, [...within, members]);
         }
-        const bottom = y - step * sequenceSpacing.fragment.bottom;
-        y += step * sequenceSpacing.fragment.foot;
+        const bottom = y - row * sequenceSpacing.fragment.bottom;
+        y += row * sequenceSpacing.fragment.foot;
         const insets = sequenceSpacing.inset;
-        const inset = insets.base + insets.step * Math.max(0, insets.levels - depth);
+        const inset = insets.base + insets.level * Math.max(0, insets.levels - depth);
         if (left && right)
           frames.push(() => {
             const frame = scene.addFrame(
               xy(left.left.offset(-inset, 0), at(top)),
               xy(right.right.offset(inset, 0), at(bottom)),
               {
-                ...(s.id ? { id: s.id } : {}),
+                ...common(s),
                 tab: s.fragment,
                 ...(s.title ? { title: `[${s.title}]` } : {}),
                 dividers: dividers.map((div) => ({
@@ -186,31 +190,16 @@ export function sequence(
       }
     }
   };
-  walk(steps, 0, []);
-  const bottom = y + step * sequenceSpacing.end;
+  walk(messages, 0, []);
+  const bottom = y + row * sequenceSpacing.end;
 
-  const answers = new Map<Event, Event>();
-  const pending = new Map<Node, Array<Event & { kind: "message" }>>();
-  for (const e of events) {
-    if (e.kind !== "message" || e.m.async || e.m.from === e.m.to) continue;
-    const callee = e.m.reply ? e.m.from : e.m.to;
-    const calls = pending.get(callee) ?? [];
-    pending.set(callee, calls);
-    if (!e.m.reply) {
-      calls.push(e);
-      continue;
-    }
-    const i = calls.findLastIndex((call) => call.m.from === e.m.to);
-    const call = calls[i];
-    if (!call) continue;
-    answers.set(e, call);
-    calls.splice(i);
-  }
-
+  const unanswered = new Set<SequenceMessage>();
+  const lonely: Array<[SequenceMessage, Edge]> = [];
+  const answers = answersOf(messages, (reply) => unanswered.add(reply));
   const stacks = new Map<Node, Bar[]>(participants.map((n) => [n, []]));
   const bars: Array<{ owner: Node; bar: Bar }> = [];
   const answered = new Set(answers.values());
-  const barOf = new Map<Event, Bar>();
+  const barOf = new Map<SequenceMessage, Bar>();
   let opened: Bar[] = [];
   const open = (owner: Node, start: number) => {
     const stack = stacks.get(owner) ?? [];
@@ -228,7 +217,7 @@ export function sequence(
   for (const e of events) {
     if (e.kind === "note") {
       const [a, b] = Array.isArray(e.s.over) ? e.s.over : [e.s.over, e.s.over];
-      const note = scene.addNode("note", e.s.note, { ...(e.s.id ? { id: e.s.id } : {}) });
+      const note = scene.addNode("note", e.s.note, common(e.s));
       const top = xy(lerp(a.center, b.center), at(e.y));
       scene.own(note, { kind: "at", at: top, anchor: "top" });
       for (const members of [all, ...e.within]) members.push(note);
@@ -237,26 +226,24 @@ export function sequence(
     const { m } = e;
     const { from, to } = m;
     const label = options.numbered ? `${e.n}. ${m.label}` : m.label;
-    const id = m.id ? { id: m.id } : {};
+    const own = common(m);
     const derived = slug(m.label);
+    const dashed = m.dashed === undefined ? {} : { dashed: m.dashed };
     opened = [];
     const add = (edge: Edge) => {
       for (const members of [all, ...e.within]) members.push(edge);
       for (const bar of opened) bar.edge ??= edge;
-    };
-    const role = {
-      ...(m.role ? { role: m.role } : {}),
-      ...(m.category ? { category: m.category } : {}),
+      return edge;
     };
     if (from === to) {
       const outer = depthOf(from);
-      const inner = open(from, e.y + step * sequenceSpacing.self.barStart);
-      inner.end = e.y + step * sequenceSpacing.self.barEnd;
+      const inner = open(from, e.y + row * sequenceSpacing.self.barStart);
+      inner.end = e.y + row * sequenceSpacing.self.barEnd;
       stacks.get(from)?.pop();
       const start = xy(from.center.offset(edgeX(outer, 1), 0), at(e.y));
       const back = xy(
         from.center.offset(offset(inner.depth) + barHalf, 0),
-        at(e.y + step * sequenceSpacing.self.back),
+        at(e.y + row * sequenceSpacing.self.back),
       );
       const reach = from.center.offset(offset(outer) + barHalf + sequenceSpacing.self.reach, 0);
       add(
@@ -264,10 +251,10 @@ export function sequence(
           start,
           back,
           {
-            ...id,
+            ...own,
+            ...dashed,
             route: { via: [xy(reach, start), xy(reach, back)] },
             label: { text: label, segment: 1, side: "right", gap: sequenceSpacing.self.labelGap },
-            ...role,
           },
           derived,
         ),
@@ -277,22 +264,28 @@ export function sequence(
     const toward = participants.indexOf(to) - participants.indexOf(from);
     if (m.reply) {
       const x1 = edgeX(depthOf(from), toward);
-      const call = answers.get(e);
-      const bar = call && barOf.get(call);
+      const answer = answers.get(m);
+      const bar = answer && barOf.get(answer);
       const stack = stacks.get(from) ?? [];
       if (bar && stack.includes(bar)) {
         bar.end = e.y;
         stack.splice(stack.indexOf(bar), 1);
       }
       const x2 = edgeX(depthOf(to), -toward);
-      add(
+      const edge = add(
         arrow(
           xy(from.center.offset(x1, 0), at(e.y)),
           xy(to.center.offset(x2, 0), at(e.y)),
-          { ...id, dashed: true, head: "open", label: { text: label, side: "above" }, ...role },
+          {
+            ...own,
+            dashed: m.dashed ?? true,
+            head: "open",
+            label: { text: label, side: "above" },
+          },
           derived,
         ),
       );
+      if (unanswered.has(m)) lonely.push([m, edge]);
       continue;
     }
     const x1 = edgeX(depthOf(from), toward);
@@ -301,9 +294,9 @@ export function sequence(
       x2 = edgeX(depthOf(to), -toward);
     } else {
       const bar = open(to, e.y);
-      barOf.set(e, bar);
-      if (!answered.has(e)) {
-        bar.end = e.y + step * sequenceSpacing.bar.short;
+      barOf.set(m, bar);
+      if (!answered.has(m)) {
+        bar.end = e.y + row * sequenceSpacing.bar.short;
         stacks.get(to)?.pop();
       }
       x2 = offset(bar.depth) - Math.sign(toward) * barHalf;
@@ -313,10 +306,10 @@ export function sequence(
         xy(from.center.offset(x1, 0), at(e.y)),
         xy(to.center.offset(x2, 0), at(e.y)),
         {
-          ...id,
+          ...own,
+          ...dashed,
           ...(m.async ? { head: "open" as const } : {}),
           label: { text: label, side: "above" },
-          ...role,
         },
         derived,
       ),
@@ -359,7 +352,78 @@ export function sequence(
   scene.nameAfter(space, sequence, "-space");
   scene.addGroup(sequence, all);
   call.done([sequence]);
+  for (const [reply, edge] of lonely) reportUnanswered(scene, call, sequence, reply, edge);
   return sequence;
+}
+
+/** The options every entry shares with drawn elements, without those it leaves unset. */
+function common(entry: SequenceEntry): EntryOptions {
+  const { id, role, category, stepOnly } = entry;
+  return {
+    ...(id !== undefined ? { id } : {}),
+    ...(role !== undefined ? { role } : {}),
+    ...(category !== undefined ? { category } : {}),
+    ...(stepOnly ? { stepOnly } : {}),
+  };
+}
+
+/**
+ * The call each reply answers: the latest open call from the participant it returns to. A reply
+ * that answers none, and no call open when an earlier branch of its fragment began, is passed on.
+ */
+function answersOf(
+  entries: SequenceEntry[],
+  unanswered: (reply: SequenceMessage) => void,
+): Map<SequenceMessage, SequenceMessage> {
+  const answers = new Map<SequenceMessage, SequenceMessage>();
+  const pending = new Map<Node, SequenceMessage[]>();
+  const match = (list: SequenceEntry[], branchStarts: Array<Set<SequenceMessage>>) => {
+    for (const s of list) {
+      if ("fragment" in s) {
+        const openAtStart = new Set([...pending.values()].flat());
+        match(s.messages, branchStarts);
+        for (const branch of s.else ?? []) match(branch.messages, [...branchStarts, openAtStart]);
+        continue;
+      }
+      if ("note" in s || s.async || s.from === s.to) continue;
+      const callee = s.reply ? s.from : s.to;
+      const calls = pending.get(callee) ?? [];
+      pending.set(callee, calls);
+      if (!s.reply) {
+        calls.push(s);
+        continue;
+      }
+      const i = calls.findLastIndex((c) => c.from === s.to);
+      const answer = calls[i];
+      if (answer) {
+        answers.set(s, answer);
+        calls.splice(i);
+        continue;
+      }
+      const returns = (c: SequenceMessage) => c.from === s.to && c.to === s.from;
+      if (!branchStarts.some((calls) => [...calls].some(returns))) unanswered(s);
+    }
+  };
+  match(entries, []);
+  return answers;
+}
+
+/** Report a reply that has no open call from the participant it returns to. */
+function reportUnanswered(
+  scene: Scene,
+  call: CallCheck,
+  sequence: Grid,
+  reply: SequenceMessage,
+  edge: Edge,
+) {
+  const path = call.pathOf(reply);
+  scene.report(
+    "REPLY_WITHOUT_CALL",
+    [edge],
+    () =>
+      `sequence ${sequence.id}: ${path}, ${edge.id}, is a reply from ${reply.from.id} to ${reply.to.id}, but ${reply.to.id} has no open call to ${reply.from.id}. Swap from and to, or remove reply.`,
+    `${path}.reply`,
+  );
 }
 
 /** Report `reply` or `async` on a message to the sender itself, which is drawn as a call. */

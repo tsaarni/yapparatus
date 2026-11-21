@@ -12,9 +12,9 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
     { from: you, to: api, label: "GET /item" },
     { from: api, to: db, label: "query" },
     { from: db, to: api, label: "rows", reply: true },
-    { fragment: "alt", title: "found", steps: [
+    { fragment: "alt", title: "found", messages: [
       { from: api, to: you, label: "200 OK", reply: true },
-    ], else: [{ title: "missing", steps: [
+    ], else: [{ title: "missing", messages: [
       { from: api, to: you, label: "404", reply: true },
     ] }] },
     { note: "Logged for audit", over: api },
@@ -27,7 +27,7 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   const worker = d.box("Worker")
   d.sequence([app, queue, worker], [
     { from: app, to: queue, label: "enqueue", async: true },
-    { fragment: "loop", title: "until empty", id: "drain", steps: [
+    { fragment: "loop", title: "until empty", id: "drain", messages: [
       { from: worker, to: queue, label: "poll" },
       { from: queue, to: worker, label: "job", reply: true },
       { from: worker, to: worker, label: "run" },

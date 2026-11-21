@@ -23,11 +23,11 @@ export type {
   TerminalOptions,
 } from "../diagram/elements.ts";
 export type {
+  SequenceEntry,
   SequenceFragment,
   SequenceMessage,
   SequenceNote,
   SequenceOptions,
-  SequenceStep,
 } from "../diagram/sequence.ts";
 export type { TreeChild, TreeLayout, TreeOptions } from "../diagram/tree.ts";
 export type { CodeMark, HighlightedCode, PageOutline } from "../document/page-module.ts";

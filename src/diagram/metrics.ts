@@ -186,33 +186,33 @@ export const fragment = {
   dividerDrop: 1,
 };
 
-/** Sequences: the default space between participants and per message, and a box's least width. */
+/** Sequences: the default space between participants and per row, and a box's least width. */
 export const sequenceSpacing = {
   gap: 40,
-  step: 44,
+  rowHeight: 44,
   minWidth: 96,
-  /** In steps: the first message below the participants, and the lifelines past the last step. */
+  /** In rows: the first message below the participants, and the lifelines past the last row. */
   start: 0.75,
   end: 0.1,
-  /** In steps: how far a note drops below its line, and the space it takes. */
-  note: { drop: 0.15, step: 1.15 },
-  /** In steps, the length of a call's bar when no reply ends it; in units, a nested bar's shift. */
+  /** In rows: how far a note drops below its line, and the space it takes. */
+  note: { drop: 0.15, rows: 1.15 },
+  /** In rows, the length of a call's bar when no reply ends it; in units, a nested bar's shift. */
   bar: { short: 0.55, nest: 6 },
   /**
-   * A message to itself. In steps: the space it takes, where its bar starts and ends, and where it
+   * A message to itself. In rows: the space it takes, where its bar starts and ends, and where it
    * comes back. In units: how far it reaches right of the bar, and its label's gap.
    */
-  self: { step: 1.25, barStart: 0.45, barEnd: 0.95, back: 0.55, reach: 26, labelGap: 8 },
+  self: { rows: 1.25, barStart: 0.45, barEnd: 0.95, back: 0.55, reach: 26, labelGap: 8 },
   /**
-   * Fragments, in steps: the top above the first step, the room for the tab, a divider above its
-   * branch and the room it takes, the bottom above the next step, and the room below it.
+   * Fragments, in rows: the top above the first message, the room for the tab, a divider above
+   * its branch and the room it takes, the bottom above the next row, and the room below it.
    */
   fragment: { top: 0.45, head: 0.55, divider: 0.35, bottom: 0.3, foot: 0.25 },
   /**
-   * How far a fragment reaches past its outer participants: `base`, plus `step` for each nesting
+   * How far a fragment reaches past its outer participants: `base`, plus `level` for each nesting
    * level by which it is shallower than `levels`.
    */
-  inset: { base: 14, step: 8, levels: 3 },
+  inset: { base: 14, level: 8, levels: 3 },
 };
 
 /** Fonts that several steps use. */

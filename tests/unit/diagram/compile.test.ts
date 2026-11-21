@@ -10,7 +10,7 @@ import { type Rect, round } from "../../../src/diagram/geometry.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { attachment, stack } from "../../../src/diagram/outlines.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
-import type { SequenceStep } from "../../../src/diagram/sequence.ts";
+import type { SequenceEntry } from "../../../src/diagram/sequence.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */
@@ -898,7 +898,7 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
       {
         fragment: "loop",
         title: "retry",
-        steps: [{ from: a, to: b, label: "again", id: "again" }],
+        messages: [{ from: a, to: b, label: "again", id: "again" }],
       },
     ],
   );
@@ -925,13 +925,13 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
 });
 
 /** Compile a sequence of boxes A, B, C and give the rectangles of its bars and notes by id. */
-function sequenceRects(steps: (a: Node, b: Node, c: Node) => SequenceStep[]) {
+function sequenceRects(entries: (a: Node, b: Node, c: Node) => SequenceEntry[]) {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   const c = d.box("C");
-  d.sequence([a, b, c], steps(a, b, c));
+  d.sequence([a, b, c], entries(a, b, c));
   const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const rects = Object.fromEntries(
@@ -1009,8 +1009,8 @@ test("sequence: a fragment with an else branch frames both branches with a divid
       fragment: "alt",
       title: "ok",
       id: "alt",
-      steps: [{ from: a, to: b, label: "yes" }],
-      else: [{ title: "fail", steps: [{ from: a, to: b, label: "no" }] }],
+      messages: [{ from: a, to: b, label: "yes" }],
+      else: [{ title: "fail", messages: [{ from: a, to: b, label: "no" }] }],
     },
   ]);
   assert.deepEqual(rects, {
@@ -1091,7 +1091,7 @@ test("sequence: a bar ends at its reply or after a short length, never at the la
       { note: "B warms: waits for endpoints", over: envoy, id: "warm" },
       { from: contour, to: envoy, label: "ClusterLoadAssignment B (EDS)", id: "eds" },
     ],
-    { gap: 280, numbered: true, step: 64 },
+    { gap: 280, numbered: true, rowHeight: 64 },
   );
   const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
@@ -1118,7 +1118,7 @@ test("sequence: a note is painted over the activation bar under it", () => {
       { note: "B warms: waits for endpoints", over: envoy, id: "warm" },
       { from: contour, to: envoy, label: "ClusterLoadAssignment B (EDS)", id: "eds" },
     ],
-    { gap: 280, numbered: true, step: 64 },
+    { gap: 280, numbered: true, rowHeight: 64 },
   );
   const ids = compile(scene, lookups).nodes.map((n) => n.id);
   const bars = ids.filter((id) => id.includes("-active-"));
@@ -1536,7 +1536,7 @@ test("containers list their members for steps: enclosures, grids, sequences, fra
     [a, b],
     [
       { from: a, to: b, label: "ask" },
-      { fragment: "loop", id: "retry", steps: [{ from: a, to: b, label: "ask" }] },
+      { fragment: "loop", id: "retry", messages: [{ from: a, to: b, label: "ask" }] },
       { note: "Done", over: b },
     ],
   );
@@ -1869,11 +1869,11 @@ test("a fragment widens to cover its members, and an outer one covers the inner"
       {
         fragment: "loop",
         id: "outer",
-        steps: [
+        messages: [
           {
             fragment: "opt",
             id: "inner",
-            steps: [{ from: b, to: b, label: "a long self-message label", id: "self" }],
+            messages: [{ from: b, to: b, label: "a long self-message label", id: "self" }],
           },
         ],
       },

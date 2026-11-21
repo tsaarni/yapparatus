@@ -98,7 +98,7 @@ test("one compile reports every mistake and draws the rest of the figure", () =>
   assert.deepEqual(
     out.diagnostics.map((x) => [x.code, x.ids, x.subject]),
     [
-      ["UNKNOWN_PARTICIPANT", ["sequence-1", "database"], "steps[0].to"],
+      ["UNKNOWN_PARTICIPANT", ["sequence-1", "database"], "messages[0].to"],
       ["INVALID_ARGUMENT", ["root-tree"], "layout"],
       ["INVALID_ARGUMENT", ["root-tree"], "nodes[1]"],
     ],

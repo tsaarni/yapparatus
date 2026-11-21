@@ -258,16 +258,16 @@ export class DiagramBuilder {
   }
   /**
    * A sequence diagram: the participants in a row, lifelines, and messages in time order.
-   * Returns one element that can be placed like any other.
+   * Returns the column that holds it, which can be placed like any other element.
    */
-  sequence(participants: Node[], steps: SequenceStep[], options: SequenceOptions = {}): Element {
+  sequence(participants: Node[], messages: SequenceEntry[], options: SequenceOptions = {}): Grid {
     const call = this.#check(signatures.sequence);
-    const [p, s, o] = call.args([participants, steps, options]) as [
+    const [p, m, o] = call.args([participants, messages, options]) as [
       Node[],
-      SequenceStep[],
+      SequenceEntry[],
       SequenceOptions,
     ];
-    return sequence(this.#scene, call, p, s, o, this.#name("sequence"));
+    return sequence(this.#scene, call, p, m, o, this.#name("sequence"));
   }
   /**
    * A tree: the root over its subtrees, joined by lines. A child is a node or `[node, children]`.
@@ -715,18 +715,21 @@ export type Route =
 
 export type Row = Record<string, number | string | Date | null>;
 
-export interface SequenceFragment {
+export type SequenceEntry = SequenceMessage | SequenceNote | SequenceFragment;
+
+export interface SequenceFragment
+  extends Pick<NodeOptions, "id" | "role" | "category" | "stepOnly"> {
   /** The operator in the tab: alt, opt, loop, par, critical… */
   fragment: string;
   /** Guard or description, shown in brackets after the tab. */
   title?: string;
-  steps: SequenceStep[];
+  messages: SequenceEntry[];
   /** Alternative branches, separated by dashed dividers. */
   else?: SequenceBranch[];
-  id?: string;
 }
 
-export interface SequenceMessage {
+export interface SequenceMessage
+  extends Pick<NodeOptions, "id" | "role" | "category" | "stepOnly"> {
   from: Node;
   to: Node;
   label: string;
@@ -734,18 +737,14 @@ export interface SequenceMessage {
   reply?: boolean;
   /** Fire and forget: open arrowhead, no activation on the receiver. */
   async?: boolean;
-  /** Default: derived from the label, such as `get-item`. */
-  id?: string;
-  role?: Role;
-  /** See `category` on shapes: a color shared with the elements of the same category. */
-  category?: string;
+  /** A dashed line. Default: true for a reply, false otherwise. */
+  dashed?: boolean;
 }
 
-export interface SequenceNote {
+export interface SequenceNote extends Pick<NodeOptions, "id" | "role" | "category" | "stepOnly"> {
   note: string;
   /** One participant, or two to span between them. */
   over: Node | [Node, Node];
-  id?: string;
 }
 
 export interface SequenceOptions {
@@ -753,12 +752,10 @@ export interface SequenceOptions {
   /** Space between participants. Default: 40. */
   gap?: number;
   /** Vertical space per message. Default: 44. */
-  step?: number;
+  rowHeight?: number;
   /** Prefix messages with 1, 2, 3… Default: false. */
   numbered?: boolean;
 }
-
-export type SequenceStep = SequenceMessage | SequenceNote | SequenceFragment;
 
 export type Side = "top" | "bottom" | "left" | "right";
 

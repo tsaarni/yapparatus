@@ -195,7 +195,7 @@ The shapes take these options. "All" is every shape in the table above but `d.re
 - `external`: an element outside the system, drawn dashed.
 - `default`: the role without the option.
 
-`role` and `category` also work on arrows, enclosures, frames, and sequence messages. There is no option for a color: colors come from the theme.
+`role` and `category` also work on arrows, enclosures, frames, and the messages, notes, and fragments of a sequence. There is no option for a color: colors come from the theme.
 
 A misspelled option is `UNKNOWN_OPTION`, and a value that the option does not take is `INVALID_ARGUMENT`. Both list what the call takes.
 
@@ -445,7 +445,7 @@ Steps tell the story of a figure in order. Each `<Step>` names the elements it i
 | Containers | Focusing an enclosure, grid, row, column, sequence, sequence fragment, or tree branch focuses everything in it |
 | Categories | Focusing a category's id focuses every element in it |
 | `build` | Each element stays hidden until the first step that focuses it |
-| `stepOnly` | An option of shapes, record cells, text marks, edges, enclosures, and frames: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
+| `stepOnly` | An option of shapes, record cells, text marks, edges, enclosures, frames, and the messages, notes, and fragments of a sequence: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
 | `id` | A step's address: `/page#cached-read--lookup`. Unique among the figure's elements and steps |
 
 To tell a story:
@@ -478,6 +478,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `UNKNOWN_OPTION` | error | A call has an option it does not take, so the option is ignored. The message lists the options it takes, the nearest first |
 | `INVALID_ARGUMENT` | error | A call has a value it cannot use, an option of another form, such as `anchor` with `below`, an option that has no effect, or a route the edge cannot take, such as `{ loop: side }` between two shapes. The message names the call, the value, and the values it takes; the call uses the default or a stand-in |
 | `UNKNOWN_PARTICIPANT` | error | A sequence message or note names a shape that is not in the participants, so it is skipped. Add the shape to the participants |
+| `REPLY_WITHOUT_CALL` | warning | A sequence message with `reply: true` has no open call from the participant it returns to, so it closes no activation bar. Swap `from` and `to`, or remove `reply` |
 | `DRAW_FAILED` | error | The `draw` function threw, at the line given, uses a name it does not define, ran longer than 1 second, or created more than 2000 elements |
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or draw a shape to itself, which loops |
