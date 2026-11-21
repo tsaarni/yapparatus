@@ -17,6 +17,7 @@ export type {
   Role,
   Route,
   Side,
+  StackOptions,
   TerminalOptions,
 } from "../diagram/elements.ts";
 export type {

@@ -229,6 +229,7 @@ export function createEdges(
 
   function snap(el: Element, rect: Rect, center: Vec, toward: Vec, route: Edge["route"]): Vec {
     const shape = el instanceof Node ? el.shape : "box";
+    const form = { shape, replicas: el instanceof Node ? el.options.replicas : undefined };
     const circular = shape === "dot" || shape === "ring";
     if (route === "straight") {
       const c = anchorOf(rect, "center");
@@ -242,7 +243,7 @@ export function createEdges(
           y: c.y + (dir.y / len) * (rect.height / 2),
         };
       }
-      return rayExit(attachment(shape, rect), c, dir) ?? c;
+      return rayExit(attachment(form, rect), c, dir) ?? c;
     }
     const dx = toward.x - center.x;
     const dy = toward.y - center.y;
@@ -259,7 +260,7 @@ export function createEdges(
         ? { ...middle, x: toward.x }
         : middle;
     if (circular) return circleExit(rect, side, at);
-    return sideExit(attachment(shape, rect), rect, side, at) ?? at;
+    return sideExit(attachment(form, rect), rect, side, at) ?? at;
   }
 
   function arrowHead(route: Vec[], at: "start" | "end", open: boolean, curved: boolean) {

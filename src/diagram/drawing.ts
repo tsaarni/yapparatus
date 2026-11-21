@@ -63,6 +63,8 @@ export interface CompiledNode {
   pin?: number;
   /** Start and end: the label beside the dot, outside its layout bounds. */
   labelRect?: Rect;
+  /** A box or document drawn as a stack of this many, from 2 to 4. */
+  replicas?: number;
 }
 
 /** A frame with its rectangle, operator tab, title, and dividers placed. */

@@ -104,8 +104,8 @@ export class DiagramBuilder {
   readonly categories: string[] = [];
 
   /** A component, service, or step: a rectangle fitted around its text. */
-  box(label: string, options: NodeOptions = {}): Node {
-    return this.add(new Node("box", label, options));
+  box(label: string, options: StackOptions = {}): Node {
+    return this.stacked("box", label, options);
   }
   /** Storage: a database, a cache. */
   cylinder(label: string, options: NodeOptions = {}): Node {
@@ -116,8 +116,8 @@ export class DiagramBuilder {
     return this.add(new Node("io", label, options));
   }
   /** A document, a report, a file: a page with a wavy bottom. */
-  doc(label: string, options: NodeOptions = {}): Node {
-    return this.add(new Node("doc", label, options));
+  doc(label: string, options: StackOptions = {}): Node {
+    return this.stacked("doc", label, options);
   }
   /** A queue, a topic, a stream: a cylinder on its side. */
   queue(label: string, options: NodeOptions = {}): Node {
@@ -160,6 +160,22 @@ export class DiagramBuilder {
   /** An end point: a ringed dot, with an optional label outside it, as for `start`. */
   end(label = "", options: TerminalOptions = {}): Node {
     return this.terminal("ring", "end", label, options);
+  }
+  /** A box or document, alone or as a stack of 2 to 4. Any other count draws it alone. */
+  private stacked(shape: "box" | "doc", label: string, options: StackOptions): Node {
+    const { replicas, ...rest } = options;
+    const valid =
+      typeof replicas === "number" && Number.isInteger(replicas) && replicas >= 2 && replicas <= 4;
+    const node = this.add(new Node(shape, label, valid ? options : rest));
+    if (replicas !== undefined && !valid) {
+      const what = shape === "box" ? "boxes" : "pages";
+      this.report(
+        "INVALID_REPLICAS",
+        `${node.id} has replicas: ${JSON.stringify(replicas)}, but a stack draws 2 to 4 ${what}. For more, or an unknown number, put the number in the label of a ${shape} with replicas: 4.`,
+        [node.id],
+      );
+    }
+    return node;
   }
   private terminal(shape: Shape, kind: string, label: string, options: TerminalOptions): Node {
     const node = new Node(shape, label, options, {
@@ -685,6 +701,14 @@ export interface SourceFileView {
   source: string;
   /** The whole file, numbered from line 1. */
   code: HighlightedCode;
+}
+
+export interface StackOptions extends NodeOptions {
+  /**
+   * Draw a stack of this many boxes or pages, from 2 to 4, for replicas such as pods or shards.
+   * Put a larger or unknown number in the label.
+   */
+  replicas?: number;
 }
 
 export const Step: { (_props: StepProps): null; diagramStep: boolean; };

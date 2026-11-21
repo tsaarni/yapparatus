@@ -124,10 +124,10 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 
 | Call | Draws |
 |---|---|
-| `d.box(label, options?)` | A component, service, or step |
+| `d.box(label, options?)` | A component, service, or step; with `replicas`, a stack of boxes |
 | `d.cylinder(label, options?)` | Storage: a database or a cache |
 | `d.queue(label, options?)` | A cylinder on its side: a queue, a topic, or a stream |
-| `d.doc(label, options?)` | A page with a wavy bottom: a document, a report, or a file |
+| `d.doc(label, options?)` | A page with a wavy bottom: a document, a report, or a file; with `replicas`, a stack of pages |
 | `d.io(label, options?)` | A parallelogram: the input or output of a flow |
 | `d.actor(label, options?)` | A person or outside system |
 | `d.note(label, options?)` | A remark with a folded corner |
@@ -139,6 +139,19 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 - **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
 - **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `side` given (`right` by default, or `left`, `above`, `below`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is `start-1`, `end-2`, and so on. `start` and `end` take `id`, `sub`, `role`, `category`, `stepOnly`, and `side`.
 - **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element. Text has no fill, so an edge through it is reported like an edge through a shape.
+- **Replicas:** `replicas` on `d.box` or `d.doc` draws a stack of 2 to 4 boxes or pages, for pods, shards, workers, or several documents. The stack has exactly that many, so two pods are `replicas: 2`. For a larger or unknown number, put the number in the label of a stack of 4. Each shape behind adds 5 units to the width and the height, and the text sits on the front shape. A fixed `width` or `height` is the front shape's.
+
+```js
+const api = d.box("API")
+const workers = d.box("Billing workers", { replicas: 3 })
+const shards = d.box("16 shards", { replicas: 4 })
+const exports = d.doc("Exports", { replicas: 2 })
+d.row([api, workers, exports])
+d.place(shards, { below: workers })
+d.arrow(api, workers)
+d.arrow(workers, exports)
+d.arrow(workers, shards)
+```
 
 Options:
 
@@ -397,6 +410,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a grid, row, or column, or `place()` it |
+| `INVALID_REPLICAS` | error | `replicas` is not a whole number from 2 to 4, so the shape is drawn alone. For more, or an unknown number, put the number in the label of a stack of 4 |
 | `UNKNOWN_GUTTER` | error | `gutterX(i)` or `gutterY(i)` names a gap that does not exist. A grid of n columns has gutters 0 to n - 2 |
 | `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `element()` names a member that does not. The message lists the valid ids |
 | `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |

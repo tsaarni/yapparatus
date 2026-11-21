@@ -74,6 +74,8 @@ export const shapes = {
   io: { slant: 14 },
   /** How far a document's wavy bottom rises above and dips below its bottom line. */
   doc: { wave: 5 },
+  /** How far each box or page of a stack of replicas sits up and to the right of the one before. */
+  stack: { offset: 5 },
   record: { padX: 14, padY: 8, row: 26, cellPad: 8, tabGap: 16, ruler: 16, gutterPad: 8 },
   /** How far a mark's highlight reaches past its text. */
   mark: { linesPad: 5 },

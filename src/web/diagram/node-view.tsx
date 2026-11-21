@@ -3,6 +3,7 @@
  */
 
 import * as stylex from "@stylexjs/stylex";
+import { Fragment } from "react";
 import type { CompiledNode, ElementState } from "../../diagram/drawing.ts";
 import { type Rect, union } from "../../diagram/geometry.ts";
 import { badge, corner, defaultMetrics } from "../../diagram/metrics.ts";
@@ -195,7 +196,20 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
   const outlined = stylex.props(styles.shape, node.role === "external" && elementStyles.dashed);
   switch (node.shape) {
     case "box":
-      return <rect x={x} y={y} width={w} height={h} rx={corner.shape} {...outlined} />;
+    case "doc": {
+      const rects = shape.stack(r, node.replicas);
+      const cover = stylex.props(styles.cover);
+      return (
+        <>
+          {rects.map((s) => (
+            <Fragment key={`${s.x},${s.y}`}>
+              {rects.length > 1 && <StackPart kind={node.shape} r={s} paint={cover} />}
+              <StackPart kind={node.shape} r={s} paint={outlined} />
+            </Fragment>
+          ))}
+        </>
+      );
+    }
     case "cylinder": {
       const { body, cap } = shape.cylinder(r);
       return (
@@ -216,8 +230,6 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
     }
     case "io":
       return <polygon points={shape.pointList(shape.parallelogram(r))} {...outlined} />;
-    case "doc":
-      return <path d={shape.page(r)} {...outlined} />;
     case "actor": {
       const { head, body } = shape.actor(r);
       return (
@@ -293,6 +305,12 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
   }
 }
 
+/** One box or page of a stack, or a box or document alone. */
+function StackPart({ kind, r, paint }: { kind: string; r: Rect; paint: object }) {
+  if (kind === "doc") return <path d={shape.page(r)} {...paint} />;
+  return <rect x={r.x} y={r.y} width={r.width} height={r.height} rx={corner.shape} {...paint} />;
+}
+
 const styles = stylex.create({
   shape: {
     fill: "var(--fill)",
@@ -300,6 +318,8 @@ const styles = stylex.create({
     strokeWidth: `calc(var(--weight) + var(--boost, 0px))`,
     strokeLinejoin: "round",
   },
+  /** Under each shape of a stack: the figure's color, so a shape covers the ones behind it. */
+  cover: { fill: `var(--figure-bg, ${theme.surface})`, stroke: "none" },
   fold: {
     fill: theme.diagramShade,
     stroke: "var(--ink)",

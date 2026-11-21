@@ -41,12 +41,17 @@ test("every diagram form compiles without diagnostics and draws in the browser",
   const outlines = {
     "upload-orders": "polygon",
     "order-events": "ellipse",
-    "daily-report": "path",
+    "daily-reports": "path",
   };
   for (const [id, outline] of Object.entries(outlines))
     await expect(
-      page.locator(`figure#report-flow [data-element-id="${id}"] ${outline}`),
+      page.locator(`figure#report-flow [data-element-id="${id}"] ${outline}`).first(),
     ).toBeVisible();
+  const stacks = { "billing-workers": ["rect", 6], "daily-reports": ["path", 4] } as const;
+  for (const [id, [outline, count]] of Object.entries(stacks))
+    await expect(
+      page.locator(`figure#report-flow [data-element-id="${id}"] > ${outline}`),
+    ).toHaveCount(count);
   await expect(page.getByRole("list", { name: "Diagram diagnostics" })).toHaveCount(0);
 });
 

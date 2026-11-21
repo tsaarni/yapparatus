@@ -197,6 +197,8 @@ The layout answers three questions about any element: its size, its position, an
 
 A shape's size is its measured text plus padding on each side, and at least a minimum size. A fixed `width` or `height` replaces it. Shapes in a size group, such as `equalSize`, take the largest size in the group, fixed sizes included. A member without a fixed width wraps its text at its shape's wrapping width before the group's size is taken. A member with a fixed size on an axis of the group keeps it, and its text wraps at that width. When that size is smaller than the group's, the group is not equal, and the compiler reports `FIXED_SIZE_IN_GROUP`. A grid's columns are as wide as their widest cells, and its rows as tall as their tallest cells. The grid is as wide as its columns and the gaps between them, and as tall as its rows and the gaps between them. A row of a grid may be shorter than the others, and an empty cell adds nothing to its tracks. An enclosure surrounds its members with padding and a band for its title. Some outlines take room beyond the padding, on one axis, and move the text away from it. A cylinder adds its two caps to its height and a queue, a cylinder on its side, to its width. A cap's depth grows with the size across it, from 6 to 12 units. An input or output adds the 14 units of its parallelogram's slant to its width. A document adds the 5 units that its wave rises above its bottom line to its height. The wave crosses the bottom line at its middle, so the middle of the bottom side is on the outline, and its left half dips 5 units below the bounds.
 
+A box or a document with `replicas` is a stack of 2 to 4 of them: the shape in front, and each one behind it 5 units up and to the right of the one before. The stack's size is the front shape's size, with its minimum and its fixed `width` and `height`, plus 5 units on each axis for each shape behind. Rows, gaps, size groups, grids, enclosures, and the overlap checks then use the whole stack with no rule of their own. The text centers on the front shape. Any other number of replicas is `INVALID_REPLICAS`, which the draw program records, and the shape is drawn alone.
+
 In the running example, "Client" measures 38.0 by 18.6. With the padding, the box would be 70 by 40.6, so the minimum size of 104 by 46 applies. The cylinder adds 7.3 units of cap above and below its text and is 55.2 units tall.
 
 ### Positions
@@ -250,7 +252,7 @@ The layout keeps the chain of values in progress. When it needs a value that is 
 
 ### Three rectangles of a shape
 
-The compiler uses three rectangles for each shape, as <Ref to="dc-boxes" /> shows. The **layout bounds** are the position and size, and placement uses them. The **outline** is the shape as drawn, such as the rhombus of a diamond, and edges attach to it. The **ink bounds** cover everything painted. They differ from the layout bounds only for a start or end with a label beside its dot. A document's wave dips below its layout bounds by 5 units, which the ink bounds leave out. The label lies outside the layout bounds, so it does not move the dot off the axis of its column. Enclosures, the overlap checks, and the view box use the ink bounds.
+The compiler uses three rectangles for each shape, as <Ref to="dc-boxes" /> shows. The **layout bounds** are the position and size, and placement uses them. The **outline** is the shape as drawn, such as the rhombus of a diamond, and edges attach to it. The **ink bounds** cover everything painted. They differ from the layout bounds only for a start or end with a label beside its dot. A document's wave dips below its layout bounds by 5 units, which the ink bounds leave out. The outline of a stack of replicas leaves two corners of its layout bounds empty. The label lies outside the layout bounds, so it does not move the dot off the axis of its column. Enclosures, the overlap checks, and the view box use the ink bounds.
 
 <Diagram id="dc-boxes" caption="The layout bounds and outline of a decision, and the layout and ink bounds of a labelled start." draw={(d) => {
   const check = d.box("Check", { id: "check" })
@@ -305,7 +307,7 @@ Each edge has a route form, and the compiler adds the corners that the form need
   ], { gap: [80, 102] })
 }} />
 
-Each shape gives the outline that edges attach to as a polygon, made by the same functions that draw it, so an edge cannot end off the ink. Curves, such as the caps of a cylinder, are sampled into short legs. A box gives its bounds, since its rounded corners are small. A dot or a ring attaches to its circle, and a record's cell as [records](#records-and-marked-text) describe.
+Each shape gives the outline that edges attach to as a polygon, made by the same functions that draw it, so an edge cannot end off the ink. Curves, such as the caps of a cylinder, are sampled into short legs. A box gives its bounds, since its rounded corners are small. A stack of boxes or pages gives the outline of all its shapes together. It steps in at the top-left and bottom-right corners of the bounds, and along the bottom it follows the front page's wave and, right of it, the waves of the pages behind. The middle of each side of the bounds lies on it: the top and the right on the shape at the back, the left and the bottom on the front one. A dot or a ring attaches to its circle, and a record's cell as [records](#records-and-marked-text) describe.
 
 A straight edge attaches where the line from the element's center toward the other end leaves the outline. Where a polygon has notches, it is the last place the line leaves it. An edge with corners attaches on the side of the bounds that faces its adjacent route point. On that side it takes the projection of that point, or the middle of the side when the projection falls outside the side less the corner radius. It attaches where the line through that point at a right angle to the side meets the outline, so it leaves the element at a right angle, also on a diamond or a dot. For `hv`, `vh`, `viaX`, and `viaY`, the adjacent point lines up with the center, so these attach at the middle. An edge whose ends coincide is `DEGENERATE_EDGE`.
 
@@ -357,7 +359,7 @@ A fragment is a frame whose corners the sequence sets from its participants, bef
 
 The compiler gives every element a role and at most one category. The web app and the picture turn them into colors and strokes, as [the components page](components#roles-and-categories) shows.
 
-An element keeps its own role, or the default role, and an enclosure without a role is `muted`. More than one element with the `accent` role is `ACCENT_OVERUSED`.
+An element keeps its own role, or the default role, and an enclosure without a role is `muted`. The shapes of a stack of replicas are one element: they share its role and category, and a step focuses and fades them together. Each one is drawn over a cover in the figure's color, from the back, so it hides the ones behind it, also in the `muted` role, which has no fill. More than one element with the `accent` role is `ACCENT_OVERUSED`.
 
 Categories are numbered 1 to 4 in the order the draw program first uses them, and each number has its own color. A fifth category is `TOO_MANY_CATEGORIES`, and its elements get no color. The legend lists the categories, and a step that focuses a category's id focuses all its elements.
 
@@ -370,7 +372,7 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 | Stage | Codes |
 |---|---|
 | Running the draw program | `DRAW_FAILED`, `STEP_NOT_TEXT`, `FONT_FALLBACK` |
-| Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT`, `UNKNOWN_GUTTER` |
+| Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT`, `UNKNOWN_GUTTER`, `INVALID_REPLICAS` |
 | Settle ids | `DUPLICATE_ID`, `UNPLACED` |
 | Measure, size, and place | `TEXT_OVERFLOW`, `FIXED_SIZE_IN_GROUP`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
 | Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED`, `HEAD_CROWDED` |

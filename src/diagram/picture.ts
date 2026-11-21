@@ -164,7 +164,15 @@ export function pictureOf(
     const style = outlined(k, node.role === "external");
     switch (node.shape) {
       case "box":
-        return rect(r, corner.shape, style);
+      case "doc": {
+        const rects = shape.stack(r, node.replicas);
+        const part = (s: Rect, paint: Record<string, string | number | undefined>) =>
+          node.shape === "doc"
+            ? `<path${attrs({ d: shape.page(s), ...paint })}/>`
+            : rect(s, corner.shape, paint);
+        const cover = rects.length > 1 ? { fill: background, stroke: "none" } : undefined;
+        return rects.map((s) => (cover ? part(s, cover) : "") + part(s, style)).join("");
+      }
       case "cylinder": {
         const { body, cap } = shape.cylinder(r);
         return `<path${attrs({ d: body, ...style })}/><ellipse${attrs({ ...cap, ...style })}/>`;
@@ -175,8 +183,6 @@ export function pictureOf(
       }
       case "io":
         return `<polygon${attrs({ points: shape.pointList(shape.parallelogram(r)), ...style })}/>`;
-      case "doc":
-        return `<path${attrs({ d: shape.page(r), ...style })}/>`;
       case "actor": {
         const { head, body } = shape.actor(r);
         const figure = {

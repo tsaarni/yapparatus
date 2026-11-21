@@ -16,7 +16,7 @@ import {
 } from "../elements.ts";
 import { anchorOf, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
 import { type Measure, type Metrics, shapes, tab } from "../metrics.ts";
-import { room } from "../outlines.ts";
+import { room, stackRoom } from "../outlines.ts";
 import { createRecords } from "./records.ts";
 import type { Report, Text } from "./text.ts";
 
@@ -150,7 +150,8 @@ export function createLayout(
         `${node.id}: content needs height ${round(needed)} but height is fixed at ${o.height}.`,
         [node.id],
       );
-    return { width, height };
+    const stacked = stackRoom(o.replicas);
+    return { width: width + stacked, height: height + stacked };
   }
 
   function size(el: Element): { width: number; height: number } {
@@ -190,12 +191,13 @@ export function createLayout(
     all: Array<{ width: number; height: number }>,
   ) {
     const largest = Math.max(...all.map((a) => a[axis]));
-    const fixed = node.options[axis];
-    if (fixed === undefined) return largest;
+    const own = node.options[axis];
+    if (own === undefined) return largest;
+    const fixed = own + stackRoom(node.options.replicas);
     if (fixed < largest - 0.5)
       report(
         "FIXED_SIZE_IN_GROUP",
-        `${node.id} has a fixed ${axis} of ${round(fixed)}, but its size group is ${round(largest)}. Remove the fixed size or take the element out of the group.`,
+        `${node.id} has a fixed ${axis} of ${round(own)}, but its size group is ${round(largest)}. Remove the fixed size or take the element out of the group.`,
         [node.id],
       );
     return fixed;

@@ -5,7 +5,9 @@ import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
 import type { Node } from "../../../src/diagram/elements.ts";
+import type { Rect } from "../../../src/diagram/geometry.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
+import { attachment, stack } from "../../../src/diagram/outlines.ts";
 import type { SequenceStep } from "../../../src/diagram/sequence.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */
@@ -366,6 +368,99 @@ test("a queue is a cylinder on its side: the text and padding plus the caps", ()
   near(ends[1], { x: 122 + curve(15), y: 15 });
   near(ends[2], { x: 20, y: 0 });
   near(ends[3], { x: 20, y: 57.19 });
+});
+
+/** A box or doc with replicas at the origin, compiled; the options may be invalid on purpose. */
+function stacked(kind: "box" | "doc", label: string, replicas?: unknown) {
+  const d = new DiagramBuilder();
+  const n = d[kind](label, { id: "n", sub: "sub", replicas: replicas as number });
+  d.place(n, { at: [0, 0], anchor: "topLeft" });
+  return compile(d, measure);
+}
+
+test("a stack of replicas is the box plus 5 units each way per box behind, text on the front", () => {
+  const plain = stacked("box", "Twelve chars").nodes[0];
+  const short = stacked("box", "A").nodes[0];
+  for (const replicas of [2, 3, 4]) {
+    const behind = 5 * (replicas - 1);
+    const out = stacked("box", "Twelve chars", replicas);
+    assert.deepEqual(out.diagnostics, []);
+    const node = out.nodes[0];
+    assert.equal(node?.replicas, replicas);
+    assert.deepEqual(node?.rect, { x: 0, y: 0, width: 116 + behind, height: 57.19 + behind });
+    assert.equal(node?.lines.length, 2);
+    node?.lines.forEach((line, i) => {
+      const alone = plain?.lines[i];
+      near(line, { x: alone?.x ?? 0, y: (alone?.y ?? 0) + behind });
+    });
+    const least = stacked("box", "A", replicas).nodes[0]?.rect;
+    assert.equal(least?.width, (short?.rect.width ?? 0) + behind, "the minimum is the front's");
+    assert.equal(least?.height, (short?.rect.height ?? 0) + behind);
+  }
+});
+
+test("replicas other than 2 to 4 are INVALID_REPLICAS, and the box is drawn alone", () => {
+  const plain = stacked("box", "Twelve chars").nodes[0];
+  for (const replicas of [0, 1, 5, 2.5, "3"]) {
+    const out = stacked("box", "Twelve chars", replicas);
+    assert.deepEqual(codes(out), ["INVALID_REPLICAS"], `replicas: ${replicas}`);
+    assert.deepEqual(out.diagnostics[0]?.ids, ["n"]);
+    assert.match(
+      out.diagnostics[0]?.message ?? "",
+      /2 to 4 boxes.*label of a box with replicas: 4/,
+    );
+    assert.deepEqual(out.nodes[0], plain);
+  }
+  assert.match(stacked("doc", "Doc", 9).diagnostics[0]?.message ?? "", /2 to 4 pages/);
+});
+
+test("an edge attaches to the outline of the whole stack, not in its notched corners", () => {
+  const d = new DiagramBuilder();
+  const n = d.box("Twelve chars", { id: "n", sub: "sub", replicas: 3 });
+  d.place(n, { at: [0, 0], anchor: "topLeft" });
+  const ends: Array<[number, number]> = [
+    [-200, 30],
+    [400, 30],
+    [20, -200],
+    [20, 300],
+  ];
+  const routed = ends.map((p) => d.line(p, n, { route: { via: [p] } }).id);
+  const center = { x: 63, y: 67.19 / 2 };
+  const corners = [
+    d.line([-center.x, -center.y], n).id,
+    d.line([126 + center.x, 67.19 + center.y], n).id,
+  ];
+  const out = compile(d, measure);
+  assert.deepEqual(out.diagnostics, []);
+  const end = (id: string) => out.edges.find((e) => e.id === id)?.points.at(-1);
+  near(end(routed[0] as string), { x: 0, y: 30 });
+  near(end(routed[1] as string), { x: 126, y: 30 });
+  near(end(routed[2] as string), { x: 20, y: 0 });
+  near(end(routed[3] as string), { x: 20, y: 67.19 });
+  const step = (5 * center.x) / center.y;
+  near(end(corners[0] as string), { x: Math.round(step * 100) / 100, y: 5 });
+  near(end(corners[1] as string), { x: Math.round((126 - step) * 100) / 100, y: 62.19 });
+});
+
+test("a stack of documents shows the waves behind only right of the page in front", () => {
+  const out = stacked("doc", "Twelve chars", 3);
+  const node = out.nodes[0];
+  assert.deepEqual(node?.rect, { x: 0, y: 0, width: 126, height: 72.19 });
+  assert.equal(node?.lines[0]?.y, 30.32, "the text centers on the front page above its wave");
+  const rects = stack(node?.rect as Rect, 3);
+  const front = rects[2] as Rect;
+  const bottom = front.y + front.height;
+  for (const p of attachment({ shape: "doc", replicas: 3 }, node?.rect as Rect)) {
+    if (p.x >= front.x + front.width - 0.01 || p.y <= front.y) continue;
+    assert.ok(Math.abs(p.y - bottom) <= 5.01, `${JSON.stringify(p)} is on the front wave`);
+  }
+  const d = new DiagramBuilder();
+  const n = d.doc("Twelve chars", { id: "n", sub: "sub", replicas: 3 });
+  d.place(n, { at: [0, 0], anchor: "topLeft" });
+  const strip = d.line([118.5, 200], n, { route: { via: [[118.5, 200]] } });
+  const out2 = compile(d, measure);
+  const end = out2.edges.find((e) => e.id === strip.id)?.points.at(-1);
+  assert.ok(end && end.y < bottom - 5 && end.y > bottom - 10, `on the middle page: ${end?.y}`);
 });
 
 test("\\n in an edge label starts a new line; the rect covers every line", () => {

@@ -146,6 +146,15 @@ export interface NodeOptions {
   stepOnly?: boolean;
 }
 
+/** Options of a box or a document, which can be drawn as a stack of replicas. */
+export interface StackOptions extends NodeOptions {
+  /**
+   * Draw a stack of this many boxes or pages, from 2 to 4, for replicas such as pods or shards.
+   * Put a larger or unknown number in the label.
+   */
+  replicas?: number;
+}
+
 /** Options for `start()` and `end()`. Their size is fixed, so they take no size options. */
 export interface TerminalOptions
   extends Pick<NodeOptions, "id" | "sub" | "role" | "category" | "stepOnly"> {
@@ -229,6 +238,7 @@ export class Node extends Element {
   readonly shape: Shape;
   readonly label: string;
   readonly options: NodeOptions &
+    Pick<StackOptions, "replicas"> &
     Pick<TerminalOptions, "side"> &
     Pick<RecordOptions, "columns" | "ruler" | "header">;
   readonly passive: boolean;

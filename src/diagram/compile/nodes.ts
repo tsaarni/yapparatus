@@ -6,7 +6,7 @@ import type { CompiledEnclosure, CompiledFrame, CompiledNode, TextLine } from ".
 import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "../elements.ts";
 import { inflate, type Rect, union, type Vec } from "../geometry.ts";
 import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
-import { room } from "../outlines.ts";
+import { room, stack } from "../outlines.ts";
 import type { Layout } from "./layout.ts";
 import { type Align, type Content, type Text, textLine } from "./text.ts";
 
@@ -71,12 +71,13 @@ export function createNodes(
         break;
       }
       default: {
-        const outline = room(node.shape, rect);
+        const front = stack(rect, node.options.replicas).at(-1) ?? rect;
+        const outline = room(node.shape, front);
         const code = node.shape === "text" && node.options.mono;
         lines = stackLines(
           c.lines,
-          rect.y + rect.height / 2 + outline.dy - c.height / 2,
-          code ? rect.x : centerX + outline.dx,
+          front.y + front.height / 2 + outline.dy - c.height / 2,
+          code ? front.x : front.x + front.width / 2 + outline.dx,
           code ? "start" : "middle",
         );
       }
@@ -97,6 +98,7 @@ export function createNodes(
       ...(node.member ? { parent: node.member.parent.id } : {}),
       ...(node.member?.pin !== undefined ? { pin: node.member.pin } : {}),
       ...(labelRect ? { labelRect } : {}),
+      ...(node.options.replicas ? { replicas: node.options.replicas } : {}),
     };
   }
 

@@ -136,6 +136,10 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A gutter point names a grid track with no gap after it.",
   },
+  INVALID_REPLICAS: {
+    severity: "error",
+    meaning: "A box or document has a number of replicas other than 2 to 4.",
+  },
   STEP_NOT_TEXT: {
     severity: "error",
     meaning: "A step's id or focus is computed; the compiler reads only plain text.",

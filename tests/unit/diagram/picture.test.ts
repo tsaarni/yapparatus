@@ -130,6 +130,31 @@ test("the picture is well formed and draws every shape the figure has", () => {
   );
 });
 
+test("a stack draws its boxes or pages from the back, each over a cover of the figure's color", () => {
+  const stacks: Figure = {
+    draw: (d) => {
+      const pods = d.box("Pods", { replicas: 3, role: "muted" });
+      const reports = d.doc("Reports", { replicas: 2, category: "New" });
+      d.row([pods, reports]);
+      d.arrow(pods, reports);
+    },
+    steps: [],
+    build: false,
+  };
+  const { svg } = draw(stacks);
+  assertWellFormed(svg);
+  const body = (id: string) =>
+    new RegExp(`<g data-element-id="${id}" data-shape="[^"]+">(.*?)</g>`, "s").exec(svg)?.[1] ?? "";
+  const pods = body("pods");
+  const xs = [...pods.matchAll(/<rect x="([\d.]+)"/g)].map((m) => Number(m[1]));
+  assert.deepEqual(xs, [10, 10, 5, 5, 0, 0], "back to front, each over its cover");
+  const covers = new RegExp(`<rect[^>]*fill="${lightColors.surface}" stroke="none"`, "g");
+  assert.equal([...pods.matchAll(covers)].length, 3);
+  const pages = [...body("reports").matchAll(/<path d="M[^"]*C[^"]*"([^>]*)\/>/g)];
+  assert.equal(pages.length, 4);
+  assert.match(pages[1]?.[1] ?? "", new RegExp(`fill="${lightColors.category1Surface}"`));
+});
+
 const flow: Figure = {
   draw: (d) => {
     const a = d.box("A");

@@ -127,15 +127,41 @@ export function page(r: Rect): string {
   return `M${x} ${y}H${x + w}V${r.y + r.height}C${c1.x} ${c1.y} ${c2.x} ${c2.y} ${end.x} ${end.y}Z`;
 }
 
-/** Points along a cubic curve, from its start to its end. */
-function cubic([a, b, c, d]: [Vec, Vec, Vec, Vec]): Vec[] {
+/** Points along a cubic curve, from its start to the fraction `to` of the way. */
+function cubic([a, b, c, d]: [Vec, Vec, Vec, Vec], to = 1): Vec[] {
   return Array.from({ length: curveLegs + 1 }, (_, i) => {
-    const t = i / curveLegs;
+    const t = (i / curveLegs) * to;
     const u = 1 - t;
     const at = (p: number, q: number, s: number, e: number) =>
       u * u * u * p + 3 * u * u * t * q + 3 * u * t * t * s + t * t * t * e;
     return { x: at(a.x, b.x, c.x, d.x), y: at(a.y, b.y, c.y, d.y) };
   });
+}
+
+/** A shape, and how many of it a stack of replicas draws; one when `replicas` is not set. */
+export interface Form {
+  shape: Shape;
+  replicas?: number | undefined;
+}
+
+/** How much wider and taller a stack of replicas is than the shape in front. */
+export function stackRoom(replicas = 1): number {
+  return (replicas - 1) * shapes.stack.offset;
+}
+
+/**
+ * The rectangles of a stack of replicas, from the one at the back to the one in front. Each one
+ * behind sits up and to the right of the one before. One replica is the rectangle itself.
+ */
+export function stack(r: Rect, replicas = 1): Rect[] {
+  const o = shapes.stack.offset;
+  const extra = stackRoom(replicas);
+  return Array.from({ length: replicas }, (_, i) => ({
+    x: r.x + extra - i * o,
+    y: r.y + i * o,
+    width: r.width - extra,
+    height: r.height - extra,
+  }));
 }
 
 /**
@@ -218,12 +244,44 @@ function corners(r: Rect): Vec[] {
   ];
 }
 
+/** The points along a box's or page's bottom, from its bottom-right corner leftward to `x`. */
+function bottom(kind: Shape, r: Rect, x: number): Vec[] {
+  const right = r.x + r.width;
+  if (kind === "doc") return cubic(wave(r), (right - x) / r.width);
+  return [
+    { x: right, y: r.y + r.height },
+    { x, y: r.y + r.height },
+  ];
+}
+
+/**
+ * The outline of a stack of boxes or pages, clockwise from the front one's top-left corner: steps
+ * up its top-left, and down its bottom-right, where a shape behind shows its bottom on its right.
+ */
+function stackOutline(kind: Shape, rects: Rect[]): Vec[] {
+  const points: Vec[] = [];
+  for (let i = rects.length - 1; i >= 0; i--) {
+    const r = rects[i] as Rect;
+    const next = rects[i - 1];
+    points.push({ x: r.x, y: r.y }, next ? { x: next.x, y: r.y } : { x: r.x + r.width, y: r.y });
+  }
+  rects.forEach((r, i) => {
+    const before = rects[i + 1];
+    points.push(...bottom(kind, r, before ? before.x + before.width : r.x));
+  });
+  return points;
+}
+
 /**
  * The outline that edges attach to, as a polygon that follows the drawn outline. Dots and rings
  * attach to their circle, so they and every shape without an outline of its own give the bounds.
  */
-export function attachment(kind: Shape, r: Rect): Vec[] {
+export function attachment(form: Form, r: Rect): Vec[] {
+  const kind = form.shape;
   switch (kind) {
+    case "box":
+    case "doc":
+      return stackOutline(kind, stack(r, form.replicas));
     case "diamond":
       return diamond(r);
     case "note":
@@ -244,8 +302,6 @@ export function attachment(kind: Shape, r: Rect): Vec[] {
     }
     case "io":
       return parallelogram(r);
-    case "doc":
-      return [{ x: r.x, y: r.y }, { x: r.x + r.width, y: r.y }, ...cubic(wave(r))];
     default:
       return corners(r);
   }
