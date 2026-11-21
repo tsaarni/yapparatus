@@ -146,3 +146,31 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   d.arrow(workers, report)
   d.arrow(report, analyst)
 }} />
+
+## Grids and trees
+
+<Diagram id="service-grid" caption="A grid with edges in its gutters and a label that wraps." draw={(d) => {
+  const web = d.box("Web app")
+  const mobile = d.box("Mobile app")
+  const api = d.box("API", { role: "accent" })
+  const auth = d.box("Auth service that checks every token against the session store")
+  const db = d.cylinder("Database")
+  d.equalSize([web, mobile, api])
+  const g = d.grid([
+    [web, api, db],
+    [mobile, null, auth],
+  ])
+  d.arrow(web, api)
+  d.arrow(mobile, api, { route: { viaX: g.gutterX(0) } })
+  d.arrow(api, db, "SQL")
+  d.arrow(api, auth, { route: { viaX: g.gutterX(1) }, label: "verify" })
+}} />
+
+<Diagram id="team-tree" caption="A tree of teams." draw={(d) => {
+  const cto = d.box("CTO", { sub: "Ada" })
+  d.tree(cto, [
+    [d.box("Platform"), [d.box("Build"), d.box("Runtime")]],
+    [d.box("Product"), [d.box("Web"), d.box("Mobile")]],
+    d.box("Security"),
+  ])
+}} />

@@ -35,6 +35,8 @@ test("every diagram form compiles without diagnostics and draws in the browser",
     "token-flow",
     "worker-states",
     "report-flow",
+    "service-grid",
+    "team-tree",
   ];
   for (const id of forms)
     await expect(page.locator(`figure#${id} svg [data-element-id]`).first()).toBeVisible();
@@ -52,6 +54,12 @@ test("every diagram form compiles without diagnostics and draws in the browser",
     await expect(
       page.locator(`figure#report-flow [data-element-id="${id}"] > ${outline}`),
     ).toHaveCount(count);
+  await expect(
+    page.locator(
+      'figure#service-grid [data-element-id="auth-service-that-checks-every-token-against-the-session-store"] > text',
+    ),
+  ).toHaveCount(2);
+  await expect(page.locator('figure#team-tree [data-element-id*="->"]')).toHaveCount(7);
   await expect(page.getByRole("list", { name: "Diagram diagnostics" })).toHaveCount(0);
 });
 
