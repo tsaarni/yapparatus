@@ -13,6 +13,7 @@ import {
   type Role,
   slug,
 } from "./elements.ts";
+import { sequenceSpacing, shapes } from "./metrics.ts";
 
 /** Elements a fragment or a whole sequence holds, for steps that focus it. */
 type Members = Array<Element | Edge | Frame>;
@@ -75,8 +76,8 @@ interface Bar {
   edge?: Edge;
 }
 
-const barHalf = 5;
-const nest = 6;
+/** Half an activation bar's width: how far a message stops short of the bar's center line. */
+const barHalf = shapes.bar / 2;
 
 /** Draw a sequence diagram into the builder and return the column that holds it all. */
 export function sequence(
@@ -85,11 +86,11 @@ export function sequence(
   steps: SequenceStep[],
   options: SequenceOptions = {},
 ): Element {
-  const step = options.step ?? 44;
+  const step = options.step ?? sequenceSpacing.step;
   const boxes = participants.filter((n) => n.shape !== "actor" && n.shape !== "icon");
-  for (const n of boxes) n.options.minWidth ??= 96;
+  for (const n of boxes) n.options.minWidth ??= sequenceSpacing.minWidth;
   if (boxes.length > 1) d.equalSize(boxes);
-  const header = d.row(participants, { gap: options.gap ?? 40, align: "end" });
+  const header = d.row(participants, { gap: options.gap ?? sequenceSpacing.gap, align: "end" });
   const known = new Set(participants);
   const check = (n: Node) => {
     if (!known.has(n)) throw new Error(`Sequence step uses "${n.id}", which is not a participant.`);
@@ -114,7 +115,7 @@ export function sequence(
     | { kind: "note"; s: SequenceNote; y: number; within: Members[] };
   const events: Event[] = [];
   const frames: Array<() => void> = [];
-  let y = step * 0.75;
+  let y = step * sequenceSpacing.start;
   let count = 0;
   const involved = (list: SequenceStep[]): Node[] =>
     list.flatMap((s) =>
@@ -132,31 +133,32 @@ export function sequence(
         check(s.from);
         check(s.to);
         events.push({ kind: "message", m: s, y, n: ++count, within });
-        y += s.from === s.to ? step * 1.25 : step;
+        y += s.from === s.to ? step * sequenceSpacing.self.step : step;
       } else if ("note" in s) {
         for (const n of Array.isArray(s.over) ? s.over : [s.over]) check(n);
-        events.push({ kind: "note", s, y: y + step * 0.15, within });
-        y += step * 1.15;
+        events.push({ kind: "note", s, y: y + step * sequenceSpacing.note.drop, within });
+        y += step * sequenceSpacing.note.step;
       } else {
         const indexes = involved([s]).map((n) => participants.indexOf(n));
         const left = participants[Math.min(...indexes)] ?? participants[0];
         const right = participants[Math.max(...indexes)] ?? left;
-        const top = y - step * 0.45;
-        y += step * 0.55;
+        const top = y - step * sequenceSpacing.fragment.top;
+        y += step * sequenceSpacing.fragment.head;
         const members: Members = [];
         walk(s.steps, depth + 1, [...within, members]);
         const dividers: Array<{ y: number; label?: string }> = [];
         for (const branch of s.else ?? []) {
           dividers.push({
-            y: y - step * 0.35,
+            y: y - step * sequenceSpacing.fragment.divider,
             ...(branch.title ? { label: `[${branch.title}]` } : {}),
           });
-          y += step * 0.35;
+          y += step * sequenceSpacing.fragment.divider;
           walk(branch.steps, depth + 1, [...within, members]);
         }
-        const bottom = y - step * 0.3;
-        y += step * 0.25;
-        const inset = 14 + 8 * Math.max(0, 3 - depth);
+        const bottom = y - step * sequenceSpacing.fragment.bottom;
+        y += step * sequenceSpacing.fragment.foot;
+        const insets = sequenceSpacing.inset;
+        const inset = insets.base + insets.step * Math.max(0, insets.levels - depth);
         if (left && right)
           frames.push(() => {
             const frame = d.frame(
@@ -180,7 +182,7 @@ export function sequence(
     }
   };
   walk(steps, 0, []);
-  const bottom = y + step * 0.1;
+  const bottom = y + step * sequenceSpacing.end;
 
   const answers = new Map<Event, Event>();
   const pending = new Map<Node, Array<Event & { kind: "message" }>>();
@@ -214,7 +216,7 @@ export function sequence(
     return bar;
   };
   const depthOf = (n: Node) => stacks.get(n)?.length ?? 0;
-  const offset = (depth: number) => (depth > 0 ? (depth - 1) * nest : 0);
+  const offset = (depth: number) => (depth > 0 ? (depth - 1) * sequenceSpacing.bar.nest : 0);
   const edgeX = (depth: number, toward: number) =>
     depth > 0 ? offset(depth) + Math.sign(toward) * barHalf : 0;
 
@@ -242,15 +244,15 @@ export function sequence(
     };
     if (from === to) {
       const outer = depthOf(from);
-      const inner = open(from, e.y + step * 0.45);
-      inner.end = e.y + step * 0.95;
+      const inner = open(from, e.y + step * sequenceSpacing.self.barStart);
+      inner.end = e.y + step * sequenceSpacing.self.barEnd;
       stacks.get(from)?.pop();
       const start = d.xy(from.center.offset(edgeX(outer, 1), 0), at(e.y));
       const back = d.xy(
         from.center.offset(offset(inner.depth) + barHalf, 0),
-        at(e.y + step * 0.55),
+        at(e.y + step * sequenceSpacing.self.back),
       );
-      const reach = from.center.offset(offset(outer) + barHalf + 26, 0);
+      const reach = from.center.offset(offset(outer) + barHalf + sequenceSpacing.self.reach, 0);
       add(
         arrow(
           start,
@@ -258,7 +260,7 @@ export function sequence(
           {
             ...id,
             route: { via: [d.xy(reach, start), d.xy(reach, back)] },
-            label: { text: label, segment: 1, side: "right", gap: 8 },
+            label: { text: label, segment: 1, side: "right", gap: sequenceSpacing.self.labelGap },
             ...role,
           },
           derived,
@@ -295,7 +297,7 @@ export function sequence(
       const bar = open(to, e.y);
       barOf.set(e, bar);
       if (!answered.has(e)) {
-        bar.end = e.y + step * 0.55;
+        bar.end = e.y + step * sequenceSpacing.bar.short;
         stacks.get(to)?.pop();
       }
       x2 = offset(bar.depth) - Math.sign(toward) * barHalf;
@@ -328,7 +330,7 @@ export function sequence(
       "",
       {
         id: `${owner.id}-active-${i + 1}`,
-        width: barHalf * 2,
+        width: shapes.bar,
         height: (bar.end ?? bar.start) - bar.start,
       },
       { passive: true, ...(bar.edge ? { follows: bar.edge } : {}) },

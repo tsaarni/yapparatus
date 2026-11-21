@@ -25,15 +25,13 @@ import {
   sideExit,
   type Vec,
 } from "../geometry.ts";
-import { corner, type Measure, type Metrics } from "../metrics.ts";
+import { corner, edgeLabel, type Measure, type Metrics, selfLoop } from "../metrics.ts";
 import { attachment } from "../outlines.ts";
 import type { Layout } from "./layout.ts";
 import { type Report, textLine } from "./text.ts";
 
 /** Legs a curved edge is sampled into; even, so a vertex sits at the apex. */
 const curveLegs = 16;
-/** How far a self-loop reaches out from its node. */
-const loopSize = 28;
 
 /** How a message names an edge end: a node's label, else the element's id, else "a point". */
 function endpointName(p: PointLike): string {
@@ -104,7 +102,7 @@ export function createEdges(
           edge.id,
         ]);
       shape = curve(edge, fromEl, toEl);
-    } else shape = { points: routed(edge, fromEl, toEl), label: {}, radius: 6 };
+    } else shape = { points: routed(edge, fromEl, toEl), label: {}, radius: corner.edge };
     const points = dedupe(shape.points);
     const heads: Vec[][] = [];
     const base: Omit<CompiledEdge, "labels" | "ariaLabel"> = {
@@ -212,7 +210,7 @@ export function createEdges(
     }[side];
     const along = { x: Math.abs(out.y), y: Math.abs(out.x) };
     const extent = out.x ? rect.height : rect.width;
-    const spread = Math.min(extent * 0.3, 14);
+    const spread = Math.min(extent * selfLoop.spread, selfLoop.maxSpread);
     const at = (s: number, o: number) => ({
       x: base.x + along.x * s + out.x * o,
       y: base.y + along.y * s + out.y * o,
@@ -221,9 +219,14 @@ export function createEdges(
       side
     ];
     return {
-      points: [at(-spread, 0), at(-spread, loopSize), at(spread, loopSize), at(spread, 0)],
+      points: [
+        at(-spread, 0),
+        at(-spread, selfLoop.size),
+        at(spread, selfLoop.size),
+        at(spread, 0),
+      ],
       label: { segment: 1, side: labelSide },
-      radius: 6,
+      radius: corner.edge,
     };
   }
 
@@ -308,11 +311,11 @@ export function createEdges(
     const p = { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
     const vertical = Math.abs(b.x - a.x) < Math.abs(b.y - a.y);
     const side = l.side ?? (vertical ? "right" : "above");
-    const gap = l.gap ?? 6;
+    const gap = l.gap ?? edgeLabel.gap;
     const font = { family: m.sans, size: m.smallSize, weight: m.edgeWeight };
     const lineHeight = font.size * m.lineHeight;
-    const width = Math.max(...texts.map((line) => measure(line, font))) + 8;
-    const height = texts.length * lineHeight + 2;
+    const width = Math.max(...texts.map((line) => measure(line, font))) + 2 * edgeLabel.padX;
+    const height = texts.length * lineHeight + 2 * edgeLabel.padY;
     let center: Vec;
     switch (side) {
       case "above":
@@ -330,10 +333,14 @@ export function createEdges(
     }
     const along = vertical ? height : width;
     const leg = distance(a, b);
-    if (legs === 1 && (side === "above" || side === "below") !== vertical && along + 12 > leg)
+    if (
+      legs === 1 &&
+      (side === "above" || side === "below") !== vertical &&
+      along + edgeLabel.room > leg
+    )
       report(
         "LABEL_CROWDED",
-        `${edge.id} label "${quoted}" needs ${round(along + 12)} units along segment ${segment}, which is ${round(leg)} long. Widen the gap or move the label.`,
+        `${edge.id} label "${quoted}" needs ${round(along + edgeLabel.room)} units along segment ${segment}, which is ${round(leg)} long. Widen the gap or move the label.`,
         [edge.id],
       );
     const top = center.y - (texts.length * lineHeight) / 2;

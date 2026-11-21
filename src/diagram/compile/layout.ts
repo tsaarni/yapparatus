@@ -15,7 +15,7 @@ import {
   toExpr,
 } from "../elements.ts";
 import { anchorOf, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
-import { type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { enclosure, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
 import { room, stackRoom } from "../outlines.ts";
 import { createRecords } from "./records.ts";
 import type { Report, Text } from "./text.ts";
@@ -114,16 +114,27 @@ export function createLayout(
       case "bar":
         return fixed(shapes.bar, 0);
       case "actor":
-        return fixed(Math.max(c.width, 36), shapes.actor.figure + shapes.actor.gap + c.height);
+        return fixed(
+          Math.max(c.width, shapes.actor.minWidth),
+          shapes.actor.figure + shapes.actor.gap + c.height,
+        );
       case "icon":
-        return fixed(Math.max(c.width, 36), shapes.icon.size + shapes.icon.gap + c.height);
+        return fixed(
+          Math.max(c.width, shapes.icon.minWidth),
+          shapes.icon.size + shapes.icon.gap + c.height,
+        );
       case "note":
         return fixed(
           c.width + 2 * shapes.note.padX + shapes.note.fold / 2,
           c.height + 2 * shapes.note.padY,
         );
-      case "diamond":
-        return fixed(Math.max((c.width + 28) * 1.5, 80), Math.max((c.height + 14) * 1.7, 52));
+      case "diamond": {
+        const r = shapes.diamond;
+        return fixed(
+          Math.max((c.width + r.padX) * r.growX, r.minWidth),
+          Math.max((c.height + r.padY) * r.growY, r.minHeight),
+        );
+      }
       case "record": {
         const g = grid(node);
         return { width: g.width, height: g.height };
@@ -351,9 +362,9 @@ export function createLayout(
     if (cached) return cached;
     return guard(`bounds(${e.id})`, () => {
       const inner = union(e.members.map(ink)) ?? { x: 0, y: 0, width: 0, height: 0 };
-      const pad = e.options.padding ?? 20;
-      const titleBand = e.options.title ? tab.height / 2 + 4 : 0;
-      const titleWidth = e.options.title ? tabWidth(e.options.title) + 28 : 0;
+      const pad = e.options.padding ?? enclosure.padding;
+      const titleBand = e.options.title ? tab.height / 2 + enclosure.titleGap : 0;
+      const titleWidth = e.options.title ? tabWidth(e.options.title) + 2 * enclosure.titleInset : 0;
       const width = Math.max(inner.width + 2 * pad, titleWidth);
       const r = {
         x: inner.x + inner.width / 2 - width / 2,

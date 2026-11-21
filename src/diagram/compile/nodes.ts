@@ -5,7 +5,15 @@
 import type { CompiledEnclosure, CompiledFrame, CompiledNode, TextLine } from "../drawing.ts";
 import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "../elements.ts";
 import { inflate, type Rect, union, type Vec } from "../geometry.ts";
-import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import {
+  enclosure,
+  fontsOf,
+  fragment,
+  type Measure,
+  type Metrics,
+  shapes,
+  tab,
+} from "../metrics.ts";
 import { room, stack } from "../outlines.ts";
 import type { Icons } from "./icons.ts";
 import type { Layout } from "./layout.ts";
@@ -124,7 +132,9 @@ export function createNodes(
 
   function titleGeometry(title: string, rect: Rect, corner: Corner = "topLeft") {
     const width = tabWidth(title);
-    const x = corner.endsWith("Right") ? rect.x + rect.width - 14 - width : rect.x + 14;
+    const x = corner.endsWith("Right")
+      ? rect.x + rect.width - enclosure.titleInset - width
+      : rect.x + enclosure.titleInset;
     const y = corner.startsWith("bottom") ? rect.y + rect.height : rect.y;
     const titleRect = { x, y: y - tab.height / 2, width, height: tab.height };
     return { title: textAt(title, x + tab.pad, y, fonts.tab, true), titleRect };
@@ -174,7 +184,7 @@ export function createNodes(
                 label: textAt(
                   d.label,
                   rect.x + fragment.padX,
-                  y + fragment.textY + 1,
+                  y + fragment.textY + fragment.dividerDrop,
                   fonts.frameTitle,
                   true,
                 ),

@@ -18,6 +18,7 @@ import {
   union,
   type Vec,
 } from "../geometry.ts";
+import { enclosure } from "../metrics.ts";
 import type { Report } from "./text.ts";
 
 /**
@@ -194,7 +195,11 @@ export function validate(
     for (const edge of edges)
       for (let i = 0; i < edge.points.length - 1; i++)
         if (
-          segmentHitsRect(edge.points[i] as Vec, edge.points[i + 1] as Vec, inflate(e.titleRect, 8))
+          segmentHitsRect(
+            edge.points[i] as Vec,
+            edge.points[i + 1] as Vec,
+            inflate(e.titleRect, enclosure.titleClearance),
+          )
         ) {
           report(
             "ENCLOSURE_TITLE_CROSSED",

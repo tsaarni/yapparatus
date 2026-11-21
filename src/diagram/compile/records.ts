@@ -105,7 +105,7 @@ export function createRecords(
       (Math.max(
         header.length ? textWidth(segments[0]) : 0,
         c.width + 2 * r.padX,
-        columns === 1 ? 140 : 0,
+        columns === 1 ? r.minWidth : 0,
       ) -
         gutter) /
         columns,
@@ -114,7 +114,7 @@ export function createRecords(
     const shown = ruler.top.flatMap((t, i) => (t ? [{ i, w: measure(t, fonts.ruler) }] : []));
     const crowded = shown.some((a, k) => {
       const b = shown[k - 1];
-      return b !== undefined && b.w / 2 + a.w / 2 + 4 > (a.i - b.i) * unit;
+      return b !== undefined && b.w / 2 + a.w / 2 + r.rulerGap > (a.i - b.i) * unit;
     });
     if (crowded)
       report(

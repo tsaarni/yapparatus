@@ -84,19 +84,39 @@ export const defaultMetrics: Metrics = {
 
 /** Shape-specific measurements shared by sizing, layout, and anchors. */
 export const shapes = {
-  actor: { figure: 30, gap: 6 },
+  /** The figure above an actor's label, the gap between them, and the actor's least width. */
+  actor: { figure: 30, gap: 6, minWidth: 36 },
   /** An icon shape: the icon above its label, as an actor's figure. */
-  icon: { size: 30, gap: 6 },
+  icon: { size: 30, gap: 6, minWidth: 36 },
   /** An icon left of a box's label, and the gap between them. */
   labelIcon: { size: 18, gap: 8 },
   note: { padX: 12, padY: 9, fold: 10 },
+  /**
+   * A decision's rhombus: the room added to its text on each axis, the factors that grow the sum
+   * to the rhombus, and its least size.
+   */
+  diamond: { padX: 28, padY: 14, growX: 1.5, growY: 1.7, minWidth: 80, minHeight: 52 },
   /** How far an input or output's top edge is shifted right of its bottom edge. */
   io: { slant: 14 },
   /** How far a document's wavy bottom rises above and dips below its bottom line. */
   doc: { wave: 5 },
   /** How far each box or page of a stack of replicas sits up and to the right of the one before. */
   stack: { offset: 5 },
-  record: { padX: 14, padY: 8, row: 26, cellPad: 8, tabGap: 16, ruler: 16, gutterPad: 8 },
+  /**
+   * Records. `minWidth` is the least width of a one-column record, and `rulerGap` the least space
+   * between two column labels of its ruler.
+   */
+  record: {
+    padX: 14,
+    padY: 8,
+    row: 26,
+    cellPad: 8,
+    tabGap: 16,
+    ruler: 16,
+    gutterPad: 8,
+    minWidth: 140,
+    rulerGap: 4,
+  },
   /** How far a mark's highlight reaches past its text. */
   mark: { linesPad: 5 },
   dot: 16,
@@ -125,10 +145,75 @@ export const minScale = 0.75;
 export const tab = { height: 20, pad: 8 };
 
 /**
+ * Enclosures: the padding around their members when an author sets none, and their title tab.
+ */
+export const enclosure = {
+  padding: 20,
+  /** Space between the lower half of the title tab and the padding. */
+  titleGap: 4,
+  /** How far the title tab sits in from the enclosure's left or right side. */
+  titleInset: 14,
+  /** How far an edge must keep from the title tab, or the title counts as crossed. */
+  titleClearance: 8,
+};
+
+/** Edge labels: the default gap to their line, the padding of their box, and the room they need. */
+export const edgeLabel = {
+  gap: 6,
+  padX: 4,
+  padY: 1,
+  /** How much longer than its label a one-leg segment must be, or the label is crowded. */
+  room: 12,
+};
+
+/**
+ * A self-loop: how far it reaches out, and how far its ends spread, as a fraction of the side and
+ * at most `maxSpread`.
+ */
+export const selfLoop = { size: 28, spread: 0.3, maxSpread: 14 };
+
+/**
  * Sequence fragments: the tab with the operator at the top-left, with a slanted corner, and the
  * margin a frame keeps around the ink of its members.
  */
-export const fragment = { padX: 8, slant: 6, tabHeight: 19, textY: 10, margin: 8 };
+export const fragment = {
+  padX: 8,
+  slant: 6,
+  tabHeight: 19,
+  textY: 10,
+  margin: 8,
+  /** How far a divider's label sits lower than the tab's text sits below the frame's top. */
+  dividerDrop: 1,
+};
+
+/** Sequences: the default space between participants and per message, and a box's least width. */
+export const sequenceSpacing = {
+  gap: 40,
+  step: 44,
+  minWidth: 96,
+  /** In steps: the first message below the participants, and the lifelines past the last step. */
+  start: 0.75,
+  end: 0.1,
+  /** In steps: how far a note drops below its line, and the space it takes. */
+  note: { drop: 0.15, step: 1.15 },
+  /** In steps, the length of a call's bar when no reply ends it; in units, a nested bar's shift. */
+  bar: { short: 0.55, nest: 6 },
+  /**
+   * A message to itself. In steps: the space it takes, where its bar starts and ends, and where it
+   * comes back. In units: how far it reaches right of the bar, and its label's gap.
+   */
+  self: { step: 1.25, barStart: 0.45, barEnd: 0.95, back: 0.55, reach: 26, labelGap: 8 },
+  /**
+   * Fragments, in steps: the top above the first step, the room for the tab, a divider above its
+   * branch and the room it takes, the bottom above the next step, and the room below it.
+   */
+  fragment: { top: 0.45, head: 0.55, divider: 0.35, bottom: 0.3, foot: 0.25 },
+  /**
+   * How far a fragment reaches past its outer participants: `base`, plus `step` for each nesting
+   * level by which it is shallower than `levels`.
+   */
+  inset: { base: 14, step: 8, levels: 3 },
+};
 
 /** Fonts that several steps use. */
 export function fontsOf(m: Metrics) {
@@ -144,8 +229,8 @@ export function cylinderCap(width: number): number {
   return Math.min(12, Math.max(6, width * 0.07));
 }
 
-/** Shape corners, by kind. */
-export const corner = { shape: 6, group: 10, frame: 4, mark: 3 };
+/** Corner radii, by kind: shapes, groups, frames, marks, and the bends of edges and loops. */
+export const corner = { shape: 6, group: 10, frame: 4, mark: 3, edge: 6 };
 
 /** The warning badge on an element's corner. */
 export const badge = { radius: 7 };
