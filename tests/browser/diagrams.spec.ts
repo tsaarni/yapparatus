@@ -34,6 +34,7 @@ test("every diagram form compiles without diagnostics and draws in the browser",
     "marked-request",
     "token-flow",
     "frame-steps",
+    "edge-steps",
     "worker-states",
     "report-flow",
     "service-grid",
@@ -119,6 +120,49 @@ test("frames keep their look without a role; step-only frames and enclosures sho
   await expect(element("store")).toHaveCSS("opacity", "0");
   await expect(element("api-callout")).toHaveCSS("opacity", "0");
   await expect(element("zone")).toHaveCSS("opacity", "1");
+});
+
+test("a step focuses an edge with its ends, and build hides it while an end is hidden", async ({
+  page,
+}) => {
+  await page.goto("/diagrams");
+  const figure = page.locator("figure#edge-steps");
+  const element = (id: string) => figure.locator(`[data-element-id="${id}"]`);
+  const states = async () =>
+    Promise.all(
+      ["client", "api", "database", "client->api", "api->database"].map((id) =>
+        element(id).getAttribute("data-state"),
+      ),
+    );
+  await element("client").click();
+  await expect(figure.getByText("The client calls the API.")).toBeVisible();
+  expect(await states()).toEqual(["focus", "focus", "hidden", "focus", "hidden"]);
+  await expect(element("api->database")).toHaveCSS("opacity", "0");
+  await figure.getByRole("button", { name: "Next step" }).click();
+  await expect(figure.getByText("The rows live in the database.")).toBeVisible();
+  expect(await states()).toEqual(["dim", "dim", "focus", "dim", "dim"]);
+  await expect(element("api->database")).toHaveCSS("opacity", "0.35");
+});
+
+test("a step without focus shows the whole figure plain, without step-only elements", async ({
+  page,
+}) => {
+  await page.goto("/diagrams");
+  const figure = page.locator("figure#frame-steps");
+  const element = (id: string) => figure.locator(`[data-element-id="${id}"]`);
+  await element("api").click();
+  await expect(figure.getByText("The API answers.")).toBeVisible();
+  await figure.getByRole("button", { name: "Next step" }).click();
+  await figure.getByRole("button", { name: "Next step" }).click();
+  await expect(figure.getByText("Together, they serve the client.")).toBeVisible();
+  for (const id of ["api", "database", "client", "client->zone", "zone"])
+    await expect(element(id)).not.toHaveAttribute("data-state");
+  await expect(element("store")).toHaveCSS("opacity", "0");
+  await expect(element("api-callout")).toHaveCSS("opacity", "0");
+  await figure.getByRole("button", { name: "Show all" }).click();
+  await expect(figure.getByText("3 steps")).toBeVisible();
+  await element("client").click();
+  await expect(figure.getByText("3 steps")).toBeVisible();
 });
 
 test("the server checks a diagram on a page no browser has open", async ({ page }) => {

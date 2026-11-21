@@ -118,7 +118,7 @@ export function sequence(
     o: EdgeOptions,
     derivedId: string,
     passive = false,
-  ) => scene.addEdge(from, to, o, { passive, derivedId });
+  ) => scene.addEdge(from, to, o, { passive, derivedId, byName: !passive });
   const all: Members = [...participants];
 
   type Event =

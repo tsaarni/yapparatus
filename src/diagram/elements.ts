@@ -515,6 +515,8 @@ export interface EdgeInternals {
   passive?: boolean;
   /** The id to use when the author gives none. Default: `<from>-><to>`. */
   derivedId?: string;
+  /** Focused only by a step that names it, never by its ends, such as a sequence message. */
+  byName?: boolean;
 }
 
 /** A line between two points or elements, with its route, style, and labels. */
@@ -532,6 +534,8 @@ export class Edge {
   readonly tail: HeadKind;
   readonly passive: boolean;
   readonly stepOnly: boolean;
+  /** Focused only by a step that names it, never by its ends. */
+  readonly byName: boolean;
   readonly labels: readonly LabelOptions[];
   /** Whether the id joins the ids of the ends, which are final only at compile time. */
   readonly fromEnds: boolean;
@@ -549,6 +553,7 @@ export class Edge {
     this.tail = options.tail ?? "none";
     this.passive = internals.passive ?? false;
     this.stepOnly = options.stepOnly ?? false;
+    this.byName = internals.byName ?? false;
     this.labels = [options.label ?? []]
       .flat()
       .map((l) => (typeof l === "string" ? { text: l } : l))
@@ -662,6 +667,15 @@ export function elementOf(p: PointLike): Element | undefined {
     else break;
   }
   if (e.k === "gutter") return e.grid;
+  return e.k === "anchor" || e.k === "port" ? e.el : undefined;
+}
+
+/** The element an edge end stands for: itself, or that of an anchor, port, or offset of one. */
+export function elementAt(p: PointLike): Element | undefined {
+  if (Array.isArray(p)) return;
+  if (!(p instanceof Point)) return p;
+  let e = p.expr;
+  while (e.k === "offset") e = e.base;
   return e.k === "anchor" || e.k === "port" ? e.el : undefined;
 }
 

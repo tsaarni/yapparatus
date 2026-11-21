@@ -98,16 +98,20 @@ A step focuses some elements, fades the others, and shows a short text under the
   const hit = d.note("Most reads stop here", { id: "hit-note", stepOnly: true })
   d.place(hit, { below: api, gap: 48 })
 }}>
-  <Step focus="client api client->api">The client sends a request to the API.</Step>
+  <Step focus="client api">The client sends a request to the API.</Step>
   <Step id="lookup" focus="cache api->cache hit-note">The API first looks in the cache.</Step>
   <Step focus="database miss">On a miss, the cache reads the database.</Step>
 </Diagram>
 
-A focused element has a heavier line. With `build`, an element stays hidden until the first step that focuses it. A step-only element, such as the note, appears only in its steps, on screen and in print. Shapes, edges, enclosures, and frames can be step-only, and so can a sequence's messages, notes, and fragments. A message's activation bar appears with the message. Focusing a container or a category focuses its elements. The layout is the same in every step.
+A focused element has a heavier line. Focusing a container or a category focuses its elements. A step also focuses an edge whose two ends it focuses, so the first step names only the client and the API, and its arrow comes with them. The second step names `api->cache`, because it focuses only one of its ends. An end counts as an element when it is the element or a point taken from that element alone: an anchor such as `api.bottom`, a port, or an offset of either, such as `api.top.offset(40, 0)` for a parallel edge. An end at a cell or a mark counts as that member, which a step focuses with its record or text. A point that combines elements or names none, made with `xy`, `lerp`, a gutter, or `[x, y]`, never counts. A step-only edge and a sequence message are focused only by a step that names them, since each message is its own moment. Lifelines and activation bars are not part of the rule: a message's activation bar appears with the message.
+
+With `build`, an element stays hidden until the first step that focuses it, and an edge that follows its ends stays hidden while one of them is hidden. A step without `focus` shows the whole figure plain, as with no step open, with or without `build`, and step-only elements are absent. For everything else it focuses nothing, so the other steps hide, fade, and show exactly what they would without it. With `build`, an opening step without `focus` shows the whole figure, and the next step hides what later steps reveal. A step-only element, such as the note, appears only in its steps, on screen and in print. Shapes, edges, enclosures, and frames can be step-only, and so can a sequence's messages, notes, and fragments. The layout is the same in every step.
+
+The view, the step checks, a click on an element, and an address all take a step's focused elements from one computation on the compiled diagram: the ids named, with containers and categories expanded, then each edge whose ends are both among them.
 
 ### Interaction
 
-The step controls are previous and next buttons, a counter such as "Step 2 of 3", and Show all, which closes the step. The arrow keys also step, and Escape closes the step. A click on an element, in any mode, opens the next step that focuses it.
+The step controls are previous and next buttons, a counter such as "Step 2 of 3", and Show all, which closes the step. The arrow keys also step, and Escape closes the step. A click on an element, in any mode, opens the next step that focuses it. A step without `focus` is about no element in particular, so a click or an address never opens it.
 
 An address can open a step: [/components#components-steps--lookup](/components#components-steps--lookup) opens the step `lookup`, and an element's address opens the first step that focuses it. In a figure that scrolls sideways, opening a step scrolls the focused elements into view.
 
@@ -141,7 +145,7 @@ An element's color comes from its role or its category, which the [diagram compi
 
 A role sets the line color, fill, label color, and line weight that every kind of element reads, so a role looks the same on a box, an arrow, an enclosure, and a frame. A frame without a role sets the same four values to its own look: the control border color, the raised surface for its tab, the text color, and a hairline. A frame's line keeps its weight when a step focuses it. The view puts an icon's markup from the diagram's icon table in a nested `svg` at its rectangle, whose text color is the label color on a box and the line color on an icon shape, which has no outline, as an actor's figure. The markup's `currentColor` then follows the role, the category on an icon shape, the theme, and a step's fading. A category sets only the colors, from the theme's four category colors. Focus and pointing add line weight, so weight shows state and color shows meaning.
 
-Pointing at a legend entry highlights its category's elements as a step does. In dev mode, an element that a warning names gets a dotted outline.
+Pointing at a legend entry highlights exactly its category's elements, without the edges between them that a step would add. In dev mode, an element that a warning names gets a dotted outline.
 
 ### Accessibility and print
 

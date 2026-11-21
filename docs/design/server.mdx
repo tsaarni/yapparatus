@@ -55,12 +55,12 @@ The server is the dev server: Vite with the `yapparatus()` plugin, serving one d
   d.arrow(compiler, docs, { id: "reads-pages", label: "reads" })
   d.arrow(files, external, { id: "reads-files", label: "reads" })
 }}>
-  <Step focus="web-app agent-library web-http agent-http router">Both clients send requests to the router under `/-/api`. The web app also receives [updates](#updates).</Step>
-  <Step focus="chat-handler to-chat chat-log to-log appends state-dir">The chat handler answers reads of the chat, and the [chat log](#chat-log) stores the messages.</Step>
+  <Step focus="web-app agent-library router">Both clients send requests to the router under `/-/api`. The web app also receives [updates](#updates).</Step>
+  <Step focus="chat-handler to-chat chat-log state-dir">The chat handler answers reads of the chat, and the [chat log](#chat-log) stores the messages.</Step>
   <Step focus="new-errors writes-prompt prompts">For an agent's read, the chat handler adds the new errors and writes the prompt.</Step>
   <Step focus="checks-replies page-compiler">The chat log [compiles each reply](#reply-checks) before it stores it.</Step>
   <Step focus="diagnostic-store to-diagnostics compiles reads-pages document-dir">The [diagnostic store](#diagnostic-store) compiles every page after each file change.</Step>
-  <Step focus="pictures to-pictures draws files to-files reads-files external-dirs">The other two handlers draw [pictures](#pictures) and read [external files](#external-files).</Step>
+  <Step focus="pictures to-pictures draws files to-files external-dirs">The other two handlers draw [pictures](#pictures) and read [external files](#external-files).</Step>
 </Diagram>
 
 When the chat, the diagnostics, or an external file changes, the server sends an [update](#updates) to the web app and answers the agent reads that are waiting.
@@ -136,7 +136,7 @@ The server computes the agent state from the agent's requests and two time limit
     label: { text: "nothing unanswered, 10 min, or chat cleared", segment: 1, side: "bottom" },
   })
 }}>
-  <Step focus="away connect waiting idle">An empty read ends after at most 25 s, and the library opens the next one at once, so the agent stays waiting.</Step>
+  <Step focus="away waiting">An empty read ends after at most 25 s, and the library opens the next one at once, so the agent stays waiting.</Step>
   <Step focus="deliver working answer">A read that returns something starts the agent's work. The agent opens no read while it works.</Step>
   <Step focus="stop give-up away">A read that closes before its answer means the agent's process ended.</Step>
 </Diagram>

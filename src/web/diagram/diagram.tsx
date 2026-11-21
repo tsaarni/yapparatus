@@ -14,9 +14,10 @@ import type { DiagramBuilder } from "../../diagram/builder.ts";
 import {
   type CompiledDiagram,
   type ElementState,
+  edgeEnds,
   elementState,
-  expand,
   type StepView,
+  stepFocus,
   stepOnlyElements,
 } from "../../diagram/drawing.ts";
 import { elementSeparator } from "../../document/address.ts";
@@ -108,17 +109,18 @@ export function Diagram({
 
   const steps = collectSteps(children).map((step) => ({
     ...step,
-    elements: expand(step.focus, shown.groups),
+    ...stepFocus(step.focus, shown),
   }));
   const stepsOf = (element: string) =>
     steps.flatMap((step, i) => (step.elements.has(element) ? [i] : []));
   const [active, setActive] = useState<number | undefined>(undefined);
   const [preview, setPreview] = useState<string[]>();
   const view: StepView = {
-    steps: steps.map((step) => step.elements),
+    steps,
     active,
     build: build ?? false,
     stepOnly: stepOnlyElements(shown),
+    ends: edgeEnds(shown),
     ...(preview ? { preview } : {}),
   };
   const stateOf = (element: string): ElementState => elementState(element, view);
@@ -205,7 +207,7 @@ export function Diagram({
 Diagram.breakout = true;
 
 /** The `<Step>` children's ids, focused element ids, and content, in order. */
-function collectSteps(children: ReactNode): Omit<StepItem, "elements">[] {
+function collectSteps(children: ReactNode): StepItem[] {
   return Children.toArray(children).flatMap((child) => {
     if (!isValidElement<StepProps>(child)) return [];
     if (!(child.type as { diagramStep?: boolean }).diagramStep) return [];

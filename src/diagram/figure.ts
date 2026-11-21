@@ -6,7 +6,7 @@ import type { DiagnosticCode } from "../document/diagnostic.ts";
 import { DiagramBuilder } from "./builder.ts";
 import { intrusions, titleCrossings } from "./compile/checks.ts";
 import { compile } from "./compile/compile.ts";
-import { type CompiledDiagram, expand } from "./drawing.ts";
+import { type CompiledDiagram, expand, stepFocus } from "./drawing.ts";
 import type { Diagnostic } from "./elements.ts";
 import { overlap } from "./geometry.ts";
 import { type Lookups, minScale, readingWidth } from "./metrics.ts";
@@ -90,10 +90,7 @@ function checkSteps(
   diagram: CompiledDiagram,
   build: boolean,
 ): Diagnostic[] {
-  const steps = figureSteps.map((step) => ({
-    ...step,
-    elements: expand(step.focus, diagram.groups),
-  }));
+  const steps = figureSteps.map((step) => ({ ...step, ...stepFocus(step.focus, diagram) }));
   const elements = [
     ...diagram.nodes.filter((n) => !n.passive).map((n) => n.id),
     ...diagram.edges.filter((e) => !e.passive).map((e) => e.id),
@@ -183,5 +180,27 @@ function checkSteps(
         "build reveals elements step by step, but the diagram has no <Step> children.",
       ),
     );
+  if (build && steps.length)
+    for (const id of neverFocused(diagram, steps))
+      diagnostics.push(
+        diagnostic(
+          "BUILD_NEVER_FOCUSED",
+          `${id} has an edge, but no step focuses it, so build shows it faded from the first step. Focus it in the step where it should appear.`,
+          [id],
+        ),
+      );
   return diagnostics;
+}
+
+/**
+ * The shapes at an end of an edge that follows its ends that no step focuses. A member counts as
+ * its record or text. Shapes without such an edge, enclosures, frames, and grids are scenery.
+ */
+function neverFocused(diagram: CompiledDiagram, steps: Array<{ elements: Set<string> }>): string[] {
+  const parent = new Map(diagram.nodes.map((n) => [n.id, n.parent ?? n.id]));
+  const ends = new Set(diagram.edges.flatMap((e) => e.ends ?? []).map((id) => parent.get(id)));
+  return diagram.nodes
+    .filter((n) => ends.has(n.id) && !n.passive && !n.stepOnly)
+    .filter((n) => !steps.some((step) => step.elements.has(n.id)))
+    .map((n) => n.id);
 }

@@ -110,6 +110,8 @@ export interface CompiledEdge {
   passive?: true;
   /** Shown only while a step focuses it. */
   stepOnly?: true;
+  /** The elements at its ends, when a step that focuses both focuses the edge too. */
+  ends?: [string, string];
   points: Vec[];
   /** The arrowhead at the `to` end, when it has one. */
   head?: CompiledHead;
@@ -170,19 +172,46 @@ export function expand(ids: string[], groups: Record<string, string[]>): Set<str
   return elements;
 }
 
+/** What a step focuses, as one place computes it for the view, the checks, and the links. */
+export interface StepFocus {
+  /** The ids named, containers and categories expanded, and the edges that follow their ends. */
+  elements: Set<string>;
+  /** A step without `focus`: it shows the whole figure plain, and focuses nothing. */
+  whole: boolean;
+}
+
+/**
+ * The elements a step focuses. An edge with `ends` is focused when both its ends are. A step
+ * without `focus` focuses nothing, so it changes no other step.
+ */
+export function stepFocus(focus: string[], diagram: CompiledDiagram): StepFocus {
+  if (!focus.length) return { elements: new Set(), whole: true };
+  const elements = expand(focus, diagram.groups);
+  for (const edge of diagram.edges)
+    if (edge.ends?.every((end) => elements.has(end))) elements.add(edge.id);
+  return { elements, whole: false };
+}
+
+/** Each edge that follows its ends, with the elements at them. */
+export function edgeEnds(diagram: CompiledDiagram): Map<string, [string, string]> {
+  return new Map(diagram.edges.flatMap((e) => (e.ends ? [[e.id, e.ends] as const] : [])));
+}
+
 /** How an element looks in a step. "absent" is a step-only element outside its steps. */
 export type ElementState = "focus" | "dim" | "hidden" | "absent" | undefined;
 
 /** What decides how each element looks: the steps, the open one, and a legend entry pointed at. */
 export interface StepView {
-  /** Each step's focused elements, with containers expanded to their contents. */
-  steps: Array<Set<string>>;
+  /** What each step focuses. */
+  steps: StepFocus[];
   /** The open step, counted from 0. Undefined shows the whole figure. */
   active: number | undefined;
   /** Hide each element until the first step that focuses it. */
   build: boolean;
   /** Elements shown only while a step focuses them. */
   stepOnly: Set<string>;
+  /** The edges that follow their ends: with `build`, hidden while an end is hidden. */
+  ends: Map<string, [string, string]>;
   /** The elements of the legend entry the reader points at, which override the step. */
   preview?: string[];
 }
@@ -198,17 +227,21 @@ export function stepOnlyElements(diagram: CompiledDiagram): Set<string> {
 
 /**
  * Focused elements are drawn heavier, the others fade, and with `build` the elements that a later
- * step focuses first are hidden. A step-only element is absent outside its steps.
+ * step focuses first are hidden, with the edges that follow them. Step-only ones are absent.
  */
 export function elementState(element: string, view: StepView): ElementState {
-  const { steps, active, build, stepOnly, preview } = view;
+  const { steps, active, build, stepOnly, ends, preview } = view;
   if (preview)
     return preview.includes(element) ? "focus" : stepOnly.has(element) ? "absent" : "dim";
   const current = active === undefined ? undefined : steps[active];
-  if (current?.has(element)) return "focus";
+  if (active === undefined || !current || current.whole)
+    return stepOnly.has(element) ? "absent" : undefined;
+  if (current.elements.has(element)) return "focus";
   if (stepOnly.has(element)) return "absent";
-  if (!current || active === undefined) return undefined;
-  const first = steps.findIndex((step) => step.has(element));
-  if (build && first >= 0 && first > active) return "hidden";
+  const later = (id: string) => {
+    const first = steps.findIndex((step) => step.elements.has(id));
+    return first > active;
+  };
+  if (build && (later(element) || ends.get(element)?.some(later))) return "hidden";
   return "dim";
 }

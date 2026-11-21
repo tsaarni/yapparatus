@@ -7,7 +7,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
-import { elementState, expand, stepOnlyElements } from "../../../src/diagram/drawing.ts";
+import {
+  edgeEnds,
+  elementState,
+  stepFocus,
+  stepOnlyElements,
+} from "../../../src/diagram/drawing.ts";
 import type { Node } from "../../../src/diagram/elements.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
@@ -241,11 +246,13 @@ function stepped(draw: (d: DiagramBuilder) => void, focus: string[][] = []) {
 
 /** The state of each element in each step of a compiled figure, by element. */
 function states(out: ReturnType<typeof stepped>, focus: string[][], ids: string[]) {
-  const steps = focus.map((f) => expand(f, out.groups));
-  const stepOnly = stepOnlyElements(out);
-  return ids.map((id) =>
-    steps.map((_, active) => elementState(id, { steps, active, build: false, stepOnly })),
-  );
+  const view = {
+    steps: focus.map((f) => stepFocus(f, out)),
+    build: false,
+    stepOnly: stepOnlyElements(out),
+    ends: edgeEnds(out),
+  };
+  return ids.map((id) => view.steps.map((_, active) => elementState(id, { ...view, active })));
 }
 
 /** The ids of the elements that the picture of a compiled figure draws. */
@@ -281,6 +288,42 @@ test("a step-only message appears only in its steps, with the activation bar it 
   const drawn = pictured(out);
   assert.ok(drawn.includes("get-item") && drawn.includes("api-active-1"));
   assert.ok(!drawn.includes("retry") && !drawn.includes("api-active-2"));
+});
+
+test("a step that focuses two participants focuses none of their messages or lifelines", () => {
+  const focus = [
+    ["client", "api"],
+    ["client", "api", "item"],
+  ];
+  const out = stepped((d) => {
+    const a = d.box("Client");
+    const b = d.box("API");
+    d.sequence(
+      [a, b],
+      [
+        { from: a, to: b, label: "get item" },
+        { from: b, to: a, label: "item", reply: true },
+      ],
+    );
+  }, focus);
+  assert.deepEqual(out.diagnostics, []);
+  assert.deepEqual(
+    out.edges.filter((e) => e.ends),
+    [],
+    "messages and lifelines do not follow their ends",
+  );
+  assert.deepEqual(
+    focus.map((f) => [...stepFocus(f, out).elements].sort()),
+    [
+      ["api", "client"],
+      ["api", "client", "item"],
+    ],
+  );
+  assert.deepEqual(states(out, focus, ["get-item", "item", "client-lifeline"]), [
+    ["dim", "dim"],
+    ["dim", "focus"],
+    ["dim", "dim"],
+  ]);
 });
 
 test("a step-only note shows only in its steps, and is reported when no step focuses it", () => {

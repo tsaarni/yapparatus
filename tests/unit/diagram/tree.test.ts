@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
-import { expand } from "../../../src/diagram/drawing.ts";
+import { expand, stepFocus } from "../../../src/diagram/drawing.ts";
 import type { Node } from "../../../src/diagram/elements.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
@@ -201,6 +201,8 @@ test("a subtree's container groups its lines, so a step on it focuses the whole 
   ]);
   assert.ok(expand(["r-tree"], out.groups).has("r->b"));
   assert.ok(!expand(["a-tree"], out.groups).has("r->a"), "the line into a branch is its parent's");
+  assert.ok(stepFocus(["r", "a-tree"], out).elements.has("r->a"), "it follows its two ends");
+  assert.ok(!stepFocus(["a-tree"], out).elements.has("r->a"));
 });
 
 test("edge options apply to every line, and an explicit root id names the container", () => {

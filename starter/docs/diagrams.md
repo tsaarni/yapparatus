@@ -418,6 +418,8 @@ d.arrow(batch, db, { dashed: true })
 
 Steps tell the story of a figure in order. Each `<Step>` names the elements it is about and says one or two sentences. Step text is MDX, so it can link to the section that explains more. Steps never move anything; they only change what is highlighted, faded, or shown.
 
+A step that focuses both ends of an edge focuses the edge too: the first step below names `client` and `api`, and the arrow between them comes with them. Name an edge when the step focuses only one of its ends, as the second step names `api->cache`.
+
 ```mdx
 <Diagram id="cached-read" caption="A cached read." build draw={(d) => {
   const client = d.box("Client")
@@ -432,7 +434,7 @@ Steps tell the story of a figure in order. Each `<Step>` names the elements it i
   const why = d.note("Most reads stop here", { stepOnly: true })
   d.place(why, { below: api })
 }}>
-  <Step focus="client api client->api">The client sends a request to the API.</Step>
+  <Step focus="client api">The client sends a request to the API.</Step>
   <Step id="lookup" focus="cache api->cache most-reads-stop-here">The API first looks in the cache.</Step>
   <Step focus="database miss">On a miss, the cache reads the database.</Step>
   <Step focus="row-1">Together, the three serve every read.</Step>
@@ -444,7 +446,9 @@ Steps tell the story of a figure in order. Each `<Step>` names the elements it i
 | `focus` | Element ids, separated by spaces. Focused elements are highlighted; the others fade |
 | Containers | Focusing an enclosure, grid, row, column, sequence, sequence fragment, or tree branch focuses everything in it |
 | Categories | Focusing a category's id focuses every element in it |
-| `build` | Each element stays hidden until the first step that focuses it |
+| Edges | A step focuses an edge when it focuses both its ends. An end at an anchor, a port, or an offset of one, such as `api.bottom` or `api.top.offset(40, 0)`, counts as the shape; a cell or mark end counts as that member. A step names an edge with an end made by `xy`, `lerp`, a gutter, or `[x, y]`, a `stepOnly` edge, and a sequence message |
+| No `focus` | `<Step>` without `focus` shows the whole figure, as with no step open, without step-only elements. It changes no other step and counts as focusing nothing |
+| `build` | Each element stays hidden until the first step that focuses it, and an edge stays hidden while one of its ends is hidden. A step without `focus` does not reveal anything for the steps after it |
 | `stepOnly` | An option of shapes, record cells, text marks, edges, enclosures, frames, and the messages, notes, and fragments of a sequence: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
 | `id` | A step's address: `/page#cached-read--lookup`. Unique among the figure's elements and steps |
 
@@ -459,7 +463,7 @@ Steps help when the reader must follow an order: a request through components, a
 - Say in each step what the drawing cannot: the reason or the consequence. Do not repeat the caption.
 - Link from a step to the section that explains more.
 - Steps and a numbered prose list that walk the same path repeat each other. Keep the walk in the steps, and keep rules and details in the prose after the figure.
-- With `build`, an element that no step focuses is shown, faded, from the first step. Focus every element that should appear in order.
+- With `build`, an element that no step focuses is shown, faded, from the first step. Focus every shape that should appear in order; a shape with an edge that no step focuses is reported. Shapes without edges and enclosures may stay as scenery.
 
 The reader steps with the buttons under the caption, the arrow keys, and Esc. Clicking an element opens the next step about it. A link to a step or element opens it. `<Ref to="cached-read--lookup">the lookup</Ref>` links to a step from the prose. When the reader comments on the figure, the message includes the open step. Print shows the whole figure, without step-only elements, and lists the steps.
 
@@ -500,6 +504,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `member()` names a member that does not. The message lists the valid ids |
 | `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |
 | `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |
+| `BUILD_NEVER_FOCUSED` | warning | With `build`, a shape that has an edge is focused by no step, so it is shown faded from the first step. Focus it in the step where it should appear |
 | `STEP_ONLY_UNUSED` | warning | A `stepOnly` element that no step focuses is never shown |
 | `DIAGRAM_SCROLLS` | warning | Wider than 1280 units. Stack it more vertically |
 | `FONT_FALLBACK` | warning | The text has characters the web app's fonts lack, such as "→", so its width is estimated. Use characters the fonts have, such as `->` |

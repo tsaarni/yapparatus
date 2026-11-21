@@ -6,6 +6,7 @@ import type { CompiledEdge, CompiledHead, CompiledLabel } from "../drawing.ts";
 import {
   type Edge,
   type Element,
+  elementAt,
   elementOf,
   type LabelOptions,
   Node,
@@ -79,6 +80,13 @@ function trim(points: Vec[], at: "start" | "end", cut: number) {
   if (at === "start") points.reverse();
 }
 
+/** The elements at an edge's ends, when it follows them: a step that focuses both focuses it. */
+function endsOf(edge: Edge): Pick<CompiledEdge, "ends"> {
+  if (edge.passive || edge.stepOnly || edge.byName) return {};
+  const [from, to] = [elementAt(edge.from), elementAt(edge.to)];
+  return from && to ? { ends: [from.id, to.id] } : {};
+}
+
 /**
  * The edge compiler over a layout: `compileEdge` gives an edge's compiled form, with its heads and
  * labels, and its route before the heads cut the line back.
@@ -110,6 +118,7 @@ export function createEdges(
       radius: shape.radius,
       ...(edge.passive ? { passive: true } : {}),
       ...(edge.stepOnly ? { stepOnly: true } : {}),
+      ...endsOf(edge),
       points,
     };
     if (points.length < 2) {

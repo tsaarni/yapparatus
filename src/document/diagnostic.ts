@@ -200,6 +200,10 @@ export const diagnosticCodes = {
   },
   STEP_ONLY_UNUSED: { severity: "warning", meaning: "A stepOnly element is in no step." },
   BUILD_WITHOUT_STEPS: { severity: "warning", meaning: "A diagram has build but no steps." },
+  BUILD_NEVER_FOCUSED: {
+    severity: "warning",
+    meaning: "With build, a shape that has an edge is focused by no step, so it shows faded.",
+  },
   /** Found when a page or reply runs in the browser. */
   RENDER_FAILED: { severity: "error", meaning: "A page threw while rendering." },
   RUNTIME_FAILED: { severity: "error", meaning: "Code on a page threw outside rendering." },

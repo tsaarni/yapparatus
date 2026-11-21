@@ -11,8 +11,6 @@ export interface StepItem {
   id?: string;
   /** The ids as written. */
   focus: string[];
-  /** The focused elements, with containers expanded to their contents. */
-  elements: Set<string>;
   content: ReactNode;
 }
 

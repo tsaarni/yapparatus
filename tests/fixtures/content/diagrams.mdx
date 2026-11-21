@@ -134,6 +134,19 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
 }}>
   <Step focus="api api-callout">The API answers.</Step>
   <Step focus="store">The store keeps the rows.</Step>
+  <Step>Together, they serve the client.</Step>
+</Diagram>
+
+<Diagram id="edge-steps" caption="Edges that follow their ends, added step by step." build draw={(d) => {
+  const client = d.box("Client")
+  const api = d.box("API")
+  const db = d.cylinder("Database")
+  d.row([client, api, db])
+  d.arrow(client, api)
+  d.arrow(api, db)
+}}>
+  <Step focus="client api">The client calls the API.</Step>
+  <Step focus="database">The rows live in the database.</Step>
 </Diagram>
 
 <Diagram id="worker-states" caption="A state machine with bends and a loop." draw={(d) => {
