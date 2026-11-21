@@ -267,6 +267,107 @@ test("an edge with corners leaves at a right angle, at the projection of its nex
   assert.deepEqual(points(beyond.id)?.at(-1), { x: 352, y: -5.5 });
 });
 
+test("edges attach to the drawn outline: rhombus, circle, cylinder cap, and cut corner", () => {
+  const d = new DiagramBuilder();
+  const ok = d.decision("Ok?");
+  const end = d.end();
+  const db = d.cylinder("DB");
+  const memo = d.note("Memo");
+  d.place(ok, { at: [0, 0], anchor: "topLeft" });
+  d.place(end, { at: [300, 0], anchor: "topLeft" });
+  d.place(db, { at: [0, 200], anchor: "topLeft" });
+  d.place(memo, { at: [300, 200], anchor: "topLeft" });
+  const corners = d.line(ok, end, {
+    route: {
+      via: [
+        [50, -40],
+        [312, -40],
+      ],
+    },
+  });
+  const cap = d.line([200, 100], db, { route: { via: [[20, 100]] } });
+  const cut = d.line([500, 100], memo);
+  const out = compile(d, measure);
+  const points = (id: string) => out.edges.find((e) => e.id === id)?.points;
+  const rect = (id: string) => out.nodes.find((n) => n.id === id)?.rect;
+  assert.deepEqual(rect("ok"), { x: 0, y: 0, width: 80, height: 55.47 });
+  assert.deepEqual(points(corners.id)?.[0], { x: 50, y: 6.93 }, "on the rhombus, not its bounds");
+  assert.deepEqual(points(corners.id)?.at(-1), { x: 312, y: 0.2 }, "on the ring's circle");
+  const top = 200 + 7.28 - 7.28 * Math.sqrt(1 - (32 / 52) ** 2);
+  const atCap = points(cap.id)?.at(-1);
+  assert.equal(atCap?.x, 20);
+  assert.ok(Math.abs((atCap?.y ?? 0) - top) < 0.1, `on the cylinder's cap, at ${atCap?.y}`);
+  assert.deepEqual(points(cut.id)?.at(-1), { x: 349.75, y: 202.75 }, "on the note's cut corner");
+});
+
+/** A shape at the origin, and where an edge with corners into each side ends on it. */
+function sides(kind: "io" | "doc" | "queue") {
+  const d = new DiagramBuilder();
+  const n = d[kind]("Twelve chars", { id: "n", sub: "sub" });
+  d.place(n, { at: [0, 0], anchor: "topLeft" });
+  const ends: Array<[number, number]> = [
+    [-200, 15],
+    [400, 15],
+    [20, -200],
+    [20, 300],
+  ];
+  const routed = ends.map((p) => d.line(p, n, { route: { via: [p] } }).id);
+  const out = compile(d, measure);
+  assert.deepEqual(out.diagnostics, []);
+  const node = out.nodes[0];
+  const end = (id: string) => out.edges.find((e) => e.id === id)?.points.at(-1);
+  return { node, ends: routed.map(end) };
+}
+
+/** Whether two points are within a tenth of a unit, which a sampled curve keeps. */
+function near(a: { x: number; y: number } | undefined, b: { x: number; y: number }) {
+  assert.ok(
+    a && Math.hypot(a.x - b.x, a.y - b.y) < 0.1,
+    `${JSON.stringify(a)} is not near ${JSON.stringify(b)}`,
+  );
+}
+
+test("an io is a parallelogram: the text and padding plus the slant, attached on its slanted sides", () => {
+  const { node, ends } = sides("io");
+  assert.deepEqual(node?.rect, { x: 0, y: 0, width: 130, height: 57.19 });
+  assert.equal(node?.lines[0]?.x, 65);
+  const slant = (y: number) => 14 * (1 - y / 57.19);
+  near(ends[0], { x: slant(15), y: 15 });
+  near(ends[1], { x: 116 + slant(15), y: 15 });
+  near(ends[2], { x: 20, y: 0 });
+  near(ends[3], { x: 20, y: 57.19 });
+});
+
+test("a doc is a page with a wavy bottom that crosses its bottom line at the middle", () => {
+  const d = new DiagramBuilder();
+  const n = d.doc("Twelve chars", { id: "n", sub: "sub" });
+  const below = d.box("Below");
+  d.column([n, below]);
+  d.line(n, below);
+  const out = compile(d, measure);
+  const rect = out.nodes[0]?.rect;
+  assert.deepEqual(out.edges[0]?.points[0], { x: 58, y: (rect?.y ?? 0) + (rect?.height ?? 0) });
+  const { node, ends } = sides("doc");
+  assert.deepEqual(node?.rect, { x: 0, y: 0, width: 116, height: 57.19 + 5 });
+  assert.equal(node?.lines[0]?.y, 20.31, "the text centers on the page above the wave");
+  near(ends[0], { x: 0, y: 15 });
+  near(ends[1], { x: 116, y: 15 });
+  near(ends[2], { x: 20, y: 0 });
+  near(ends[3], { x: 20, y: 66.97 });
+  assert.ok((ends[3]?.y ?? 0) > 62.19, "the left half dips below the bottom line");
+});
+
+test("a queue is a cylinder on its side: the text and padding plus the caps", () => {
+  const { node, ends } = sides("queue");
+  assert.deepEqual(node?.rect, { x: 0, y: 0, width: 128, height: 57.19 });
+  assert.equal(node?.lines[0]?.x, 61, "the text moves away from the right cap");
+  const curve = (y: number) => 6 * Math.sqrt(1 - ((y - 28.595) / 28.595) ** 2);
+  near(ends[0], { x: 6 - curve(15), y: 15 });
+  near(ends[1], { x: 122 + curve(15), y: 15 });
+  near(ends[2], { x: 20, y: 0 });
+  near(ends[3], { x: 20, y: 57.19 });
+});
+
 test("\\n in an edge label starts a new line; the rect covers every line", () => {
   const d = new DiagramBuilder();
   const a = d.box("A");

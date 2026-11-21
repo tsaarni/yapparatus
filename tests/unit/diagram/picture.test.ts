@@ -86,6 +86,8 @@ const everything = (d: DiagramBuilder) => {
     ],
   );
   d.place(sequence, { below: request, gap: 40 });
+  const flow = d.row([d.io("Upload"), d.doc("Report"), d.queue("Events")]);
+  d.place(flow, { below: sequence, gap: 40 });
 };
 
 test("the picture is well formed and draws every shape the figure has", () => {
@@ -97,6 +99,9 @@ test("the picture is well formed and draws every shape the figure has", () => {
     "actor",
     "box",
     "cylinder",
+    "io",
+    "doc",
+    "queue",
     "diamond",
     "dot",
     "ring",

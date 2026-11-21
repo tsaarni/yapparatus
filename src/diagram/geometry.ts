@@ -157,18 +157,46 @@ export function sideToward(
   return allowed.reduce((a, b) => (progress[b] > progress[a] ? b : a));
 }
 
-/** Where a line from the center of `rect` toward `toward` crosses its outline. */
-export function boundaryToward(rect: Rect, toward: Vec): Vec {
-  const c = anchorOf(rect, "center");
-  const dx = toward.x - c.x;
-  const dy = toward.y - c.y;
-  if (dx === 0 && dy === 0) return c;
-  const side = sideToward(rect, toward);
-  const s =
-    side === "left" || side === "right"
-      ? rect.width / 2 / Math.abs(dx)
-      : rect.height / 2 / Math.abs(dy);
-  return { x: c.x + dx * s, y: c.y + dy * s };
+/**
+ * Where a ray from `from` along `dir` last crosses a polygon's outline, so on a shape with notches
+ * it is the outermost crossing. Undefined when the ray misses the polygon.
+ */
+export function rayExit(polygon: Vec[], from: Vec, dir: Vec): Vec | undefined {
+  let last: number | undefined;
+  for (let i = 0; i < polygon.length; i++) {
+    const a = polygon[i] as Vec;
+    const b = polygon[(i + 1) % polygon.length] as Vec;
+    const ex = b.x - a.x;
+    const ey = b.y - a.y;
+    const denom = dir.x * ey - dir.y * ex;
+    if (Math.abs(denom) < 1e-12) continue;
+    const ax = a.x - from.x;
+    const ay = a.y - from.y;
+    const t = (ax * ey - ay * ex) / denom;
+    const s = (ax * dir.y - ay * dir.x) / denom;
+    if (t >= 0 && s >= -1e-9 && s <= 1 + 1e-9 && (last === undefined || t > last)) last = t;
+  }
+  return last === undefined ? undefined : { x: from.x + dir.x * last, y: from.y + dir.y * last };
+}
+
+/** The outward direction of a side of a rectangle. */
+export function normalOf(side: Side): Vec {
+  return {
+    top: { x: 0, y: -1 },
+    bottom: { x: 0, y: 1 },
+    left: { x: -1, y: 0 },
+    right: { x: 1, y: 0 },
+  }[side];
+}
+
+/**
+ * Where the line at a right angle to `side` of `rect`, through `at` on that side, meets a polygon
+ * inside the rectangle: its outermost crossing toward that side.
+ */
+export function sideExit(polygon: Vec[], rect: Rect, side: Side, at: Vec): Vec | undefined {
+  const n = normalOf(side);
+  const across = n.x ? rect.width : rect.height;
+  return rayExit(polygon, { x: at.x - n.x * (across + 1), y: at.y - n.y * (across + 1) }, n);
 }
 
 /** The straight-line distance between two points. */

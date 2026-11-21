@@ -5,15 +5,8 @@ import type { DiagnosticCode } from "../../document/diagnostic.ts";
 import type { TextLine } from "../drawing.ts";
 import type { Node, Shape } from "../elements.ts";
 import { round } from "../geometry.ts";
-import {
-  cylinderCap,
-  type FontSpec,
-  fontsOf,
-  type Measure,
-  type Metrics,
-  shapes,
-  tab,
-} from "../metrics.ts";
+import { type FontSpec, fontsOf, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { room } from "../outlines.ts";
 
 /** Reports a diagnostic; every compiler step takes one. */
 export type Report = (code: DiagnosticCode, message: string, ids: string[]) => void;
@@ -93,7 +86,7 @@ function wrap(text: string, font: FontSpec, width: number, measure: Measure): st
 }
 
 /** The shapes whose text wraps at `wrapWidth` when no width is fixed. */
-const labelShapes = new Set<Shape>(["box", "cylinder", "diamond", "actor"]);
+const labelShapes = new Set<Shape>(["box", "cylinder", "queue", "doc", "io", "diamond", "actor"]);
 
 /** The shapes whose text wraps at `textWrapWidth` when no width is fixed. */
 const textShapes = new Set<Shape>(["note", "text", "dot", "ring"]);
@@ -124,7 +117,8 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
         : node.shape === "note"
           ? shapes.note.padX
           : m.padX;
-    const fixed = o.width !== undefined ? o.width - 2 * pad : undefined;
+    const outline = room(node.shape, { width: o.width ?? 0, height: o.height ?? m.minHeight });
+    const fixed = o.width !== undefined ? o.width - 2 * pad - outline.width : undefined;
     const shapeWidth = labelShapes.has(node.shape)
       ? m.wrapWidth
       : textShapes.has(node.shape)
@@ -162,10 +156,6 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
     return c;
   }
 
-  function capHeight(node: Node, width: number) {
-    return node.shape === "cylinder" ? cylinderCap(width) : 0;
-  }
-
   function textAt(
     text: string,
     x: number,
@@ -189,5 +179,5 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
     return measure(text, fonts.tab) + 2 * tab.pad;
   }
 
-  return { measureNode, capHeight, textAt, textFont, tabWidth };
+  return { measureNode, textAt, textFont, tabWidth };
 }

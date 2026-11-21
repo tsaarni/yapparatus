@@ -16,6 +16,7 @@ import {
 } from "../elements.ts";
 import { anchorOf, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
 import { type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { room } from "../outlines.ts";
 import { createRecords } from "./records.ts";
 import type { Report, Text } from "./text.ts";
 
@@ -64,7 +65,7 @@ export function createLayout(
   report: Report,
   text: Text,
 ) {
-  const { measureNode, capHeight, tabWidth } = text;
+  const { measureNode, tabWidth } = text;
   const records = createRecords(m, measure, report, text, bounds);
   const { grid, member } = records;
   const known = new Set<Element>([...scene.nodes, ...scene.grids, ...scene.enclosures]);
@@ -127,14 +128,22 @@ export function createLayout(
       }
     }
     const text = node.shape === "text";
-    const padX = text ? 0 : m.padX;
-    const padY = text ? 0 : m.padY;
-    let width = o.width ?? Math.max(c.width + 2 * padX, text ? 0 : (o.minWidth ?? m.minWidth));
-    if (o.minWidth !== undefined) width = Math.max(width, o.minWidth);
-    const cap = capHeight(node, width);
-    const needed = c.height + 2 * padY + 2 * cap;
-    let height = o.height ?? Math.max(needed, text ? 0 : (o.minHeight ?? m.minHeight));
-    if (o.minHeight !== undefined) height = Math.max(height, o.minHeight);
+    const pad = { width: text ? 0 : m.padX, height: text ? 0 : m.padY };
+    const least = { width: o.minWidth, height: o.minHeight };
+    const floor = {
+      width: text ? 0 : (o.minWidth ?? m.minWidth),
+      height: text ? 0 : (o.minHeight ?? m.minHeight),
+    };
+    const fit = (needed: number, axis: "width" | "height") =>
+      Math.max(o[axis] ?? Math.max(needed, floor[axis]), least[axis] ?? 0);
+    const base = { width: c.width + 2 * pad.width, height: c.height + 2 * pad.height };
+    const outline = room(node.shape, {
+      width: fit(base.width, "width"),
+      height: fit(base.height, "height"),
+    });
+    const width = fit(base.width + outline.width, "width");
+    const needed = base.height + outline.height;
+    const height = fit(needed, "height");
     if (o.height !== undefined && needed > o.height + 0.5)
       report(
         "TEXT_OVERFLOW",

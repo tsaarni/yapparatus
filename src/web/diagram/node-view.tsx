@@ -1,5 +1,5 @@
 /**
- * Shapes: boxes, cylinders, records and their cells, marks, notes, and their badges and pins.
+ * Shapes: boxes, cylinders, flow shapes, records and their cells, marks, notes, badges, and pins.
  */
 
 import * as stylex from "@stylexjs/stylex";
@@ -205,6 +205,19 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
         </>
       );
     }
+    case "queue": {
+      const { body, cap } = shape.queue(r);
+      return (
+        <>
+          <path d={body} {...outlined} />
+          <ellipse {...cap} {...outlined} />
+        </>
+      );
+    }
+    case "io":
+      return <polygon points={shape.pointList(shape.parallelogram(r))} {...outlined} />;
+    case "doc":
+      return <path d={shape.page(r)} {...outlined} />;
     case "actor": {
       const { head, body } = shape.actor(r);
       return (
@@ -224,7 +237,7 @@ function Shape({ node, clip }: { node: CompiledNode; clip: string }) {
       );
     }
     case "diamond":
-      return <polygon points={shape.diamond(r)} {...outlined} />;
+      return <polygon points={shape.pointList(shape.diamond(r))} {...outlined} />;
     case "dot":
       return <circle cx={x + w / 2} cy={y + h / 2} r={w / 2} {...stylex.props(styles.solid)} />;
     case "ring":

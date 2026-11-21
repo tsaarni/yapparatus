@@ -37,6 +37,7 @@ Draw a figure when it shows structure, a path, or an order faster than text; a r
 |---|---|
 | Components and who talks to whom | [Components](#components) |
 | A flow with a question | [A flow](#a-flow) |
+| Data through a pipeline: inputs, queues, reports | [A pipeline](#a-pipeline) |
 | States and transitions | [A state machine](#a-state-machine) |
 | Messages over time | [Sequences](diagram-sequences.md) |
 | Tables, types, protocol headers, registers, arrays | [Structures](diagram-structures.md) |
@@ -83,6 +84,25 @@ d.arrow(serve, done)
 - The main path runs down a `column`; a side branch is placed `rightOf` its decision.
 - Ask in two or three words in a decision, and explain it in the prose.
 
+### A pipeline
+
+```js
+const upload = d.io("Upload orders")
+const events = d.queue("Order events")
+const worker = d.box("Billing worker", { role: "accent" })
+const db = d.cylinder("Ledger")
+const report = d.doc("Daily report")
+d.row([upload, events, worker, report])
+d.place(db, { below: worker })
+d.arrow(upload, events)
+d.arrow(events, worker)
+d.arrow(worker, db)
+d.arrow(worker, report)
+```
+
+- A queue, a topic, or a stream is `d.queue`; a cylinder is storage that is read again.
+- `d.io` marks where data enters or leaves the flow, and `d.doc` what it produces.
+
 ### A state machine
 
 ```js
@@ -105,7 +125,10 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 | Call | Draws |
 |---|---|
 | `d.box(label, options?)` | A component, service, or step |
-| `d.cylinder(label, options?)` | Storage: a database, cache, or queue |
+| `d.cylinder(label, options?)` | Storage: a database or a cache |
+| `d.queue(label, options?)` | A cylinder on its side: a queue, a topic, or a stream |
+| `d.doc(label, options?)` | A page with a wavy bottom: a document, a report, or a file |
+| `d.io(label, options?)` | A parallelogram: the input or output of a flow |
 | `d.actor(label, options?)` | A person or outside system |
 | `d.note(label, options?)` | A remark with a folded corner |
 | `d.decision(label, options?)` | A diamond around a short question |
@@ -131,7 +154,7 @@ Options:
 
 `\n` starts a new line in a shape's label or `sub` and in an edge or message label. Sequence fragment titles and divider labels are one line.
 
-Long text wraps at spaces into lines of similar length: at 220 units in boxes, cylinders, decisions, and actors, and at 320 in notes, text, and the labels of start and end. The shape grows to its widest line. Text in `mono`, record titles and cells, and edge labels do not wrap unless `width` is fixed; break their lines with `\n`.
+Long text wraps at spaces into lines of similar length: at 220 units in boxes, cylinders, queues, documents, inputs and outputs, decisions, and actors, and at 320 in notes, text, and the labels of start and end. The shape grows to its widest line. Text in `mono`, record titles and cells, and edge labels do not wrap unless `width` is fixed; break their lines with `\n`.
 
 ## Ids
 

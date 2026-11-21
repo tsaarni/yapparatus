@@ -60,9 +60,21 @@ export class DiagramBuilder {
   box(label: string, options: NodeOptions = {}): Node {
     return this.add(new Node("box", label, options));
   }
-  /** Storage: a database, a cache, a queue. */
+  /** Storage: a database, a cache. */
   cylinder(label: string, options: NodeOptions = {}): Node {
     return this.add(new Node("cylinder", label, options));
+  }
+  /** Input or output of a flow: a parallelogram around its text. */
+  io(label: string, options: NodeOptions = {}): Node {
+    return this.add(new Node("io", label, options));
+  }
+  /** A document, a report, a file: a page with a wavy bottom. */
+  doc(label: string, options: NodeOptions = {}): Node {
+    return this.add(new Node("doc", label, options));
+  }
+  /** A queue, a topic, a stream: a cylinder on its side. */
+  queue(label: string, options: NodeOptions = {}): Node {
+    return this.add(new Node("queue", label, options));
   }
   /** Free-standing text without an outline. `marks` name spans or lines as members. */
   text(label: string, options: TextOptions = {}): Node {

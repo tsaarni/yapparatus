@@ -132,3 +132,12 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   d.arrow(busy, idle, { label: "done", bend: 32 })
   d.arrow(busy, busy, { label: "retry", loop: "top" })
 }} />
+
+<Diagram id="report-flow" caption="Input, a queue, and a report." draw={(d) => {
+  const upload = d.io("Upload orders")
+  const events = d.queue("Order events", { category: "New" })
+  const report = d.doc("Daily report", { role: "accent" })
+  d.row([upload, events, report])
+  d.arrow(upload, events)
+  d.arrow(events, report)
+}} />

@@ -6,6 +6,7 @@ import type { CompiledEnclosure, CompiledFrame, CompiledNode, TextLine } from ".
 import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "../elements.ts";
 import { inflate, type Rect, union, type Vec } from "../geometry.ts";
 import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { room } from "../outlines.ts";
 import type { Layout } from "./layout.ts";
 import { type Align, type Content, type Text, textLine } from "./text.ts";
 
@@ -18,7 +19,7 @@ export function createNodes(
   categoryOf: (name: string | undefined) => { category?: number },
 ) {
   const fonts = fontsOf(m);
-  const { measureNode, capHeight, textAt, tabWidth } = text;
+  const { measureNode, textAt, tabWidth } = text;
   const { terminalLabel, member, recordLines, evalPoint, enclosureRect } = layout;
 
   function compileNode(node: Node, rect: Rect): CompiledNode {
@@ -70,12 +71,12 @@ export function createNodes(
         break;
       }
       default: {
-        const cap = capHeight(node, rect.width);
+        const outline = room(node.shape, rect);
         const code = node.shape === "text" && node.options.mono;
         lines = stackLines(
           c.lines,
-          rect.y + rect.height / 2 + cap / 2 - c.height / 2,
-          code ? rect.x : centerX,
+          rect.y + rect.height / 2 + outline.dy - c.height / 2,
+          code ? rect.x : centerX + outline.dx,
           code ? "start" : "middle",
         );
       }

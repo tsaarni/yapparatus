@@ -16,14 +16,17 @@ import {
 } from "../elements.ts";
 import {
   anchorOf,
-  boundaryToward,
   distance,
+  normalOf,
   pathLength,
   type Rect,
+  rayExit,
   round,
+  sideExit,
   type Vec,
 } from "../geometry.ts";
 import { corner, type Measure, type Metrics } from "../metrics.ts";
+import { attachment } from "../outlines.ts";
 import type { Layout } from "./layout.ts";
 import { type Report, textLine } from "./text.ts";
 
@@ -37,6 +40,20 @@ function endpointName(p: PointLike): string {
   const el = elementOf(p);
   if (!el) return "a point";
   return el instanceof Node ? el.label || el.id : el.id;
+}
+
+/**
+ * Where the line at a right angle to `side`, through `at` on that side, meets the circle of a dot
+ * or a ring drawn in `rect`.
+ */
+function circleExit(rect: Rect, side: Side, at: Vec): Vec {
+  const n = normalOf(side);
+  const rx = rect.width / 2;
+  const ry = rect.height / 2;
+  const c = { x: rect.x + rx, y: rect.y + ry };
+  const off = n.x ? (at.y - c.y) / ry : (at.x - c.x) / rx;
+  const reach = Math.sqrt(Math.max(0, 1 - off * off));
+  return n.x ? { x: c.x + n.x * rx * reach, y: at.y } : { x: at.x, y: c.y + n.y * ry * reach };
 }
 
 /** Drop consecutive points that coincide. */
@@ -212,32 +229,37 @@ export function createEdges(
 
   function snap(el: Element, rect: Rect, center: Vec, toward: Vec, route: Edge["route"]): Vec {
     const shape = el instanceof Node ? el.shape : "box";
+    const circular = shape === "dot" || shape === "ring";
     if (route === "straight") {
       const c = anchorOf(rect, "center");
-      const dx = toward.x - c.x;
-      const dy = toward.y - c.y;
-      if (shape === "diamond" && (dx || dy)) {
-        const t = 1 / (Math.abs(dx) / (rect.width / 2) + Math.abs(dy) / (rect.height / 2));
-        return { x: c.x + dx * t, y: c.y + dy * t };
+      const dir = { x: toward.x - c.x, y: toward.y - c.y };
+      if (!dir.x && !dir.y) return c;
+      if (shape === "cell" && el instanceof Node) return cellSide(el, rect, toward);
+      if (circular) {
+        const len = Math.hypot(dir.x, dir.y);
+        return {
+          x: c.x + (dir.x / len) * (rect.width / 2),
+          y: c.y + (dir.y / len) * (rect.height / 2),
+        };
       }
-      if (shape === "cell" && el instanceof Node && (dx || dy)) return cellSide(el, rect, toward);
-      if ((shape === "dot" || shape === "ring") && (dx || dy)) {
-        const len = Math.hypot(dx, dy);
-        return { x: c.x + (dx / len) * (rect.width / 2), y: c.y + (dy / len) * (rect.height / 2) };
-      }
-      return boundaryToward(rect, toward);
+      return rayExit(attachment(shape, rect), c, dir) ?? c;
     }
     const dx = toward.x - center.x;
     const dy = toward.y - center.y;
     const across = Math.abs(dx) >= Math.abs(dy);
-    const middle = across
-      ? anchorOf(rect, dx >= 0 ? "right" : "left")
-      : anchorOf(rect, dy >= 0 ? "bottom" : "top");
-    if (shape === "diamond" || shape === "dot" || shape === "ring") return middle;
+    const side: Side = across ? (dx >= 0 ? "right" : "left") : dy >= 0 ? "bottom" : "top";
+    const middle = anchorOf(rect, side);
     const within = (at: number, start: number, length: number) =>
       at >= start + corner.shape && at <= start + length - corner.shape;
-    if (across) return within(toward.y, rect.y, rect.height) ? { ...middle, y: toward.y } : middle;
-    return within(toward.x, rect.x, rect.width) ? { ...middle, x: toward.x } : middle;
+    const at = across
+      ? within(toward.y, rect.y, rect.height)
+        ? { ...middle, y: toward.y }
+        : middle
+      : within(toward.x, rect.x, rect.width)
+        ? { ...middle, x: toward.x }
+        : middle;
+    if (circular) return circleExit(rect, side, at);
+    return sideExit(attachment(shape, rect), rect, side, at) ?? at;
   }
 
   function arrowHead(route: Vec[], at: "start" | "end", open: boolean, curved: boolean) {

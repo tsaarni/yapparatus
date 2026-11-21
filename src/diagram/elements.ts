@@ -103,6 +103,9 @@ export type { Element };
 export type Shape =
   | "box"
   | "cylinder"
+  | "io"
+  | "doc"
+  | "queue"
   | "text"
   | "actor"
   | "note"

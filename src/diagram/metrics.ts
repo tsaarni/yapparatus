@@ -33,7 +33,7 @@ export interface Metrics {
   lineHeight: number;
   padX: number;
   padY: number;
-  /** Where the text of boxes, cylinders, decisions, and actors wraps when no width is fixed. */
+  /** Where the text of boxes, cylinders, queues, docs, ios, decisions, and actors wraps. */
   wrapWidth: number;
   /** Where notes, free text, and the labels of start and end dots wrap. */
   textWrapWidth: number;
@@ -70,6 +70,10 @@ export const defaultMetrics: Metrics = {
 export const shapes = {
   actor: { figure: 30, gap: 6 },
   note: { padX: 12, padY: 9, fold: 10 },
+  /** How far an input or output's top edge is shifted right of its bottom edge. */
+  io: { slant: 14 },
+  /** How far a document's wavy bottom rises above and dips below its bottom line. */
+  doc: { wave: 5 },
   record: { padX: 14, padY: 8, row: 26, cellPad: 8, tabGap: 16, ruler: 16, gutterPad: 8 },
   /** How far a mark's highlight reaches past its text. */
   mark: { linesPad: 5 },
@@ -107,7 +111,7 @@ export function fontsOf(m: Metrics) {
   };
 }
 
-/** Vertical radius of a cylinder's elliptical cap. */
+/** The short radius of a cylinder's elliptical cap, from its width; a queue's from its height. */
 export function cylinderCap(width: number): number {
   return Math.min(12, Math.max(6, width * 0.07));
 }

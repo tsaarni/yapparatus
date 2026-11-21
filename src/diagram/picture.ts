@@ -169,6 +169,14 @@ export function pictureOf(
         const { body, cap } = shape.cylinder(r);
         return `<path${attrs({ d: body, ...style })}/><ellipse${attrs({ ...cap, ...style })}/>`;
       }
+      case "queue": {
+        const { body, cap } = shape.queue(r);
+        return `<path${attrs({ d: body, ...style })}/><ellipse${attrs({ ...cap, ...style })}/>`;
+      }
+      case "io":
+        return `<polygon${attrs({ points: shape.pointList(shape.parallelogram(r)), ...style })}/>`;
+      case "doc":
+        return `<path${attrs({ d: shape.page(r), ...style })}/>`;
       case "actor": {
         const { head, body } = shape.actor(r);
         const figure = {
@@ -187,7 +195,7 @@ export function pictureOf(
         );
       }
       case "diamond":
-        return `<polygon${attrs({ points: shape.diamond(r), ...style })}/>`;
+        return `<polygon${attrs({ points: shape.pointList(shape.diamond(r)), ...style })}/>`;
       case "dot":
         return `<circle${attrs({ cx: r.x + r.width / 2, cy: r.y + r.height / 2, r: r.width / 2, fill: color.text })}/>`;
       case "ring": {
