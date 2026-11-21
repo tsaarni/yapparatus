@@ -73,22 +73,22 @@ test("a viaX or viaY that is not a number or a point is reported, and the edge i
     const c = d.box("C");
     d.column([a, b, c]);
     d.place(d.box("D"), { rightOf: b });
-    d.arrow(a, b, { route: { viaX: c as never } });
-    d.arrow(b, c, { route: { viaY: [0, 50] as never } });
+    d.arrow(a, b, { route: { viaX: "c" as never } });
+    d.arrow(b, c, { route: { viaY: [0, Number.NaN] } });
   });
   const wrong = out.diagnostics.filter((x) => x.code === "INVALID_ARGUMENT");
   assert.deepEqual(wrong, [
     {
       code: "INVALID_ARGUMENT",
       message:
-        "arrow a->b: route.viaX is c, but it takes a number or a point, such as grid.gutterX(0). The default is used.",
-      ids: ["a->b", "c"],
+        'arrow a->b: route.viaX is "c", but it takes a number or a point, a shape, a grid, an enclosure, or [x, y]. The default is used.',
+      ids: ["a->b"],
       subject: "route.viaX",
     },
     {
       code: "INVALID_ARGUMENT",
       message:
-        "arrow b->c: route.viaY is a list of 2, but it takes a number or a point, such as grid.gutterY(0). The default is used.",
+        "arrow b->c: route.viaY is a list of 2, but it takes a number or a point, a shape, a grid, an enclosure, or [x, y]. The default is used.",
       ids: ["b->c"],
       subject: "route.viaY",
     },

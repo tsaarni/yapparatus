@@ -146,6 +146,7 @@ export function validate(
     const to = endOf(edge.to);
     const self = elementOf(edge.from) !== undefined && elementOf(edge.from) === elementOf(edge.to);
     const last = compiled.points.length - 2;
+    const bent = typeof edge.route === "object" && "bend" in edge.route && edge.route.bend !== 0;
     for (const node of nodes) {
       if (node.shape === "mark" || node.passive) continue;
       if (compiled.stepOnly && node.stepOnly) continue;
@@ -158,7 +159,7 @@ export function validate(
       }
       const own = from.has(node.id) || to.has(node.id);
       const touches = (i: number) =>
-        (own && (self || edge.bend !== 0)) ||
+        (own && (self || bent)) ||
         (i === 0 && from.has(node.id)) ||
         (i === last && to.has(node.id));
       for (let i = 0; i < compiled.points.length - 1; i++) {
@@ -170,7 +171,7 @@ export function validate(
             "EDGE_NODE_INTERSECTION",
             own && !touches(i)
               ? `${compiled.id} runs through its own end ${node.id}. Use a straight route or another route form.`
-              : `${compiled.id} crosses ${node.id}. Route it (via, viaX, viaY), bend it, or move ${node.id}.`,
+              : `${compiled.id} crosses ${node.id}. Give it the route { viaX: x }, { viaY: y }, { via: [points] }, or { bend: units }, or move ${node.id}.`,
             [compiled.id, node.id],
           );
           break;
@@ -276,7 +277,7 @@ export function checkOverlaps(edges: CompiledEdge[], routes: Vec[][], report: Re
       if (shared > sharedLimit)
         report(
           "EDGE_OVERLAP",
-          `${a.id} and ${b.id} run on top of each other for ${round(shared)} units, so they read as one line. Give one a bend, attach one at a port(), or draw one edge with ends: "<->".`,
+          `${a.id} and ${b.id} run on top of each other for ${round(shared)} units, so they read as one line. Give one the route { bend: units }, attach one at a port(), or draw one edge with ends: "<->".`,
           [a.id, b.id],
         );
     }

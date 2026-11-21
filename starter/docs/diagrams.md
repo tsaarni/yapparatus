@@ -113,13 +113,13 @@ d.row([idle, busy], { gap: 160 })
 const start = d.start()
 d.place(start, { leftOf: idle, gap: 56 })
 d.arrow(start, idle)
-d.arrow(idle, busy, { label: "request", bend: 32 })
-d.arrow(busy, idle, { label: "done", bend: 32 })
-d.arrow(busy, busy, { label: "retry", loop: "top" })
+d.arrow(idle, busy, { label: "request", route: { bend: 32 } })
+d.arrow(busy, idle, { label: "done", route: { bend: 32 } })
+d.arrow(busy, busy, { label: "retry", route: { loop: "top" } })
 ```
 
-- Opposite transitions take the same `bend`, and curve apart.
-- `d.arrow(a, a)` loops; `loop` picks the side.
+- Opposite transitions take the same `bend` route, and curve apart.
+- `d.arrow(a, a)` loops on the right; the route `{ loop: side }` picks the side.
 
 ## Shapes
 
@@ -308,7 +308,7 @@ Derived points:
 
 ```ts
 d.arrow(from, to, "label")
-d.arrow(from, to, { id, label, route, bend, loop, role, category, dashed, ends, head, stepOnly })
+d.arrow(from, to, { id, label, route, role, category, dashed, ends, head, stepOnly })
 d.line(from, to, ...)   // the same, without arrowheads
 ```
 
@@ -319,9 +319,7 @@ d.line(from, to, ...)   // the same, without arrowheads
 |---|---|
 | `id` | See [Ids](#ids) |
 | `label` | A string, or a label's options, as below |
-| `route` | `"straight"` (default), `"hv"`, `"vh"`, `{ viaX: x }`, `{ viaY: y }`, `{ via: [p1, p2] }` |
-| `bend` | Curve this many units to the left of the direction of travel |
-| `loop` | For `d.arrow(a, a)`: the side of the loop. Default `right` |
+| `route` | `"straight"` (default), `"hv"`, `"vh"`, `{ viaX: x }`, `{ viaY: y }`, `{ via: [p1, p2] }`, `{ bend: units }`, `{ loop: side }` |
 | `ends` | `"->"` (default), `"<-"`, `"<->"`, `"--"` |
 | `head` | `"filled"` (default) for calls and flows, `"open"` for replies and async messages |
 | `dashed` | `true` for returns and optional paths |
@@ -331,14 +329,11 @@ d.line(from, to, ...)   // the same, without arrowheads
 Routes:
 
 - `"hv"` goes across, then down; `"vh"` goes down, then across.
-- `viaX` and `viaY` go through a channel at a given x or y. The value is a number or a point, such as a grid's gutter.
+- `viaX` and `viaY` go through a channel at a given x or y. The value is a number, or anything `via` takes: a point such as a grid's gutter, a shape for its center, or `[x, y]`.
 - `via` goes through the given points.
 - A route with corners leaves a shape at a right angle: in line with the first `via` point when the side reaches that far, and from the middle of the side otherwise. The last `via` point sets where it enters the other shape in the same way.
-
-Curves and loops:
-
-- Give an A→B edge and a B→A edge the same `bend`, and they curve apart.
-- `bend` cannot be combined with `route`.
+- `bend` curves the edge this many units to the left of the direction of travel. Give an A→B edge and a B→A edge the same `bend`, and they curve apart.
+- `loop` is the route of an edge from a shape to itself, `d.arrow(a, a)`, and leaves and returns on the given side. Such an edge has `{ loop: "right" }` unless it gives a side, and takes no other route.
 
 A label is a string or `{ text, segment, at, side, gap }`:
 
@@ -354,7 +349,7 @@ A label is a string or `{ text, segment, at, side, gap }`:
 - **Rows that line up are a grid.** Put shapes that share columns across rows in one `d.grid`, not in rows aligned with `place` or `at`.
 - **Elbows between columns use a gutter.** When several edges cross from one column to the next, route each through the grid's gutter: `route: { viaX: g.gutterX(0) }`. They then turn at one line instead of crossing each other.
 - **Edges that would cross a node go around it.** Route through a channel above or below, such as `route: { viaY: group.bottom.offset(0, 28) }`, and give the label the leg it belongs on with `segment`.
-- **Parallel edges between the same shapes** leave from offset points, such as `a.top.offset(40, 0)`, or curve apart with the same `bend`.
+- **Parallel edges between the same shapes** leave from offset points, such as `a.top.offset(40, 0)`, or curve apart with the same `bend` route.
 - **Enclosures name a boundary,** such as a process, a machine, or a network. Move the title with `titleAt` when an edge would cross it.
 - **Gaps carry meaning.** Use the defaults, and widen a gap only to make room for an edge label or to separate groups.
 
@@ -453,17 +448,16 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
 | `NOT_PLACEABLE` | error | An enclosure, a cell, or a mark is in a grid, row, or column, or placed. Position its members or its parent instead |
 | `UNKNOWN_OPTION` | error | A call has an option it does not take, so the option is ignored. The message lists the options it takes, the nearest first |
-| `INVALID_ARGUMENT` | error | A call has a value it cannot use, an option of another form, such as `anchor` with `below`, or an option that has no effect, such as `loop` between two shapes. The message names the call, the value, and the values it takes; the call uses the default or a stand-in |
+| `INVALID_ARGUMENT` | error | A call has a value it cannot use, an option of another form, such as `anchor` with `below`, an option that has no effect, or a route the edge cannot take, such as `{ loop: side }` between two shapes. The message names the call, the value, and the values it takes; the call uses the default or a stand-in |
 | `UNKNOWN_PARTICIPANT` | error | A sequence message or note names a shape that is not in the participants, so it is skipped. Add the shape to the participants |
 | `DRAW_FAILED` | error | The `draw` function threw, at the line given, uses a name it does not define, ran longer than 1 second, or created more than 2000 elements |
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
-| `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or use `loop` |
+| `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or draw a shape to itself, which loops |
 | `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |
 | `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are out of range. Mark a longer text or whole lines, or break the text's lines with `\n` |
 | `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
-| `BEND_WITH_ROUTE` | error | An edge has both `bend` and `route`. Keep one |
-| `EDGE_NODE_INTERSECTION` | warning | Route the edge (`viaX`, `viaY`, `via`), bend it, or move the shape. An edge that runs through its own end needs a straight route or another route form |
-| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one a `bend`, attach one at a `port()`, or draw one edge with `ends: "<->"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
+| `EDGE_NODE_INTERSECTION` | warning | Give the edge the route `{ viaX: x }`, `{ viaY: y }`, `{ via: [points] }`, or `{ bend: units }`, or move the shape. An edge that runs through its own end needs a straight route or another route form |
+| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one the route `{ bend: units }`, attach one at a `port()`, or draw one edge with `ends: "<->"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
 | `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Widen the gap |
 | `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `at`, or widen the gap |
 | `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements overlap only if one step shows both |

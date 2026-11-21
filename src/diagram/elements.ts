@@ -455,10 +455,14 @@ export type Route =
   /** Vertical first leg, then horizontal. */
   | "vh"
   | { via: PointLike[] }
-  /** Horizontal, then vertical along this x, then horizontal. */
-  | { viaX: number | Point }
-  /** Vertical, then horizontal along this y, then vertical. */
-  | { viaY: number | Point };
+  /** Horizontal, then vertical along this x, or the x of this point, then horizontal. */
+  | { viaX: number | PointLike }
+  /** Vertical, then horizontal along this y, or the y of this point, then vertical. */
+  | { viaY: number | PointLike }
+  /** Curve a straight edge this many units to its left, seen in the direction of travel. */
+  | { bend: number }
+  /** Leave and return on this side: the route of an edge from an element to itself. */
+  | { loop: Side };
 
 /** The side of an edge leg, or of a terminal's dot, where a label sits. */
 export type LabelSide = "above" | "below" | "left" | "right";
@@ -482,11 +486,8 @@ export type Ends = "->" | "<-" | "<->" | "--";
 export interface EdgeOptions {
   id?: string;
   label?: string | LabelOptions;
+  /** Default: `{ loop: "right" }` from an element to itself, else `"straight"`. */
   route?: Route;
-  /** Curve a straight edge this many units to its left, seen in the direction of travel. */
-  bend?: number;
-  /** The side a self-loop (`d.arrow(a, a)`) leaves from. Default: right. */
-  loop?: Side;
   role?: Role;
   /**
    * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
@@ -517,8 +518,6 @@ export class Edge {
   readonly from: PointLike;
   readonly to: PointLike;
   readonly route: Route;
-  readonly bend: number;
-  readonly loop: Side;
   readonly role: Role;
   readonly category: string | undefined;
   readonly dashed: boolean;
@@ -537,9 +536,7 @@ export class Edge {
     this.explicitId = options.id !== undefined;
     this.from = from;
     this.to = to;
-    this.route = options.route ?? "straight";
-    this.bend = options.bend ?? 0;
-    this.loop = options.loop ?? "right";
+    this.route = options.route ?? defaultRoute(from, to);
     this.role = options.role ?? "default";
     this.category = options.category;
     this.dashed = options.dashed ?? false;
@@ -637,6 +634,16 @@ export function xy(x: PointLike, y: PointLike): Point {
 /** The point between `a` and `b` by linear interpolation: t = 0 at a, 1 at b. */
 export function lerp(a: PointLike, b: PointLike, t = 0.5): Point {
   return new Point({ k: "lerp", a: toExpr(a), b: toExpr(b), t });
+}
+
+/** Whether an edge goes from an element to itself: both ends are the same element object. */
+export function isSelfEdge(from: PointLike, to: PointLike): boolean {
+  return from === to && !(from instanceof Point) && !Array.isArray(from);
+}
+
+/** The route of an edge that gives none. */
+export function defaultRoute(from: PointLike, to: PointLike): Route {
+  return isSelfEdge(from, to) ? { loop: "right" } : "straight";
 }
 
 /** The element a point is derived from: offset → base, xy → x, lerp → a. */

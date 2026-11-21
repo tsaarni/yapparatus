@@ -148,16 +148,17 @@ test("a diagram problem's subject joins its element ids and its option", async (
   const a = d.box("A")
   const b = d.box("B")
   d.column([a, b, d.box("A", { replicas: 9 })])
-  d.arrow(a, b, { route: { viaX: b } })
-  d.arrow(b, a, { route: { viaX: a }, bend: 20 })
+  d.arrow(a, b, { route: { loop: "top" } })
+  d.arrow(b, b, { route: "hv", bend: 20 })
 }} />
 `);
   assert.deepEqual(
     issues.map(({ code, subject, elements }) => ({ code, subject, elements })),
     [
       { code: "INVALID_ARGUMENT", subject: "a-2 replicas", elements: ["a-2"] },
-      { code: "INVALID_ARGUMENT", subject: "a->b,b route.viaX", elements: ["a->b", "b"] },
-      { code: "INVALID_ARGUMENT", subject: "b->a,a route.viaX", elements: ["b->a", "a"] },
+      { code: "INVALID_ARGUMENT", subject: "a->b route", elements: ["a->b"] },
+      { code: "UNKNOWN_OPTION", subject: "b->b bend", elements: ["b->b"] },
+      { code: "INVALID_ARGUMENT", subject: "b->b route", elements: ["b->b"] },
     ],
   );
 });

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
-import type { BoxOptions, Node } from "../../../src/diagram/elements.ts";
+import type { BoxOptions, Node, Route } from "../../../src/diagram/elements.ts";
 import { type Rect, round } from "../../../src/diagram/geometry.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { attachment, stack } from "../../../src/diagram/outlines.ts";
@@ -1320,14 +1320,14 @@ test("arrow takes its label as a string; a sequence is one placeable element", (
   );
 });
 
-test("bend curves an edge to the left of travel with the label outside", () => {
+test("a bend route curves an edge to the left of travel with the label outside", () => {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.row([a, b], { gap: 120 });
-  const there = d.arrow(a, b, { label: "go", bend: 20 });
-  const back = d.arrow(b, a, { label: "return", bend: 20 });
+  const there = d.arrow(a, b, { label: "go", route: { bend: 20 } });
+  const back = d.arrow(b, a, { label: "return", route: { bend: 20 } });
   const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const go = out.edges.find((e) => e.id === there.id);
@@ -1341,23 +1341,113 @@ test("bend curves an edge to the left of travel with the label outside", () => {
   assert.ok((go.labels[0]?.rect.y ?? 0) + (go.labels[0]?.rect.height ?? 0) <= top(go) + 1);
 });
 
-test("a self-loop leaves and returns on one side; bend with a route is an error", () => {
+test("a self-loop leaves and returns on the side of its loop route, by default the right", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const s = d.box("Running");
+  d.row([s, d.box("Stopped")]);
+  const tick = d.arrow(s, s, { label: "tick", route: { loop: "top" } });
+  const tock = d.arrow(s, s, "tock");
+  const out = compile(scene, lookups);
+  assert.deepEqual(codes(out), []);
+  const r = out.nodes[0]?.rect;
+  const top = out.edges.find((e) => e.id === tick.id);
+  const right = out.edges.find((e) => e.id === tock.id);
+  assert.ok(r && top && right);
+  assert.ok(
+    top.points.every((p) => p.y <= r.y + 0.01),
+    "the loop stays above the node",
+  );
+  assert.ok(
+    right.points.every((p) => p.x >= r.x + r.width - 0.01),
+    "the default loop stays right of the node",
+  );
+});
+
+test("a loop route between two shapes, or another route on a self edge, is replaced", () => {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
   const s = d.box("Running");
   const t = d.box("Stopped");
-  d.row([s, t]);
-  const tick = d.arrow(s, s, { label: "tick", loop: "top" });
-  d.arrow(s, t, { bend: 10, route: "hv" });
+  d.row([s, t], { gap: 60 });
+  d.arrow(s, t, { route: { loop: "top" } });
+  d.arrow(s, s, { route: "hv" });
+  d.arrow(t, t, { route: { bend: 20 } });
   const out = compile(scene, lookups);
-  const r = out.nodes[0]?.rect;
-  const loop = out.edges.find((e) => e.id === tick.id);
-  assert.ok(r && loop);
-  assert.ok(
-    loop.points.every((p) => p.y <= r.y + 0.01),
-    "the loop stays above the node",
+  assert.deepEqual(
+    out.diagnostics.map(({ code, ids, subject, message }) => ({ code, ids, subject, message })),
+    [
+      {
+        code: "INVALID_ARGUMENT",
+        ids: ["running->stopped"],
+        subject: "route",
+        message:
+          'arrow running->stopped: route is { loop }, but only an edge from an element to itself takes { loop: side }. "straight" stands in.',
+      },
+      {
+        code: "INVALID_ARGUMENT",
+        ids: ["running->running"],
+        subject: "route",
+        message:
+          'arrow running->running: route is "hv", but the edge goes from running to itself and takes only { loop: side }. { loop: "right" } stands in.',
+      },
+      {
+        code: "INVALID_ARGUMENT",
+        ids: ["stopped->stopped"],
+        subject: "route",
+        message:
+          'arrow stopped->stopped: route is { bend }, but the edge goes from stopped to itself and takes only { loop: side }. { loop: "right" } stands in.',
+      },
+    ],
   );
-  assert.ok(codes(out).includes("BEND_WITH_ROUTE"));
+  const [straight, ...loops] = out.edges;
+  assert.equal(straight?.points.length, 2, "the edge between two shapes is straight");
+  for (const [edge, node] of loops.map((e, i) => [e, out.nodes[i]] as const))
+    assert.ok(
+      edge.points.every((p) => node && p.x >= node.rect.x + node.rect.width - 0.01),
+      `${edge.id} loops on the right`,
+    );
+});
+
+test("viaX and viaY take a number, a point, an element's center, or [x, y]", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = sized(d, "a", 40, 40);
+  const b = sized(d, "b", 40, 40);
+  const mid = sized(d, "mid", 20, 20);
+  d.grid(
+    [
+      [a, null],
+      [null, mid],
+      [null, b],
+    ],
+    { gap: 40 },
+  );
+  const routes: Route[] = [
+    { viaX: 150 },
+    { viaX: mid },
+    { viaX: [150, 0] },
+    { viaX: mid.center },
+    { viaY: mid },
+    { viaY: [0, 110] },
+  ];
+  for (const route of routes) d.arrow(a, b, { route });
+  const out = compile(scene, lookups);
+  const mids = rects(out).mid;
+  assert.ok(mids);
+  const cx = mids.x + mids.width / 2;
+  const cy = mids.y + mids.height / 2;
+  assert.deepEqual(
+    out.edges.map((e) => e.points[1]),
+    [
+      { x: 150, y: 20 },
+      { x: cx, y: 20 },
+      { x: 150, y: 20 },
+      { x: cx, y: 20 },
+      { x: 20, y: cy },
+      { x: 20, y: 110 },
+    ],
+  );
 });
 
 test("an enclosure title can sit in any corner", () => {
@@ -1598,7 +1688,7 @@ test("a head with too little room shrinks and is reported; a curve carries a ful
   const c = d.box("C");
   const e = d.box("E");
   d.place(d.row([c, e]), { below: a });
-  const curved = d.arrow(c, e, { bend: 20 });
+  const curved = d.arrow(c, e, { route: { bend: 20 } });
   const out = compile(scene, lookups);
   const crowded = out.diagnostics.filter((x) => x.code === "HEAD_CROWDED");
   assert.deepEqual(
@@ -1656,7 +1746,11 @@ function overlapsIn(edges: (d: DiagramBuilder, s1: Node, s2: Node, t: Node, u: N
   const out = compile(scene, lookups);
   const overlaps = out.diagnostics.filter((x) => x.code === "EDGE_OVERLAP");
   if (overlaps[0])
-    assert.match(overlaps[0].message, /bend.*port\(\).*ends: "<->"/, "the message names the fixes");
+    assert.match(
+      overlaps[0].message,
+      /\{ bend: units \}.*port\(\).*ends: "<->"/,
+      "the message names the fixes",
+    );
   return overlaps.map((x) => x.ids);
 }
 

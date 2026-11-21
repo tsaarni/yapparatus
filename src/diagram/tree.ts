@@ -33,7 +33,7 @@ export interface TreeOptions {
   /** Space between a parent and its children. Default: 48. `indent` uses `gap` instead. */
   levelGap?: number;
   /** Options of every line, such as `ends`, `dashed`, or `role`. */
-  edge?: Omit<EdgeOptions, "id" | "label" | "route" | "bend" | "loop">;
+  edge?: Omit<EdgeOptions, "id" | "label" | "route">;
 }
 
 /** The direction one subtree grows in; `left` is `right` mirrored, for the left half of `both`. */

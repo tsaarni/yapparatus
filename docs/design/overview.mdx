@@ -147,7 +147,7 @@ The source code is split into directories. Code in each directory runs in Node, 
   const shared = d.enclose([lower, doc], { id: "shared", title: "Shared code", titleAt: "bottomLeft" })
   d.arrow(vite, server)
   d.arrow(server, compiler)
-  d.arrow(vite, compiler, { bend: 40 })
+  d.arrow(vite, compiler, { route: { bend: 40 } })
   d.arrow(web.bottom, shared.left, { route: "vh" })
   for (const from of [vite, server, compiler]) d.arrow(from.bottom, d.xy(from.bottom, shared.top))
   d.arrow(agent, protocol)

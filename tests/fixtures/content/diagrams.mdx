@@ -128,9 +128,9 @@ Fixture page for browser tests. It draws one figure of each form in the diagram 
   const start = d.start()
   d.place(start, { leftOf: idle, gap: 56 })
   d.arrow(start, idle)
-  d.arrow(idle, busy, { label: "request", bend: 32 })
-  d.arrow(busy, idle, { label: "done", bend: 32 })
-  d.arrow(busy, busy, { label: "retry", loop: "top" })
+  d.arrow(idle, busy, { label: "request", route: { bend: 32 } })
+  d.arrow(busy, idle, { label: "done", route: { bend: 32 } })
+  d.arrow(busy, busy, { label: "retry", route: { loop: "top" } })
 }} />
 
 <Diagram id="report-flow" caption="Input, a queue, replicated workers with an icon, reports, and their reader." draw={(d) => {

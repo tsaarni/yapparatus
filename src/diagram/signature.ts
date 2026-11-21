@@ -53,10 +53,9 @@ interface Plain extends Described {
   kind: "text" | "boolean" | "function" | "empty";
 }
 
-/** A point: with `strict`, only a point object, else also an element or `[x, y]`. */
+/** A point, or an element or `[x, y]`, which stand for points. */
 interface PointValue extends Described {
   kind: "point";
-  strict: boolean;
 }
 
 /** An element of the given kinds. A frame is none of them. */
@@ -197,15 +196,9 @@ export const empty: Value = { kind: "empty", noun: "null", nouns: "null" };
 /** A point, or an element or `[x, y]`, which stand for points. */
 export const point: Value = {
   kind: "point",
-  strict: false,
   noun: "a point, a shape, a grid, an enclosure, or [x, y]",
   nouns: "points, shapes, grids, enclosures, or [x, y]",
 };
-
-/** Only a point object, such as a grid's gutter. */
-export function pointObject(example: string): Value {
-  return { kind: "point", strict: true, noun: `a point, such as ${example}`, nouns: "points" };
-}
 
 /** An element of the given kinds. */
 export function element(...of: ElementKind[]): Value {
@@ -386,11 +379,10 @@ function accepts(takes: Value, value: unknown): boolean {
     case "point":
       return (
         value instanceof Point ||
-        (!takes.strict &&
-          (isElement(value, ["shape", "grid", "enclosure"]) ||
-            (Array.isArray(value) &&
-              value.length === 2 &&
-              value.every((n) => typeof n === "number" && Number.isFinite(n)))))
+        isElement(value, ["shape", "grid", "enclosure"]) ||
+        (Array.isArray(value) &&
+          value.length === 2 &&
+          value.every((n) => typeof n === "number" && Number.isFinite(n)))
       );
     case "element":
       return isElement(value, takes.of);
@@ -493,6 +485,11 @@ export class CallCheck {
   /** Report a value that the call takes but that has no effect here, and why. */
   ignore(path: string, given: unknown, why: () => string) {
     this.#problem("INVALID_ARGUMENT", path, given, () => `${why()} ${ignored}`);
+  }
+
+  /** Report a value that the call cannot use in its form; `why` says what stands in for it. */
+  replace(path: string, given: unknown, why: () => string) {
+    this.#problem("INVALID_ARGUMENT", path, given, why);
   }
 
   /** Record a problem, which `done` reports. */

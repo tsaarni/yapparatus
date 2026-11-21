@@ -49,7 +49,6 @@ import {
   optional,
   options,
   point,
-  pointObject,
   type Signature,
   standIn,
   text,
@@ -132,12 +131,20 @@ const route = either(
     { required: ["via"], tag: "via", noun: "{ via: [points] }" },
   ),
   options<Extract<Route, { viaX: unknown }>>()(
-    { viaX: either(number(), pointObject("grid.gutterX(0)")) },
+    { viaX: either(number(), point) },
     { required: ["viaX"], tag: "viaX", noun: "{ viaX: x }" },
   ),
   options<Extract<Route, { viaY: unknown }>>()(
-    { viaY: either(number(), pointObject("grid.gutterY(0)")) },
+    { viaY: either(number(), point) },
     { required: ["viaY"], tag: "viaY", noun: "{ viaY: y }" },
+  ),
+  options<Extract<Route, { bend: unknown }>>()(
+    { bend: number() },
+    { required: ["bend"], tag: "bend", noun: "{ bend: units }" },
+  ),
+  options<Extract<Route, { loop: unknown }>>()(
+    { loop: side },
+    { required: ["loop"], tag: "loop", noun: "{ loop: side }" },
   ),
 );
 /** How an edge is drawn, which a tree's lines share. */
@@ -157,8 +164,6 @@ const edgeOptions = either(
     id: text,
     label: edgeLabel,
     route,
-    bend: number(),
-    loop: side,
   }),
 );
 

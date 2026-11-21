@@ -5,15 +5,18 @@
 import {
   type BoxOptions,
   type Cell,
+  defaultRoute,
   Edge,
   type EdgeOptions,
   type Element,
   type EncloseOptions,
   type Enclosure,
+  elementOf,
   type Frame,
   type FrameOptions,
   type Grid,
   type GridOptions,
+  isSelfEdge,
   type LineOptions,
   lerp,
   type MarkOptions,
@@ -315,7 +318,7 @@ export class DiagramBuilder {
   }
   /**
    * An edge of the author's, over the call's defaults. With an end it cannot use it is left out.
-   * An option that the edge's form ignores is reported.
+   * An option that the edge's form ignores is reported, and a route it cannot take is replaced.
    */
   #edge(
     signature: Signature,
@@ -336,19 +339,15 @@ export class DiagramBuilder {
       call.done([], [from, to].filter(isNamed));
       return new Edge(from as PointLike, to as PointLike, full);
     }
-    const edge = this.#scene.addEdge(a, b, full);
-    const self = a === b && !(a instanceof Point) && !Array.isArray(a);
-    const loop = () => `${edge.id} goes from an element to itself, which loop draws`;
-    if (self) {
-      for (const key of ["route", "bend"] as const)
-        if (given[key] !== undefined)
-          call.ignore(key, given[key], () => `${key} is ${quote(given[key])}, but ${loop()}.`);
-    } else if (given.loop !== undefined)
-      call.ignore(
-        "loop",
-        given.loop,
-        () =>
-          `loop is ${quote(given.loop)}, but loop draws only an edge from an element to itself.`,
+    const self = isSelfEdge(a, b);
+    const route = given.route;
+    const fits = route === undefined || (typeof route === "object" && "loop" in route) === self;
+    const edge = this.#scene.addEdge(a, b, fits ? full : { ...full, route: defaultRoute(a, b) });
+    if (!fits)
+      call.replace("route", route, () =>
+        self
+          ? `route is ${quote(route)}, but the edge goes from ${elementOf(a)?.id} to itself and takes only { loop: side }. { loop: "right" } stands in.`
+          : `route is ${quote(route)}, but only an edge from an element to itself takes { loop: side }. "straight" stands in.`,
       );
     if (full.ends === "--" && given.head !== undefined)
       call.ignore(

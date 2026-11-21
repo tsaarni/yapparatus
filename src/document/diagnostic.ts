@@ -102,7 +102,6 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A record cell spans more columns than remain in its row.",
   },
-  BEND_WITH_ROUTE: { severity: "error", meaning: "An edge sets both bend and route." },
   DEGENERATE_EDGE: { severity: "error", meaning: "An edge starts and ends at the same point." },
   PLACEMENT_CYCLE: {
     severity: "error",

@@ -367,7 +367,7 @@ export class DiagramBuilder {
   }
   /**
    * An edge of the author's, over the call's defaults. With an end it cannot use it is left out.
-   * An option that the edge's form ignores is reported.
+   * An option that the edge's form ignores is reported, and a route it cannot take is replaced.
    */
   #edge(
     signature: Signature,
@@ -388,19 +388,15 @@ export class DiagramBuilder {
       call.done([], [from, to].filter(isNamed));
       return new Edge(from as PointLike, to as PointLike, full);
     }
-    const edge = this.#scene.addEdge(a, b, full);
-    const self = a === b && !(a instanceof Point) && !Array.isArray(a);
-    const loop = () => `${edge.id} goes from an element to itself, which loop draws`;
-    if (self) {
-      for (const key of ["route", "bend"] as const)
-        if (given[key] !== undefined)
-          call.ignore(key, given[key], () => `${key} is ${quote(given[key])}, but ${loop()}.`);
-    } else if (given.loop !== undefined)
-      call.ignore(
-        "loop",
-        given.loop,
-        () =>
-          `loop is ${quote(given.loop)}, but loop draws only an edge from an element to itself.`,
+    const self = isSelfEdge(a, b);
+    const route = given.route;
+    const fits = route === undefined || (typeof route === "object" && "loop" in route) === self;
+    const edge = this.#scene.addEdge(a, b, fits ? full : { ...full, route: defaultRoute(a, b) });
+    if (!fits)
+      call.replace("route", route, () =>
+        self
+          ? `route is ${quote(route)}, but the edge goes from ${elementOf(a)?.id} to itself and takes only { loop: side }. { loop: "right" } stands in.`
+          : `route is ${quote(route)}, but only an edge from an element to itself takes { loop: side }. "straight" stands in.`,
       );
     if (full.ends === "--" && given.head !== undefined)
       call.ignore(
@@ -500,11 +496,8 @@ export interface DocumentSettings {
 export interface EdgeOptions {
   id?: string;
   label?: string | LabelOptions;
+  /** Default: `{ loop: "right" }` from an element to itself, else `"straight"`. */
   route?: Route;
-  /** Curve a straight edge this many units to its left, seen in the direction of travel. */
-  bend?: number;
-  /** The side a self-loop (`d.arrow(a, a)`) leaves from. Default: right. */
-  loop?: Side;
   role?: Role;
   /**
    * What sets this element apart, in a few words, such as "New" or "To be removed". Elements with
@@ -707,10 +700,14 @@ export type Route =
   /** Vertical first leg, then horizontal. */
   | "vh"
   | { via: PointLike[] }
-  /** Horizontal, then vertical along this x, then horizontal. */
-  | { viaX: number | Point }
-  /** Vertical, then horizontal along this y, then vertical. */
-  | { viaY: number | Point };
+  /** Horizontal, then vertical along this x, or the x of this point, then horizontal. */
+  | { viaX: number | PointLike }
+  /** Vertical, then horizontal along this y, or the y of this point, then vertical. */
+  | { viaY: number | PointLike }
+  /** Curve a straight edge this many units to its left, seen in the direction of travel. */
+  | { bend: number }
+  /** Leave and return on this side: the route of an edge from an element to itself. */
+  | { loop: Side };
 
 export type Row = Record<string, number | string | Date | null>;
 
@@ -829,7 +826,7 @@ export interface TreeOptions {
   /** Space between a parent and its children. Default: 48. `indent` uses `gap` instead. */
   levelGap?: number;
   /** Options of every line, such as `ends`, `dashed`, or `role`. */
-  edge?: Omit<EdgeOptions, "id" | "label" | "route" | "bend" | "loop">;
+  edge?: Omit<EdgeOptions, "id" | "label" | "route">;
 }
 ```
 

@@ -11,6 +11,7 @@ import {
   Node,
   Point,
   type PointLike,
+  type Route,
   type Side,
   toExpr,
 } from "../elements.ts";
@@ -94,15 +95,12 @@ export function createEdges(
   function compileEdge(edge: Edge): { compiled: CompiledEdge; route: Vec[] } {
     const fromEl = edge.from instanceof Point || Array.isArray(edge.from) ? undefined : edge.from;
     const toEl = edge.to instanceof Point || Array.isArray(edge.to) ? undefined : edge.to;
+    const r = edge.route;
     let shape: { points: Vec[]; label: Partial<LabelOptions>; radius: number };
-    if (fromEl && fromEl === toEl) shape = loop(bounds(fromEl), edge.loop);
-    else if (edge.bend) {
-      if (edge.route !== "straight")
-        report("BEND_WITH_ROUTE", `${edge.id} has both bend and route; use one of them.`, [
-          edge.id,
-        ]);
-      shape = curve(edge, fromEl, toEl);
-    } else shape = { points: routed(edge, fromEl, toEl), label: {}, radius: corner.edge };
+    if (typeof r === "object" && "loop" in r && fromEl) shape = loop(bounds(fromEl), r.loop);
+    else if (typeof r === "object" && "bend" in r && r.bend)
+      shape = curve(edge, r.bend, fromEl, toEl);
+    else shape = { points: routed(edge, fromEl, toEl), label: {}, radius: corner.edge };
     const points = dedupe(shape.points);
     const heads: Vec[][] = [];
     const base: Omit<CompiledEdge, "labels" | "ariaLabel"> = {
@@ -150,15 +148,17 @@ export function createEdges(
     let start = raw(edge.from);
     let end = raw(edge.to);
     const middle: Vec[] = [];
-    const r = edge.route;
+    const given = edge.route;
+    const r =
+      typeof given === "object" && ("bend" in given || "loop" in given) ? "straight" : given;
     if (r === "hv") middle.push({ x: end.x, y: start.y });
     else if (r === "vh") middle.push({ x: start.x, y: end.y });
     else if (typeof r === "object" && "via" in r) middle.push(...r.via.map(raw));
     else if (typeof r === "object" && "viaX" in r) {
-      const x = typeof r.viaX === "number" ? r.viaX : evalPoint(r.viaX.expr).x;
+      const x = typeof r.viaX === "number" ? r.viaX : raw(r.viaX).x;
       middle.push({ x, y: start.y }, { x, y: end.y });
     } else if (typeof r === "object" && "viaY" in r) {
-      const y = typeof r.viaY === "number" ? r.viaY : evalPoint(r.viaY.expr).y;
+      const y = typeof r.viaY === "number" ? r.viaY : raw(r.viaY).y;
       middle.push({ x: start.x, y }, { x: end.x, y });
     }
     if (fromEl) start = snap(fromEl, bounds(fromEl), start, middle[0] ?? end, r);
@@ -168,14 +168,14 @@ export function createEdges(
     return [start, ...middle, end];
   }
 
-  function curve(edge: Edge, fromEl?: Element, toEl?: Element) {
+  function curve(edge: Edge, bend: number, fromEl?: Element, toEl?: Element) {
     const a = evalPoint(toExpr(edge.from));
     const b = evalPoint(toExpr(edge.to));
     const len = distance(a, b) || 1;
     const normal = { x: (b.y - a.y) / len, y: -(b.x - a.x) / len };
     const control = {
-      x: (a.x + b.x) / 2 + normal.x * 2 * edge.bend,
-      y: (a.y + b.y) / 2 + normal.y * 2 * edge.bend,
+      x: (a.x + b.x) / 2 + normal.x * 2 * bend,
+      y: (a.y + b.y) / 2 + normal.y * 2 * bend,
     };
     const start = fromEl ? snap(fromEl, bounds(fromEl), a, control, "straight") : a;
     const end = toEl ? snap(toEl, bounds(toEl), b, control, "straight") : b;
@@ -188,7 +188,7 @@ export function createEdges(
         y: u * u * start.y + 2 * u * t * control.y + t * t * end.y,
       });
     }
-    const out = { x: normal.x * Math.sign(edge.bend), y: normal.y * Math.sign(edge.bend) };
+    const out = { x: normal.x * Math.sign(bend), y: normal.y * Math.sign(bend) };
     const side: LabelOptions["side"] =
       Math.abs(out.y) >= Math.abs(out.x)
         ? out.y < 0
@@ -230,7 +230,7 @@ export function createEdges(
     };
   }
 
-  function snap(el: Element, rect: Rect, center: Vec, toward: Vec, route: Edge["route"]): Vec {
+  function snap(el: Element, rect: Rect, center: Vec, toward: Vec, route: Route): Vec {
     const shape = el instanceof Node ? el.shape : "box";
     const form = { shape, replicas: el instanceof Node ? el.options.replicas : undefined };
     const circular = shape === "dot" || shape === "ring";

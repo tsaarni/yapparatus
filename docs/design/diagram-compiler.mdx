@@ -155,7 +155,8 @@ One check runs every call against its signature before the call records anything
 - `UNKNOWN_OPTION`: the call does not take the option. The message lists the options the call takes, the nearest first when the name is a few edits away, and the option is ignored.
 - `INVALID_ARGUMENT`: the value is not one the argument or the option takes. The message names the call, the value, and the values it takes. The option's default is used. An argument has a stand-in, such as empty text for a label or an empty list for a list, or the call leaves out what it cannot make, such as an edge with an end that is not an element or a point. An item of a list that is not one of the list's values is left out, and an empty cell stands in for a grid's cell.
 - A call with several forms takes exactly one form key and only the options of that form. `place()` takes one of `below`, `above`, `leftOf`, `rightOf`, and `at`; the first four take `gap` and `align`, and `at` takes `anchor`. A mark takes one of `text` and `lines`, and a sequence message at most one of `reply` and `async`. No form key, a second one, and an option of another form are `INVALID_ARGUMENT`. A `place()` without a form, or without its options, is ignored.
-- An option that the call takes but that has no effect in its form is `INVALID_ARGUMENT` and is ignored: `loop` on an edge between two elements, `route` or `bend` on an edge from an element to itself, `head` on an edge without arrowheads, `side` on a start or end without a label, `titleAt` on an enclosure without a title, `levelGap` in the `indent` layout of a tree, and `reply` or `async` on a message from a participant to itself.
+- An option that the call takes but that has no effect in its form is `INVALID_ARGUMENT` and is ignored: `head` on an edge without arrowheads, `side` on a start or end without a label, `titleAt` on an enclosure without a title, `levelGap` in the `indent` layout of a tree, and `reply` or `async` on a message from a participant to itself.
+- A route that the edge cannot take is `INVALID_ARGUMENT`, and the edge's default route stands in: a route other than `loop` on an edge from an element to itself, and a `loop` route on any other edge.
 
 The diagnostic's subject is the path of the argument or option, such as `role`, `label.side`, or `steps[2].label`, so two problems on one element are two diagnostics. A frame is not an element, so a frame given where an element or a point is due is `INVALID_ARGUMENT`.
 
@@ -307,7 +308,16 @@ Routing turns each edge into a list of points, its arrowheads, and its label box
 
 ### Routes
 
-Each edge has a route form, and the compiler adds the corners that the form needs between the two ends. <Ref to="dc-routes" /> shows the forms: a straight line, one elbow, a channel at a given x or y, a list of points, a curve, and a loop.
+Each edge has one route, which carries all of its geometry between the two ends. The route is one of these forms, and the compiler adds the corners or the curve that the form needs:
+
+- `"straight"`: one line. It is the default.
+- `"hv"` and `"vh"`: one elbow, across first or down first.
+- `{ viaX: x }` and `{ viaY: y }`: a channel at a given x or y. The value is a number, or anything `via` takes, of which the channel uses the x or the y. An element stands for its center.
+- `{ via: [points] }`: a list of points.
+- `{ bend: units }`: a curve that bows this many units to the left of the direction of travel. A bend of 0 is straight.
+- `{ loop: side }`: a loop that leaves and returns on one side of an element.
+
+An edge goes from an element to itself when both ends are the same element. Ends given as points on one element, such as `a.top` and `a.bottom`, are two points, so that edge is routed between them like any other. An edge from an element to itself has the route `{ loop: "right" }` unless it gives a `loop` route, and only such an edge takes `loop`. <Ref to="dc-routes" /> shows the forms.
 
 <Diagram id="dc-routes" caption="The route forms, a curve, and loops." draw={(d) => {
   const panel = (title, draw) => {
@@ -327,12 +337,12 @@ Each edge has a route form, and the compiler adds the corners that the form need
     [
       panel("via", (a, b) => d.arrow(a, b, { id: "via-edge", route: { via: [a.right.offset(24, 0), b.top.offset(0, -24)] } })),
       panel("bend", (a, b) => {
-        d.arrow(a, b, { id: "bend-ab", bend: 20 })
-        d.arrow(b, a, { id: "bend-ba", bend: 20 })
+        d.arrow(a, b, { id: "bend-ab", route: { bend: 20 } })
+        d.arrow(b, a, { id: "bend-ba", route: { bend: 20 } })
       }),
       panel("loop", (a, b) => {
         d.arrow(a, a, { id: "self-a" })
-        d.arrow(b, b, { id: "self-b", loop: "left" })
+        d.arrow(b, b, { id: "self-b", route: { loop: "left" } })
       }),
     ],
   ], { gap: [80, 102] })
@@ -423,7 +433,7 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 | Record | `UNKNOWN_OPTION`, `INVALID_ARGUMENT`, `UNKNOWN_PARTICIPANT`, `NOT_PLACEABLE`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT`, `UNKNOWN_GUTTER` |
 | Settle ids | `DUPLICATE_ID`, `UNPLACED` |
 | Measure, size, and place | `INVALID_ARGUMENT`, `UNKNOWN_ICON`, `TEXT_OVERFLOW`, `FIXED_SIZE_IN_GROUP`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
-| Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED`, `HEAD_CROWDED` |
+| Route | `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED`, `HEAD_CROWDED` |
 | Check | `NODE_OVERLAP`, `EDGE_NODE_INTERSECTION`, `EDGE_OVERLAP`, `LABEL_OVERLAP`, `ENCLOSURE_TITLE_CROSSED`, `ENCLOSURE_INTRUSION`, `ACCENT_OVERUSED` |
 | Finish | `TOO_MANY_CATEGORIES`, `DUPLICATE_ID`, `DIAGRAM_FAILED` |
 | Check steps | `UNKNOWN_ELEMENT`, `DUPLICATE_ID`, `STEP_ONLY_UNUSED`, `NODE_OVERLAP`, `BUILD_WITHOUT_STEPS`, `DIAGRAM_SCROLLS` |
@@ -434,9 +444,9 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 
 The collision checks run on the exact geometry, before rounding. Two rectangles overlap only when they share more than half a unit in both directions, and an edge hits a shape only when it passes more than one unit inside it. Shapes that touch, and an edge that ends on an outline, are therefore not reported. Edges also keep eight units away from enclosure titles.
 
-The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. Free text is checked like any shape, because it has no fill and an edge through it shows through the words. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and a self-loop or a bent edge is not checked against its ends.
+The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. Free text is checked like any shape, because it has no fill and an edge through it shows through the words. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and an edge whose two ends are on one element, or that has a `bend` route, is not checked against its ends.
 
-Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel such as a grid's gutter, and an edge that lies wholly on another are reported. The fixes are a `bend`, a `port()`, or one edge with `ends: "<->"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
+Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel such as a grid's gutter, and an edge that lies wholly on another are reported. The fixes are the route `{ bend: units }`, a `port()`, or one edge with `ends: "<->"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
 
 ### Steps and width
 

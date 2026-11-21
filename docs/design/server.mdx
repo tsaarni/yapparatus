@@ -125,11 +125,11 @@ The server computes the agent state from the agent's requests and two time limit
   d.row([away, waiting, working], { gap: 260 })
   d.place(start, { leftOf: away, gap: 56 })
   d.arrow(start, away)
-  d.arrow(away, waiting, { id: "connect", label: "read opens,\nor reply accepted", bend: 36 })
-  d.arrow(waiting, away, { id: "stop", label: "read closed unanswered,\nor 10 s without a read", bend: 36 })
-  d.arrow(waiting, waiting, { id: "idle", label: "empty read;\nthe next read follows", loop: "top" })
-  d.arrow(waiting, working, { id: "deliver", label: "read returns\nmessages or errors", bend: 36 })
-  d.arrow(working, waiting, { id: "answer", label: "read opens,\nor reply accepted", bend: 36 })
+  d.arrow(away, waiting, { id: "connect", label: "read opens,\nor reply accepted", route: { bend: 36 } })
+  d.arrow(waiting, away, { id: "stop", label: "read closed unanswered,\nor 10 s without a read", route: { bend: 36 } })
+  d.arrow(waiting, waiting, { id: "idle", label: "empty read;\nthe next read follows", route: { loop: "top" } })
+  d.arrow(waiting, working, { id: "deliver", label: "read returns\nmessages or errors", route: { bend: 36 } })
+  d.arrow(working, waiting, { id: "answer", label: "read opens,\nor reply accepted", route: { bend: 36 } })
   d.arrow(working.bottom, away.bottom, {
     id: "give-up",
     route: { viaY: waiting.bottom.offset(0, 120) },

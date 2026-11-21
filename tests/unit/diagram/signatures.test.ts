@@ -245,13 +245,12 @@ test("each row of the item table gives its diagnostic", () => {
   assert.deepEqual(
     problems((d) => {
       const [a, b] = two(d);
-      d.arrow(a, b, { loop: "top" });
-      d.arrow(a, a, { bend: 20, route: "hv" });
+      d.arrow(a, b, { route: { loop: "top" } });
+      d.arrow(a, a, { route: { bend: 20 } });
     }),
     [
-      ["INVALID_ARGUMENT", ["a->b"], "loop"],
+      ["INVALID_ARGUMENT", ["a->b"], "route"],
       ["INVALID_ARGUMENT", ["a->a"], "route"],
-      ["INVALID_ARGUMENT", ["a->a"], "bend"],
     ],
   );
   assert.deepEqual(
