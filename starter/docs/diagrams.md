@@ -25,7 +25,7 @@
 The page compiler runs `draw` when it compiles the page, and the browser only draws the result. Four rules follow:
 
 - `draw` uses only `d` and the values it defines itself. A page's imports and constants do not exist where it runs, and a name from outside is a `DRAW_FAILED` error that names it.
-- `draw` finishes within 1 second and creates at most 2000 elements. Past either limit it stops with a `DRAW_FAILED` error.
+- `draw` finishes within 1 second and creates at most 2000 elements. Past either limit, or when it throws, it stops with a `DRAW_FAILED` error. Any other mistake in a call is reported with the ids of its elements, and the rest of the figure is still checked, so one compile lists every mistake.
 - Write `<Diagram>` in a page or a reply. One inside a `.tsx` component is not compiled.
 - Write a `<Step>`'s `id` and `focus` as plain text, such as `focus="client api"`. A computed value, `focus={…}`, is a `STEP_NOT_TEXT` error.
 
@@ -411,7 +411,10 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `PLACEMENT_CYCLE` | error | Placements depend on each other. Place one of them independently |
 | `CONFLICTING_PLACEMENT` | error | A shape is in a grid, row, or column and also placed, or in two of them. Keep one |
 | `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
-| `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT` | error | Check the `place()` options |
+| `INVALID_PLACEMENT` | error | Give `place()` exactly one of `below`, `above`, `leftOf`, `rightOf`, and `at` |
+| `NOT_PLACEABLE` | error | An enclosure, a cell, or a mark is in a grid, row, or column, or placed. Position its members or its parent instead |
+| `INVALID_ARGUMENT` | error | A call has a value it cannot use. The message names the call, the value, and the values it takes; the call uses a stand-in, such as leaving the value out |
+| `UNKNOWN_PARTICIPANT` | error | A sequence message or note names a shape that is not in the participants, so it is skipped. Add the shape to the participants |
 | `DRAW_FAILED` | error | The `draw` function threw, at the line given, uses a name it does not define, ran longer than 1 second, or created more than 2000 elements |
 | `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
 | `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or use `loop` |

@@ -90,7 +90,10 @@ export interface Diagnostic {
   message: string;
   /** The elements it is about, which also identify it. */
   ids: string[];
-  /** What it is about when no element is, such as a step's id. */
+  /**
+   * What it is about besides its elements, such as a step's id or an option's name, so that
+   * two problems on one element are two diagnostics.
+   */
   subject?: string;
 }
 
@@ -178,8 +181,9 @@ export class DiagramBuilder {
       const what = shape === "box" ? "boxes" : "pages";
       this.#scene.report(
         "INVALID_REPLICAS",
-        `${node.id} has replicas: ${JSON.stringify(replicas)}, but a stack draws 2 to 4 ${what}. For more, or an unknown number, put the number in the label of a ${shape} with replicas: 4.`,
-        [node.id],
+        [node],
+        () =>
+          `${node.id} has replicas: ${quote(replicas)}, but a stack draws 2 to 4 ${what}. For more, or an unknown number, put the number in the label of a ${shape} with replicas: 4.`,
       );
     }
     return node;
@@ -275,8 +279,9 @@ export class DiagramBuilder {
     if (count !== 1) {
       this.#scene.report(
         "INVALID_PLACEMENT",
-        `place(${el.id}) needs exactly one of below, above, leftOf, rightOf, or at; got ${count}.`,
-        [el.id],
+        [el],
+        () =>
+          `place(${el.id}) needs exactly one of below, above, leftOf, rightOf, or at; got ${count}.`,
       );
       return el;
     }
@@ -292,7 +297,7 @@ export class DiagramBuilder {
             align: options.align ?? "center",
           }
         : { kind: "at", at: options.at ?? [0, 0], anchor: options.anchor ?? "center" };
-    this.#scene.own(el, placement, "place()");
+    this.#scene.own(el, placement);
     return el;
   }
 
@@ -302,7 +307,8 @@ export class DiagramBuilder {
 
   /** An arrow. A string third argument is its label. `d.arrow(a, a)` draws a self-loop. */
   arrow(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
-    return this.#scene.addEdge(
+    return this.#edge(
+      "arrow",
       from,
       to,
       typeof options === "string" ? { label: options } : options,
@@ -310,22 +316,71 @@ export class DiagramBuilder {
   }
   /** A connection without arrowheads. */
   line(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
-    return this.arrow(
+    return this.#edge(
+      "line",
       from,
       to,
       typeof options === "string" ? { label: options, ends: "--" } : { ends: "--", ...options },
     );
   }
+  /**
+   * An edge of the author's. With an end that is not an element or a point it is left out, and
+   * with a `viaX` or `viaY` that is not a number or a point it is straight; both are reported.
+   */
+  #edge(call: string, from: PointLike, to: PointLike, options: EdgeOptions): Edge {
+    const ends = { from, to };
+    const wrong = (["from", "to"] as const).filter((end) => !isEnd(ends[end]));
+    for (const end of wrong)
+      this.#scene.report(
+        "INVALID_ARGUMENT",
+        [from, to].flatMap((end) => (isNamed(end) ? [end] : [])),
+        () =>
+          `${call}: ${end} is ${quote(ends[end])}, but an edge ends at a shape, a grid, an enclosure, a point, or [x, y]. The edge is left out.`,
+        end,
+      );
+    if (wrong.length) return new Edge(from, to, options);
+    const via = viaOf(options.route);
+    const wrongVia = via && !(typeof via.value === "number" || via.value instanceof Point);
+    const edge = this.#scene.addEdge(
+      from,
+      to,
+      wrongVia ? { ...options, route: "straight" } : options,
+    );
+    if (via && wrongVia)
+      this.#scene.report(
+        "INVALID_ARGUMENT",
+        [edge],
+        () =>
+          `${call} ${edge.id}: route ${via.axis} is ${quote(via.value)}, but ${via.axis} takes a number or a point, such as grid.gutter${via.axis.slice(3)}(0). The edge is drawn straight.`,
+        "route",
+      );
+    return edge;
+  }
 
   /** Give these nodes the largest measured width and height among them. */
   equalSize(nodes: Node[]) {
-    this.#scene.addSizeGroup({ members: nodes, width: true, height: true });
+    this.#sizeGroup("equalSize", nodes, true, true);
   }
   equalWidth(nodes: Node[]) {
-    this.#scene.addSizeGroup({ members: nodes, width: true, height: false });
+    this.#sizeGroup("equalWidth", nodes, true, false);
   }
   equalHeight(nodes: Node[]) {
-    this.#scene.addSizeGroup({ members: nodes, width: false, height: true });
+    this.#sizeGroup("equalHeight", nodes, false, true);
+  }
+  /** A size group of the shapes in `nodes`; anything else is reported and left out. */
+  #sizeGroup(call: string, nodes: Node[], width: boolean, height: boolean) {
+    const members = nodes.filter((node, i) => {
+      if (node instanceof Node) return true;
+      this.#scene.report(
+        "INVALID_ARGUMENT",
+        isNamed(node) ? [node] : [],
+        () =>
+          `${call}: nodes[${i}] is ${quote(node)}, but ${call} takes shapes. The group leaves it out.`,
+        `nodes[${i}]`,
+      );
+      return false;
+    });
+    this.#scene.addSizeGroup({ members, width, height });
   }
 
   point(x: number, y: number): Point {

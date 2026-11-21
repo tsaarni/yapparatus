@@ -99,7 +99,7 @@ function diagram(jsx: Jsx, issues: ContentIssue[]): CompiledDiagram {
       ? (start.expression.loc?.start.line ?? line) - leadingLines(expression.value)
       : line;
   for (const d of result.drawing.diagnostics) {
-    const subject = d.subject ?? (d.ids.length ? d.ids.join(",") : undefined);
+    const subject = [d.ids.join(","), d.subject].filter(Boolean).join(" ") || undefined;
     report(
       {
         code: d.code,

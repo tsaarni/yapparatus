@@ -72,7 +72,7 @@ The web app sends codes without a severity, and the server adds it from that lis
 
 A diagnostic is a `Diagnostic`. It holds its `origin`, `code`, and `message`, and when known the `source` file relative to the project, the `line` in it, a `target`, a `subject`, and the ids of the diagram `elements` involved. A diagnostic is identified by its `code`, `source`, `target`, and `subject`.
 
-The target is a figure id on a page, or a message number in a reply. The subject is what the diagnostic is about, such as a link's target, or else its message. So a diagnostic whose line moves stays the same, and two broken links on one page stay two. The store uses it to drop duplicate reports and to remember which errors the agent has been given.
+The target is a figure id on a page, or a message number in a reply. The subject is what the diagnostic is about, such as a link's target, or else its message. In a diagram, it is the ids of the elements followed by the name of the option, such as `a->c route`, so two problems on one element, or one problem on two elements, stay two. So a diagnostic whose line moves stays the same, and two broken links on one page stay two. The store uses it to drop duplicate reports and to remember which errors the agent has been given.
 
 ## Revisions and reports
 

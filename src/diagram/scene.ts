@@ -15,23 +15,31 @@ import {
   type FrameOptions,
   Grid,
   type GridOptions,
+  type Named,
   Node,
   type NodeInternals,
   type Placement,
+  Point,
   type PointLike,
+  type Reporter,
   type Shape,
 } from "./elements.ts";
 
 /** The most elements a drawing may have, so that the checks, which compare pairs, stay fast. */
 const maxElements = 2000;
 
-/** Anything with an id that the id check settles. */
-export type Named = Element | Edge | Frame;
-
 /** An id that is its owner's final id followed by a suffix, such as `api-lifeline`. */
 export interface DerivedId {
   owner: Element;
   suffix: string;
+}
+
+/** A problem a call found, with the elements it is about and its message, written later. */
+interface Problem {
+  code: DiagnosticCode;
+  about: Named[];
+  message: () => string;
+  subject?: string;
 }
 
 /** Nodes that share the largest measured width, height, or both. */
@@ -54,7 +62,7 @@ export class Scene {
   readonly #owner = new Map<Element, Grid | Placement>();
   readonly #sizeGroups: SizeGroup[] = [];
   readonly #groups = new Map<Element | Frame, Array<Element | Edge | Frame>>();
-  readonly #diagnostics: Diagnostic[] = [];
+  readonly #problems: Problem[] = [];
   readonly #categories: string[] = [];
   readonly #derivedIds = new Map<Named, DerivedId>();
 
@@ -87,9 +95,6 @@ export class Scene {
   get groups(): ReadonlyMap<Element | Frame, ReadonlyArray<Element | Edge | Frame>> {
     return this.#groups;
   }
-  get diagnostics(): readonly Diagnostic[] {
-    return this.#diagnostics;
-  }
   /** Categories in the order the drawing first uses them, which sets their colors. */
   get categories(): readonly string[] {
     return this.#categories;
@@ -108,7 +113,7 @@ export class Scene {
   ): Node {
     this.#grow();
     const node = new Node(shape, label, options, internals);
-    node.report = (code, message, ids) => this.report(code, message, ids);
+    node.report = this.report;
     internals.member?.parent.members.push(node);
     this.#nodes.push(node);
     this.#noteCategory(node.options.category);
@@ -128,8 +133,8 @@ export class Scene {
     return edge;
   }
   /**
-   * A grid, a row, or a column, which becomes the position owner of its cells. `name` is its
-   * id without an `id`, such as `row-1`, and defaults to its kind, as for every add function.
+   * A grid, a row, or a column, which owns its cells' positions; a cell it cannot position is
+   * left empty. `name` is its id without an `id`, such as `row-1`, and defaults to its kind.
    */
   addGrid(
     kind: Grid["kind"],
@@ -138,10 +143,11 @@ export class Scene {
     name: string = kind,
   ): Grid {
     this.#grow();
-    const grid = new Grid(kind, rows, options, name);
-    grid.report = (code, message, ids) => this.report(code, message, ids);
+    const cells = rows.map((row) => row.map((cell) => (cell && placeable(cell) ? cell : null)));
+    const grid = new Grid(kind, cells, options, name);
+    grid.report = this.report;
     this.#grids.push(grid);
-    for (const child of grid.children) this.own(child, grid, `${kind}(${grid.id})`);
+    for (const child of rows.flat()) if (child) this.own(child, grid);
     return grid;
   }
   /** An enclosure; `name` is its id without an `id` or a title, such as `enclosure-1`. */
@@ -160,23 +166,28 @@ export class Scene {
     return frame;
   }
 
-  /** Give an element its position owner; a second owner or an enclosure is reported. */
-  own(el: Element, owner: Grid | Placement, by: string) {
-    if (el instanceof Enclosure) {
-      this.report(
-        "ENCLOSURE_PLACEMENT",
-        `${el.id} is an enclosure; its bounds come from its members. Position the members instead.`,
-        [el.id],
-      );
+  /**
+   * Give an element its position owner. An element whose bounds come from elsewhere, or that
+   * has an owner already, is reported and keeps its bounds or its first owner.
+   */
+  own(el: Element, owner: Grid | Placement) {
+    if (!placeable(el)) {
+      this.report("NOT_PLACEABLE", [el], () => {
+        const parent = el instanceof Node ? el.member?.parent : undefined;
+        const what = parent
+          ? `a ${el instanceof Node ? el.shape : "member"} of ${parent.id}; its bounds come from its parent. Position ${parent.id} instead.`
+          : "an enclosure; its bounds come from its members. Position the members instead.";
+        return `${ownerName(owner)} positions ${el.id}, which is ${what}`;
+      });
       return;
     }
     const existing = this.#owner.get(el);
     if (existing) {
-      const prior = existing instanceof Grid ? `${existing.kind}(${existing.id})` : "place()";
       this.report(
         "CONFLICTING_PLACEMENT",
-        `${el.id} is positioned by both ${prior} and ${by}. Each element has one position owner.`,
-        [el.id],
+        [el],
+        () =>
+          `${el.id} is positioned by both ${ownerName(existing)} and ${ownerName(owner)}. Each element has one position owner.`,
       );
       return;
     }
@@ -198,8 +209,21 @@ export class Scene {
   addGroup(container: Element | Frame, members: Array<Element | Edge | Frame>) {
     this.#groups.set(container, [...members]);
   }
-  report(code: DiagnosticCode, message: string, ids: string[]) {
-    this.#diagnostics.push({ code, message, ids });
+  /** Report a problem about elements. Its message is written when the diagnostics are read. */
+  report: Reporter = (code, about, message, subject) => {
+    this.#problems.push({ code, about, message, ...(subject !== undefined ? { subject } : {}) });
+  };
+  /**
+   * The problems the calls reported, written from the elements' ids as they are now. The
+   * compiler reads them once, after the id check, so they name final ids.
+   */
+  diagnostics(): Diagnostic[] {
+    return this.#problems.map(({ code, about, message, subject }) => ({
+      code,
+      message: message(),
+      ids: about.map((el) => el.id),
+      ...(subject !== undefined ? { subject } : {}),
+    }));
   }
 
   #noteCategory(category: string | undefined) {
@@ -216,4 +240,43 @@ export class Scene {
       this.#enclosures.length;
     if (count >= maxElements) throw new Error(`The drawing has more than ${maxElements} elements.`);
   }
+}
+
+/** Whether a grid or a placement can position an element: not an enclosure, a cell, or a mark. */
+function placeable(el: Element): boolean {
+  return !(el instanceof Enclosure) && !(el instanceof Node && el.member);
+}
+
+/** How a message names a position owner: `row(row-1)` or `place()`. */
+function ownerName(owner: Grid | Placement): string {
+  return owner instanceof Grid ? `${owner.kind}(${owner.id})` : "place()";
+}
+
+/**
+ * A value as a message quotes it: an element by its id and kind, text and numbers as written,
+ * a list by its length, and an object by its keys, so that a misspelled option shows.
+ */
+export function quote(value: unknown): string {
+  if (value instanceof Node) return value.id;
+  if (value instanceof Grid) return `${value.id}, a ${value.kind}`;
+  if (value instanceof Enclosure) return `${value.id}, an enclosure`;
+  if (value instanceof Frame) return `${value.id}, a frame`;
+  if (value instanceof Edge) return `${value.id}, an edge`;
+  if (value instanceof Point) return "a point";
+  if (Array.isArray(value)) return `a list of ${value.length}`;
+  if (typeof value === "string") return JSON.stringify(value);
+  if (typeof value === "function") return "a function";
+  if (value === null || typeof value !== "object") return String(value);
+  return `{ ${Object.keys(value).join(", ")} }`;
+}
+
+/** Whether a value is something a diagnostic can name by its id. */
+export function isNamed(value: unknown): value is Named {
+  return (
+    value instanceof Node ||
+    value instanceof Grid ||
+    value instanceof Enclosure ||
+    value instanceof Edge ||
+    value instanceof Frame
+  );
 }

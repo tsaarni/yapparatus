@@ -3,7 +3,15 @@
  */
 
 import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "../drawing.ts";
-import { type Element, Enclosure, elementOf, Grid, Node, type PointLike } from "../elements.ts";
+import {
+  type Element,
+  Enclosure,
+  elementOf,
+  Grid,
+  type Named,
+  Node,
+  type PointLike,
+} from "../elements.ts";
 import {
   contains,
   distance,
@@ -18,7 +26,7 @@ import {
   type Vec,
 } from "../geometry.ts";
 import { enclosure } from "../metrics.ts";
-import type { Named, Scene } from "../scene.ts";
+import type { Scene } from "../scene.ts";
 import type { Report } from "./text.ts";
 
 /**

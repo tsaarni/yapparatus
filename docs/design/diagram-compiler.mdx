@@ -55,7 +55,7 @@ The page compiler finds each `<Diagram>` on a page and [hands its draw program t
 
 The compiler measures, sizes, and places on demand: it computes a value the first time a later stage asks for it, and keeps it. The order in <Ref to="dc-stages" /> is the order in which results become final.
 
-A stage reports each problem it finds and continues with a usable value, so one compile reports all problems at once. Only a placement cycle or an exception stops the compile, and the result then has no geometry. A diagram with any error is marked as failed, and the server draws no picture of it.
+A stage reports each problem it finds and continues with a usable value, so one compile reports all problems at once. A call in the draw program does the same: it reports a value it cannot use and continues with a stand-in. Only the element limit, the time limit, an exception that the draw program throws, a placement cycle, and an exception in the compiler stop the compile, and the result then has no geometry. A diagram with any error is marked as failed, and the server draws no picture of it.
 
 ### A running example
 
@@ -141,10 +141,14 @@ The sections below follow one small diagram through the stages. <Ref to="dc-exam
 
 The draw program records elements and arrangements in a scene, which the compiler then lays out. The scene and the object `d` that the draw program receives are two separate things:
 
-- The scene holds the elements, the position owner of each element, the size groups, the groups that steps focus, the categories, the owner and suffix of each element named after another, and the diagnostics. It has one function for adding each kind of element: a node, an edge, a grid, an enclosure, and a frame. That function applies the element limit, registers the element's category, and connects the element to the diagnostics, so that the element can report a problem such as a missing member.
+- The scene holds the elements, the position owner of each element, the size groups, the groups that steps focus, the categories, the owner and suffix of each element named after another, and the problems the calls report. It has one function for adding each kind of element: a node, an edge, a grid, an enclosure, and a frame. That function applies the element limit, registers the element's category, and connects the element to the scene's report, so that the element can report a problem such as a missing member.
 - `d` has only the calls that the diagram reference documents, and each call adds elements through the scene's functions. The draw program cannot reach the scene or change its lists.
 
 A sequence and a tree add their elements through the same functions, with what an author cannot set: a passive element, such as a lifeline, an element that follows an edge, such as an activation bar, and an id derived from another element. Their elements therefore count against the limit and register their categories as the author's elements do.
+
+A call reports a problem with the elements it is about and a message that is written later. The ids of those elements are not final while the draw program runs, so the compiler writes every message and the diagnostic's ids after the id check, from the final ids. A box with `replicas: 9` that settles as `a-2` is reported as `a-2`.
+
+A call that gets an argument or an option it cannot use reports `INVALID_ARGUMENT` and continues with a stand-in. The message names the call, the value, and the values the call takes, and the diagnostic's subject is the name of the argument or option, so two problems on one element are two diagnostics. `equalSize`, `equalWidth`, and `equalHeight` leave out anything that is not a shape. An edge with an end that is not a shape, a grid, an enclosure, or a point is left out, and one with a `viaX` or `viaY` that is neither a number nor a point is straight.
 
 A call that creates an element returns an object that stands for it, and the program passes it to later calls, such as a row or an edge. <Ref to="dc-scene" /> shows the scene of the running example.
 
@@ -163,7 +167,7 @@ A scene holds at most 2,000 elements, counting nodes with their cells and marks,
 
 An element in the scene has no coordinates. A point on it, such as `api.bottom`, or a point computed from others, such as `api.bottom.offset(0, 20)`, is a description that the layout evaluates once the positions it names are known. The order of the statements therefore does not matter.
 
-Each element gets its position from exactly one source: the grid it is in, or the `place()` call that places it. A second source is `CONFLICTING_PLACEMENT`, and the first one stays in force. Before layout, the compiler looks for elements with no source. The first one goes to the origin, and every other one is reported as `UNPLACED`. In the running example, only the row has no source, so it is at the origin.
+Each element gets its position from exactly one source: the grid it is in, or the `place()` call that places it. A second source is `CONFLICTING_PLACEMENT`, and the first one stays in force. An enclosure takes its bounds from its members, and a cell or a mark from its parent, so a grid or a `place()` that positions one is `NOT_PLACEABLE`: the grid leaves that cell empty, and the placement is ignored. Before layout, the compiler looks for elements with no source. The first one goes to the origin, and every other one is reported as `UNPLACED`. In the running example, only the row has no source, so it is at the origin.
 
 A grid holds rows of cells, and each cell is an element or empty. A row is a grid of one row, and a column is a grid of one column, so one layout rule places all three. Grids can be placed like any element, so they nest.
 
@@ -369,7 +373,7 @@ A mark highlights words or lines of a text. The compiler finds the marked words 
 
 ## Sequences
 
-A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A bar means that a participant is handling a call, so only a receiver gets one. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar, and an async message gets none. Sending opens no bar: a participant that only sends has a plain lifeline, and its messages start and end on it. A self-message on a participant with no bar starts from the lifeline and opens only its own short bar. Lifelines and bars are drawn, but the checks and the steps leave them out. The sequence is a column of the row of participants and a spacer, an empty shape as tall as the lifelines, so that an element placed below the sequence clears them.
+A sequence diagram is built from the other elements while the draw program runs, so the layout and the checks treat it like any other drawing. The participants go into a row. The messages are then laid out in time order, each one lower than the last, as edges between two points. A bar means that a participant is handling a call, so only a receiver gets one. A call opens an activation bar on its receiver. A reply closes the bar of the latest open call from the participant it returns to, and closes every call made after that one. A call that no reply closes gets a short bar, and an async message gets none. Sending opens no bar: a participant that only sends has a plain lifeline, and its messages start and end on it. A self-message on a participant with no bar starts from the lifeline and opens only its own short bar. Lifelines and bars are drawn, but the checks and the steps leave them out. A message or a note about a shape that is not a participant is `UNKNOWN_PARTICIPANT`. A step that is not a message, a note, or a fragment, and a message without a label, is `INVALID_ARGUMENT`. The sequence skips each of them and draws the rest, and the diagnostic's subject is the step's place in the list, such as `steps[2].label`. The sequence is a column of the row of participants and a spacer, an empty shape as tall as the lifelines, so that an element placed below the sequence clears them.
 
 A fragment is a frame whose corners the sequence sets from its participants, before anything is measured, so its members can reach past them: a self-message at the rightmost participant has its label to the right of that participant. The scene lists the members of each fragment: its messages, its notes, and the fragments inside it. The compiler compiles frames after nodes and edges, and a frame with members covers their ink: edge points, heads, and labels, node rectangles and labels, and inner frames. Where a member reaches past the corners, the frame keeps a margin of 8 units around it. Each frame compiles after the frames it holds, so an outer frame covers an inner frame that was widened. A frame that an author draws with `d.frame` has no members and lies exactly between its corners.
 
@@ -381,6 +385,8 @@ A tree is also built from the other elements while the draw program runs: rows, 
 - `right`: a row of the node and a column of its subtrees, left-aligned, with each line turning at the row's gutter.
 - `both`: at the root, a row of a column of left subtrees, the root, and a column of right subtrees. The root's children alternate right and left. A left subtree is `right` mirrored: its column comes first and is right-aligned, so deeper levels keep growing away from the root.
 - `indent`: a column of the node and a grid whose rows each hold an empty cell and one subtree, so the gap after the empty column indents every subtree by the same amount. Each line starts at a point under the left part of the node's rectangle, goes down, and turns into the child's left side.
+
+Any other layout is `INVALID_ARGUMENT`, and the tree grows `down`.
 
 A container centers its node across the container, so a node is centered on the whole of its subtrees, not on its direct children. Adding a child widens its ancestors and moves nothing else.
 
@@ -405,7 +411,7 @@ Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists
 | Stage | Codes |
 |---|---|
 | Running the draw program | `DRAW_FAILED`, `STEP_NOT_TEXT`, `FONT_FALLBACK` |
-| Record | `INVALID_PLACEMENT`, `ENCLOSURE_PLACEMENT`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT`, `UNKNOWN_GUTTER`, `INVALID_REPLICAS` |
+| Record | `INVALID_ARGUMENT`, `UNKNOWN_PARTICIPANT`, `INVALID_PLACEMENT`, `NOT_PLACEABLE`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT`, `UNKNOWN_GUTTER`, `INVALID_REPLICAS` |
 | Settle ids | `DUPLICATE_ID`, `UNPLACED` |
 | Measure, size, and place | `UNKNOWN_ICON`, `TEXT_OVERFLOW`, `FIXED_SIZE_IN_GROUP`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
 | Route | `BEND_WITH_ROUTE`, `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED`, `HEAD_CROWDED` |
@@ -480,7 +486,7 @@ With the `ids` option, the picture also writes each element's id beside it and o
 
 The draw program states the arrangement, and the compiler measures it. Automatic graph layout, as in Graphviz or ELK, can rearrange the whole diagram when one edge is added. A language model states an arrangement well and computes coordinates poorly, so a draw program states rows, columns, and placements, and the compiler computes every number.
 
-The compiler reports problems and does not repair them. A silent repair, such as moving a shape to remove an overlap, hides the problem, changes what the draw program says, and can be undone by the next edit.
+The compiler reports problems and does not repair them. A silent repair, such as moving a shape to remove an overlap, hides the problem, changes what the draw program says, and can be undone by the next edit. A stand-in for a value that a call cannot use is always reported as an error. It exists only so that the rest of the figure compiles and one compile reports every problem.
 
 A draw program is TypeScript. A text language such as Mermaid, D2, or PlantUML is shorter for simple graphs, but it has no loops, variables, or functions, and its errors are vague. An error in a draw program names the page line of the statement.
 

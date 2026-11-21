@@ -5,20 +5,20 @@
 import {
   type BoxOptions,
   type Cell,
-  type Edge,
+  Edge,
   type EdgeOptions,
   type Element,
   type EncloseOptions,
-  type Enclosure,
+  Enclosure,
   type Frame,
   type FrameOptions,
-  type Grid,
+  Grid,
   type GridOptions,
   type LineOptions,
   lerp,
   type Mark,
   type MemberOptions,
-  type Node,
+  Node,
   type NodeOptions,
   type Place,
   type Placement,
@@ -34,7 +34,7 @@ import {
   xy,
 } from "./elements.ts";
 import { defaultGap } from "./metrics.ts";
-import type { Scene } from "./scene.ts";
+import { isNamed, quote, type Scene } from "./scene.ts";
 import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
 import { type TreeChild, type TreeOptions, tree } from "./tree.ts";
 
@@ -124,8 +124,9 @@ export class DiagramBuilder {
       const what = shape === "box" ? "boxes" : "pages";
       this.#scene.report(
         "INVALID_REPLICAS",
-        `${node.id} has replicas: ${JSON.stringify(replicas)}, but a stack draws 2 to 4 ${what}. For more, or an unknown number, put the number in the label of a ${shape} with replicas: 4.`,
-        [node.id],
+        [node],
+        () =>
+          `${node.id} has replicas: ${quote(replicas)}, but a stack draws 2 to 4 ${what}. For more, or an unknown number, put the number in the label of a ${shape} with replicas: 4.`,
       );
     }
     return node;
@@ -221,8 +222,9 @@ export class DiagramBuilder {
     if (count !== 1) {
       this.#scene.report(
         "INVALID_PLACEMENT",
-        `place(${el.id}) needs exactly one of below, above, leftOf, rightOf, or at; got ${count}.`,
-        [el.id],
+        [el],
+        () =>
+          `place(${el.id}) needs exactly one of below, above, leftOf, rightOf, or at; got ${count}.`,
       );
       return el;
     }
@@ -238,7 +240,7 @@ export class DiagramBuilder {
             align: options.align ?? "center",
           }
         : { kind: "at", at: options.at ?? [0, 0], anchor: options.anchor ?? "center" };
-    this.#scene.own(el, placement, "place()");
+    this.#scene.own(el, placement);
     return el;
   }
 
@@ -248,7 +250,8 @@ export class DiagramBuilder {
 
   /** An arrow. A string third argument is its label. `d.arrow(a, a)` draws a self-loop. */
   arrow(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
-    return this.#scene.addEdge(
+    return this.#edge(
+      "arrow",
       from,
       to,
       typeof options === "string" ? { label: options } : options,
@@ -256,22 +259,71 @@ export class DiagramBuilder {
   }
   /** A connection without arrowheads. */
   line(from: PointLike, to: PointLike, options: string | EdgeOptions = {}): Edge {
-    return this.arrow(
+    return this.#edge(
+      "line",
       from,
       to,
       typeof options === "string" ? { label: options, ends: "--" } : { ends: "--", ...options },
     );
   }
+  /**
+   * An edge of the author's. With an end that is not an element or a point it is left out, and
+   * with a `viaX` or `viaY` that is not a number or a point it is straight; both are reported.
+   */
+  #edge(call: string, from: PointLike, to: PointLike, options: EdgeOptions): Edge {
+    const ends = { from, to };
+    const wrong = (["from", "to"] as const).filter((end) => !isEnd(ends[end]));
+    for (const end of wrong)
+      this.#scene.report(
+        "INVALID_ARGUMENT",
+        [from, to].flatMap((end) => (isNamed(end) ? [end] : [])),
+        () =>
+          `${call}: ${end} is ${quote(ends[end])}, but an edge ends at a shape, a grid, an enclosure, a point, or [x, y]. The edge is left out.`,
+        end,
+      );
+    if (wrong.length) return new Edge(from, to, options);
+    const via = viaOf(options.route);
+    const wrongVia = via && !(typeof via.value === "number" || via.value instanceof Point);
+    const edge = this.#scene.addEdge(
+      from,
+      to,
+      wrongVia ? { ...options, route: "straight" } : options,
+    );
+    if (via && wrongVia)
+      this.#scene.report(
+        "INVALID_ARGUMENT",
+        [edge],
+        () =>
+          `${call} ${edge.id}: route ${via.axis} is ${quote(via.value)}, but ${via.axis} takes a number or a point, such as grid.gutter${via.axis.slice(3)}(0). The edge is drawn straight.`,
+        "route",
+      );
+    return edge;
+  }
 
   /** Give these nodes the largest measured width and height among them. */
   equalSize(nodes: Node[]) {
-    this.#scene.addSizeGroup({ members: nodes, width: true, height: true });
+    this.#sizeGroup("equalSize", nodes, true, true);
   }
   equalWidth(nodes: Node[]) {
-    this.#scene.addSizeGroup({ members: nodes, width: true, height: false });
+    this.#sizeGroup("equalWidth", nodes, true, false);
   }
   equalHeight(nodes: Node[]) {
-    this.#scene.addSizeGroup({ members: nodes, width: false, height: true });
+    this.#sizeGroup("equalHeight", nodes, false, true);
+  }
+  /** A size group of the shapes in `nodes`; anything else is reported and left out. */
+  #sizeGroup(call: string, nodes: Node[], width: boolean, height: boolean) {
+    const members = nodes.filter((node, i) => {
+      if (node instanceof Node) return true;
+      this.#scene.report(
+        "INVALID_ARGUMENT",
+        isNamed(node) ? [node] : [],
+        () =>
+          `${call}: nodes[${i}] is ${quote(node)}, but ${call} takes shapes. The group leaves it out.`,
+        `nodes[${i}]`,
+      );
+      return false;
+    });
+    this.#scene.addSizeGroup({ members, width, height });
   }
 
   point(x: number, y: number): Point {
@@ -285,4 +337,22 @@ export class DiagramBuilder {
   lerp(a: PointLike, b: PointLike, t = 0.5): Point {
     return lerp(a, b, t);
   }
+}
+
+/** Whether a value can be an end of an edge: an element, a point, or `[x, y]`. */
+function isEnd(value: unknown): value is PointLike {
+  if (Array.isArray(value)) return value.length === 2 && value.every((n) => typeof n === "number");
+  return (
+    value instanceof Point ||
+    value instanceof Node ||
+    value instanceof Grid ||
+    value instanceof Enclosure
+  );
+}
+
+/** The `viaX` or `viaY` of a route and its value, when the route has one. */
+function viaOf(route: unknown): { axis: "viaX" | "viaY"; value: unknown } | undefined {
+  if (!route || typeof route !== "object") return;
+  for (const axis of ["viaX", "viaY"] as const)
+    if (axis in route) return { axis, value: Reflect.get(route, axis) };
 }

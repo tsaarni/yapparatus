@@ -31,7 +31,7 @@ export function compile(
 ): CompiledDiagram {
   const m = metrics;
   const measure: Measure = (text, font) => lookups.measure(text.replace(/ {2,}/g, " "), font);
-  const diagnostics: Diagnostic[] = [...scene.diagnostics];
+  const diagnostics: Diagnostic[] = [];
   const report = (code: DiagnosticCode, message: string, ids: string[]) =>
     diagnostics.push({ code, message, ids });
   const categoryOf = (name: string | undefined) => {
@@ -40,6 +40,7 @@ export function compile(
   };
 
   checkIds(scene, report);
+  diagnostics.unshift(...scene.diagnostics());
   checkPlaced(scene, report);
 
   const icons = createIcons(lookups.icons, scene.nodes, report);

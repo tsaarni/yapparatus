@@ -116,9 +116,10 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A placement does not name exactly one relation.",
   },
-  ENCLOSURE_PLACEMENT: {
+  NOT_PLACEABLE: {
     severity: "error",
-    meaning: "An enclosure is placed; it takes its place from what it holds.",
+    meaning:
+      "An enclosure, a cell, or a mark is in a grid or placed; its bounds come from elsewhere.",
   },
   CONFLICTING_PLACEMENT: {
     severity: "error",
@@ -127,6 +128,14 @@ export const diagnosticCodes = {
   UNPLACED: {
     severity: "error",
     meaning: "An element has no placement, so it is drawn over another element.",
+  },
+  INVALID_ARGUMENT: {
+    severity: "error",
+    meaning: "A call has an argument or an option with a value it cannot use.",
+  },
+  UNKNOWN_PARTICIPANT: {
+    severity: "error",
+    meaning: "A sequence message or note names a shape that is not a participant.",
   },
   UNKNOWN_ELEMENT: {
     severity: "error",

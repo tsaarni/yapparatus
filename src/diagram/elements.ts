@@ -21,9 +21,26 @@ export interface Diagnostic {
   message: string;
   /** The elements it is about, which also identify it. */
   ids: string[];
-  /** What it is about when no element is, such as a step's id. */
+  /**
+   * What it is about besides its elements, such as a step's id or an option's name, so that
+   * two problems on one element are two diagnostics.
+   */
   subject?: string;
 }
+
+/** Anything with an id that the id check settles, which a diagnostic can be about. */
+export type Named = Element | Edge | Frame;
+
+/**
+ * Reports a problem that a call finds. `message` is written once the ids of the elements in
+ * `about` are final, so it reads their ids when it runs.
+ */
+export type Reporter = (
+  code: DiagnosticCode,
+  about: Named[],
+  message: () => string,
+  subject?: string,
+) => void;
 
 /** How a point is derived, resolved to coordinates at compile time. */
 export type PointExpr =
@@ -273,7 +290,7 @@ export class Node extends Element {
     this.member = internals.member;
   }
   /** Set by the scene: where a missing member is reported. */
-  report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
+  report?: Reporter;
   /**
    * A member by its own id, such as `users.element("team-id")`, usable like any element.
    * A missing member is reported, and the parent stands in for it.
@@ -283,8 +300,9 @@ export class Node extends Element {
     if (found) return found;
     this.report?.(
       "UNKNOWN_ELEMENT",
-      `${this.id} has no member "${id}". Members: ${this.members.map((m) => m.member?.own).join(", ") || "none"}.`,
-      [this.id],
+      [this],
+      () =>
+        `${this.id} has no member "${id}". Members: ${this.members.map((m) => m.member?.own).join(", ") || "none"}.`,
     );
     return this;
   }
@@ -336,7 +354,7 @@ export class Grid extends Element {
     this.align = { x: ax, y: ay };
   }
   /** Set by the scene: where a gutter that does not exist is reported. */
-  report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
+  report?: Reporter;
   /** The cells that hold an element, row by row. */
   get children(): Element[] {
     return this.rows.flatMap((row) =>
@@ -369,8 +387,8 @@ export class Grid extends Element {
           : "has no gap to name";
     this.report?.(
       "UNKNOWN_GUTTER",
-      `${this.id} has ${count}, so gutter${axis.toUpperCase()} ${range}; got ${i}.`,
-      [this.id],
+      [this],
+      () => `${this.id} has ${count}, so gutter${axis.toUpperCase()} ${range}; got ${i}.`,
     );
     return this.center;
   }

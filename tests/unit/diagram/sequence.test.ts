@@ -135,3 +135,87 @@ test("a sequence's elements are named after their owners", () => {
   );
   assert.ok(out.groups["loop-until-empty"]?.includes("drain"));
 });
+
+/** The ids of a compiled sequence's messages: its edges that are not lifelines. */
+const messages = (out: ReturnType<typeof compile>) =>
+  out.edges.filter((e) => !e.passive).map((e) => e.id);
+
+test("a message to a shape that is not a participant is UNKNOWN_PARTICIPANT and skipped", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("A");
+  const outside = d.box("A");
+  const s = d.sequence(
+    [a, b],
+    [
+      { from: a, to: outside, label: "lost" },
+      { note: "aside", over: [a, outside] },
+      { from: a, to: b, label: "call" },
+    ],
+  );
+  d.place(outside, { below: s });
+  const out = compile(scene, lookups);
+  const participants = "Participants: a, a-2.";
+  assert.deepEqual(out.diagnostics, [
+    {
+      code: "UNKNOWN_PARTICIPANT",
+      message: `sequence sequence-1: steps[0].to is a-3, which is not a participant, so the message is skipped. ${participants}`,
+      ids: ["sequence-1", "a-3"],
+      subject: "steps[0].to",
+    },
+    {
+      code: "UNKNOWN_PARTICIPANT",
+      message: `sequence sequence-1: steps[1].over[1] is a-3, which is not a participant, so the note is skipped. ${participants}`,
+      ids: ["sequence-1", "a-3"],
+      subject: "steps[1].over[1]",
+    },
+  ]);
+  assert.deepEqual(messages(out), ["call"]);
+  assert.ok(out.nodes.some((n) => n.id === "a-3"));
+});
+
+test("a message without a label, and a step of no kind, are INVALID_ARGUMENT and skipped", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const a = d.box("A");
+  const b = d.box("B");
+  d.sequence(
+    [a, b],
+    [
+      { from: a, to: b, lable: "typo" } as never,
+      { form: a } as never,
+      { fragment: "loop", steps: [{ from: a, to: b, label: "poll" }, 3 as never] },
+      { from: a, to: b, label: "call" },
+    ],
+  );
+  const out = compile(scene, lookups);
+  assert.deepEqual(out.diagnostics, [
+    {
+      code: "INVALID_ARGUMENT",
+      message:
+        "sequence sequence-1: the message steps[0], { from, to, lable }, has no label, so it is skipped.",
+      ids: ["sequence-1"],
+      subject: "steps[0].label",
+    },
+    {
+      code: "INVALID_ARGUMENT",
+      message:
+        "sequence sequence-1: steps[1] is { form }, but a step is a message (from), a note (note), or a fragment (fragment), so it is skipped.",
+      ids: ["sequence-1"],
+      subject: "steps[1]",
+    },
+    {
+      code: "INVALID_ARGUMENT",
+      message:
+        "sequence sequence-1: steps[2].steps[1] is 3, but a step is a message (from), a note (note), or a fragment (fragment), so it is skipped.",
+      ids: ["sequence-1"],
+      subject: "steps[2].steps[1]",
+    },
+  ]);
+  assert.deepEqual(messages(out), ["poll", "call"]);
+  assert.deepEqual(
+    out.frames.map((f) => f.id),
+    ["loop"],
+  );
+});

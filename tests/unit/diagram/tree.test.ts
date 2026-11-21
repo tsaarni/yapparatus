@@ -305,11 +305,41 @@ test("a node placed elsewhere is CONFLICTING_PLACEMENT, as in any row or column"
   );
 });
 
-test("a layout that is not one of the four stops the draw program", () => {
+test("a layout that is not one of the four is INVALID_ARGUMENT, and the tree grows down", () => {
+  const drawn = (layout: TreeLayout) => {
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
+    const other = sized(d, "other");
+    const t = d.tree(sized(d, "r"), [sized(d, "a"), sized(d, "b")], { layout });
+    d.column([other, t]);
+    return compile(scene, lookups);
+  };
+  const out = drawn("up" as TreeLayout);
+  assert.deepEqual(out.diagnostics, [
+    {
+      code: "INVALID_ARGUMENT",
+      message:
+        'tree r-tree: layout is "up", but a tree takes down, right, both, indent. The tree grows down.',
+      ids: ["r-tree"],
+      subject: "layout",
+    },
+  ]);
+  const down = drawn("down");
+  assert.deepEqual(rects(out), rects(down));
+  assert.deepEqual(routes(out), routes(down));
+});
+
+test("a node in a row and then in a tree names the tree's container by its final id", () => {
   const scene = new Scene();
   const d = new DiagramBuilder(scene);
-  assert.throws(
-    () => d.tree(sized(d, "r"), [], { layout: "up" as TreeLayout }),
-    /Tree layout "up" is not one of down, right, both, indent/,
-  );
+  const x = d.box("X");
+  d.column([d.row([x, sized(d, "y")]), d.tree(d.box("R"), [x])]);
+  const out = compile(scene, lookups);
+  const conflict = out.diagnostics.find((c) => c.code === "CONFLICTING_PLACEMENT");
+  assert.deepEqual(conflict, {
+    code: "CONFLICTING_PLACEMENT",
+    message:
+      "x is positioned by both row(row-1) and row(r-children). Each element has one position owner.",
+    ids: ["x"],
+  });
 });

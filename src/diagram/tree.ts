@@ -13,7 +13,7 @@ import type {
   Route,
 } from "./elements.ts";
 import { defaultGap, treeSpacing } from "./metrics.ts";
-import type { Scene } from "./scene.ts";
+import { quote, type Scene } from "./scene.ts";
 
 /** How a tree grows: down, to the right, to both sides, or as an indented list. */
 export type TreeLayout = "down" | "right" | "both" | "indent";
@@ -45,8 +45,8 @@ type Branch = (i: number) => [PointLike, Route];
 const layouts: readonly TreeLayout[] = ["down", "right", "both", "indent"];
 
 /**
- * Draw a tree into the scene and return the row or column that holds it all. Each branch is
- * named after its node: `-tree`, with its subtrees in `-children`, or `-left` and `-right`.
+ * Draw a tree into the scene and return the row or column that holds it all. A layout that is
+ * not one of the four is reported, and the tree grows down.
  */
 export function tree(
   scene: Scene,
@@ -55,8 +55,29 @@ export function tree(
   options: TreeOptions = {},
 ): Grid {
   const layout = options.layout ?? "down";
-  if (!layouts.includes(layout))
-    throw new Error(`Tree layout "${layout}" is not one of ${layouts.join(", ")}.`);
+  if (layouts.includes(layout)) return grown(scene, root, children, options, layout);
+  const outermost = grown(scene, root, children, options, "down");
+  scene.report(
+    "INVALID_ARGUMENT",
+    [outermost],
+    () =>
+      `tree ${outermost.id}: layout is ${quote(layout)}, but a tree takes ${layouts.join(", ")}. The tree grows down.`,
+    "layout",
+  );
+  return outermost;
+}
+
+/**
+ * The tree in a known layout. Each branch is named after its node: `-tree`, with its subtrees
+ * in `-children`, or `-left` and `-right`.
+ */
+function grown(
+  scene: Scene,
+  root: Node,
+  children: TreeChild[],
+  options: TreeOptions,
+  layout: TreeLayout,
+): Grid {
   const gap = options.gap ?? treeSpacing.gap;
   const levelGap = options.levelGap ?? treeSpacing.levelGap;
   const outer: GridOptions = options.id !== undefined ? { id: options.id } : {};

@@ -142,3 +142,22 @@ test("a drawing of more than 2000 elements is an error", async () => {
     [{ code: "DRAW_FAILED", message: "The drawing has more than 2000 elements.", line: 4 }],
   );
 });
+
+test("a diagram problem's subject joins its element ids and its option", async () => {
+  const { issues } = await compilePage(`<Diagram id="routes" draw={(d) => {
+  const a = d.box("A")
+  const b = d.box("B")
+  d.column([a, b, d.box("A", { replicas: 9 })])
+  d.arrow(a, b, { route: { viaX: b } })
+  d.arrow(b, a, { route: { viaX: a }, bend: 20 })
+}} />
+`);
+  assert.deepEqual(
+    issues.map(({ code, subject, elements }) => ({ code, subject, elements })),
+    [
+      { code: "INVALID_REPLICAS", subject: "a-2", elements: ["a-2"] },
+      { code: "INVALID_ARGUMENT", subject: "a->b route", elements: ["a->b"] },
+      { code: "INVALID_ARGUMENT", subject: "b->a route", elements: ["b->a"] },
+    ],
+  );
+});
