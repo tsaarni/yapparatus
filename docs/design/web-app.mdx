@@ -197,6 +197,8 @@ A comment shows its references, each with its address and the Show on page butto
 
 The panel header shows the [agent state](server#agent-state). While the newest message is unanswered and an agent is connected, the thread ends with typing dots and the seconds since the message. While no agent is connected, Copy prompt copies the [start prompt](agent-library#prompts) for a new agent. Clear deletes the chat on the server after the user confirms. The thread follows new messages while the user is at its bottom.
 
+**[Direction](directions):** while the agent is working, the header also shows how long ago the server last heard from it, such as "last heard 8 min ago", and a Disconnect button. The time tells an agent that is busy from one that has stopped. Disconnect [makes the server forget the agent](server#agent-state), so the header shows "Agent not connected" and Copy prompt. Copy prompt tells the user that no agent is there, so it appears only when the agent's process has ended or the user has disconnected the agent, and never because time has passed. Disconnect does not stop the agent, which the web app cannot do.
+
 ## Diagnostics display
 
 In dev mode, the header shows the number of errors and warnings, and opens a list of them grouped by page. An item's code and line open the page at the diagnostic's place. Its message is text that the user can select, and its Copy button copies the diagnostic with its file and line. Its Comment button writes a request to fix the diagnostic into the message box. Diagnostics also appear in place: a page that fails to render shows its error instead of its content, and a [diagram](components#diagram) or chart lists them under the figure.

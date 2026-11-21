@@ -159,7 +159,9 @@ A timer runs out with each time limit, so the web app learns that the agent went
 
 </Table>
 
-`working` is an estimate, and the 10 minute limit bounds how long a wrong estimate is shown.
+`working` is an estimate, and the 10 minute limit bounds how long a wrong estimate is shown. The estimate is wrong in both directions: an agent that stopped is shown as working for up to 10 minutes, and an agent that works longer is shown as not connected.
+
+**[Direction](directions):** `working` has no time limit. It ends when a reply is accepted, when the user disconnects the agent, or when the chat is cleared, so the server never says "not connected" about an agent that may still be working. The server keeps the time of the agent's last request. Every request of the agent library counts, also a check of the document and a picture, so these requests say that an agent sent them. The agent state gives that time with `working`. The user disconnects the agent from the [chat panel](web-app#chat-panel): the server forgets the agent, and the state is `away`. The unanswered messages stay unanswered, and the next agent is given them. If the forgotten agent sends a reply after all, the reply is accepted and the state is `waiting`, as for any reply. A `waiting` agent still becomes `away` when its read closes unanswered or 10 s pass without a read, because that shows that its process ended.
 
 ## What the agent has to do
 
