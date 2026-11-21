@@ -3,7 +3,6 @@
  * lazy and memoized, so declaration order never matters; a real cycle is reported with its chain.
  */
 
-import type { DiagramBuilder } from "../builder.ts";
 import {
   type Align,
   type Element,
@@ -17,6 +16,7 @@ import {
 import { anchorOf, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
 import { enclosure, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
 import { room, stackRoom } from "../outlines.ts";
+import type { Scene } from "../scene.ts";
 import { createRecords } from "./records.ts";
 import type { Report, Text } from "./text.ts";
 
@@ -59,7 +59,7 @@ export type Layout = ReturnType<typeof createLayout>;
 
 /** Lay out a scene: memoized sizes, positions, and points that resolve on first use. */
 export function createLayout(
-  scene: DiagramBuilder,
+  scene: Scene,
   m: Metrics,
   measure: Measure,
   report: Report,

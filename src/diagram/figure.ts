@@ -9,6 +9,7 @@ import { type CompiledDiagram, expand } from "./drawing.ts";
 import type { Diagnostic } from "./elements.ts";
 import { overlap } from "./geometry.ts";
 import { type Lookups, minScale, readingWidth } from "./metrics.ts";
+import { Scene } from "./scene.ts";
 
 /** A step as data: its id and the ids it focuses, as written. */
 export interface FigureStep {
@@ -58,11 +59,11 @@ export function drawFailed(message: string): CompiledDiagram {
   };
 }
 
-/** Run the author's draw program on a new builder and compile it, or report why it threw. */
+/** Run the author's draw program on a new scene and compile it, or report why it threw. */
 function compileDraw(draw: Figure["draw"], lookups: Lookups): CompiledDiagram {
-  const scene = new DiagramBuilder();
+  const scene = new Scene();
   try {
-    draw(scene);
+    draw(new DiagramBuilder(scene));
   } catch (error) {
     return drawFailed(error instanceof Error ? error.message : String(error));
   }

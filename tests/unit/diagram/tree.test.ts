@@ -7,6 +7,7 @@ import { compile } from "../../../src/diagram/compile/compile.ts";
 import { expand } from "../../../src/diagram/drawing.ts";
 import type { Node } from "../../../src/diagram/elements.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
+import { Scene } from "../../../src/diagram/scene.ts";
 import type { TreeLayout } from "../../../src/diagram/tree.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
@@ -34,11 +35,12 @@ function routes(out: ReturnType<typeof compile>) {
  * all 100 × 40.
  */
 function uneven(layout: TreeLayout, extra: (d: DiagramBuilder) => void = () => {}) {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = (id: string) => sized(d, id);
   const t = d.tree(n("r"), [[n("a"), [n("a1"), [n("a2"), [n("x"), n("y")]]]], n("b")], { layout });
   extra(d);
-  return { out: compile(d, lookups), tree: t };
+  return { out: compile(scene, lookups), tree: t };
 }
 
 test("down: the root is centered over all of its subtrees, which are top-aligned", () => {
@@ -101,12 +103,13 @@ test("right: the tree turned, children left-aligned and the root centered on its
 });
 
 test("both: children alternate right and left, and the left ones grow to the left", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = (id: string) => sized(d, id);
   const tree = d.tree(n("r"), [n("a"), [n("b"), [n("b1"), [n("b2"), [n("z")]]]], n("c")], {
     layout: "both",
   });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   assert.equal(tree.id, "r-tree");
   const r = rects(out);
@@ -161,7 +164,8 @@ test("indent: each subtree is indented under its parent, with lines from under i
 
 test("the lines from one parent share a trunk, which is not EDGE_OVERLAP, in every layout", () => {
   for (const layout of ["down", "right", "both", "indent"] as const) {
-    const d = new DiagramBuilder();
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
     const n = (id: string) => sized(d, id, 80, 30);
     d.tree(
       n("r"),
@@ -174,7 +178,7 @@ test("the lines from one parent share a trunk, which is not EDGE_OVERLAP, in eve
       ],
       { layout },
     );
-    assert.deepEqual(compile(d, lookups).diagnostics, [], layout);
+    assert.deepEqual(compile(scene, lookups).diagnostics, [], layout);
   }
 });
 
@@ -189,11 +193,12 @@ test("a subtree's container groups its lines, so a step on it focuses the whole 
 });
 
 test("edge options apply to every line, and an explicit root id names the container", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const tree = d.tree(d.box("Root", { id: "top" }), [d.box("A"), d.box("B")], {
     edge: { ends: "->", dashed: true, role: "muted" },
   });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   assert.equal(tree.id, "top-tree");
   assert.deepEqual(
@@ -206,11 +211,12 @@ test("edge options apply to every line, and an explicit root id names the contai
 });
 
 test("a tree nests in a row like any element, and its own gaps are kept", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const left = sized(d, "left");
   const t = d.tree(sized(d, "r"), [sized(d, "a"), sized(d, "b")], { gap: 10, levelGap: 30 });
   d.row([left, t], { gap: 20 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   const r = rects(out);
   assert.equal(r.a?.x, 120);
@@ -221,9 +227,10 @@ test("a tree nests in a row like any element, and its own gaps are kept", () => 
 });
 
 test("one child sits under its parent, and a tree without children is its root alone", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   d.tree(sized(d, "r"), [sized(d, "a")]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   assert.deepEqual(routes(out)["r->a"], [
     { x: 50, y: 40 },
@@ -231,9 +238,10 @@ test("one child sits under its parent, and a tree without children is its root a
     { x: 50, y: 88 },
   ]);
   for (const layout of ["down", "right", "both", "indent"] as const) {
-    const e = new DiagramBuilder();
+    const eScene = new Scene();
+    const e = new DiagramBuilder(eScene);
     const t = e.tree(sized(e, "r"), [], { layout });
-    const alone = compile(e, lookups);
+    const alone = compile(eScene, lookups);
     assert.deepEqual(alone.diagnostics, [], layout);
     assert.equal(t.id, "r-tree");
     assert.deepEqual(alone.groups["r-tree"], ["r"]);
@@ -242,18 +250,20 @@ test("one child sits under its parent, and a tree without children is its root a
 });
 
 test("a node placed elsewhere is CONFLICTING_PLACEMENT, as in any row or column", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = sized(d, "a");
   const b = sized(d, "b");
   const t = d.tree(sized(d, "r"), [a]);
   d.column([d.row([a, b]), t]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const conflict = out.diagnostics.find((x) => x.code === "CONFLICTING_PLACEMENT");
   assert.match(conflict?.message ?? "", /^a is positioned by both row\(row-\d+\) and row/);
 });
 
 test("a layout that is not one of the four stops the draw program", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   assert.throws(
     () => d.tree(sized(d, "r"), [], { layout: "up" as TreeLayout }),
     /Tree layout "up" is not one of down, right, both, indent/,

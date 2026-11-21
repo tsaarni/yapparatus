@@ -3,7 +3,6 @@
  * has its own file; this file runs them in order, each with what the steps before it made.
  */
 import { type DiagnosticCode, diagnosticCodes } from "../../document/diagnostic.ts";
-import type { DiagramBuilder } from "../builder.ts";
 import {
   type CompiledDiagram,
   type CompiledEdge,
@@ -16,6 +15,7 @@ import {
 import { type Diagnostic, Edge, type Element, Frame, slug } from "../elements.ts";
 import { inflate, type Rect, rounded, union, type Vec } from "../geometry.ts";
 import { defaultMetrics, type Lookups, type Measure, type Metrics } from "../metrics.ts";
+import type { Scene } from "../scene.ts";
 import { checkIds, checkOverlaps, checkPlaced, groupsOf, validate } from "./checks.ts";
 import { createEdges } from "./edges.ts";
 import { createIcons } from "./icons.ts";
@@ -25,7 +25,7 @@ import { createText, type Report } from "./text.ts";
 
 /** Measure and lay out a built scene into the drawing the views render, with its diagnostics. */
 export function compile(
-  scene: DiagramBuilder,
+  scene: Scene,
   lookups: Lookups,
   metrics: Metrics = defaultMetrics,
 ): CompiledDiagram {
@@ -128,7 +128,7 @@ export function compile(
  * members: edge points, heads, and labels, node rectangles and labels, and inner frames.
  */
 function compileFrames(
-  scene: DiagramBuilder,
+  scene: Scene,
   nodes: CompiledNode[],
   edges: CompiledEdge[],
   compileFrame: (frame: Frame, ink: Rect[]) => CompiledFrame,
@@ -170,7 +170,7 @@ function paintOrder(nodes: CompiledNode[]): CompiledNode[] {
  * elements in steps, unless an element or container has that id.
  */
 function legendOf(
-  scene: DiagramBuilder,
+  scene: Scene,
   elements: Array<{ id: string; category?: number }>,
   groups: Record<string, string[]>,
   report: Report,

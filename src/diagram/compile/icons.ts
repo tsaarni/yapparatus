@@ -15,7 +15,7 @@ export type Icons = ReturnType<typeof createIcons>;
  * Look up the icon of every box and icon shape, and report each name the set does not have.
  * `iconOf` gives a node's known icon, and `table` each icon used, once, with its drawing.
  */
-export function createIcons(set: IconSet, nodes: Node[], report: Report) {
+export function createIcons(set: IconSet, nodes: readonly Node[], report: Report) {
   const known = new Map<Node, string>();
   const table = new Map<string, string>();
   for (const node of nodes) {

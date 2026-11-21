@@ -2,18 +2,20 @@
  * Sequence diagrams from the diagram primitives: participants in a row with lifelines, and
  * activation bars derived from calls and replies, with notes and fragments drawn as frames.
  */
-import type { DiagramBuilder } from "./builder.ts";
 import {
-  Edge,
+  type Edge,
   type EdgeOptions,
   type Element,
   type Frame,
-  Node,
+  lerp,
+  type Node,
   type PointLike,
   type Role,
   slug,
+  xy,
 } from "./elements.ts";
-import { sequenceSpacing, shapes } from "./metrics.ts";
+import { defaultGap, sequenceSpacing, shapes } from "./metrics.ts";
+import type { Scene } from "./scene.ts";
 
 /** Elements a fragment or a whole sequence holds, for steps that focus it. */
 type Members = Array<Element | Edge | Frame>;
@@ -79,9 +81,9 @@ interface Bar {
 /** Half an activation bar's width: how far a message stops short of the bar's center line. */
 const barHalf = shapes.bar / 2;
 
-/** Draw a sequence diagram into the builder and return the column that holds it all. */
+/** Draw a sequence diagram into the scene and return the column that holds it all. */
 export function sequence(
-  d: DiagramBuilder,
+  scene: Scene,
   participants: Node[],
   steps: SequenceStep[],
   options: SequenceOptions = {},
@@ -89,8 +91,11 @@ export function sequence(
   const step = options.step ?? sequenceSpacing.step;
   const boxes = participants.filter((n) => n.shape !== "actor" && n.shape !== "icon");
   for (const n of boxes) n.options.minWidth ??= sequenceSpacing.minWidth;
-  if (boxes.length > 1) d.equalSize(boxes);
-  const header = d.row(participants, { gap: options.gap ?? sequenceSpacing.gap, align: "end" });
+  if (boxes.length > 1) scene.addSizeGroup({ members: boxes, width: true, height: true });
+  const header = scene.addGrid("row", [participants], {
+    gap: [options.gap ?? sequenceSpacing.gap, defaultGap.y],
+    align: "end",
+  });
   const known = new Set(participants);
   const check = (n: Node) => {
     if (!known.has(n)) throw new Error(`Sequence step uses "${n.id}", which is not a participant.`);
@@ -103,11 +108,7 @@ export function sequence(
     o: EdgeOptions,
     derivedId: string,
     passive = false,
-  ) => {
-    const edge = new Edge(from, to, o, { passive, derivedId });
-    d.edges.push(edge);
-    return edge;
-  };
+  ) => scene.addEdge(from, to, o, { passive, derivedId });
   const all: Members = [...participants];
 
   type Event =
@@ -161,9 +162,9 @@ export function sequence(
         const inset = insets.base + insets.step * Math.max(0, insets.levels - depth);
         if (left && right)
           frames.push(() => {
-            const frame = d.frame(
-              d.xy(left.left.offset(-inset, 0), at(top)),
-              d.xy(right.right.offset(inset, 0), at(bottom)),
+            const frame = scene.addFrame(
+              xy(left.left.offset(-inset, 0), at(top)),
+              xy(right.right.offset(inset, 0), at(bottom)),
               {
                 ...(s.id ? { id: s.id } : {}),
                 tab: s.fragment,
@@ -174,7 +175,7 @@ export function sequence(
                 })),
               },
             );
-            d.groups.set(frame, members);
+            scene.addGroup(frame, members);
             for (const outer of within) outer.push(frame);
             all.push(frame);
           });
@@ -223,8 +224,9 @@ export function sequence(
   for (const e of events) {
     if (e.kind === "note") {
       const [a, b] = Array.isArray(e.s.over) ? e.s.over : [e.s.over, e.s.over];
-      const note = d.note(e.s.note, { ...(e.s.id ? { id: e.s.id } : {}) });
-      d.place(note, { at: d.xy(d.lerp(a.center, b.center), at(e.y)), anchor: "top" });
+      const note = scene.addNode("note", e.s.note, { ...(e.s.id ? { id: e.s.id } : {}) });
+      const top = xy(lerp(a.center, b.center), at(e.y));
+      scene.own(note, { kind: "at", at: top, anchor: "top" }, "place()");
       for (const members of [all, ...e.within]) members.push(note);
       continue;
     }
@@ -247,8 +249,8 @@ export function sequence(
       const inner = open(from, e.y + step * sequenceSpacing.self.barStart);
       inner.end = e.y + step * sequenceSpacing.self.barEnd;
       stacks.get(from)?.pop();
-      const start = d.xy(from.center.offset(edgeX(outer, 1), 0), at(e.y));
-      const back = d.xy(
+      const start = xy(from.center.offset(edgeX(outer, 1), 0), at(e.y));
+      const back = xy(
         from.center.offset(offset(inner.depth) + barHalf, 0),
         at(e.y + step * sequenceSpacing.self.back),
       );
@@ -259,7 +261,7 @@ export function sequence(
           back,
           {
             ...id,
-            route: { via: [d.xy(reach, start), d.xy(reach, back)] },
+            route: { via: [xy(reach, start), xy(reach, back)] },
             label: { text: label, segment: 1, side: "right", gap: sequenceSpacing.self.labelGap },
             ...role,
           },
@@ -281,8 +283,8 @@ export function sequence(
       const x2 = edgeX(depthOf(to), -toward);
       add(
         arrow(
-          d.xy(from.center.offset(x1, 0), at(e.y)),
-          d.xy(to.center.offset(x2, 0), at(e.y)),
+          xy(from.center.offset(x1, 0), at(e.y)),
+          xy(to.center.offset(x2, 0), at(e.y)),
           { ...id, dashed: true, head: "open", label: { text: label, side: "above" }, ...role },
           derived,
         ),
@@ -304,8 +306,8 @@ export function sequence(
     }
     add(
       arrow(
-        d.xy(from.center.offset(x1, 0), at(e.y)),
-        d.xy(to.center.offset(x2, 0), at(e.y)),
+        xy(from.center.offset(x1, 0), at(e.y)),
+        xy(to.center.offset(x2, 0), at(e.y)),
         {
           ...id,
           ...(m.async ? { head: "open" as const } : {}),
@@ -319,13 +321,13 @@ export function sequence(
   for (const n of participants)
     arrow(
       n.bottom,
-      d.xy(n.bottom, at(bottom)),
+      xy(n.bottom, at(bottom)),
       { id: `${n.id}-lifeline`, dashed: true, role: "muted", ends: "--" },
       "",
       true,
     );
   bars.forEach(({ owner, bar }, i) => {
-    const shape = new Node(
+    const shape = scene.addNode(
       "bar",
       "",
       {
@@ -335,22 +337,21 @@ export function sequence(
       },
       { passive: true, ...(bar.edge ? { follows: bar.edge } : {}) },
     );
-    d.nodes.push(shape);
-    d.place(shape, {
-      at: d.xy(owner.center.offset(offset(bar.depth), 0), at(bar.start)),
-      anchor: "top",
-    });
+    const top = xy(owner.center.offset(offset(bar.depth), 0), at(bar.start));
+    scene.own(shape, { kind: "at", at: top, anchor: "top" }, "place()");
   });
   for (const make of frames) make();
 
-  const space = new Node(
+  const space = scene.addNode(
     "space",
     "",
     { id: `${options.id ?? header.id}-space`, width: 0, height: bottom },
     { passive: true },
   );
-  d.nodes.push(space);
-  const sequence = d.column([header, space], { gap: 0, ...(options.id ? { id: options.id } : {}) });
-  d.groups.set(sequence, all);
+  const sequence = scene.addGrid("column", [[header], [space]], {
+    gap: [defaultGap.x, 0],
+    ...(options.id ? { id: options.id } : {}),
+  });
+  scene.addGroup(sequence, all);
   return sequence;
 }

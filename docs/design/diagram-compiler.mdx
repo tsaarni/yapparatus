@@ -139,7 +139,14 @@ The sections below follow one small diagram through the stages. <Ref to="dc-exam
 
 ## The scene
 
-The draw program receives an object `d` whose functions record elements and arrangements, which together are the scene. A function that creates an element returns an object that stands for it, and the program passes it to later calls, such as a row or an edge. <Ref to="dc-scene" /> shows the scene of the running example.
+The draw program records elements and arrangements in a scene, which the compiler then lays out. The scene and the object `d` that the draw program receives are two separate things:
+
+- The scene holds the elements, the position owner of each element, the size groups, the groups that steps focus, the categories, and the diagnostics. It has one function for adding each kind of element: a node, an edge, a grid, an enclosure, and a frame. That function applies the element limit, registers the element's category, and connects the element to the diagnostics, so that the element can report a problem such as a missing member.
+- `d` has only the calls that the diagram reference documents, and each call adds elements through the scene's functions. The draw program cannot reach the scene or change its lists.
+
+A sequence and a tree add their elements through the same functions, with what an author cannot set: a passive element, such as a lifeline, an element that follows an edge, such as an activation bar, and an id derived from another element. Their elements therefore count against the limit and register their categories as the author's elements do.
+
+A call that creates an element returns an object that stands for it, and the program passes it to later calls, such as a row or an edge. <Ref to="dc-scene" /> shows the scene of the running example.
 
 <Diagram id="dc-scene" caption="The scene that the running example records: each element and what sets its position." draw={(d) => {
   d.record([

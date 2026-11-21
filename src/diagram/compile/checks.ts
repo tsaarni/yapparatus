@@ -2,7 +2,6 @@
  * Checks over the scene and the compiled drawing: ids, positions, overlaps, crossings.
  */
 
-import type { DiagramBuilder } from "../builder.ts";
 import type { CompiledEdge, CompiledEnclosure, CompiledLabel, CompiledNode } from "../drawing.ts";
 import { type Element, Enclosure, elementOf, Grid, Node, type PointLike } from "../elements.ts";
 import {
@@ -19,15 +18,16 @@ import {
   type Vec,
 } from "../geometry.ts";
 import { enclosure } from "../metrics.ts";
+import type { Scene } from "../scene.ts";
 import type { Report } from "./text.ts";
 
 /**
  * Settle ids in dependency order: shapes and containers, then members, then edges.
  * Explicit ids are fixed; derived ids get a numeric suffix when they collide.
  */
-export function checkIds(scene: DiagramBuilder, report: Report) {
+export function checkIds(scene: Scene, report: Report) {
   const taken = new Set<string>();
-  const settle = (all: Array<{ id: string; explicitId: boolean }>) => {
+  const settle = (all: ReadonlyArray<{ id: string; explicitId: boolean }>) => {
     for (const el of all.filter((e) => e.explicitId)) {
       if (taken.has(el.id)) report("DUPLICATE_ID", `Two elements use id "${el.id}".`, [el.id]);
       taken.add(el.id);
@@ -47,7 +47,7 @@ export function checkIds(scene: DiagramBuilder, report: Report) {
 }
 
 /** Every element needs a position owner; all but the first without one are reported. */
-export function checkPlaced(scene: DiagramBuilder, report: Report) {
+export function checkPlaced(scene: Scene, report: Report) {
   const roots = [...scene.nodes, ...scene.grids].filter(
     (el) => !scene.owner.has(el) && !(el instanceof Node && el.member),
   );
@@ -67,7 +67,7 @@ export function checkPlaced(scene: DiagramBuilder, report: Report) {
 
 /** Check the compiled drawing: accent overuse, overlaps, crossings, and enclosure intrusions. */
 export function validate(
-  scene: DiagramBuilder,
+  scene: Scene,
   nodes: CompiledNode[],
   edges: CompiledEdge[],
   enclosures: CompiledEnclosure[],
@@ -331,9 +331,9 @@ function commonStart(a: Vec[], b: Vec[]): number {
 }
 
 /** The direct members of every container, by id. Steps expand them recursively. */
-export function groupsOf(scene: DiagramBuilder): Record<string, string[]> {
+export function groupsOf(scene: Scene): Record<string, string[]> {
   const groups: Record<string, string[]> = {};
-  const add = (id: string, members: Array<{ id: string }>) => {
+  const add = (id: string, members: ReadonlyArray<{ id: string }>) => {
     groups[id] = [...(groups[id] ?? []), ...members.map((m) => m.id)];
   };
   for (const e of scene.enclosures) add(e.id, e.members);

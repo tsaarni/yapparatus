@@ -8,6 +8,7 @@ import type { BoxOptions, Node } from "../../../src/diagram/elements.ts";
 import { type Rect, round } from "../../../src/diagram/geometry.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { attachment, stack } from "../../../src/diagram/outlines.ts";
+import { Scene } from "../../../src/diagram/scene.ts";
 import type { SequenceStep } from "../../../src/diagram/sequence.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
@@ -17,11 +18,12 @@ const lookups = { measure, icons: fixedIcons };
 const codes = (d: ReturnType<typeof compile>) => d.diagnostics.map((x) => x.code);
 
 test("row places children with boundary gaps and centered cross-axis alignment", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A", { height: 48 });
   const b = d.box("B", { height: 96 });
   d.row([a, b], { gap: 30 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   const [ra, rb] = out.nodes.map((n) => n.rect);
   assert.equal(ra?.x, 0);
@@ -41,7 +43,8 @@ function rects(out: ReturnType<typeof compile>) {
 }
 
 test("a grid sizes each column to its widest cell and each row to its tallest", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = sized(d, "a", 100, 40);
   const b = sized(d, "b", 60, 80);
   const c = sized(d, "c", 140, 50);
@@ -55,7 +58,7 @@ test("a grid sizes each column to its widest cell and each row to its tallest", 
   );
   const x = sized(d, "x", 50, 50);
   d.place(x, { rightOf: g, gap: 0 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   const r = rects(out);
   assert.deepEqual(r.a, { x: 20, y: 20, width: 100, height: 40 }, "centered in its tracks");
@@ -69,7 +72,8 @@ test("a grid sizes each column to its widest cell and each row to its tallest", 
 
 test("a grid aligns cells in their tracks, one value or one for each direction", () => {
   const layout = (align: "end" | ["start", "end"]) => {
-    const d = new DiagramBuilder();
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
     const a = sized(d, "a", 100, 40);
     const b = sized(d, "b", 60, 80);
     const c = sized(d, "c", 140, 50);
@@ -80,7 +84,7 @@ test("a grid aligns cells in their tracks, one value or one for each direction",
       ],
       { gap: 10, align },
     );
-    return rects(compile(d, lookups));
+    return rects(compile(scene, lookups));
   };
   assert.deepEqual(layout("end").a, { x: 40, y: 40, width: 100, height: 40 });
   assert.deepEqual(layout(["start", "end"]).a, { x: 0, y: 40, width: 100, height: 40 });
@@ -88,7 +92,8 @@ test("a grid aligns cells in their tracks, one value or one for each direction",
 });
 
 test("rows and columns are grids of one row and one column, with the default gaps", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = sized(d, "a", 100, 40);
   const b = sized(d, "b", 60, 80);
   const c = sized(d, "c", 140, 50);
@@ -98,7 +103,7 @@ test("rows and columns are grids of one row and one column, with the default gap
   const column = d.column([c, e], { align: "start" });
   const grid = d.grid([[f]]);
   d.place(d.column([row, column, grid]), { at: [0, 0], anchor: "topLeft" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   assert.deepEqual([row.id, column.id, grid.id], ["row-1", "column-2", "grid-3"]);
   const r = rects(out);
@@ -109,7 +114,8 @@ test("rows and columns are grids of one row and one column, with the default gap
 });
 
 test("a grid nests in a row, and its gutters are the middle of its gaps", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = sized(d, "a", 100, 40);
   const b = sized(d, "b", 60, 80);
   const c = sized(d, "c", 140, 50);
@@ -124,7 +130,7 @@ test("a grid nests in a row, and its gutters are the middle of its gaps", () => 
   d.row([side, g], { gap: 30 });
   d.arrow(a, c, { id: "down", route: { viaX: g.gutterX(0) } });
   d.arrow(a, b.bottom, { id: "under", route: { viaY: g.gutterY(0) } });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   const r = rects(out);
   assert.deepEqual(r.a, { x: 70, y: 20, width: 100, height: 40 });
@@ -136,7 +142,8 @@ test("a grid nests in a row, and its gutters are the middle of its gaps", () => 
 });
 
 test("a gutter after the last track, or before the first, is UNKNOWN_GUTTER", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = sized(d, "a", 100, 40);
   const b = sized(d, "b", 60, 80);
   const g = d.grid([[a, b]]);
@@ -145,7 +152,7 @@ test("a gutter after the last track, or before the first, is UNKNOWN_GUTTER", ()
   for (const p of [g.gutterX(1), g.gutterX(-1), g.gutterX(0.5), g.gutterY(0), row.gutterX(0)])
     d.arrow(a, p, { route: "hv" });
   d.arrow(a, b, { route: { viaX: g.gutterX(0) } });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.equal(out.ok, false);
   const unknown = out.diagnostics.filter((x) => x.code === "UNKNOWN_GUTTER");
   assert.equal(unknown.length, 5);
@@ -155,13 +162,14 @@ test("a gutter after the last track, or before the first, is UNKNOWN_GUTTER", ()
 });
 
 test("the drawing keeps hundredths and leaves out false flags and centered alignment", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const precise: Measure = (text) => text.length * 7.123456;
   const a = d.box("Alpha", { sub: "first" });
   const b = d.box("Beta");
   d.row([a, b], { gap: 41.987654 });
   d.arrow(a, b, "calls");
-  const out = compile(d, { measure: precise, icons: fixedIcons });
+  const out = compile(scene, { measure: precise, icons: fixedIcons });
   const numbers: number[] = [];
   JSON.stringify([out.nodes, out.edges], (_, v) => {
     if (typeof v === "number") numbers.push(v);
@@ -187,11 +195,12 @@ test("the drawing keeps hundredths and leaves out false flags and centered align
 });
 
 test("place below uses layout-boundary gap and resolves regardless of order", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const db = d.cylinder("Database");
   const api = d.box("API");
   d.place(db, { below: api, gap: 50 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const rdb = out.nodes.find((n) => n.id === "database")?.rect;
   const rapi = out.nodes.find((n) => n.id === "api")?.rect;
   assert.equal(rdb?.y, (rapi?.y ?? 0) + (rapi?.height ?? 0) + 50);
@@ -199,26 +208,28 @@ test("place below uses layout-boundary gap and resolves regardless of order", ()
 });
 
 test("placement cycle is reported with its chain", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.place(a, { rightOf: b });
   d.place(b, { rightOf: a });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.equal(out.ok, false);
   const cycle = out.diagnostics.find((x) => x.code === "PLACEMENT_CYCLE");
   assert.match(cycle?.message ?? "", /position\(a\) → position\(b\) → position\(a\)/);
 });
 
 test("conflicting ownership and duplicate explicit ids are errors; derived ids disambiguate", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("Same");
   const twin = d.box("Same");
   d.box("X", { id: "dup" });
   d.box("Y", { id: "dup" });
   d.row([a]);
   d.place(a, { at: [0, 0] });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.ok(codes(out).includes("CONFLICTING_PLACEMENT"));
   assert.ok(codes(out).includes("DUPLICATE_ID"));
   assert.equal(twin.id, "same-2");
@@ -226,13 +237,14 @@ test("conflicting ownership and duplicate explicit ids are errors; derived ids d
 });
 
 test("elbow route keeps anchors and labels a vertical leg on its right", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const cache = d.box("Cache");
   const db = d.box("Database");
   d.place(db, { below: cache, gap: 80, align: "end" });
   d.place(cache, { at: [300, 50] });
   const e = d.arrow(cache.bottom, db.left.offset(-40, 0), { route: "vh", label: "miss" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const edge = out.edges.find((x) => x.id === e.id);
   assert.equal(edge?.points.length, 3);
   const [p0, p1] = edge?.points ?? [];
@@ -242,7 +254,8 @@ test("elbow route keeps anchors and labels a vertical leg on its right", () => {
 });
 
 test("an edge with corners leaves at a right angle, at the projection of its next point", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.place(a, { at: [0, 0], anchor: "topLeft" });
@@ -263,7 +276,7 @@ test("an edge with corners leaves at a right angle, at the projection of its nex
       ],
     },
   });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const points = (id: string) => out.edges.find((e) => e.id === id)?.points;
   assert.deepEqual(points(near.id)?.[0], { x: 82, y: 0 });
   assert.deepEqual(points(near.id)?.at(-1), { x: 382, y: -5.5 }, "the head shortens the end");
@@ -272,7 +285,8 @@ test("an edge with corners leaves at a right angle, at the projection of its nex
 });
 
 test("edges attach to the drawn outline: rhombus, circle, cylinder cap, and cut corner", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const ok = d.decision("Ok?");
   const end = d.end();
   const db = d.cylinder("DB");
@@ -291,7 +305,7 @@ test("edges attach to the drawn outline: rhombus, circle, cylinder cap, and cut 
   });
   const cap = d.line([200, 100], db, { route: { via: [[20, 100]] } });
   const cut = d.line([500, 100], memo);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const points = (id: string) => out.edges.find((e) => e.id === id)?.points;
   const rect = (id: string) => out.nodes.find((n) => n.id === id)?.rect;
   assert.deepEqual(rect("ok"), { x: 0, y: 0, width: 80, height: 55.47 });
@@ -306,7 +320,8 @@ test("edges attach to the drawn outline: rhombus, circle, cylinder cap, and cut 
 
 /** A shape at the origin, and where an edge with corners into each side ends on it. */
 function sides(kind: "io" | "doc" | "queue") {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = d[kind]("Twelve chars", { id: "n", sub: "sub" });
   d.place(n, { at: [0, 0], anchor: "topLeft" });
   const ends: Array<[number, number]> = [
@@ -316,7 +331,7 @@ function sides(kind: "io" | "doc" | "queue") {
     [20, 300],
   ];
   const routed = ends.map((p) => d.line(p, n, { route: { via: [p] } }).id);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   const node = out.nodes[0];
   const end = (id: string) => out.edges.find((e) => e.id === id)?.points.at(-1);
@@ -343,12 +358,13 @@ test("an io is a parallelogram: the text and padding plus the slant, attached on
 });
 
 test("a doc is a page with a wavy bottom that crosses its bottom line at the middle", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = d.doc("Twelve chars", { id: "n", sub: "sub" });
   const below = d.box("Below");
   d.column([n, below]);
   d.line(n, below);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const rect = out.nodes[0]?.rect;
   assert.deepEqual(out.edges[0]?.points[0], { x: 58, y: (rect?.y ?? 0) + (rect?.height ?? 0) });
   const { node, ends } = sides("doc");
@@ -374,10 +390,11 @@ test("a queue is a cylinder on its side: the text and padding plus the caps", ()
 
 /** A box or doc with replicas at the origin, compiled; the options may be invalid on purpose. */
 function stacked(kind: "box" | "doc", label: string, replicas?: unknown) {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = d[kind](label, { id: "n", sub: "sub", replicas: replicas as number });
   d.place(n, { at: [0, 0], anchor: "topLeft" });
-  return compile(d, lookups);
+  return compile(scene, lookups);
 }
 
 test("a stack of replicas is the box plus 5 units each way per box behind, text on the front", () => {
@@ -418,10 +435,11 @@ test("replicas other than 2 to 4 are INVALID_REPLICAS, and the box is drawn alon
 
 /** A box labelled "Billing service", 105 units wide, at the origin, compiled. */
 function iconBox(options: BoxOptions) {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = d.box("Billing service", { id: "n", ...options });
   d.place(n, { at: [0, 0], anchor: "topLeft" });
-  return compile(d, lookups);
+  return compile(scene, lookups);
 }
 
 test("a box's icon and gap widen it, and the icon and the text center together", () => {
@@ -454,12 +472,13 @@ test("a box's icon reduces the wrapping width, and sits on the front of a stack"
 });
 
 test("an icon shape is laid out as an actor: the icon above its label", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const user = d.icon("user", "User");
   const actor = d.actor("Person");
   d.row([user, actor], { align: "start" });
   d.arrow(actor, user);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   const [icon, figure] = out.nodes;
   assert.equal(icon?.shape, "icon");
@@ -470,21 +489,23 @@ test("an icon shape is laid out as an actor: the icon above its label", () => {
 });
 
 test("an icon used twice is in the table once, and each node names it", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("Primary", { icon: "database" });
   const b = d.box("Replica", { icon: "database" });
   const c = d.icon("database", "Archive");
   d.row([a, b, c]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(Object.keys(out.icons), ["database"]);
   assert.equal(out.icons.database, fixedIcons.body("database"));
   assert.deepEqual(
     out.nodes.map((n) => n.icon?.name),
     ["database", "database", "database"],
   );
-  const none = new DiagramBuilder();
+  const noneScene = new Scene();
+  const none = new DiagramBuilder(noneScene);
   none.box("Plain");
-  assert.deepEqual(compile(none, lookups).icons, {});
+  assert.deepEqual(compile(noneScene, lookups).icons, {});
 });
 
 test("an icon the set does not have is UNKNOWN_ICON with the nearest names, and is left out", () => {
@@ -500,14 +521,16 @@ test("an icon the set does not have is UNKNOWN_ICON with the nearest names, and 
     /Nearest names: database, database-zap, database-backup\./,
   );
   for (const name of ["__proto__", "constructor", "lucide:database"]) {
-    const d = new DiagramBuilder();
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
     d.icon(name, "Thing");
-    assert.deepEqual(codes(compile(d, lookups)), ["UNKNOWN_ICON"], name);
+    assert.deepEqual(codes(compile(scene, lookups)), ["UNKNOWN_ICON"], name);
   }
 });
 
 test("an edge attaches to the outline of the whole stack, not in its notched corners", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = d.box("Twelve chars", { id: "n", sub: "sub", replicas: 3 });
   d.place(n, { at: [0, 0], anchor: "topLeft" });
   const ends: Array<[number, number]> = [
@@ -522,7 +545,7 @@ test("an edge attaches to the outline of the whole stack, not in its notched cor
     d.line([-center.x, -center.y], n).id,
     d.line([126 + center.x, 67.19 + center.y], n).id,
   ];
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.diagnostics, []);
   const end = (id: string) => out.edges.find((e) => e.id === id)?.points.at(-1);
   near(end(routed[0] as string), { x: 0, y: 30 });
@@ -546,22 +569,24 @@ test("a stack of documents shows the waves behind only right of the page in fron
     if (p.x >= front.x + front.width - 0.01 || p.y <= front.y) continue;
     assert.ok(Math.abs(p.y - bottom) <= 5.01, `${JSON.stringify(p)} is on the front wave`);
   }
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const n = d.doc("Twelve chars", { id: "n", sub: "sub", replicas: 3 });
   d.place(n, { at: [0, 0], anchor: "topLeft" });
   const strip = d.line([118.5, 200], n, { route: { via: [[118.5, 200]] } });
-  const out2 = compile(d, lookups);
+  const out2 = compile(scene, lookups);
   const end = out2.edges.find((e) => e.id === strip.id)?.points.at(-1);
   assert.ok(end && end.y < bottom - 5 && end.y > bottom - 10, `on the middle page: ${end?.y}`);
 });
 
 test("\\n in an edge label starts a new line; the rect covers every line", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.row([a, b], { gap: 200 });
   const e = d.arrow(a, b, "ab\ncdef");
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const label = out.edges.find((x) => x.id === e.id)?.labels[0];
   assert.ok(label);
@@ -592,7 +617,8 @@ test("\\n in an edge label starts a new line; the rect covers every line", () =>
 
 test("a multi-line label is checked with its full height and quoted on one line", () => {
   const overlaps = (text: string) => {
-    const d = new DiagramBuilder();
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
     const x = d.box("X");
     const y = d.box("Y");
     const top = d.box("Top");
@@ -600,7 +626,7 @@ test("a multi-line label is checked with its full height and quoted on one line"
     d.place(y, { at: [400, 0] });
     d.place(top, { at: [200, -35], anchor: "bottom" });
     d.arrow(x, y, text);
-    return compile(d, lookups).diagnostics.filter((x) => x.code === "LABEL_OVERLAP");
+    return compile(scene, lookups).diagnostics.filter((x) => x.code === "LABEL_OVERLAP");
   };
   assert.deepEqual(overlaps("short"), []);
   const hits = overlaps("one\ntwo\nthree");
@@ -609,11 +635,12 @@ test("a multi-line label is checked with its full height and quoted on one line"
 });
 
 test("sequence message labels break lines like edge labels", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.sequence([a, b], [{ from: a, to: b, label: "first\nsecond", id: "msg" }]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const label = out.edges.find((e) => e.id === "msg")?.labels[0];
   assert.deepEqual(
     label?.lines.map((l) => l.text),
@@ -622,13 +649,14 @@ test("sequence message labels break lines like edge labels", () => {
 });
 
 test("element endpoints snap to facing sides; obstacles are reported, not avoided", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("Left");
   const mid = d.box("Middle");
   const b = d.box("Right");
   d.row([a, mid, b]);
   d.arrow(a, b);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const edge = out.edges[0];
   const ra = out.nodes[0]?.rect;
   assert.equal(edge?.points[0]?.x, (ra?.x ?? 0) + (ra?.width ?? 0));
@@ -637,7 +665,8 @@ test("element endpoints snap to facing sides; obstacles are reported, not avoide
 });
 
 test("an edge that runs through its own end is reported; the legs that touch an end are not", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const source = d.box("Source");
   const target = d.box("Target");
   const other = d.box("Other");
@@ -650,7 +679,7 @@ test("an edge that runs through its own end is reported; the legs that touch an 
   const diamond = d.decision("Ok?");
   d.place(diamond, { below: other });
   const straight = d.arrow(other, diamond);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const hits = out.diagnostics.filter((x) => x.code === "EDGE_NODE_INTERSECTION");
   assert.deepEqual(
     hits.map((x) => x.ids),
@@ -661,36 +690,39 @@ test("an edge that runs through its own end is reported; the legs that touch an 
 });
 
 test("equalSize, fixed-width wrapping, and overflow", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("Short");
   const b = d.box("A much longer label");
   const c = d.box("wrap these words please", { width: 120, id: "wrapped" });
   const tight = d.box("Too tall\nfor this", { height: 20, id: "tight" });
   d.equalSize([a, b]);
   d.column([a, b, c, tight]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.equal(out.nodes[0]?.rect.width, out.nodes[1]?.rect.width);
   assert.ok((out.nodes[2]?.lines.length ?? 0) > 1);
   assert.ok(codes(out).includes("TEXT_OVERFLOW"));
 });
 
 test("an overflowing member of a size group is reported once", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("Too tall\nfor this", { height: 20, id: "tight" });
   const b = d.box("B");
   const c = d.box("C");
   d.equalSize([a, b, c]);
   d.row([a, b, c]);
-  assert.deepEqual(codes(compile(d, lookups)), ["TEXT_OVERFLOW", "FIXED_SIZE_IN_GROUP"]);
+  assert.deepEqual(codes(compile(scene, lookups)), ["TEXT_OVERFLOW", "FIXED_SIZE_IN_GROUP"]);
 });
 
 test("a fixed size in a size group is kept, and a smaller one is reported", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const fixed = d.box("wrap these words please", { width: 120, id: "fixed" });
   const wide = d.box("A much longer label than that", { id: "wide" });
   d.equalSize([fixed, wide]);
   d.row([fixed, wide]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const rect = (id: string) => out.nodes.find((n) => n.id === id)?.rect;
   assert.equal(rect("fixed")?.width, 120);
   assert.equal(rect("wide")?.width, 29 * 7 + 2 * 16);
@@ -702,7 +734,8 @@ test("a fixed size in a size group is kept, and a smaller one is reported", () =
 });
 
 test("a long label wraps at the shape's limit, in balanced lines", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const label = "one two three four five six seven eight nine";
   d.column([
     d.box(label, { id: "long" }),
@@ -712,7 +745,7 @@ test("a long label wraps at the shape's limit, in balanced lines", () => {
     d.text(label, { id: "text" }),
     d.text(`${label} ten eleven`, { id: "longer-text" }),
   ]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const node = (id: string) => out.nodes.find((n) => n.id === id);
   const lines = (id: string) => node(id)?.lines.map((l) => l.text);
@@ -727,10 +760,11 @@ test("a long label wraps at the shape's limit, in balanced lines", () => {
 });
 
 test("a word wider than the limit widens the shape, and overflows only a fixed width", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const word = "x".repeat(40);
   d.column([d.box(word, { id: "free" }), d.box(word, { id: "fixed", width: 120 })]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.equal(out.nodes.find((n) => n.id === "free")?.rect.width, 40 * 7 + 2 * 16);
   assert.deepEqual(
     out.diagnostics.map((x) => [x.code, x.ids]),
@@ -739,7 +773,8 @@ test("a word wider than the limit widens the shape, and overflows only a fixed w
 });
 
 test("a fixed size that is the largest sets its group's size; other axes are free", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const big = d.box("Big", { width: 300 });
   const small = d.box("Small");
   d.equalSize([big, small]);
@@ -747,7 +782,7 @@ test("a fixed size that is the largest sets its group's size; other axes are fre
   const b = d.box("B", { width: 140, sub: "two\nlines" });
   d.equalHeight([a, b]);
   d.column([d.row([big, small]), d.row([a, b])]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const rect = (id: string) => out.nodes.find((n) => n.id === id)?.rect;
   assert.equal(rect("small")?.width, 300);
@@ -756,14 +791,15 @@ test("a fixed size that is the largest sets its group's size; other axes are fre
 });
 
 test("enclosure wraps members with title band and flags intruders", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const api = d.box("API");
   const cache = d.box("Cache");
   const outsider = d.box("Outsider");
   d.row([api, cache]);
   const svc = d.enclose([api, cache], { title: "Service", padding: 10 });
   d.place(outsider, { below: api, gap: 0 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const r = out.enclosures[0]?.rect;
   assert.ok(r && r.x === -10);
   assert.ok(codes(out).includes("ENCLOSURE_INTRUSION"));
@@ -771,7 +807,8 @@ test("enclosure wraps members with title band and flags intruders", () => {
 });
 
 test("sequence: calls open bars, replies close them, async and unanswered calls stay short", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   const c = d.cylinder("C");
@@ -789,7 +826,7 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
       },
     ],
   );
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const bars = out.nodes.filter((n) => n.shape === "bar");
   const barOf = (id: string) => bars.filter((n) => n.id.startsWith(`${id}-active`));
@@ -813,12 +850,13 @@ test("sequence: calls open bars, replies close them, async and unanswered calls 
 
 /** Compile a sequence of boxes A, B, C and give the rectangles of its bars and notes by id. */
 function sequenceRects(steps: (a: Node, b: Node, c: Node) => SequenceStep[]) {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   const c = d.box("C");
   d.sequence([a, b, c], steps(a, b, c));
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const rects = Object.fromEntries(
     out.nodes.filter((n) => n.shape === "bar" || n.shape === "note").map((n) => [n.id, n.rect]),
@@ -965,7 +1003,8 @@ test("sequence: only receivers get bars; a sender without one sends from its lif
 });
 
 test("sequence: a bar ends at its reply or after a short length, never at the last message", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const envoy = d.box("Envoy");
   const contour = d.box("Contour");
   d.sequence(
@@ -978,7 +1017,7 @@ test("sequence: a bar ends at its reply or after a short length, never at the la
     ],
     { gap: 280, numbered: true, step: 64 },
   );
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const bars = Object.fromEntries(
     out.nodes.filter((n) => n.shape === "bar").map((n) => [n.id, n.rect]),
@@ -991,7 +1030,8 @@ test("sequence: a bar ends at its reply or after a short length, never at the la
 });
 
 test("sequence: a note is painted over the activation bar under it", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const envoy = d.box("Envoy");
   const contour = d.box("Contour");
   d.sequence(
@@ -1004,19 +1044,20 @@ test("sequence: a note is painted over the activation bar under it", () => {
     ],
     { gap: 280, numbered: true, step: 64 },
   );
-  const ids = compile(d, lookups).nodes.map((n) => n.id);
+  const ids = compile(scene, lookups).nodes.map((n) => n.id);
   const bars = ids.filter((id) => id.includes("-active-"));
   assert.ok(bars.length > 0);
   for (const bar of bars) assert.ok(ids.indexOf(bar) < ids.indexOf("warm"), bar);
 });
 
 test("record cells are elements; an edge from a row leaves the record's side", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const rec = d.record(["seq", "author", "text"], { title: "Message", id: "message" });
   const choice = d.decision("Same page?", { id: "choice" });
   d.row([rec, choice], { gap: 80 });
   const link = d.arrow(rec.element("text"), choice, { id: "link" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const r = out.nodes.find((n) => n.id === "message")?.rect;
   const cell = out.nodes.find((n) => n.id === "message.text");
   const edge = out.edges.find((e) => e.id === link.id);
@@ -1034,7 +1075,8 @@ test("record cells are elements; an edge from a row leaves the record's side", (
 });
 
 test("record cells are rectangles: the rest of a row, or whole rows", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   d.record(
     [
       ["Version", 4],
@@ -1048,7 +1090,7 @@ test("record cells are rectangles: the rest of a row, or whole rows", () => {
       id: "ip",
     },
   );
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const cell = (id: string) => out.nodes.find((n) => n.id === `ip.${id}`)?.rect;
   const flow = cell("flow");
   const source = cell("source-address");
@@ -1061,12 +1103,13 @@ test("record cells are rectangles: the rest of a row, or whole rows", () => {
 });
 
 test("a record widened by equalWidth widens its cells to its right side", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const wide = d.record(["a\t4294967296"], { title: "HTTPProxy weights", id: "wide" });
   const narrow = d.record(["a\t0", "b\t1"], { title: "Envoy", id: "narrow" });
   d.equalWidth([wide, narrow]);
   d.row([wide, narrow], { gap: 40 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const r = out.nodes.find((n) => n.id === "narrow")?.rect;
   const a = out.nodes.find((n) => n.id === "narrow.a")?.rect;
   const w = out.nodes.find((n) => n.id === "wide")?.rect;
@@ -1076,14 +1119,15 @@ test("a record widened by equalWidth widens its cells to its right side", () => 
 });
 
 test("member ids follow their record's id, even when it is derived and repeated", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.record(["key", "next"], { title: "entry" });
   const b = d.record(["key", "next"], { title: "entry" });
   d.row([a, b]);
   const link = d.arrow(a.element("next"), b.element("key"));
   const untitled = d.record(["x"]);
   d.place(untitled, { below: a });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   assert.deepEqual(
     out.nodes.map((n) => n.id),
@@ -1102,18 +1146,20 @@ test("member ids follow their record's id, even when it is derived and repeated"
 });
 
 test("a missing member is reported, and its parent stands in", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const rec = d.record(["id"], { id: "users" });
   assert.equal(rec.element("email"), rec);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const missing = out.diagnostics.find((x) => x.code === "UNKNOWN_ELEMENT");
   assert.match(missing?.message ?? "", /no member "email"\. Members: id\./);
 });
 
 test("a header row lines up with the cells' tab columns", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   d.record(["id\tuuid", "email\ttext"], { id: "users", title: "users", header: "column\ttype" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const rec = out.nodes.find((n) => n.id === "users");
   const cell = out.nodes.find((n) => n.id === "users.id");
   const header = rec?.lines.filter((l) => l.muted);
@@ -1127,7 +1173,8 @@ test("a header row lines up with the cells' tab columns", () => {
 });
 
 test("text marks are elements over their substring; unmatched marks are reported", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const t = d.text("GET /users/42 HTTP/1.1\nHost: example.com\nAccept: */*", {
     id: "req",
     mono: true,
@@ -1141,7 +1188,7 @@ test("text marks are elements over their substring; unmatched marks are reported
   });
   const centered = d.text("one two\nthree", { id: "c", marks: { two: "two" } });
   d.place(centered, { below: t });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const node = (id: string) => out.nodes.find((n) => n.id === id);
   const width = (s: string) => measure(s, { family: "", size: 0, weight: 0 });
   const path = node("req.path");
@@ -1162,15 +1209,17 @@ test("text marks are elements over their substring; unmatched marks are reported
 });
 
 test("a marked substring split by wrapping says so", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   d.text("alpha beta gamma", { id: "t", width: 50, marks: { bg: "beta gamma" } });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const message = out.diagnostics.find((x) => x.code === "MARK_UNMATCHED")?.message ?? "";
   assert.match(message, /split across wrapped lines/);
 });
 
 test("a pin numbers a member", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   d.record(
     [
       ["Flags", { span: 8, pin: 1 }],
@@ -1178,20 +1227,21 @@ test("a pin numbers a member", () => {
     ],
     { columns: 32, id: "tcp" },
   );
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.equal(out.nodes.find((n) => n.id === "tcp.flags")?.pin, 1);
   assert.equal(out.nodes.find((n) => n.id === "tcp.window")?.pin, undefined);
 });
 
 test("arrow takes its label as a string; a sequence is one placeable element", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   const seq = d.sequence([a, b], [{ from: a, to: b, label: "hello" }]);
   const after = d.box("After");
   d.place(after, { below: seq, gap: 20 });
   const plain = d.arrow(after, a, "back");
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.equal(plain.labels[0]?.text, "back");
   const lifeline = out.edges.find((e) => e.id === "a-lifeline");
   const rAfter = out.nodes.find((n) => n.id === "after")?.rect;
@@ -1205,13 +1255,14 @@ test("arrow takes its label as a string; a sequence is one placeable element", (
 });
 
 test("bend curves an edge to the left of travel with the label outside", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.row([a, b], { gap: 120 });
   const there = d.arrow(a, b, { label: "go", bend: 20 });
   const back = d.arrow(b, a, { label: "return", bend: 20 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const go = out.edges.find((e) => e.id === there.id);
   const ret = out.edges.find((e) => e.id === back.id);
@@ -1225,13 +1276,14 @@ test("bend curves an edge to the left of travel with the label outside", () => {
 });
 
 test("a self-loop leaves and returns on one side; bend with a route is an error", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const s = d.box("Running");
   const t = d.box("Stopped");
   d.row([s, t]);
   const tick = d.arrow(s, s, { label: "tick", loop: "top" });
   d.arrow(s, t, { bend: 10, route: "hv" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const r = out.nodes[0]?.rect;
   const loop = out.edges.find((e) => e.id === tick.id);
   assert.ok(r && loop);
@@ -1243,10 +1295,11 @@ test("a self-loop leaves and returns on one side; bend with a route is an error"
 });
 
 test("an enclosure title can sit in any corner", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   d.enclose([a], { title: "Group", titleAt: "bottomRight" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const e = out.enclosures[0];
   assert.ok(e?.titleRect);
   assert.ok(e.titleRect.x > e.rect.x + e.rect.width / 2, "right half");
@@ -1254,7 +1307,8 @@ test("an enclosure title can sit in any corner", () => {
 });
 
 test("containers list their members for steps: enclosures, grids, sequences, fragments", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   const seq = d.sequence(
@@ -1268,7 +1322,7 @@ test("containers list their members for steps: enclosures, grids, sequences, fra
   const c = d.box("C");
   d.place(c, { below: seq });
   d.enclose([c], { id: "outside" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(out.groups.retry, ["ask-2"], "a fragment holds its messages");
   assert.ok(out.groups[seq.id]?.includes("ask") && out.groups[seq.id]?.includes("done"));
   assert.ok(out.groups[seq.id]?.includes("retry"), "a sequence holds its fragments");
@@ -1276,37 +1330,40 @@ test("containers list their members for steps: enclosures, grids, sequences, fra
 });
 
 test("step-only elements may share a place without overlap warnings", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const box = d.box("Counter");
   const one = d.note("count = 1", { stepOnly: true });
   const two = d.note("count = 2", { stepOnly: true });
   d.place(one, { below: box });
   d.place(two, { below: box });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   assert.equal(out.nodes.filter((n) => n.stepOnly).length, 2);
 });
 
 test("one accent per figure: a second one is reported", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A", { role: "accent" });
   const b = d.box("B", { role: "accent" });
   d.place(b, { rightOf: a });
   d.arrow(a, b);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), ["ACCENT_OVERUSED"]);
   assert.deepEqual(out.diagnostics[0]?.ids, ["a", "b"]);
 });
 
 test("categories: colors in order of first use, a legend, and a group for steps", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("Orders", { category: "New" });
   const b = d.box("Batch job", { category: "To be removed" });
   const c = d.cylinder("Database");
   d.place(b, { rightOf: a });
   d.place(c, { rightOf: b });
   d.arrow(a, c, { category: "New", route: { viaY: a.bottom.offset(0, 40) } });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const node = (id: string) => out.nodes.find((n) => n.id === id);
   assert.equal(node("orders")?.category, 1);
@@ -1324,32 +1381,35 @@ test("categories: colors in order of first use, a legend, and a group for steps"
 });
 
 test("categories: a fifth is reported and drawn without a color", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const boxes = ["A", "B", "C", "D", "E"].map((name) => d.box(name, { category: `Kind ${name}` }));
   d.row(boxes);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), ["TOO_MANY_CATEGORIES"]);
   assert.equal(out.legend.length, 4);
   assert.equal(out.nodes.find((n) => n.id === "e")?.category, undefined);
 });
 
 test("categories: an id an element already has cannot name a category for steps", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   d.box("Cache", { category: "Cache" });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), ["DUPLICATE_ID"]);
   assert.equal(out.groups.cache, undefined);
 });
 
 test("start and end labels sit beside the dot without moving it, and are checked", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const start = d.start("Clicked");
   const step = d.box("Step");
   const end = d.end();
   d.column([start, step, end]);
   d.arrow(start, step);
   d.arrow(step, end);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const node = (id: string) => out.nodes.find((n) => n.id === id);
   const dot = node("clicked");
@@ -1361,16 +1421,19 @@ test("start and end labels sit beside the dot without moving it, and are checked
   assert.ok(out.viewBox.x + out.viewBox.width >= dot.labelRect.x + dot.labelRect.width);
   assert.ok(node("end-3"), "an unlabeled end keeps its numbered id");
 
-  const e = new DiagramBuilder();
+  const eScene = new Scene();
+
+  const e = new DiagramBuilder(eScene);
   const s = e.start("Go", { side: "below" });
   const b = e.box("Next");
   e.column([s, b]);
   e.arrow(s, b);
-  assert.ok(codes(compile(e, lookups)).includes("EDGE_NODE_INTERSECTION"));
+  assert.ok(codes(compile(eScene, lookups)).includes("EDGE_NODE_INTERSECTION"));
 });
 
 test("a ruler labels each side from a function, and crowded labels are reported", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const packet = d.record([["Field", 32]], {
     id: "packet",
     columns: 32,
@@ -1384,7 +1447,7 @@ test("a ruler labels each side from a function, and crowded labels are reported"
     ruler: { top: (i) => 31 - i },
   });
   d.column([packet, crowded]);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const labels = out.nodes.find((n) => n.id === "packet")?.lines.map((l) => l.text);
   assert.deepEqual(labels, ["0", "8", "16", "24", "0x0"]);
   const crowdedIds = out.diagnostics.filter((x) => x.code === "RULER_CROWDED").map((x) => x.ids[0]);
@@ -1392,7 +1455,8 @@ test("a ruler labels each side from a function, and crowded labels are reported"
 });
 
 test("a cell is as wide as the columns it spans", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   d.record(
     [
       ["Flags", 8],
@@ -1400,7 +1464,7 @@ test("a cell is as wide as the columns it spans", () => {
     ],
     { columns: 32, id: "tcp" },
   );
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const width = (id: string) => out.nodes.find((n) => n.id === id)?.rect.width ?? 0;
   assert.ok(width("tcp.flags") > 0);
   assert.equal(width("tcp.window"), 3 * width("tcp.flags"), "Window is three times Flags");
@@ -1408,12 +1472,13 @@ test("a cell is as wide as the columns it spans", () => {
 });
 
 test("an edge leaves a wide cell through the side its line crosses first", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const rec = d.record([["Options", 32]], { columns: 32, width: 420, id: "tcp" });
   const note = d.note("Up to 40 bytes", { id: "note" });
   d.place(note, { below: rec, gap: 40, align: "end" });
   d.arrow(note, rec.element("options"));
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const cell = out.nodes.find((n) => n.id === "tcp.options")?.rect;
   const tip = out.edges[0]?.heads[0]?.[0];
   assert.ok(cell && tip);
@@ -1422,15 +1487,17 @@ test("an edge leaves a wide cell through the side its line crosses first", () =>
 
 test("a run of spaces is measured as one space, as SVG text draws it", () => {
   const size = (label: string) => {
-    const d = new DiagramBuilder();
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
     d.box(label, { id: "a" });
-    return compile(d, lookups).nodes.find((n) => n.id === "a")?.rect.width;
+    return compile(scene, lookups).nodes.find((n) => n.id === "a")?.rect.width;
   };
   assert.equal(size("Read  model   cache"), size("Read model cache"));
 });
 
 test("an edge through free text is reported; an edge that ends at a text is not", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const heading = d.text("Heading");
   const b = d.box("B");
@@ -1439,7 +1506,7 @@ test("an edge through free text is reported; an edge that ends at a text is not"
   const note = d.text("Note");
   d.place(note, { below: a });
   const toText = d.arrow(a, note);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const hits = out.diagnostics.filter((x) => x.code === "EDGE_NODE_INTERSECTION");
   assert.deepEqual(
     hits.map((x) => x.ids),
@@ -1456,7 +1523,8 @@ function headLength(head: Array<{ x: number; y: number }>): number {
 }
 
 test("a head with too little room shrinks and is reported; a curve carries a full head", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.row([a, b], { gap: 4 });
@@ -1465,7 +1533,7 @@ test("a head with too little room shrinks and is reported; a curve carries a ful
   const e = d.box("E");
   d.place(d.row([c, e]), { below: a });
   const curved = d.arrow(c, e, { bend: 20 });
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const crowded = out.diagnostics.filter((x) => x.code === "HEAD_CROWDED");
   assert.deepEqual(
     crowded.map((x) => [x.ids, x.message]),
@@ -1477,7 +1545,8 @@ test("a head with too little room shrinks and is reported; a curve carries a ful
 });
 
 test("a fragment widens to cover its members, and an outer one covers the inner", () => {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const a = d.box("A");
   const b = d.box("B");
   d.sequence(
@@ -1496,7 +1565,7 @@ test("a fragment widens to cover its members, and an outer one covers the inner"
       },
     ],
   );
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   assert.deepEqual(codes(out), []);
   const frame = (id: string) => out.frames.find((f) => f.id === id)?.rect;
   const label = out.edges.find((x) => x.id === "self")?.labels[0]?.rect;
@@ -1511,13 +1580,14 @@ test("a fragment widens to cover its members, and an outer one covers the inner"
 
 /** The pairs of edge ids that EDGE_OVERLAP reports for edges among a row of boxes S1, S2, T, U. */
 function overlapsIn(edges: (d: DiagramBuilder, s1: Node, s2: Node, t: Node, u: Node) => void) {
-  const d = new DiagramBuilder();
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
   const boxes = ["S1", "S2", "T", "U"].map((label) => d.box(label));
   const [s1, s2, t, u] = boxes;
   assert.ok(s1 && s2 && t && u);
   d.row(boxes);
   edges(d, s1, s2, t, u);
-  const out = compile(d, lookups);
+  const out = compile(scene, lookups);
   const overlaps = out.diagnostics.filter((x) => x.code === "EDGE_OVERLAP");
   if (overlaps[0])
     assert.match(overlaps[0].message, /bend.*port\(\).*ends: "<->"/, "the message names the fixes");

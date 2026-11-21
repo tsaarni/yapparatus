@@ -272,7 +272,7 @@ export class Node extends Element {
     this.follows = internals.follows;
     this.member = internals.member;
   }
-  /** Set by the builder: where a missing member is reported. */
+  /** Set by the scene: where a missing member is reported. */
   report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
   /**
    * A member by its own id, such as `users.element("team-id")`, usable like any element.
@@ -335,7 +335,7 @@ export class Grid extends Element {
       : [options.align ?? "center", options.align ?? "center"];
     this.align = { x: ax, y: ay };
   }
-  /** Set by the builder: where a gutter that does not exist is reported. */
+  /** Set by the scene: where a gutter that does not exist is reported. */
   report?: (code: DiagnosticCode, message: string, ids: string[]) => void;
   /** The cells that hold an element, row by row. */
   get children(): Element[] {
@@ -569,6 +569,16 @@ export function toExpr(p: PointLike): PointExpr {
   if (p instanceof Point) return p.expr;
   if (Array.isArray(p)) return { k: "abs", x: p[0], y: p[1] };
   return { k: "anchor", el: p, name: "center" };
+}
+
+/** The point with the x coordinate of `x` and the y coordinate of `y`. */
+export function xy(x: PointLike, y: PointLike): Point {
+  return new Point({ k: "xy", x: toExpr(x), y: toExpr(y) });
+}
+
+/** The point between `a` and `b` by linear interpolation: t = 0 at a, 1 at b. */
+export function lerp(a: PointLike, b: PointLike, t = 0.5): Point {
+  return new Point({ k: "lerp", a: toExpr(a), b: toExpr(b), t });
 }
 
 /** The element a point is derived from: offset → base, xy → x, lerp → a. */

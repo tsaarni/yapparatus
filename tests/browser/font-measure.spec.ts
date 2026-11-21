@@ -8,6 +8,7 @@ import { lucideIcons } from "../../src/compiler/lucide-icons.ts";
 import { DiagramBuilder } from "../../src/diagram/builder.ts";
 import { compile } from "../../src/diagram/compile/compile.ts";
 import { type FontSpec, type Measure, defaultMetrics as m } from "../../src/diagram/metrics.ts";
+import { Scene } from "../../src/diagram/scene.ts";
 import { examplePages, examples } from "../unit/diagram/examples.ts";
 
 /** Every font the compiler measures with: the sans weights at each size, and mono. */
@@ -46,13 +47,14 @@ function referenceTexts(): Array<{ text: string; font: FontSpec }> {
   const found = new Map<string, { text: string; font: FontSpec }>();
   for (const page of examplePages)
     for (const { draw } of examples(page)) {
-      const d = new DiagramBuilder();
+      const scene = new Scene();
+      const d = new DiagramBuilder(scene);
       new Function("d", draw)(d);
       const measure: Measure = (text, font) => {
         found.set(`${font.family}|${font.weight}|${font.size}|${text}`, { text, font });
         return text.length * 7;
       };
-      compile(d, { measure, icons: lucideIcons() });
+      compile(scene, { measure, icons: lucideIcons() });
     }
   return [...found.values()];
 }
