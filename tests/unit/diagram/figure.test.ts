@@ -6,9 +6,11 @@ import type { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { expand } from "../../../src/diagram/drawing.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
+import { fixedIcons } from "./fixed-icons.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */
 const measure: Measure = (text) => text.length * 7;
+const lookups = { measure, icons: fixedIcons };
 
 const pair = (d: DiagramBuilder) => {
   const a = d.box("A");
@@ -20,7 +22,7 @@ const pair = (d: DiagramBuilder) => {
 test("a figure without problems has no diagnostics", () => {
   const out = compileFigure(
     { draw: pair, steps: [{ focus: ["a"] }, { id: "then", focus: ["b", "a->b"] }], build: true },
-    measure,
+    lookups,
   );
   assert.equal(out.ok, true);
   assert.deepEqual(out.diagnostics, []);
@@ -35,14 +37,14 @@ test("a draw program that throws is DRAW_FAILED", () => {
       steps: [{ focus: ["missing"] }],
       build: false,
     },
-    measure,
+    lookups,
   );
   assert.equal(out.ok, false);
   assert.deepEqual(out.diagnostics, [{ code: "DRAW_FAILED", message: "boom", ids: [] }]);
 });
 
 test("a step that focuses a missing element names the elements there are", () => {
-  const out = compileFigure({ draw: pair, steps: [{ focus: ["a", "c"] }], build: false }, measure);
+  const out = compileFigure({ draw: pair, steps: [{ focus: ["a", "c"] }], build: false }, lookups);
   assert.deepEqual(out.diagnostics, [
     {
       code: "UNKNOWN_ELEMENT",
@@ -65,7 +67,7 @@ test("a step id may not repeat an element id or another step id", () => {
       ],
       build: false,
     },
-    measure,
+    lookups,
   );
   assert.deepEqual(
     out.diagnostics.map((d) => [d.code, d.subject]),
@@ -84,14 +86,14 @@ test("step-only elements: unused ones and those a step shows on top of each othe
     d.place(one, { below: box });
     d.place(two, { below: box });
   };
-  const unused = compileFigure({ draw, steps: [{ focus: ["one"] }], build: false }, measure);
+  const unused = compileFigure({ draw, steps: [{ focus: ["one"] }], build: false }, lookups);
   assert.deepEqual(
     unused.diagnostics.map((d) => [d.code, d.ids]),
     [["STEP_ONLY_UNUSED", ["two"]]],
   );
   const together = compileFigure(
     { draw, steps: [{ focus: ["one"] }, { focus: ["one", "two"] }], build: false },
-    measure,
+    lookups,
   );
   assert.deepEqual(together.diagnostics, [
     {
@@ -108,13 +110,13 @@ test("a step focuses a container's contents", () => {
     const note = d.note("only here", { stepOnly: true, id: "note" });
     d.column([a, note], { id: "stack" });
   };
-  const out = compileFigure({ draw, steps: [{ focus: ["stack"] }], build: false }, measure);
+  const out = compileFigure({ draw, steps: [{ focus: ["stack"] }], build: false }, lookups);
   assert.deepEqual(out.diagnostics, []);
   assert.deepEqual([...expand(["stack"], out.groups)].sort(), ["a", "note", "stack"]);
 });
 
 test("build without steps is reported", () => {
-  const out = compileFigure({ draw: pair, steps: [], build: true }, measure);
+  const out = compileFigure({ draw: pair, steps: [], build: true }, lookups);
   assert.deepEqual(
     out.diagnostics.map((d) => d.code),
     ["BUILD_WITHOUT_STEPS"],
@@ -125,10 +127,10 @@ test("a drawing too wide to fit when shrunk is DIAGRAM_SCROLLS", () => {
   const wide = (gap: number) => (d: DiagramBuilder) => {
     d.row([d.box("A"), d.box("B")], { gap });
   };
-  const fits = compileFigure({ draw: wide(1000), steps: [], build: false }, measure);
+  const fits = compileFigure({ draw: wide(1000), steps: [], build: false }, lookups);
   assert.ok(fits.viewBox.width * 0.75 <= 960);
   assert.deepEqual(fits.diagnostics, []);
-  const out = compileFigure({ draw: wide(1200), steps: [], build: false }, measure);
+  const out = compileFigure({ draw: wide(1200), steps: [], build: false }, lookups);
   const width = out.viewBox.width;
   assert.deepEqual(out.diagnostics, [
     {

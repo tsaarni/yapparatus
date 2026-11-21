@@ -12,7 +12,7 @@ import {
   type TextLine,
 } from "./drawing.ts";
 import { type Rect, union } from "./geometry.ts";
-import { badge, corner, defaultMetrics, type FontSpec, type Measure } from "./metrics.ts";
+import { badge, corner, defaultMetrics, type FontSpec, iconGrid, type Measure } from "./metrics.ts";
 import * as shape from "./outlines.ts";
 import { categories, haloWidth, type Paint, roles } from "./paint.ts";
 
@@ -235,6 +235,13 @@ export function pictureOf(
     }
   };
 
+  const icon = (node: CompiledNode, color: string) => {
+    if (!node.icon || !Object.hasOwn(diagram.icons, node.icon.name)) return "";
+    const viewBox = `0 0 ${iconGrid} ${iconGrid}`;
+    const body = diagram.icons[node.icon.name];
+    return `<svg${attrs({ ...node.icon.rect, viewBox, color })}>${body}</svg>`;
+  };
+
   const nodeOf = (node: CompiledNode): string => {
     if (node.shape === "space") return "";
     const visible = node.passive ? !node.follows || shown(node.follows) : shown(node.id);
@@ -251,7 +258,8 @@ export function pictureOf(
       );
     const layered = (node.shape === "record" && node.rules !== undefined) || node.shape === "cell";
     const k = inkOf(node, paint);
-    let body = shapeOf(node, k) + lines(node, k.label);
+    let body =
+      shapeOf(node, k) + icon(node, node.shape === "icon" ? k.ink : k.label) + lines(node, k.label);
     if (node.role === "warning" && !layered) body += warningBadge(node.rect);
     if (flagged.has(node.id) && !layered)
       body += flag(node.labelRect ? (union([node.rect, node.labelRect]) as Rect) : node.rect, 4, 8);

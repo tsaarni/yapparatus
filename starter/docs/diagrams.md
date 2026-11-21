@@ -124,12 +124,13 @@ d.arrow(busy, busy, { label: "retry", loop: "top" })
 
 | Call | Draws |
 |---|---|
-| `d.box(label, options?)` | A component, service, or step; with `replicas`, a stack of boxes |
+| `d.box(label, options?)` | A component, service, or step; with `replicas`, a stack of boxes; with `icon`, an icon left of the label |
 | `d.cylinder(label, options?)` | Storage: a database or a cache |
 | `d.queue(label, options?)` | A cylinder on its side: a queue, a topic, or a stream |
 | `d.doc(label, options?)` | A page with a wavy bottom: a document, a report, or a file; with `replicas`, a stack of pages |
 | `d.io(label, options?)` | A parallelogram: the input or output of a flow |
 | `d.actor(label, options?)` | A person or outside system |
+| `d.icon(name, label, options?)` | A thing drawn as a picture, such as a user, a cloud, or a server: an icon above its label |
 | `d.note(label, options?)` | A remark with a folded corner |
 | `d.decision(label, options?)` | A diamond around a short question |
 | `d.record(cells, options?)` | Cells on a grid: a table, type, header, register, or array. See [Structures](diagram-structures.md) |
@@ -153,6 +154,20 @@ d.arrow(workers, exports)
 d.arrow(workers, shards)
 ```
 
+- **Icons:** `icon: "database"` on `d.box` draws a Lucide icon left of the label. `d.icon(name, label)` draws a larger one above its label, laid out as an actor is. The name is the Lucide name without the `lucide:` prefix; other collections do not work in diagrams. Find names as [Icons](icons.md#find-names) shows. A box's icon is drawn in the color of its label; the box's outline shows its role and category. A `d.icon` has no outline, so its icon is drawn in the element's line color, as an actor's figure is, and shows the role and category; its label keeps the label color. An unknown name is `UNKNOWN_ICON`, with the nearest names.
+
+```js
+const user = d.icon("user", "Customer")
+const api = d.box("Orders API", { icon: "server", role: "accent" })
+const db = d.box("Orders", { icon: "database", sub: "PostgreSQL" })
+const cloud = d.icon("cloud", "Payment provider", { role: "external" })
+d.row([user, api, db])
+d.place(cloud, { below: api })
+d.arrow(user, api, "orders")
+d.arrow(api, db, "SQL")
+d.arrow(api, cloud, "charge")
+```
+
 Options:
 
 - `id`: see [Ids](#ids).
@@ -161,13 +176,13 @@ Options:
 - `category`: what sets the element apart, in a few words, such as `"New"` or `"To be removed"`. See [Categories](#categories).
 
 `role` and `category` also work on arrows, enclosures, and sequence messages. There is no option for a color: colors come from the theme.
-- `width`: a fixed width; the text wraps at the width less the padding.
+- `width`: a fixed width; the text wraps at the width less the padding, and less a box's icon and the gap after it.
 - `height`: a fixed height; overflow is reported.
 - `minWidth`, `minHeight`, `mono`.
 
 `\n` starts a new line in a shape's label or `sub` and in an edge or message label. Sequence fragment titles and divider labels are one line.
 
-Long text wraps at spaces into lines of similar length: at 220 units in boxes, cylinders, queues, documents, inputs and outputs, decisions, and actors, and at 320 in notes, text, and the labels of start and end. The shape grows to its widest line. Text in `mono`, record titles and cells, and edge labels do not wrap unless `width` is fixed; break their lines with `\n`.
+Long text wraps at spaces into lines of similar length: at 220 units in boxes, cylinders, queues, documents, inputs and outputs, decisions, actors, and icons, and at 320 in notes, text, and the labels of start and end. The shape grows to its widest line. Text in `mono`, record titles and cells, and edge labels do not wrap unless `width` is fixed; break their lines with `\n`.
 
 ## Ids
 
@@ -411,6 +426,7 @@ The page compiler finds diagnostics when it compiles the page, so they are liste
 | `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
 | `UNPLACED` | error | Add the shape to a grid, row, or column, or `place()` it |
 | `INVALID_REPLICAS` | error | `replicas` is not a whole number from 2 to 4, so the shape is drawn alone. For more, or an unknown number, put the number in the label of a stack of 4 |
+| `UNKNOWN_ICON` | error | The icon name is not a Lucide icon, so nothing is drawn. Use a name from the message, or find one as [Icons](icons.md#find-names) shows, without the `lucide:` prefix |
 | `UNKNOWN_GUTTER` | error | `gutterX(i)` or `gutterY(i)` names a gap that does not exist. A grid of n columns has gutters 0 to n - 2 |
 | `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `element()` names a member that does not. The message lists the valid ids |
 | `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |

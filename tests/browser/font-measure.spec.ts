@@ -4,9 +4,10 @@
  */
 import { expect, test } from "@playwright/test";
 import { fontMeasure } from "../../src/compiler/font-measure.ts";
+import { lucideIcons } from "../../src/compiler/lucide-icons.ts";
 import { DiagramBuilder } from "../../src/diagram/builder.ts";
 import { compile } from "../../src/diagram/compile/compile.ts";
-import { type FontSpec, defaultMetrics as m } from "../../src/diagram/metrics.ts";
+import { type FontSpec, type Measure, defaultMetrics as m } from "../../src/diagram/metrics.ts";
 import { examplePages, examples } from "../unit/diagram/examples.ts";
 
 /** Every font the compiler measures with: the sans weights at each size, and mono. */
@@ -47,10 +48,11 @@ function referenceTexts(): Array<{ text: string; font: FontSpec }> {
     for (const { draw } of examples(page)) {
       const d = new DiagramBuilder();
       new Function("d", draw)(d);
-      compile(d, (text, font) => {
+      const measure: Measure = (text, font) => {
         found.set(`${font.family}|${font.weight}|${font.size}|${text}`, { text, font });
         return text.length * 7;
-      });
+      };
+      compile(d, { measure, icons: lucideIcons() });
     }
   return [...found.values()];
 }

@@ -7,6 +7,7 @@ export type { CompiledDiagram } from "../diagram/drawing.ts";
 export type {
   Align,
   AnchorName,
+  BoxOptions,
   Corner,
   Diagnostic,
   EdgeOptions,

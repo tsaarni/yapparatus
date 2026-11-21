@@ -9,6 +9,11 @@ export type Align = "start" | "center" | "end";
 
 export type AnchorName = (typeof ANCHORS)[number];
 
+export interface BoxOptions extends StackOptions {
+  /** A Lucide icon's name, such as `"database"`, drawn left of the label in the label's color. */
+  icon?: string;
+}
+
 export const Chart: { ({ plot, data: written, load, id, caption, description }: ChartProps): Element; breakout: boolean; };
 
 export interface ChartColumn {
@@ -66,6 +71,11 @@ export interface CompiledDiagram {
   diagnostics: Diagnostic[];
   /** What a step focuses along with each container: enclosures, rows, columns, sequences. */
   groups: Record<string, string[]>;
+  /**
+   * The markup of each icon the nodes name, once, on the icon grid, in `currentColor`. It comes
+   * from the icon package, never from the author.
+   */
+  icons: Record<string, string>;
 }
 
 export interface CompiledDiagramProps extends Omit<DiagramProps, "draw"> {
@@ -104,7 +114,7 @@ export class DiagramBuilder {
   readonly categories: string[] = [];
 
   /** A component, service, or step: a rectangle fitted around its text. */
-  box(label: string, options: StackOptions = {}): Node {
+  box(label: string, options: BoxOptions = {}): Node {
     return this.stacked("box", label, options);
   }
   /** Storage: a database, a cache. */
@@ -141,6 +151,13 @@ export class DiagramBuilder {
   /** A person or outside system that acts: a figure above its name. */
   actor(label: string, options: NodeOptions = {}): Node {
     return this.add(new Node("actor", label, options));
+  }
+  /**
+   * A thing drawn as a picture, such as a user, a cloud, or a server: a Lucide icon, named
+   * without a prefix, above its label.
+   */
+  icon(name: string, label: string, options: NodeOptions = {}): Node {
+    return this.add(new Node("icon", label, { ...options, icon: name }));
   }
   /** An annotation with a folded corner. */
   note(label: string, options: NodeOptions = {}): Node {

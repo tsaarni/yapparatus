@@ -1,6 +1,6 @@
 /**
  * A figure: its draw program, its steps, and `build`, compiled and checked together. The page
- * compiler runs it in Node with the web app's font files; tests run it with a fixed measure.
+ * compiler runs it with the web app's fonts and the Lucide icons; tests with fixed lookups.
  */
 import type { DiagnosticCode } from "../document/diagnostic.ts";
 import { DiagramBuilder } from "./builder.ts";
@@ -8,7 +8,7 @@ import { compile } from "./compile/compile.ts";
 import { type CompiledDiagram, expand } from "./drawing.ts";
 import type { Diagnostic } from "./elements.ts";
 import { overlap } from "./geometry.ts";
-import { type Measure, minScale, readingWidth } from "./metrics.ts";
+import { type Lookups, minScale, readingWidth } from "./metrics.ts";
 
 /** A step as data: its id and the ids it focuses, as written. */
 export interface FigureStep {
@@ -29,8 +29,8 @@ export interface Figure {
  * Runs `draw`, compiles the scene, and checks the steps and the width. Step and width
  * problems are added as diagnostics and leave `ok` as the compiler set it.
  */
-export function compileFigure(figure: Figure, measure: Measure): CompiledDiagram {
-  const diagram = compileDraw(figure.draw, measure);
+export function compileFigure(figure: Figure, lookups: Lookups): CompiledDiagram {
+  const diagram = compileDraw(figure.draw, lookups);
   if (!diagram.ok) return diagram;
   return {
     ...diagram,
@@ -53,19 +53,20 @@ export function drawFailed(message: string): CompiledDiagram {
     frames: [],
     legend: [],
     groups: {},
+    icons: {},
     diagnostics: [{ code: "DRAW_FAILED", message, ids: [] }],
   };
 }
 
 /** Run the author's draw program on a new builder and compile it, or report why it threw. */
-function compileDraw(draw: Figure["draw"], measure: Measure): CompiledDiagram {
+function compileDraw(draw: Figure["draw"], lookups: Lookups): CompiledDiagram {
   const scene = new DiagramBuilder();
   try {
     draw(scene);
   } catch (error) {
     return drawFailed(error instanceof Error ? error.message : String(error));
   }
-  return compile(scene, measure);
+  return compile(scene, lookups);
 }
 
 /** Checked against a fixed budget, not the current window, so every author sees the same result. */

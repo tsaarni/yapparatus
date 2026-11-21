@@ -7,8 +7,9 @@ import { type Corner, type Enclosure, type Frame, type Node, toExpr } from "../e
 import { inflate, type Rect, union, type Vec } from "../geometry.ts";
 import { fontsOf, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
 import { room, stack } from "../outlines.ts";
+import type { Icons } from "./icons.ts";
 import type { Layout } from "./layout.ts";
-import { type Align, type Content, type Text, textLine } from "./text.ts";
+import { type Align, type Content, linesHeight, type Text, textLine } from "./text.ts";
 
 /** The compilers for nodes, frames, and enclosures over a finished layout. */
 export function createNodes(
@@ -17,6 +18,7 @@ export function createNodes(
   text: Text,
   layout: Layout,
   categoryOf: (name: string | undefined) => { category?: number },
+  icons: Icons,
 ) {
   const fonts = fontsOf(m);
   const { measureNode, textAt, tabWidth } = text;
@@ -37,6 +39,7 @@ export function createNodes(
     let lines: TextLine[];
     let divider: number | undefined;
     let rules: Array<[Vec, Vec]> | undefined;
+    let iconRect: Rect | undefined;
     const labelRect = terminalLabel(node, rect);
     switch (node.shape) {
       case "cell":
@@ -59,6 +62,12 @@ export function createNodes(
           "middle",
         );
         break;
+      case "icon": {
+        const size = shapes.icon.size;
+        iconRect = { x: centerX - size / 2, y: rect.y, width: size, height: size };
+        lines = stackLines(c.lines, rect.y + size + shapes.icon.gap, centerX, "middle");
+        break;
+      }
       case "note":
         lines = stackLines(c.lines, rect.y + shapes.note.padY, rect.x + shapes.note.padX, "start");
         break;
@@ -74,14 +83,24 @@ export function createNodes(
         const front = stack(rect, node.options.replicas).at(-1) ?? rect;
         const outline = room(node.shape, front);
         const code = node.shape === "text" && node.options.mono;
+        const middle = {
+          x: front.x + front.width / 2 + outline.dx,
+          y: front.y + front.height / 2 + outline.dy,
+        };
+        const left = middle.x - c.width / 2;
+        if (c.lead) {
+          const size = shapes.labelIcon.size;
+          iconRect = { x: left, y: middle.y - size / 2, width: size, height: size };
+        }
         lines = stackLines(
           c.lines,
-          front.y + front.height / 2 + outline.dy - c.height / 2,
-          code ? front.x : front.x + front.width / 2 + outline.dx,
+          middle.y - linesHeight(c.lines, m) / 2,
+          code ? front.x : left + c.lead + (c.width - c.lead) / 2,
           code ? "start" : "middle",
         );
       }
     }
+    const icon = icons.iconOf(node);
     return {
       id: node.id,
       shape: node.shape,
@@ -99,6 +118,7 @@ export function createNodes(
       ...(node.member?.pin !== undefined ? { pin: node.member.pin } : {}),
       ...(labelRect ? { labelRect } : {}),
       ...(node.options.replicas ? { replicas: node.options.replicas } : {}),
+      ...(icon && iconRect ? { icon: { name: icon, rect: iconRect } } : {}),
     };
   }
 

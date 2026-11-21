@@ -14,6 +14,7 @@ import type { CompiledDiagram } from "../../diagram/drawing.ts";
 import { compileFigure, drawFailed, type FigureStep } from "../../diagram/figure.ts";
 import { authorFunction, timedOut } from "../author-function.ts";
 import { fontMeasure } from "../font-measure.ts";
+import { lucideIcons } from "../lucide-icons.ts";
 import { type ContentIssue, compiledAttribute, contentIssues } from "./conventions.ts";
 
 type Jsx = MdxJsxFlowElementHast | MdxJsxTextElementHast;
@@ -218,7 +219,7 @@ function run(source: string, steps: FigureStep[], build: boolean): Compiled {
       steps,
       build,
     },
-    measure,
+    { measure, icons: lucideIcons() },
   );
   if (uncovered.size) {
     const characters = [...uncovered];

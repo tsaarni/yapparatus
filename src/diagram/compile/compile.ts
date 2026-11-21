@@ -1,6 +1,6 @@
 /**
- * Compilation: measure → size → place → route → label → validate → bounds. Each step has
- * its own file; this file runs them in order, each with what the steps before it made.
+ * Compilation: icons → measure → size → place → route → label → validate → bounds. Each step
+ * has its own file; this file runs them in order, each with what the steps before it made.
  */
 import { type DiagnosticCode, diagnosticCodes } from "../../document/diagnostic.ts";
 import type { DiagramBuilder } from "../builder.ts";
@@ -15,9 +15,10 @@ import {
 } from "../drawing.ts";
 import { type Diagnostic, Edge, type Element, Frame, slug } from "../elements.ts";
 import { inflate, type Rect, rounded, union, type Vec } from "../geometry.ts";
-import { defaultMetrics, type Measure, type Metrics } from "../metrics.ts";
+import { defaultMetrics, type Lookups, type Measure, type Metrics } from "../metrics.ts";
 import { checkIds, checkOverlaps, checkPlaced, groupsOf, validate } from "./checks.ts";
 import { createEdges } from "./edges.ts";
+import { createIcons } from "./icons.ts";
 import { CycleError, createLayout } from "./layout.ts";
 import { createNodes } from "./nodes.ts";
 import { createText, type Report } from "./text.ts";
@@ -25,11 +26,11 @@ import { createText, type Report } from "./text.ts";
 /** Measure and lay out a built scene into the drawing the views render, with its diagnostics. */
 export function compile(
   scene: DiagramBuilder,
-  measureText: Measure,
+  lookups: Lookups,
   metrics: Metrics = defaultMetrics,
 ): CompiledDiagram {
   const m = metrics;
-  const measure: Measure = (text, font) => measureText(text.replace(/ {2,}/g, " "), font);
+  const measure: Measure = (text, font) => lookups.measure(text.replace(/ {2,}/g, " "), font);
   const diagnostics: Diagnostic[] = [...scene.diagnostics];
   const report = (code: DiagnosticCode, message: string, ids: string[]) =>
     diagnostics.push({ code, message, ids });
@@ -41,7 +42,8 @@ export function compile(
   checkIds(scene, report);
   checkPlaced(scene, report);
 
-  const text = createText(m, measure, report);
+  const icons = createIcons(lookups.icons, scene.nodes, report);
+  const text = createText(m, measure, report, icons);
   const layout = createLayout(scene, m, measure, report, text);
   const { compileNode, compileFrame, compileEnclosure } = createNodes(
     m,
@@ -49,6 +51,7 @@ export function compile(
     text,
     layout,
     categoryOf,
+    icons,
   );
   const { compileEdge } = createEdges(m, measure, report, layout, categoryOf);
 
@@ -111,6 +114,7 @@ export function compile(
       legend,
       diagnostics,
       groups: { ...groups, ...categoryGroups },
+      icons: icons.table(),
     };
   }
 

@@ -11,7 +11,7 @@
 - `name` is a literal `collection:icon`. An unknown name fails compilation.
 - `size` is pixels; default 20. `color` overrides the text color of a monochrome icon.
 - Give `label` when the icon carries meaning; leave it out when the text beside it says the same.
-- Diagram shapes take no icons.
+- Diagrams draw Lucide icons only, named without the prefix: `d.box("Database", { icon: "database" })` and `d.icon("user", "Customer")`. See [Diagrams](diagrams.md#shapes).
 
 ## Collections
 

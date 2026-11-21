@@ -140,6 +140,10 @@ export const diagnosticCodes = {
     severity: "error",
     meaning: "A box or document has a number of replicas other than 2 to 4.",
   },
+  UNKNOWN_ICON: {
+    severity: "error",
+    meaning: "A box or icon names an icon that the Lucide set does not have.",
+  },
   STEP_NOT_TEXT: {
     severity: "error",
     meaning: "A step's id or focus is computed; the compiler reads only plain text.",

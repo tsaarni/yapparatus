@@ -86,7 +86,7 @@ export function sequence(
   options: SequenceOptions = {},
 ): Element {
   const step = options.step ?? 44;
-  const boxes = participants.filter((n) => n.shape !== "actor");
+  const boxes = participants.filter((n) => n.shape !== "actor" && n.shape !== "icon");
   for (const n of boxes) n.options.minWidth ??= 96;
   if (boxes.length > 1) d.equalSize(boxes);
   const header = d.row(participants, { gap: options.gap ?? 40, align: "end" });

@@ -10,17 +10,19 @@ import { compileFigure, type Figure } from "../../../src/diagram/figure.ts";
 import type { Measure } from "../../../src/diagram/metrics.ts";
 import { type PictureOptions, pictureOf } from "../../../src/diagram/picture.ts";
 import { lightPaint } from "../../../src/server/theme-values.ts";
+import { fixedIcons } from "./fixed-icons.ts";
 
 const lightColors = lightPaint.colors;
 
 /** 7 units per character: deterministic stand-in for font measurement. */
 const measure: Measure = (text) => text.length * 7;
+const lookups = { measure, icons: fixedIcons };
 /** Each text as a marker path, so tests can find where text is drawn. */
 const outline = (text: string, _font: unknown, x: number, y: number) => `M${x} ${y}h${text.length}`;
 
 /** Compile a figure, which must have no errors, and write its picture in the light theme. */
 function draw(figure: Figure, options: PictureOptions = {}) {
-  const drawing = compileFigure(figure, measure);
+  const drawing = compileFigure(figure, lookups);
   assert.equal(drawing.ok, true, JSON.stringify(drawing.diagnostics));
   return pictureOf(drawing, options, { measure, outline }, lightPaint);
 }
@@ -126,8 +128,39 @@ test("the picture is well formed and draws every shape the figure has", () => {
   assert.match(svg, /stroke-width="5"[^>]*\/><path d="M[\d.]+ [\d.]+h3"/);
   assert.match(svg, /<g data-layer="legend">/);
   assert.ok(
-    height > compileFigure({ draw: everything, steps: [], build: false }, measure).viewBox.height,
+    height > compileFigure({ draw: everything, steps: [], build: false }, lookups).viewBox.height,
   );
+});
+
+test("a box's icon draws in its label's color, and an icon shape's in its ink, as an actor", () => {
+  const { svg } = draw({
+    draw: (d) => {
+      const db = d.box("Ledger", { icon: "database", role: "accent", category: "New" });
+      const user = d.icon("user", "Reader", { role: "muted" });
+      const server = d.icon("server", "Host", { role: "accent" });
+      const store = d.icon("database", "Store", { category: "New" });
+      d.row([db, user, server, store]);
+      d.arrow(user, db);
+    },
+    steps: [],
+    build: false,
+  });
+  assertWellFormed(svg);
+  const icons = [
+    ...svg.matchAll(
+      /<svg x="([\d.]+)" y="([\d.]+)" width="(\d+)" height="(\d+)" viewBox="0 0 24 24" color="([^"]+)">(.*?)<\/svg>/g,
+    ),
+  ];
+  assert.deepEqual(
+    icons.map((m) => [m[3], m[4], m[5], m[6]]),
+    [
+      ["18", "18", lightColors.text, fixedIcons.body("database")],
+      ["30", "30", lightColors.borderStrong, fixedIcons.body("user")],
+      ["30", "30", lightColors.accent, fixedIcons.body("server")],
+      ["30", "30", lightColors.category1, fixedIcons.body("database")],
+    ],
+  );
+  assert.match(svg, new RegExp(`<path d="M[^"]*" fill="${lightColors.textMuted}"/>`));
 });
 
 test("a stack draws its boxes or pages from the back, each over a cover of the figure's color", () => {
@@ -196,7 +229,7 @@ test("the id overlay labels each element and outlines the elements diagnostics n
 test("text is drawn as outlines from the web app's font files", () => {
   const { measure: fontWidth } = fontMeasure();
   const figure: Figure = { draw: (d) => void d.box("Outline"), steps: [], build: false };
-  const drawing = compileFigure(figure, fontWidth);
+  const drawing = compileFigure(figure, { measure: fontWidth, icons: fixedIcons });
   const { svg } = pictureOf(drawing, {}, { measure: fontWidth, outline: textOutline }, lightPaint);
   assert.doesNotMatch(svg, /<text/);
   assert.match(svg, /<path d="M[^"]*Q[^"]*" fill="#11141b"\/>/);

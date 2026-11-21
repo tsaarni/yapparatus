@@ -8,6 +8,7 @@ import { createRequire } from "node:module";
 import { test } from "node:test";
 import * as fontkit from "fontkit";
 import { fontMeasure, fontStylesheets } from "../../../src/compiler/font-measure.ts";
+import { lucideIcons } from "../../../src/compiler/lucide-icons.ts";
 import type { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
 import { defaultMetrics as m } from "../../../src/diagram/metrics.ts";
@@ -111,7 +112,7 @@ test("a diagram from the reference compiles with font measurement", () => {
       steps: [],
       build: false,
     },
-    measure,
+    { measure, icons: lucideIcons() },
   );
   assert.equal(out.ok, true);
   assert.deepEqual(out.diagnostics, []);

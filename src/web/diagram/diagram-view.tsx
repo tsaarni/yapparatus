@@ -62,6 +62,8 @@ export function DiagramView({
   const decoration = (state: ElementState) => (state && state !== "focus" ? { state } : {});
   const anyStepped = [...diagram.nodes, ...diagram.edges].some((p) => stepped(p.id));
   const clip = `clip${marker.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const iconOf = (name: string | undefined) =>
+    name !== undefined && Object.hasOwn(diagram.icons, name) ? diagram.icons[name] : undefined;
   return (
     <svg
       data-diagram={marker}
@@ -91,6 +93,7 @@ export function DiagramView({
         <NodeView
           key={node.id}
           node={node}
+          icon={iconOf(node.icon?.name)}
           flagged={flagged.has(node.id)}
           clip={clip}
           {...(node.passive

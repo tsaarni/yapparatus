@@ -1,5 +1,6 @@
 /**
  * The theme setting: auto follows the system and lets the reader choose; a fixed theme does not.
+ * Diagram icons follow the theme in their label's color, or in their ink on an icon shape.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -77,4 +78,45 @@ test("a fixed theme ignores the system and offers no choice", async ({ page }) =
   expect(await canvas(page)).toBe(dark);
   expect(await colorScheme(page)).toBe("dark");
   await expect(page.locator(".theme-switch")).toHaveCount(0);
+});
+
+/**
+ * For the icon box and the icon shape of the report flow: the icon's color, its label's, and the
+ * element's ink, read from a probe stroked as an actor's figure is.
+ */
+const iconColors = (page: Page) =>
+  page.evaluate(() =>
+    ["billing-workers", "analyst"].map((id) => {
+      const element = document.querySelector(`figure#report-flow [data-element-id="${id}"]`);
+      const stroke = element?.querySelector(":scope > svg [stroke]");
+      const label = element?.querySelector(":scope > text");
+      const probe = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      probe.style.stroke = "var(--ink)";
+      element?.append(probe);
+      const ink = getComputedStyle(probe).stroke;
+      probe.remove();
+      return {
+        icon: stroke ? getComputedStyle(stroke).stroke : "none",
+        label: label ? getComputedStyle(label).fill : "none",
+        ink,
+      };
+    }),
+  );
+
+/** A box's icon has its label's color; an icon shape's has the element's ink, as an actor. */
+async function expectIconColors(page: Page) {
+  await page.goto("/diagrams");
+  await expect(page.locator('figure#report-flow [data-element-id="analyst"] svg')).toBeVisible();
+  const [box, shape] = await iconColors(page);
+  expect(box?.icon).toBe(box?.label);
+  expect(shape?.icon).toBe(shape?.ink);
+  expect(shape?.icon).not.toBe(shape?.label);
+  return box?.icon;
+}
+
+test("a diagram icon draws in its label's or its ink's color in both themes", async ({ page }) => {
+  const inDark = await expectIconColors(page);
+  await withTheme(page, "light", async () => {
+    expect(await expectIconColors(page)).not.toBe(inDark);
+  });
 });

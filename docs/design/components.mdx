@@ -139,7 +139,7 @@ An element's color comes from its role or its category, which the [diagram compi
   <Step focus="new to-be-removed">A category replaces the color and keeps the role's weight, badge, and dashes. The legend names each category.</Step>
 </Diagram>
 
-A role sets the line color, fill, label color, and line weight that every kind of element reads, so a role looks the same on a box, an arrow, and an enclosure. A category sets only the colors, from the theme's four category colors. Focus and pointing add line weight, so weight shows state and color shows meaning.
+A role sets the line color, fill, label color, and line weight that every kind of element reads, so a role looks the same on a box, an arrow, and an enclosure. The view puts an icon's markup from the diagram's icon table in a nested `svg` at its rectangle, whose text color is the label color on a box and the line color on an icon shape, which has no outline, as an actor's figure. The markup's `currentColor` then follows the role, the category on an icon shape, the theme, and a step's fading. A category sets only the colors, from the theme's four category colors. Focus and pointing add line weight, so weight shows state and color shows meaning.
 
 Pointing at a legend entry highlights its category's elements as a step does. In dev mode, an element that a warning names gets a dotted outline.
 

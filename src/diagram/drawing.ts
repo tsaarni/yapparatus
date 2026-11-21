@@ -65,6 +65,8 @@ export interface CompiledNode {
   labelRect?: Rect;
   /** A box or document drawn as a stack of this many, from 2 to 4. */
   replicas?: number;
+  /** A box's or icon shape's icon: its name in the diagram's `icons`, and where it is drawn. */
+  icon?: { name: string; rect: Rect };
 }
 
 /** A frame with its rectangle, operator tab, title, and dividers placed. */
@@ -128,6 +130,11 @@ export interface CompiledDiagram {
   diagnostics: Diagnostic[];
   /** What a step focuses along with each container: enclosures, rows, columns, sequences. */
   groups: Record<string, string[]>;
+  /**
+   * The markup of each icon the nodes name, once, on the icon grid, in `currentColor`. It comes
+   * from the icon package, never from the author.
+   */
+  icons: Record<string, string>;
 }
 
 /** The elements named, with every container replaced by itself plus all it holds. */

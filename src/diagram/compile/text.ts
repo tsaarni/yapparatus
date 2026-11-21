@@ -7,11 +7,15 @@ import type { Node, Shape } from "../elements.ts";
 import { round } from "../geometry.ts";
 import { type FontSpec, fontsOf, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
 import { room } from "../outlines.ts";
+import type { Icons } from "./icons.ts";
 
 /** Reports a diagnostic; every compiler step takes one. */
 export type Report = (code: DiagnosticCode, message: string, ids: string[]) => void;
 
-/** A node's label and sublabel, wrapped and measured. */
+/**
+ * A node's label and sublabel, wrapped and measured, after a box's icon. The width and height
+ * cover the icon, the gap, and the text; `lead` is the room the icon and the gap take.
+ */
 export interface Content {
   lines: Array<{
     text: string;
@@ -23,6 +27,12 @@ export interface Content {
   }>;
   width: number;
   height: number;
+  lead: number;
+}
+
+/** The height of lines of text set one under the other. */
+export function linesHeight(lines: Content["lines"], m: Metrics): number {
+  return lines.reduce((sum, l) => sum + l.size * m.lineHeight, 0);
 }
 
 /** The text functions that layout and the node compiler share. */
@@ -86,13 +96,22 @@ function wrap(text: string, font: FontSpec, width: number, measure: Measure): st
 }
 
 /** The shapes whose text wraps at `wrapWidth` when no width is fixed. */
-const labelShapes = new Set<Shape>(["box", "cylinder", "queue", "doc", "io", "diamond", "actor"]);
+const labelShapes = new Set<Shape>([
+  "box",
+  "cylinder",
+  "queue",
+  "doc",
+  "io",
+  "diamond",
+  "actor",
+  "icon",
+]);
 
 /** The shapes whose text wraps at `textWrapWidth` when no width is fixed. */
 const textShapes = new Set<Shape>(["note", "text", "dot", "ring"]);
 
 /** Text measuring for one compile, with each node's measured content cached. */
-export function createText(m: Metrics, measure: Measure, report: Report) {
+export function createText(m: Metrics, measure: Measure, report: Report, icons: Icons) {
   const content = new Map<Node, Content>();
   const fonts = fontsOf(m);
 
@@ -110,6 +129,7 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
     const pad =
       node.shape === "text" ||
       node.shape === "actor" ||
+      node.shape === "icon" ||
       node.shape === "bar" ||
       node.shape === "dot" ||
       node.shape === "ring"
@@ -118,12 +138,15 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
           ? shapes.note.padX
           : m.padX;
     const outline = room(node.shape, { width: o.width ?? 0, height: o.height ?? m.minHeight });
-    const fixed = o.width !== undefined ? o.width - 2 * pad - outline.width : undefined;
-    const shapeWidth = labelShapes.has(node.shape)
-      ? m.wrapWidth
-      : textShapes.has(node.shape)
-        ? m.textWrapWidth
-        : Number.POSITIVE_INFINITY;
+    const icon = node.shape === "box" && icons.iconOf(node) !== undefined;
+    const lead = icon ? shapes.labelIcon.size + shapes.labelIcon.gap : 0;
+    const fixed = o.width !== undefined ? o.width - 2 * pad - outline.width - lead : undefined;
+    const shapeWidth =
+      (labelShapes.has(node.shape)
+        ? m.wrapWidth
+        : textShapes.has(node.shape)
+          ? m.textWrapWidth
+          : Number.POSITIVE_INFINITY) - lead;
     const wrapWidth = (font: FontSpec) =>
       fixed ?? (font.family === m.mono ? Number.POSITIVE_INFINITY : shapeWidth);
     const lines: Content["lines"] = [];
@@ -143,14 +166,14 @@ export function createText(m: Metrics, measure: Measure, report: Report) {
     };
     if (node.label) push(node.label, labelFont, false);
     if (o.sub) push(o.sub, subFont, true);
-    const width = Math.max(0, ...lines.map((l) => l.width));
-    const height = lines.reduce((sum, l) => sum + l.size * m.lineHeight, 0);
-    const c = { lines, width, height };
+    const textWidth = Math.max(0, ...lines.map((l) => l.width));
+    const height = Math.max(linesHeight(lines, m), icon ? shapes.labelIcon.size : 0);
+    const c = { lines, width: lead + textWidth, height, lead };
     content.set(node, c);
-    if (fixed !== undefined && lines.length && width > fixed + 0.5)
+    if (fixed !== undefined && lines.length && textWidth > fixed + 0.5)
       report(
         "TEXT_OVERFLOW",
-        `${node.id}: a word is ${round(width - fixed)} units wider than the fixed width allows.`,
+        `${node.id}: a word is ${round(textWidth - fixed)} units wider than the fixed width allows.`,
         [node.id],
       );
     return c;

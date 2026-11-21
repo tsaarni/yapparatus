@@ -115,6 +115,8 @@ export function createLayout(
         return fixed(shapes.bar, 0);
       case "actor":
         return fixed(Math.max(c.width, 36), shapes.actor.figure + shapes.actor.gap + c.height);
+      case "icon":
+        return fixed(Math.max(c.width, 36), shapes.icon.size + shapes.icon.gap + c.height);
       case "note":
         return fixed(
           c.width + 2 * shapes.note.padX + shapes.note.fold / 2,

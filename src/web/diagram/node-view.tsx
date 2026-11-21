@@ -19,18 +19,24 @@ import {
   type Target,
   targetFor,
 } from "./element.tsx";
+import { IconView } from "./icon-view.tsx";
 
 const m = defaultMetrics;
 
-/** A node: its shape, text lines, and warning badge, or a bar or nothing for those shapes. */
+/**
+ * A node: its shape, icon, text lines, and warning badge, or a bar or nothing for those shapes.
+ * `icon` is the markup of the node's icon, from the diagram's icon table.
+ */
 export function NodeView({
   node,
+  icon,
   flagged,
   clip,
   target,
   state,
 }: {
   node: CompiledNode;
+  icon?: string | undefined;
   flagged: boolean;
   clip: string;
   target?: Target;
@@ -63,6 +69,9 @@ export function NodeView({
       )}
     >
       <Shape node={node} clip={clip} />
+      {node.icon && icon !== undefined && (
+        <IconView body={icon} rect={node.icon.rect} ink={node.shape === "icon"} />
+      )}
       <Lines lines={node.lines} />
       {node.role === "warning" && !layered && <WarningBadge node={node} />}
       {flagged && !layered && (

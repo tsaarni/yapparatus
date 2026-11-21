@@ -12,6 +12,22 @@ export interface FontSpec {
 /** Text width, injected: the server measures with the font files, tests use a fixed advance. */
 export type Measure = (text: string, font: FontSpec) => number;
 
+/** The icons a diagram may draw: each one's markup on the icon grid, and every name. */
+export interface IconSet {
+  /** The markup of a known icon, from the package; undefined for any other name. */
+  body: (name: string) => string | undefined;
+  names: readonly string[];
+}
+
+/** What the compiler looks up outside itself: text widths, and the icons it may draw. */
+export interface Lookups {
+  measure: Measure;
+  icons: IconSet;
+}
+
+/** The size of the square grid that icons are drawn on, as in their `viewBox`. */
+export const iconGrid = 24;
+
 /**
  * Diagram type. Every text the compiler places gets one of these fonts, and the renderer
  * draws it with the font the compiler measured.
@@ -69,6 +85,10 @@ export const defaultMetrics: Metrics = {
 /** Shape-specific measurements shared by sizing, layout, and anchors. */
 export const shapes = {
   actor: { figure: 30, gap: 6 },
+  /** An icon shape: the icon above its label, as an actor's figure. */
+  icon: { size: 30, gap: 6 },
+  /** An icon left of a box's label, and the gap between them. */
+  labelIcon: { size: 18, gap: 8 },
   note: { padX: 12, padY: 9, fold: 10 },
   /** How far an input or output's top edge is shifted right of its bottom edge. */
   io: { slant: 14 },

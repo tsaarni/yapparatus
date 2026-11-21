@@ -108,6 +108,8 @@ export type Shape =
   | "queue"
   | "text"
   | "actor"
+  /** An icon above its label. */
+  | "icon"
   | "note"
   | "diamond"
   | "dot"
@@ -153,6 +155,12 @@ export interface StackOptions extends NodeOptions {
    * Put a larger or unknown number in the label.
    */
   replicas?: number;
+}
+
+/** Options of a box: a stack of replicas, and an icon left of the label. */
+export interface BoxOptions extends StackOptions {
+  /** A Lucide icon's name, such as `"database"`, drawn left of the label in the label's color. */
+  icon?: string;
 }
 
 /** Options for `start()` and `end()`. Their size is fixed, so they take no size options. */
@@ -238,7 +246,7 @@ export class Node extends Element {
   readonly shape: Shape;
   readonly label: string;
   readonly options: NodeOptions &
-    Pick<StackOptions, "replicas"> &
+    Pick<BoxOptions, "replicas" | "icon"> &
     Pick<TerminalOptions, "side"> &
     Pick<RecordOptions, "columns" | "ruler" | "header">;
   readonly passive: boolean;
