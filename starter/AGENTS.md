@@ -8,5 +8,6 @@ Write and edit the pages following [docs/guide.md](docs/guide.md). Read the refe
 - [docs/diagrams.md](docs/diagrams.md): `<Diagram>` and `<Step>`, with an example for each common form.
 - [docs/diagram-structures.md](docs/diagram-structures.md): tables, protocol headers, registers, arrays, and marked text.
 - [docs/diagram-sequences.md](docs/diagram-sequences.md): messages over time.
+- [docs/diagram-trees.md](docs/diagram-trees.md): org charts, class hierarchies, mind maps, and file trees.
 - [docs/charts.md](docs/charts.md): `<Chart>`.
 - [docs/icons.md](docs/icons.md): `<Icon>` and how to find icon names.

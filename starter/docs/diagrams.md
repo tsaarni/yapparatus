@@ -40,6 +40,7 @@ Draw a figure when it shows structure, a path, or an order faster than text; a r
 | Data through a pipeline: inputs, queues, reports | [A pipeline](#a-pipeline) |
 | States and transitions | [A state machine](#a-state-machine) |
 | Messages over time | [Sequences](diagram-sequences.md) |
+| Hierarchies: org charts, class trees, mind maps, file trees | [Trees](diagram-trees.md) |
 | Tables, types, protocol headers, registers, arrays | [Structures](diagram-structures.md) |
 | Which span of a text or code matters | [Marked text](diagram-structures.md#marked-text) |
 | A layout or a size | Boxes with a fixed `width` and `height`, placed with gaps that match the thing drawn |
@@ -375,7 +376,7 @@ Steps tell the story of a figure in order. Each `<Step>` names the elements it i
 | Feature | Meaning |
 |---|---|
 | `focus` | Element ids, separated by spaces. Focused elements are highlighted; the others fade |
-| Containers | Focusing an enclosure, grid, row, column, sequence, or sequence fragment focuses everything in it |
+| Containers | Focusing an enclosure, grid, row, column, sequence, sequence fragment, or tree branch focuses everything in it |
 | Categories | Focusing a category's id focuses every element in it |
 | `build` | Each element stays hidden until the first step that focuses it |
 | `stepOnly` | A shape or edge option: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |

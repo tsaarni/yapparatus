@@ -109,6 +109,12 @@ export const shapes = {
 /** Space between neighbors when an author sets none: across (`x`) and down (`y`). */
 export const defaultGap = { x: 88, y: 64 };
 
+/**
+ * Trees: the default space between siblings and between levels, and in an indented tree how far
+ * each level is indented and how far right of its parent's left edge the trunk drops.
+ */
+export const treeSpacing = { gap: 24, levelGap: 48, indent: 32, trunk: 12 };
+
 /** Inner width of a figure in the wide track: text column plus breakout. */
 export const readingWidth = 960;
 

@@ -357,6 +357,21 @@ A sequence diagram is built from the other elements while the draw program runs,
 
 A fragment is a frame whose corners the sequence sets from its participants, before anything is measured, so its members can reach past them: a self-message at the rightmost participant has its label to the right of that participant. The scene lists the members of each fragment: its messages, its notes, and the fragments inside it. The compiler compiles frames after nodes and edges, and a frame with members covers their ink: edge points, heads, and labels, node rectangles and labels, and inner frames. Where a member reaches past the corners, the frame keeps a margin of 8 units around it. Each frame compiles after the frames it holds, so an outer frame covers an inner frame that was widened. A frame that an author draws with `d.frame` has no members and lies exactly between its corners.
 
+## Trees
+
+A tree is also built from the other elements while the draw program runs: rows, columns, and lines. It adds no position owner, so the layout and the checks treat it like any other drawing. Each node with children becomes a container of the node and its children's subtrees, and a leaf stays a bare node. The layout sets the containers:
+
+- `down`: a column of the node and a row of its subtrees, top-aligned. Each line leaves the node's bottom and turns at the column's gutter, halfway between the levels.
+- `right`: a row of the node and a column of its subtrees, left-aligned, with each line turning at the row's gutter.
+- `both`: at the root, a row of a column of left subtrees, the root, and a column of right subtrees. The root's children alternate right and left. A left subtree is `right` mirrored: its column comes first and is right-aligned, so deeper levels keep growing away from the root.
+- `indent`: a column of the node and a grid whose rows each hold an empty cell and one subtree, so the gap after the empty column indents every subtree by the same amount. Each line starts at a point under the left part of the node's rectangle, goes down, and turns into the child's left side.
+
+A container centers its node across the container, so a node is centered on the whole of its subtrees, not on its direct children. Adding a child widens its ancestors and moves nothing else.
+
+Every line from one parent starts at the same point and runs down or across the same trunk before it turns to its child, so two lines share a stretch from their first points and part. That is a fork, which the `EDGE_OVERLAP` check allows. The lines are ordinary edges, so the other checks apply to them as to any edge. A node that already has a position owner is `CONFLICTING_PLACEMENT` when the tree puts it in a container, as in any row or column.
+
+A container's id is its node's id followed by `-tree`. It is derived, so it gets a suffix only when another element already has it. The scene lists each container's lines as its members, and a container lists its node and its inner row, column, or grid. A step that focuses a container therefore focuses the branch below it: its nodes, its lines, and the lines of every subtree in it. The line into the branch belongs to the parent's container.
+
 ## Roles and categories
 
 The compiler gives every element a role and at most one category. The web app and the picture turn them into colors and strokes, as [the components page](components#roles-and-categories) shows.

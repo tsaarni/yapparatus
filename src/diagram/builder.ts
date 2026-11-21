@@ -36,6 +36,7 @@ import {
 } from "./elements.ts";
 import { defaultGap } from "./metrics.ts";
 import { type SequenceOptions, type SequenceStep, sequence } from "./sequence.ts";
+import { type TreeChild, type TreeOptions, tree } from "./tree.ts";
 
 /** The most elements a drawing may have, so that the checks, which compare pairs, stay fast. */
 const maxElements = 2000;
@@ -51,7 +52,7 @@ export class DiagramBuilder {
   readonly sizeGroups: Array<{ members: Node[]; width: boolean; height: boolean }> = [];
   /**
    * Elements a step focuses together with a container, beyond what it encloses or lays out:
-   * a sequence's messages and notes, a fragment's messages.
+   * a sequence's messages and notes, a fragment's messages, a tree branch's lines.
    */
   readonly groups = new Map<Element | Frame, Array<Element | Edge | Frame>>();
   readonly diagnostics: Diagnostic[] = [];
@@ -188,6 +189,13 @@ export class DiagramBuilder {
    */
   sequence(participants: Node[], steps: SequenceStep[], options: SequenceOptions = {}): Element {
     return sequence(this, participants, steps, options);
+  }
+  /**
+   * A tree: the root over its subtrees, joined by lines. A child is a node or `[node, children]`.
+   * Returns the outermost row or column, which can be placed like any other element.
+   */
+  tree(root: Node, children: TreeChild[], options: TreeOptions = {}): Grid {
+    return tree(this, root, children, options);
   }
   /** A titled region between two corners, such as a UML fragment. */
   frame(from: PointLike, to: PointLike, options: FrameOptions = {}): Frame {

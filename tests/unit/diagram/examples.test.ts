@@ -16,7 +16,12 @@ const measure: Measure = (text) => text.length * 7;
 const icons = lucideIcons();
 
 test("the diagram reference has pages with examples", () => {
-  assert.deepEqual(pages.sort(), ["diagram-sequences.md", "diagram-structures.md", "diagrams.md"]);
+  assert.deepEqual(pages.sort(), [
+    "diagram-sequences.md",
+    "diagram-structures.md",
+    "diagram-trees.md",
+    "diagrams.md",
+  ]);
   for (const page of pages) assert.ok(examples(page).length > 0, page);
 });
 
