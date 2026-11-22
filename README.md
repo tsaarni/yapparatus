@@ -28,4 +28,4 @@ In the demo animation below, the user selects an arrow of a sequence diagram and
 <img src="assets/demo-light.webp#gh-light-mode-only">
 <img src="assets/demo-dark.webp#gh-dark-mode-only">
 
-The project also has a [test document](tests/fixtures/content), which you can start with `pnpm dev tests/fixtures/content`.
+The project also has a test fixtures document that shows every component. [Read it online](https://tsaarni.github.io/yapparatus/test-fixtures/), or start it from [`tests/fixtures/content/`](tests/fixtures/content) with `pnpm dev tests/fixtures/content`.
