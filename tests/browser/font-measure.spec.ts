@@ -1,6 +1,6 @@
 /**
  * The font measure in src/compiler/font-measure.ts gives the web app's canvas widths. The browser
- * runs at scale 2: at scale 1 Linux Chromium rounds each glyph advance to a whole pixel.
+ * runs without font hinting: with it, Linux Chromium rounds each glyph advance to a whole pixel.
  */
 import { expect, test } from "@playwright/test";
 import { fontMeasure } from "../../src/compiler/font-measure.ts";
@@ -11,7 +11,7 @@ import { type FontSpec, type Measure, defaultMetrics as m } from "../../src/diag
 import { Scene } from "../../src/diagram/scene.ts";
 import { examplePages, examples } from "../unit/diagram/examples.ts";
 
-test.use({ launchOptions: { args: ["--force-device-scale-factor=2"] } });
+test.use({ launchOptions: { args: ["--font-render-hinting=none"] } });
 
 /** Every font the compiler measures with: the sans weights at each size, and mono. */
 const fonts: FontSpec[] = [m.labelSize, m.smallSize, m.tabSize].flatMap((size) => [
