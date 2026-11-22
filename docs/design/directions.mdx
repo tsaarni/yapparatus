@@ -13,6 +13,18 @@ This page lists agreed work that is not built yet, and open questions. The page 
 - **Images from the project's assets.** A page shows a screenshot or a photo from `assets/` with Markdown image syntax, as `assets:name.png`. The build bundles it, and `-light` and `-dark` files follow the theme. Diagrams and charts stay draw programs. See [icons](page-compiler#icons).
 - **The user ends the agent's working state.** The chat panel shows when the server last heard from the agent, and a Disconnect button. The working state has no time limit. See [agent state](server#agent-state) and [chat panel](web-app#chat-panel).
 
+### Diagram features for later
+
+The diagram features below are agreed in outline. Each one is built when an author needs it for a document.
+
+- **More of sequence diagrams.** A sequence also draws found and lost messages, which start or end at the edge of the diagram, messages that create or destroy a participant, and `ref` fragments, which refer to another sequence. See [sequences](diagram-compiler#sequences).
+- **Stricter reply matching.** The compiler matches replies to calls more strictly. `REPLY_WITHOUT_CALL` and the activation bars use one matching, so the ends of the bars change too. See [sequences](diagram-compiler#sequences).
+- **Arrowheads for class and ER diagrams.** The end of an edge can have a hollow triangle, a filled or hollow diamond, or a crow's foot. See [arrowheads](diagram-compiler#arrowheads).
+- **Braces.** A brace is an edge style, as in `d.line(a, b, { style: "brace" })`. Labels, steps, and checks work on a brace as on every edge. See [edges](diagram-compiler#edges).
+- **Swimlanes.** The diagram reference shows swimlanes as a grid with a title on each row. A call for swimlanes is added only when the pattern is not enough. See [the scene](diagram-compiler#the-scene).
+- **The nearest call in an error.** When a draw program calls a function that does not exist, such as `d.cilinder(…)`, the message names the nearest call, `d.cylinder`. The agent then fixes the call in one step. See [the scene](diagram-compiler#the-scene).
+- **Page lines in diagram diagnostics.** A diagnostic about an element names the page line of the call that created the element and of the call that placed it. The agent then finds the call to change. See [checks](diagram-compiler#checks).
+
 ## Open questions
 
 - **Waiting in the background:** whether every agent can keep its wait for messages running. See [open questions](agent-library#open-questions).

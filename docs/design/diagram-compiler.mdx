@@ -160,6 +160,8 @@ One check runs every call against its signature before the call records anything
 
 The diagnostic's subject is the path of the argument or option, such as `role`, `label.side`, or `messages[2].label`, so two problems on one element are two diagnostics.
 
+**[Direction](directions):** a call that does not exist, such as `d.cilinder(…)`, is `DRAW_FAILED`, and the compiler writes a message that names the nearest call, as it does for `UNKNOWN_OPTION`.
+
 A frame is an element, and the signatures take it wherever they take an enclosure: as a point, an end of an edge, a cell of a grid, a row, or a column, a member of an enclosure, and the element that `place()` positions or places next to. A size group, a tree, and a sequence take only shapes. A frame or an enclosure in a grid, a row, a column, or `place()` passes the signature, and the scene reports it as `NOT_PLACEABLE`.
 
 A call that creates an element returns an object that stands for it, and the program passes it to later calls, such as a row or an edge. <Ref to="dc-scene" /> shows the scene of the running example.
@@ -182,6 +184,8 @@ An element in the scene has no coordinates. A point on it, such as `api.bottom`,
 Each element gets its position from exactly one source: the grid it is in, or the `place()` call that places it. A second source is `CONFLICTING_PLACEMENT`, and the first one stays in force. An enclosure takes its bounds from its members, a frame from its two corners, and a cell or a mark from its parent, so a grid or a `place()` that positions one is `NOT_PLACEABLE`: the grid leaves that cell empty, and the placement is ignored. An element may be placed next to an enclosure or a frame, because that uses the rectangle and owns nothing. Before layout, the compiler looks for elements with no source. The first one goes to the origin, and every other one is reported as `UNPLACED`. In the running example, only the row has no source, so it is at the origin.
 
 A grid holds rows of cells, and each cell is an element or empty. A row is a grid of one row, and a column is a grid of one column, so one layout rule places all three. Grids can be placed like any element, so they nest.
+
+**[Direction](directions):** the diagram reference shows swimlanes as a pattern: a grid with a title on each row. A call for swimlanes is added to `d` only when the pattern is not enough.
 
 ## Ids
 
@@ -342,6 +346,8 @@ The compiler uses three rectangles for each shape, as <Ref to="dc-boxes" /> show
 
 Routing turns each edge into a list of points, its arrowheads, and its label boxes. An edge that ends at an element attaches to the element's outline. An edge that ends at a point, such as `api.bottom`, ends exactly there.
 
+**[Direction](directions):** a brace is an edge style, as in `d.line(a, b, { style: "brace" })`. A brace is therefore an edge, and its labels, id, steps, and checks work as they do for every edge.
+
 ### Routes
 
 Each edge has one route, which carries all of its geometry between the two ends. The route is one of these forms, and the compiler adds the corners or the curve that the form needs:
@@ -406,6 +412,8 @@ A head points along the last straight piece at its end, with its tip on the end 
 
 The piece that carries a head is the last leg of a route with corners, and the whole curve of a bent edge. The compiler samples a curve into short legs, and the head points along the last of them. A head is 10 units long and needs a piece of at least 17 units, because it takes at most 60% of the piece. On a shorter piece, the head shrinks to fit, and the compiler reports `HEAD_CROWDED` for that end, with the room the head has and the room it needs. Its subject is `head` or `tail`, so the two ends of one edge are two diagnostics.
 
+**[Direction](directions):** the arrowhead kinds also include a hollow triangle, a filled and a hollow diamond, and crow's foot ends, which class and ER diagrams use. The compiler then writes each head as path data with a fill mode, because the crow's foot for zero has a circle.
+
 ## Records and marked text
 
 The cells of a record and the marks of a text are elements of their own, so edges, steps, and links treat them like any other element. A draw program reaches one with its parent's `member()` and its own id, such as `rec.member("payload")`, and a missing one is `UNKNOWN_ELEMENT`, with its parent standing in. Their rectangles come from their parent's rectangle. A ruler's functions run when the record is measured, after the ids are final. A function that throws or gives anything other than text or a number is `INVALID_ARGUMENT` about the record, with the subject `ruler.top` or `ruler.left` and a message that names the first such column or row; that label is empty, and the rest of the record is drawn. <Ref to="dc-record" /> shows a record; the [structures reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagram-structures.md) lists the forms.
@@ -434,11 +442,15 @@ A sequence diagram is built from the other elements while the draw program runs,
 
 A reply with no open call from the participant it returns to is `REPLY_WITHOUT_CALL`, a warning, with the fix: swap `from` and `to`, or remove `reply`. The reply is drawn and closes no bar. The branches of a fragment are alternatives, so a reply in an `else` branch may also answer a call that was open when the fragment began, which an earlier branch's reply already closed: in an `alt`, each branch replies to the same call. A message from a participant to itself is drawn as a call, so its `reply` is ignored and never reported as a reply without a call.
 
+**[Direction](directions):** the compiler matches replies to calls more strictly. `REPLY_WITHOUT_CALL` and the activation bars use one matching, per participant and across the branches of a fragment, so the stricter matching also changes where the bars end.
+
 A message, a note, and a fragment take the options of every drawn element: `id`, `role`, `category`, and `stepOnly`. A message's id comes from its label, a note's from its text, and a fragment's from its operator and title, as for a frame. A message is an edge, and it takes `dashed` too. `reply` and `async` set a message's line and arrowhead: a reply has a dashed line and an open head, and an async message an open head. An explicit `dashed` sets the line of any message. A step-only message is an edge that only the steps that focus it show, and its activation bar follows it, so the bar appears with it. A step-only note is a step-only shape. A step-only fragment is a step-only frame: the steps that focus it show the frame, and its messages are step-only only when they say so themselves.
 
 A message or a note about a shape that is not a participant is `UNKNOWN_PARTICIPANT`. An entry that is not a message, a note, or a fragment, a message without a label, and a message with both `reply` and `async` are `INVALID_ARGUMENT`, as the signature of `d.sequence` states. The sequence skips each entry it cannot draw and draws the rest, and a message with both `reply` and `async` keeps the first of the two. The diagnostic's subject is the entry's place in the list, such as `messages[2].label`. `d.sequence` returns the column that holds the sequence: the row of participants and a spacer, an empty shape as tall as the lifelines, so that an element placed below the sequence clears them.
 
 A fragment is a frame whose corners the sequence sets from its participants, before anything is measured, so its members can reach past them: a self-message at the rightmost participant has its label to the right of that participant. The scene lists the members of each fragment: its messages, its notes, and the fragments inside it. A frame is an element, so the layout gives its rectangle when something first needs it, as for any element. A frame with members covers their ink: edge points, heads, and labels, node rectangles and labels, and inner frames. Where a member reaches past the corners, the frame keeps a margin of 8 units around it. An outer frame covers the rectangle of an inner frame, which the layout computes first. A frame's anchors, ports, and outline come from this final rectangle. An edge among a frame's members that also ends at the frame therefore depends on itself, which is `PLACEMENT_CYCLE` with a chain such as `route(a->loop) → bounds(loop) → route(a->loop)`. A frame that an author draws with `d.frame` has no members and lies exactly between its corners.
+
+**[Direction](directions):** a sequence also takes three more kinds of entry: a found or lost message, which starts or ends at the edge of the diagram; a message that creates or destroys a participant; and a `ref` fragment, which refers to another sequence.
 
 ## Trees
 
@@ -468,6 +480,8 @@ Categories are numbered 1 to 4 in the order the draw program first uses them, an
 ## Checks
 
 Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. Each message names the elements involved and says how to fix the problem, as [diagnostics](/diagnostics#codes-and-severity) describes. The registry of codes lists every diagram code with its severity and meaning.
+
+**[Direction](directions):** a diagnostic about an element names the page line of the call that created the element and the page line of the call that placed it. The compiler receives a function that gives the page line of each call, as it receives the font measure. The page compiler keeps a table from element id to page line, outside the compiled diagram. Elements that a helper function or a loop creates share a page line.
 
 <Table id="dc-check-origins" caption="What each stage of the diagram compiler checks.">
 
