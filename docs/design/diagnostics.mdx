@@ -41,7 +41,7 @@ The web app checks what exists only when a page runs: [the drawing of a chart](/
 
 The server also [checks each reply](/server#reply-checks), and returns its errors to the agent without storing them.
 
-**[Direction](directions):** an open tab also renders the pages it does not show, off screen, so one tab checks the whole document. Browsers slow down background tabs, so this needs testing first.
+**[Direction](directions):** in dev mode, the server renders each page with React in Node after it compiles the page, and reports a page that throws as origin `render`. Every page is then checked for render errors with no browser open. See [builds](/page-compiler#builds).
 
 ## Codes and severity
 

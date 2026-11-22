@@ -1,21 +1,21 @@
 # Directions
 
-This page lists agreed work that is not built yet, and open questions. The page that an item changes describes it under a **Direction** marker that links here. When a direction is added, built, or dropped, this list changes in the same edit.
+This page lists ideas that are not built, and open questions. None of them is decided: each idea is designed in full, changed, or dropped when work on it starts. The page that an idea would change describes it under a **Direction** marker that links here. When an idea is added, built, or dropped, this list changes in the same edit.
 
-## Agreed work
+## Ideas
 
 - **The server checks chart drawings.** The page compiler draws each chart when the page is saved, and reports too many categories, overlapping labels, and Plot's errors. The agent gets these errors before a user opens the page in a browser. See [checks on the marks](charts#checks-on-the-marks).
-- **One browser tab checks every page.** The open tab renders the other pages off screen and reports their errors. Browsers slow down background tabs, so this needs testing first. See [origins](diagnostics#origins).
 - **Comments on repeated words.** When the selected words occur more than once on a page, the address also holds the words before and after them. The web app and the agent then find the place that the user selected. See [text fragments](documents#text-fragments).
 - **Several line ranges in one comment.** A file address takes a list of lines, such as `#L54-L68,L80`. See [lines](documents#lines).
 - **Selected words in single-file links.** In the single HTML file, Copy link keeps the selected words as `#/page#id~text=…`, and the web app finds them. See [addresses in builds](documents#addresses-in-builds).
 - **Comments on chart marks.** A user can comment on a dot, a line, or a range of a chart. The address names the marks by their data values, such as `Month=2026-03`, so it stays correct after rows are added or sorted. See [color](charts#color) and [addresses](documents#addresses).
 - **Images from the project's assets.** A page shows a screenshot or a photo from `assets/` with Markdown image syntax, as `assets:name.png`. The build bundles it, and `-light` and `-dark` files follow the theme. Diagrams and charts stay draw programs. See [icons](page-compiler#icons).
+- **Pages rendered on the server.** The website build writes the content of each page into the page's HTML file, and the web app takes over that HTML in the browser. Readers without JavaScript, search engines, link previews, and agents that fetch a page as text then see its text, tables, code, and diagrams, and the page shows before its scripts load. In dev mode, the server renders every page after each change and reports the pages that throw, so the agent sees render errors without a browser. See [builds](page-compiler#builds) and [origins](diagnostics#origins).
 - **The user ends the agent's working state.** The chat panel shows when the server last heard from the agent, and a Disconnect button. The working state has no time limit. See [agent state](server#agent-state) and [chat panel](web-app#chat-panel).
 
-### Diagram features for later
+### Diagrams
 
-The diagram features below are agreed in outline. Each one is built when an author needs it for a document.
+These ideas add to what a draw program can draw and to what its diagnostics say. Each one would be built when an author needs it for a document.
 
 - **More of sequence diagrams.** A sequence also draws found and lost messages, which start or end at the edge of the diagram, messages that create or destroy a participant, and `ref` fragments, which refer to another sequence. See [sequences](diagram-compiler#sequences).
 - **Stricter reply matching.** The compiler matches replies to calls more strictly. `REPLY_WITHOUT_CALL` and the activation bars use one matching, so the ends of the bars change too. See [sequences](diagram-compiler#sequences).
@@ -28,4 +28,3 @@ The diagram features below are agreed in outline. Each one is built when an auth
 ## Open questions
 
 - **Waiting in the background:** whether every agent can keep its wait for messages running. See [open questions](agent-library#open-questions).
-- **Page text in website builds:** whether a build writes each page's text into its HTML file, so that readers without JavaScript and search engines see it. See [open questions](page-compiler#open-questions).

@@ -19,7 +19,7 @@ Design documents state the design that the code implements. They name the design
 
 - **No backwards compatibility.** Change any API, format, or address when a better design appears; update every caller and document in the same change.
 - **One way to do each thing.** Prefer an opinionated API with a single elegant, clear path over options and aliases.
-- **Docs describe what exists.** Covers only built features; agreed but unbuilt rules start with `**[Direction](directions):**` in design documents and are listed in [docs/design/directions.mdx](docs/design/directions.mdx).
+- **Docs describe what exists.** Covers only built features; ideas that are not built start with `**[Direction](directions):**` in design documents and are listed in [docs/design/directions.mdx](docs/design/directions.mdx).
 
 - `pnpm verify`, `pnpm test:unit`, and `pnpm test` pass before work is done; `pnpm api:report` when exports change.
 - StyleX: longhand properties only (`borderWidth`, `backgroundColor`). Shorthands with theme variables are dropped silently; `pnpm verify` rejects them and literal colors.
