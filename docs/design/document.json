@@ -1,8 +1,8 @@
 {
   "title": "Design",
   "subtitle": "Yapparatus",
-  "logo": "local:yapparatus",
-  "favicon": "local:yapparatus",
+  "logo": "assets:logo-icon",
+  "favicon": "assets:logo-favicon",
   "theme": "auto",
   "pages": [
     "overview.mdx",

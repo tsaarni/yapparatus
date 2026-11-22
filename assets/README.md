@@ -1,6 +1,27 @@
 # Assets
 
-The logo and the demo that the project README shows.
+The project's images: the logo, the demo that the project README shows, and the SVG files that documents use as `assets:name`.
+
+## Logo
+
+The logo is a robot with its jaw dropped open, yapping. The colored files use the accent colors of the web app's theme: `#3d4fd6` on light and `#8b9bff` on dark. The names say what each file has: `text` adds the name Yapparatus beside the robot, `animated` makes the robot blink and yap twice every 5 seconds, and `light` or `dark` is the background it is drawn for. The animation is CSS inside the SVG, and it stops when the reader prefers reduced motion.
+
+| File | Use |
+|---|---|
+| `logo-text-animated-light.svg`, `logo-text-animated-dark.svg` | The project README |
+| `logo-text-light.svg`, `logo-text-dark.svg` | Places where the logo with the name should not move |
+| `logo-animated-light.svg`, `logo-animated-dark.svg` | The robot alone, 256 px, animated |
+| `logo-light.svg`, `logo-dark.svg` | The robot alone, 256 px |
+| `logo-icon.svg` | The line icon in `currentColor`, for a document's `logo` |
+| `logo-favicon.svg` | The same drawing filled, with the eyes cut out, in `currentColor`: it stays readable at 16 px, for a document's `favicon` |
+
+A document names a file here as `assets:name` for `assets/name.svg`. The design document and the test fixtures use `"logo": "assets:logo-icon"` and `"favicon": "assets:logo-favicon"` in `document.json`, and pages show `assets:gateway`. The logo files are generated from one drawing of the robot in `scripts/logo.ts`. To change the logo, edit the parts, colors, or animation there, and write the ten files again:
+
+```sh
+node scripts/logo.ts
+```
+
+Look at the files before committing them.
 
 ## Demo
 

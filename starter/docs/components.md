@@ -134,28 +134,27 @@ To number a tree, wrap it in a `Figure`. The tree then draws no frame of its own
 ```mdx
 <Icon name="lucide:database" label="Database" />
 <Icon name="selfhst:redis" size={28} label="Redis" />
-<Icon name="local:gateway" size={24} label="Gateway" />
+<Icon name="assets:gateway" size={24} label="Gateway" />
 ```
 
-- `name` is a literal `collection:icon`. An unknown name fails compilation.
+- `name` is a literal `prefix:icon`: an installed icon set, or `assets:` for an SVG of the project. An unknown name fails compilation.
 - `size` is pixels; default 20. `color` overrides the text color of a monochrome icon.
 - Give `label` when the icon carries meaning; leave it out when the text beside it says the same.
 - Diagrams draw Lucide icons only, named without the prefix: `d.box("Database", { icon: "database" })` and `d.icon("user", "Customer")`.
 
-### Collections
+### Icon sets
 
 | Prefix | Use for |
 |---|---|
 | `lucide` | General technical symbols and actions. The default family |
 | `selfhst` | Logos of real software and services, often with `-light` and `-dark` variants |
 | `energy-icons` | Energy and engineering symbols |
-| `local` | An SVG in `icons/`: `icons/gateway.svg` → `local:gateway` |
 
 Use one family for ordinary symbols, and logos only for the actual product. When a document with `selfhst` logos is shared, credit selfh.st (CC BY 4.0).
 
 ### Find names
 
-Search every installed collection from the project directory; replace `redis` with a word:
+Search every installed icon set from the project directory; replace `redis` with a word:
 
 ```sh
 node --input-type=module -e '
@@ -172,11 +171,11 @@ for (const pkg of Object.keys(dependencies).filter((name) => name.startsWith("@i
 selfhst: redis redis-dark redis-light
 ```
 
-With web access, browse a collection at `https://icon-sets.iconify.design/<prefix>/`, such as [lucide](https://icon-sets.iconify.design/lucide/). Only installed collections compile; ask the user before adding one with `pnpm add @iconify-json/<prefix>`.
+With web access, browse an icon set at `https://icon-sets.iconify.design/<prefix>/`, such as [lucide](https://icon-sets.iconify.design/lucide/). Only installed icon sets compile; ask the user before adding one with `pnpm add @iconify-json/<prefix>`.
 
-### Local SVGs
+### Project assets
 
-Put the file in `icons/` with a `viewBox`. Use `currentColor` for a monochrome icon so it follows the theme.
+`assets:gateway` is `assets/gateway.svg` in the project directory, shared by all its documents. Put the file there with a `viewBox`. Use `currentColor` for a monochrome icon so it follows the theme.
 
 ### In custom components
 

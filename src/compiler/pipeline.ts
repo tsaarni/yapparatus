@@ -8,7 +8,6 @@ import { fileURLToPath } from "node:url";
 import mdx from "@mdx-js/rollup";
 import stylex from "@stylexjs/unplugin";
 import react from "@vitejs/plugin-react";
-import type { CustomCollectionIconLoader } from "unplugin-icons";
 import { FileSystemHMRIconLoader } from "unplugin-icons/loaders";
 import Icons from "unplugin-icons/vite";
 import type { PluginOption } from "vite";
@@ -31,9 +30,31 @@ const sharedEntries = [
 /** Is yapparatus a dependency of the project at `root`, rather than the project itself? */
 const installedIn = (root: string) => existsSync(path.join(root, "node_modules", "yapparatus"));
 
+/** The loader with hot updates that unplugin-icons takes for a directory of SVG files. */
+type HotIconLoader = ReturnType<typeof FileSystemHMRIconLoader>[string];
+
+/**
+ * The project's SVG files as `assets:name`. The icon plugin takes the loader before Vite resolves
+ * the root, and tracks files for hot updates only through loaders it has from the start.
+ */
+function assetIcons() {
+  let loader: HotIconLoader | undefined;
+  const collection: HotIconLoader = {
+    __iconifyCustomHmrIconLoader: true,
+    name: "assets",
+    iconLoader: (name) => loader?.iconLoader(name),
+    resolveModuleIconName: (file) => loader?.resolveModuleIconName(file),
+    resolveSVGIconPath: (name) => loader?.resolveSVGIconPath(name),
+  };
+  const setRoot = (root: string) => {
+    loader = FileSystemHMRIconLoader(path.join(root, "assets"), "assets").assets;
+  };
+  return { collection, setRoot };
+}
+
 /** The plugins for a document: shared runtime, MDX pages, StyleX, icons, and the web app. */
 export function pipeline(document: DocumentDirectory): PluginOption[] {
-  const iconCollections: Record<string, CustomCollectionIconLoader> = {};
+  const assets = assetIcons();
   return [
     {
       name: "yapparatus:runtime",
@@ -59,10 +80,7 @@ export function pipeline(document: DocumentDirectory): PluginOption[] {
           const include = config.optimizeDeps.include ?? [];
           config.optimizeDeps.include = include.filter((entry) => !sharedEntries.includes(entry));
         }
-        Object.assign(
-          iconCollections,
-          FileSystemHMRIconLoader(path.join(config.root, "icons"), "local"),
-        );
+        assets.setRoot(config.root);
       },
       transform(_code, id) {
         for (const file of excerptFiles.get(id.split("?")[0] ?? id) ?? []) this.addWatchFile(file);
@@ -79,7 +97,7 @@ export function pipeline(document: DocumentDirectory): PluginOption[] {
       jsx: "react",
       autoInstall: false,
       scale: 1,
-      customCollections: iconCollections,
+      customCollections: { assets: assets.collection },
       collectionsNodeResolvePath: fileURLToPath(new URL("../..", import.meta.url)),
     }),
     react({ include: /\.(js|jsx|ts|tsx)$/ }),

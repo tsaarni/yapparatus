@@ -21,7 +21,7 @@ export function iconImports() {
       if (name?.type !== "mdxJsxAttribute") return;
       if (typeof name.value !== "string" || !iconName.test(name.value)) {
         throw new Error(
-          "Icon name must be a literal collection:icon, for example lucide:database. For dynamic icons, import the component and pass icon={Component}.",
+          "Icon name must be a literal prefix:icon, for example lucide:database or assets:logo. For dynamic icons, import the component and pass icon={Component}.",
         );
       }
       const identifier = `_yapparatusIcon${index++}`;

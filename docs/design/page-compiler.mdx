@@ -145,7 +145,9 @@ Code marks, such as `// [!code ++]`, are removed before highlighting, so they wo
 
 ## Icons
 
-For each `<Icon name="collection:name">`, the icon stage imports that one icon, and a Vite plugin turns the import into an SVG component, so a page bundles only the icons it names. The icons come from the installed icon packages and the project's `icons/` directory. A name that is not a literal string cannot become an import, so the page fails with `COMPILE_FAILED`.
+For each `<Icon name="prefix:name">`, the icon stage imports that one icon, and a Vite plugin turns the import into an SVG component, so a page bundles only the icons it names. The icons come from the installed icon packages and the SVG files in the project's `assets/` directory, which a page names as `assets:name` for `assets/name.svg`. An edit to a file in `assets/` reaches the open pages that show it, and the logo and favicon. A name that is not a literal string cannot become an import, so the page fails with `COMPILE_FAILED`.
+
+**[Direction](directions):** a page shows an image from `assets/` with Markdown, as in `![The settings dialog](assets:settings-dialog.png)`. The compiler turns the path into an import, so the build bundles the file and the single HTML file inlines it. When `assets/` has both `settings-dialog-light.png` and `settings-dialog-dark.png`, the image follows the theme. An image goes in a `Figure` for its caption and address. Images are for what cannot be drawn, such as screenshots and photos; a diagram or a chart stays a draw program, so the agent can read and change it.
 
 ## Diagrams
 

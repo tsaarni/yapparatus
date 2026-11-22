@@ -55,7 +55,7 @@ Neither build includes the chat.
 
 ## Add another document
 
-A project can hold more than one document. Each document is a directory with its own `document.json` and pages, and all documents share `docs/`, `icons/`, and `node_modules/`. A document directory cannot be inside another one.
+A project can hold more than one document. Each document is a directory with its own `document.json` and pages, and all documents share `docs/`, `assets/`, and `node_modules/`. A document directory cannot be inside another one.
 
 To add a document, for example in `tutorial/`, ask the agent to write it in that directory, and then start it with `pnpm dev tutorial`.
 

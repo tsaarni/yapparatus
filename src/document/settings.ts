@@ -9,7 +9,7 @@ export const themeSettings = ["dark", "light", "auto"] as const;
 /** One of `themeSettings`. */
 export type ThemeSetting = (typeof themeSettings)[number];
 
-/** An icon name, as `<Icon>`, `logo`, and `favicon` take it: `collection:icon`. */
+/** An icon name, as `<Icon>`, `logo`, and `favicon` take it: `prefix:icon`. */
 export const iconName = /^[a-z0-9-]+:[a-z0-9-]+$/;
 
 /** Which kinds of thing the document numbers. */
@@ -32,9 +32,9 @@ export interface DocumentSettings {
   title?: string;
   /** Small line above the title, also after it in the browser tab, such as the project. */
   subtitle?: string;
-  /** Icon beside the title in the header, as `collection:icon`. Default: none. */
+  /** Icon beside the title in the header, as `prefix:icon`. Default: none. */
   logo?: string;
-  /** Icon in the browser tab, as `collection:icon`. Default: the browser's own. */
+  /** Icon in the browser tab, as `prefix:icon`. Default: the browser's own. */
   favicon?: string;
   /** Heading above the page list. Default: "Contents". */
   contentsLabel?: string;

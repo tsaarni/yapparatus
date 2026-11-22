@@ -1,6 +1,6 @@
 <h1>
-  <img alt="Yapparatus" src="assets/logo-light.svg#gh-light-mode-only" height="64">
-  <img alt="Yapparatus" src="assets/logo-dark.svg#gh-dark-mode-only" height="64">
+  <img alt="Yapparatus" src="assets/logo-text-animated-light.svg#gh-light-mode-only" height="64">
+  <img alt="Yapparatus" src="assets/logo-text-animated-dark.svg#gh-dark-mode-only" height="64">
 </h1>
 
 Yapparatus is a tool for creating documents that are written and revised in conversation with a coding agent. The agent writes the pages as [MDX](https://mdxjs.com/), with components for diagrams, charts, tables, code excerpts and more to make the document highly visual. In the browser, the document appears next to a chat where you can select anything in the document and comment on it: a question, a correction, or a change to make. The agent replies in the chat, edits the pages, or both.

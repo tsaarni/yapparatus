@@ -1,8 +1,8 @@
 {
   "title": "Fixture document",
   "subtitle": "Fixture",
-  "logo": "lucide:book-open",
-  "favicon": "lucide:book-open",
+  "logo": "assets:logo-icon",
+  "favicon": "assets:logo-favicon",
   "pages": [
     "first-page.mdx",
     "second-page.mdx",

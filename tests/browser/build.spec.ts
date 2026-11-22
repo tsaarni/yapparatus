@@ -33,7 +33,7 @@ async function expectCompiledDiagram(page: Page) {
 
 test.beforeAll(async () => {
   root = mkdtempSync(path.join(os.tmpdir(), "yapparatus-build-"));
-  for (const entry of ["src", "icons"]) cpSync(entry, path.join(root, entry), { recursive: true });
+  for (const entry of ["src", "assets"]) cpSync(entry, path.join(root, entry), { recursive: true });
   cpSync("tests/fixtures/content", path.join(root, "content"), { recursive: true });
   cpSync("tests/fixtures/source", path.join(root, "source"), { recursive: true });
   symlinkSync(path.resolve("node_modules"), path.join(root, "node_modules"), "dir");

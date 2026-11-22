@@ -8,7 +8,7 @@ import { createServer } from "vite";
 const root = path.join(realpathSync(os.tmpdir()), "yapparatus-browser");
 rmSync(root, { recursive: true, force: true });
 mkdirSync(root);
-for (const entry of ["src", "lib", "icons", "package.json", "tsconfig.base.json"])
+for (const entry of ["src", "lib", "assets", "package.json", "tsconfig.base.json"])
   cpSync(entry, path.join(root, entry), { recursive: true });
 cpSync("tests/fixtures/content", path.join(root, "content"), { recursive: true });
 cpSync("tests/fixtures/source", path.join(root, "source"), { recursive: true });

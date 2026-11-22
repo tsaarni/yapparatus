@@ -44,7 +44,7 @@ export function checkIcons(settings: { logo?: unknown; favicon?: unknown }): str
     const value = settings[field];
     if (value === undefined || (typeof value === "string" && iconName.test(value))) return [];
     return [
-      `"${field}" in document.json is ${JSON.stringify(value)}; use an icon name such as "lucide:book-open" or "local:logo".`,
+      `"${field}" in document.json is ${JSON.stringify(value)}; use an icon name such as "lucide:book-open" or "assets:logo".`,
     ];
   });
 }

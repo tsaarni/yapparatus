@@ -16,7 +16,7 @@ const styles = stylex.create({
 
 /** What an author writes on an icon. */
 export interface IconProps {
-  /** MDX-only literal collection:name, resolved at build time. */
+  /** MDX-only literal prefix:icon, resolved at build time. */
   name?: string;
   /** Imported ~icons component, for TSX and dynamic component references. */
   icon?: ComponentType<SVGProps<SVGSVGElement>>;

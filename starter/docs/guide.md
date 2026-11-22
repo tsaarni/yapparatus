@@ -54,7 +54,7 @@ The components, diagrams, and charts are specific to Yapparatus and not in your 
 |---|---|---|
 | `title` | Header and tab title | Directory name |
 | `subtitle` | Small line above the title, such as the project or team | None |
-| `logo` | Icon beside the title, as an icon name: `"local:myapp"` for `icons/myapp.svg` | None |
+| `logo` | Icon beside the title, as an icon name: `"assets:myapp"` for `assets/myapp.svg` | None |
 | `favicon` | Icon in the browser tab, as an icon name; a monochrome icon takes the accent color | Browser default |
 | `contentsLabel` | Heading over the page list | `"Contents"` |
 | `numbering` | `false`, or `{ "sections": false }`; kinds: `sections`, `figures`, `tables`, `listings` | All on |

@@ -465,9 +465,9 @@ export interface DocumentSettings {
   title?: string;
   /** Small line above the title, also after it in the browser tab, such as the project. */
   subtitle?: string;
-  /** Icon beside the title in the header, as `collection:icon`. Default: none. */
+  /** Icon beside the title in the header, as `prefix:icon`. Default: none. */
   logo?: string;
-  /** Icon in the browser tab, as `collection:icon`. Default: the browser's own. */
+  /** Icon in the browser tab, as `prefix:icon`. Default: the browser's own. */
   favicon?: string;
   /** Heading above the page list. Default: "Contents". */
   contentsLabel?: string;
@@ -570,7 +570,7 @@ export interface HighlightedCode {
 export const Icon: ({ icon: Svg, name, size, label, color }: IconProps) => Element;
 
 export interface IconProps {
-  /** MDX-only literal collection:name, resolved at build time. */
+  /** MDX-only literal prefix:icon, resolved at build time. */
   name?: string;
   /** Imported ~icons component, for TSX and dynamic component references. */
   icon?: ComponentType<SVGProps<SVGSVGElement>>;
