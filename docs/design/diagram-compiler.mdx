@@ -467,20 +467,20 @@ Categories are numbered 1 to 4 in the order the draw program first uses them, an
 
 ## Checks
 
-Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. Each message names the elements involved and says how to fix the problem, as [diagnostics](/diagnostics#codes-and-severity) describes.
+Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. Each message names the elements involved and says how to fix the problem, as [diagnostics](/diagnostics#codes-and-severity) describes. The registry of codes lists every diagram code with its severity and meaning.
 
-<Table id="dc-check-origins" caption="The stage that finds each diagram diagnostic.">
+<Table id="dc-check-origins" caption="What each stage of the diagram compiler checks.">
 
-| Stage | Codes |
+| Stage | Checks |
 |---|---|
-| Running the draw program | `DRAW_FAILED`, `STEP_NOT_TEXT`, `FONT_FALLBACK` |
-| Record | `UNKNOWN_OPTION`, `INVALID_ARGUMENT`, `UNKNOWN_PARTICIPANT`, `REPLY_WITHOUT_CALL`, `NOT_PLACEABLE`, `CONFLICTING_PLACEMENT`, `UNKNOWN_ELEMENT`, `UNKNOWN_GUTTER` |
-| Settle ids | `DUPLICATE_ID`, `UNPLACED` |
-| Measure, size, and place | `INVALID_ARGUMENT`, `UNKNOWN_ICON`, `TEXT_OVERFLOW`, `FIXED_SIZE_IN_GROUP`, `CELL_SPAN`, `RULER_CROWDED`, `MARK_UNMATCHED`, `PLACEMENT_CYCLE` |
-| Route | `DEGENERATE_EDGE`, `LABEL_SEGMENT`, `LABEL_CROWDED`, `HEAD_CROWDED` |
-| Check | `NODE_OVERLAP`, `EDGE_NODE_INTERSECTION`, `EDGE_OVERLAP`, `LABEL_OVERLAP`, `ENCLOSURE_TITLE_CROSSED`, `ENCLOSURE_INTRUSION`, `ACCENT_OVERUSED` |
-| Finish | `TOO_MANY_CATEGORIES`, `DUPLICATE_ID`, `DIAGRAM_FAILED` |
-| Check steps | `UNKNOWN_ELEMENT`, `DUPLICATE_ID`, `STEP_ONLY_UNUSED`, `NODE_OVERLAP`, `ENCLOSURE_INTRUSION`, `ENCLOSURE_TITLE_CROSSED`, `BUILD_WITHOUT_STEPS`, `BUILD_NEVER_FOCUSED`, `DIAGRAM_SCROLLS` |
+| Running the draw program | The program throws or runs too long, a step's id or focus is computed, and text has characters that the fonts lack |
+| Record | Each call against its signature, the participants of a sequence, and that each element has one placement |
+| Settle ids | Ids are unique, and every element is placed |
+| Measure, size, and place | Text fits, icons exist, records and marks match their text, and placements form no cycle |
+| Route | Each edge has length, and its labels and arrowheads have room |
+| Check | Shapes, edges, labels, and enclosures do not collide, and few elements are accented |
+| Finish | The number of categories |
+| Check steps | Each step names existing elements, step-only elements appear in a step, and the diagram fits the width |
 
 </Table>
 

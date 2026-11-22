@@ -1,18 +1,18 @@
 # Directions
 
-This page lists the work that is agreed but not built, and the questions that are still open. Each item is described on the page it changes, where a **Direction** marker links back here. When a Direction is added, built, or dropped, this list changes in the same edit.
+This page lists agreed work that is not built yet, and open questions. The page that an item changes describes it under a **Direction** marker that links here. When a direction is added, built, or dropped, this list changes in the same edit.
 
-## Agreed, not built
+## Agreed work
 
-- **Text fragments with prefix and suffix,** so that words that occur more than once on a page name one place. See [text fragments](documents#text-fragments).
-- **Lists of lines in file addresses,** such as `#L54-L68,L80`. See [lines](documents#lines).
-- **Words in single-file addresses,** written `#/page#id~text=…` and found by the web app. See [addresses in builds](documents#addresses-in-builds).
-- **Commenting on a mark or a range of a chart,** named in the address by its data values. See [color](charts#color) and [addresses](documents#addresses).
-- **The server draws charts,** so the checks on a chart's drawing run when the page compiles. See [checks on the marks](charts#checks-on-the-marks).
-- **The user ends the working state,** with a Disconnect button in the chat panel. The state has no time limit, and the panel shows when the server last heard from the agent. See [agent state](server#agent-state) and [chat panel](web-app#chat-panel).
-- **One browser tab checks every page,** by rendering off screen the pages that it does not show. See [origins](diagnostics#origins).
+- **The server checks chart drawings.** The page compiler draws each chart when the page is saved, and reports too many categories, overlapping labels, and Plot's errors. The agent gets these errors before a user opens the page in a browser. See [checks on the marks](charts#checks-on-the-marks).
+- **One browser tab checks every page.** The open tab renders the other pages off screen and reports their errors. Browsers slow down background tabs, so this needs testing first. See [origins](diagnostics#origins).
+- **Comments on repeated words.** When the selected words occur more than once on a page, the address also holds the words before and after them. The web app and the agent then find the place that the user selected. See [text fragments](documents#text-fragments).
+- **Several line ranges in one comment.** A file address takes a list of lines, such as `#L54-L68,L80`. See [lines](documents#lines).
+- **Selected words in single-file links.** In the single HTML file, Copy link keeps the selected words as `#/page#id~text=…`, and the web app finds them. See [addresses in builds](documents#addresses-in-builds).
+- **Comments on chart marks.** A user can comment on a dot, a line, or a range of a chart. The address names the marks by their data values, such as `Month=2026-03`, so it stays correct after rows are added or sorted. See [color](charts#color) and [addresses](documents#addresses).
+- **The user ends the agent's working state.** The chat panel shows when the server last heard from the agent, and a Disconnect button. The working state has no time limit. See [agent state](server#agent-state) and [chat panel](web-app#chat-panel).
 
 ## Open questions
 
-- **Agents and background commands:** whether every agent can keep its wait for messages running. See [open questions](agent-library#open-questions).
-- **Pre-rendered pages in builds:** whether a website build writes each page's text into its HTML file. See [open questions](page-compiler#open-questions).
+- **Waiting in the background:** whether every agent can keep its wait for messages running. See [open questions](agent-library#open-questions).
+- **Page text in website builds:** whether a build writes each page's text into its HTML file, so that readers without JavaScript and search engines see it. See [open questions](page-compiler#open-questions).
