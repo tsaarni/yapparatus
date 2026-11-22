@@ -1,6 +1,6 @@
 /**
- * The font measure in src/compiler/font-measure.ts gives the widths the web app's canvas gives,
- * so a diagram compiled in Node has the layout the browser would compute.
+ * The font measure in src/compiler/font-measure.ts gives the web app's canvas widths. The browser
+ * runs at scale 2: at scale 1 Linux Chromium rounds each glyph advance to a whole pixel.
  */
 import { expect, test } from "@playwright/test";
 import { fontMeasure } from "../../src/compiler/font-measure.ts";
@@ -10,6 +10,8 @@ import { compile } from "../../src/diagram/compile/compile.ts";
 import { type FontSpec, type Measure, defaultMetrics as m } from "../../src/diagram/metrics.ts";
 import { Scene } from "../../src/diagram/scene.ts";
 import { examplePages, examples } from "../unit/diagram/examples.ts";
+
+test.use({ launchOptions: { args: ["--force-device-scale-factor=2"] } });
 
 /** Every font the compiler measures with: the sans weights at each size, and mono. */
 const fonts: FontSpec[] = [m.labelSize, m.smallSize, m.tabSize].flatMap((size) => [
