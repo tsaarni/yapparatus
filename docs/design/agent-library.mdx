@@ -56,14 +56,14 @@ A command runs TypeScript with Node from the project directory, with the code in
 <Listing id="agent-reply-command" caption="The command that sends a reply and waits for the next message.">
 
 ```sh
-node --input-type=module-typescript -e 'import { sendReply, waitForMessage } from "yapparatus/agent"; await sendReply(); console.log((await waitForMessage()).prompt);' <<'MDX'
+node --input-type=module-typescript -e 'import { sendReply, waitForMessage } from "yapparatus/agent"; await sendReply(); console.log("Reply sent. Waiting for the next message."); console.log((await waitForMessage()).prompt);' <<'MDX'
 <your reply>
 MDX
 ```
 
 </Listing>
 
-The server writes every command, and each prompt ends with the command to run next. The code uses only double quotes, because a single quote would end the shell argument. The reply goes in a quoted heredoc, `<<'MDX'`, so the shell expands nothing in it, or comes from a file with `< reply.mdx`. When `sendReply()` rejects, `waitForMessage()` does not run, and the output is the error.
+The server writes every command, and each prompt ends with the command to run next. The code uses only double quotes, because a single quote would end the shell argument. The reply goes in a quoted heredoc, `<<'MDX'`, so the shell expands nothing in it, or comes from a file with `< reply.mdx`. When `sendReply()` rejects, nothing after it runs, and the output is the error. Otherwise the command prints that the reply was sent before it waits, so an agent whose wait ends early, such as when the server restarts, knows that the reader has the reply.
 
 ## waitForMessage
 
@@ -85,7 +85,7 @@ The server [checks the reply](server#reply-checks) before it stores it. A refuse
 
 ## savePicture
 
-`savePicture(address, file, options?)` saves a diagram's picture as a PNG in the file that the agent names. The address is the figure's `/page#figure`. With `{ ids: true }`, the picture labels each element with its id and outlines the elements that diagnostics name. The agent opens the file as an image and deletes it afterwards. The picture shows what no diagnostic covers, such as a layout that is valid but hard to read, so the start prompt asks the agent to look once after it changes a diagram and the check is clean.
+`savePicture(address, file, options?)` saves a diagram's picture as a PNG in the file that the agent names. The address is the figure's `/page#figure`. With `{ ids: true }`, the picture labels each element with its id and outlines the elements that diagnostics name. The agent opens the file as an image and deletes it afterwards. The picture shows what no diagnostic covers, such as a layout that is valid but hard to read, so the start prompt asks the agent to look after it changes a diagram and the check is clean, and to stop once the drawing reads clearly.
 
 ## Prompts
 
@@ -106,12 +106,12 @@ A prompt is text the server writes for the agent. The library passes it on uncha
 
 </Table>
 
-The start prompt holds the instructions for the whole session: where the authoring guide is, which components a reply may use, how to run the wait command, and when to check the document and look at a picture. It also lists the external directories, so the agent can open the files that references name. Later prompts hold only the messages, the diagnostics, and the next commands. The commands take no arguments, so the loop keeps working after the agent compacts its conversation.
+The start prompt holds the instructions for the whole session as a numbered loop: wait, edit pages following the authoring guide after reading the page for each feature, check the document, look at changed diagrams, and reply. The guide says what a reply may hold. It also lists the external directories, so the agent can open the files that references name. Later prompts hold only the messages, the diagnostics, and the next commands. The commands take no arguments, so the loop keeps working after the agent compacts its conversation.
 
 <Ref to="agent-prompt" /> shows a prompt with one reader message, about a page and about lines of a file in an external directory named `app`.
 
 <Diagram id="agent-prompt" caption="A prompt with one reader message, in its four parts. The two commands are shortened. The reply command is in full in its listing." description="The text of a prompt, with the user's message, the references, the diagnostics, and the next commands marked" draw={(d) => {
-  d.text("<reader_message time=\"14:02\">\nWhy does a read wait at most 25 s?\n</reader_message>\nAttached by the reader, at the lines they saw:\n- section, docs/design/rest-api.mdx:88-140, /rest-api#read-the-chat\n- file lines, ../app/src/server.ts:40-52, /-/files/app/src/server.ts#L40-L52\n\nIf a file changed since, find each reference by its address and words.\n\nDiagnostics: none\n\nEdit pages (/home/me/doc/docs/guide.md) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\nnode --input-type=module-typescript -e '… checkDocument() …'\n\nThen reply and wait:\n\nnode --input-type=module-typescript -e '… sendReply() … waitForMessage() …' <<'MDX'\n<your reply>\nMDX", {
+  d.text("<reader_message time=\"14:02\">\nWhy does a read wait at most 25 s?\n</reader_message>\nAttached by the reader, at the lines they saw:\n- section, docs/design/rest-api.mdx:88-140, /rest-api#read-the-chat\n- file lines, ../app/src/server.ts:40-52, /-/files/app/src/server.ts#L40-L52\n\nIf a file changed since, find each reference by its address and words.\n\nDiagnostics: none\n\nAct on the messages: edit pages following /home/me/doc/docs/guide.md, reply, or both. If you edited pages, check the document first and fix what it lists:\n\nnode --input-type=module-typescript -e '… checkDocument() …'\n\nThen reply and wait:\n\nnode --input-type=module-typescript -e '… sendReply() … waitForMessage() …' <<'MDX'\n<your reply>\nMDX", {
     mono: true,
     id: "prompt",
     marks: {

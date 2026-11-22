@@ -108,7 +108,7 @@ test("step-only elements: unused ones and those a step shows on top of each othe
   assert.deepEqual(together.diagnostics, [
     {
       code: "NODE_OVERLAP",
-      message: "one and two overlap, and step 2 shows both.",
+      message: "one and two overlap, and step 2 shows both. Adjust the placement or the gaps.",
       ids: ["one", "two"],
     },
   ]);
@@ -183,7 +183,8 @@ test("a step that shows a step-only enclosure checks the step-only shapes and ed
   assert.deepEqual(out.diagnostics, [
     {
       code: "ENCLOSURE_INTRUSION",
-      message: "aside is not a member of only-a but overlaps its boundary. Step 3 shows both.",
+      message:
+        "aside is not a member of only-a but overlaps its boundary. Move it out, or add it to the members. Step 3 shows both.",
       ids: ["aside", "only-a"],
     },
   ]);

@@ -10,7 +10,7 @@ import { contentIssues, literal } from "./conventions.ts";
 import { excerptFiles } from "./excerpts.ts";
 
 /** Which MDX components are numbered blocks, and of which kind. */
-const numberedComponents: Record<string, NumberedKind> = {
+export const numberedComponents: Record<string, NumberedKind> = {
   Chart: "figure",
   Diagram: "figure",
   Figure: "figure",

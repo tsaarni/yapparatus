@@ -27,7 +27,9 @@
 />
 ````
 
-In this example, the data is a file that a tool wrote. Each request is a dot on a time axis and a log scale, colored by a column of categories. A rule and a label show a target and an event. `id` and `caption` make a numbered figure. `description` is the accessible description. The charts page of the design of Yapparatus, `node_modules/yapparatus/docs/design/charts.mdx`, draws this chart and examples of the other forms.
+Each request is a dot on a time axis and a log scale, colored by a column of categories. A rule and a label show a target and an event. `id` and `caption` make a numbered figure. `description` is the accessible description. `node_modules/yapparatus/docs/design/charts.mdx` draws this chart and examples of the other forms.
+
+Contents: Choosing a form · Data · Marks · Color
 
 ## Choosing a form
 
@@ -53,7 +55,7 @@ Write the data in one of three places:
 
 - **A `Table` on the page**, when the reader should see the numbers too: `from="#requests"` names `<Table id="requests">` on the same page, before or after the chart. The table stays shown, and the chart draws its rows.
 - **A block of CSV** inside the chart, fenced as ```` ```csv ````, for numbers you write yourself. Leave a blank line after the opening tag and before the closing tag. A ```` ```tsv ```` block works too.
-- **A file**, for numbers a tool produced or more than a few dozen rows: `from="/-/files/bench/results.csv"`. The file is a `.csv` or `.tsv` in an external directory; see [external files](guide.md#external-files). Never copy a tool's numbers into the page. The page holds none of the file's rows. They load when the reader scrolls near the chart, so a large file does not slow the page. An edit to the file redraws the chart. Files over 1 MB are not shown.
+- **A file**, for numbers a tool produced or more than a few dozen rows: `from="/-/files/bench/results.csv"`. The file is a `.csv` or `.tsv` in an external directory that `document.json` names. Never copy a tool's numbers into the page. Files over 1 MB are not shown.
 
 A chart has one source: a block or `from`, not both. A block's data is not shown; when the reader needs the exact numbers, put them in a `Table` and name it with `from`.
 
@@ -81,11 +83,11 @@ plot={(Plot, rows) => ({
 ```
 
 - Every mark and transform of Plot works: `Plot.dot(rows, …)`, `Plot.boxY(rows, …)`, `Plot.areaY(rows, …)`, and transforms such as `Plot.groupX`, `Plot.binX`, and `Plot.windowY`. A mark can also take its own array, as `Plot.ruleY([300])` does.
-- A field option names a column exactly as its header is written: `y: "p99 (ms)"`. A name that is not a column is an error that lists the columns.
+- A field option names a column exactly as its header is written: `y: "p99 (ms)"`.
 - `plot` may also return `x`, `y`, `fx`, `fy`, and `r`: the options of those scales, such as `{ type: "log" }`, `{ type: "utc" }` for times written with `Z`, `{ grid: true }`, `{ label: "…" }`, `{ ticks: 5 }`, or `{ tickRotate: -30 }`. Use `fx` or `fy` to split a chart into small multiples.
-- Yapparatus sets the width, height, margins, fonts, and colors. `plot` returns nothing else, and does not call `Plot.plot` or `Plot.legend`.
-- `plot` uses only `Plot`, `rows`, and values written inside it.
-- `plot` finishes within 1 second.
+- Tick labels must not overlap: give many or long ones fewer `ticks` or a `tickRotate`, or put long category names on `y`.
+- Draw thousands of rows with a transform, such as `Plot.binX` or `Plot.windowY`: each mark is an element on the page.
+- `plot` returns only marks and scale options, and does not call `Plot.plot` or `Plot.legend`: Yapparatus sets the size, margins, fonts, and colors. It uses only `Plot`, `rows`, and values written inside it, and finishes within 1 second.
 
 ## Color
 
@@ -93,26 +95,3 @@ plot={(Plot, rows) => ({
 - **Four categories at most.** More are drawn in a muted color and reported. Give `fill` or `stroke` a column with fewer values, or split the chart with `fx`.
 - **Color shows categories, not amounts.** A column of numbers in `fill` or `stroke` becomes one category for each value. Show amounts by position or size, with `y` or `r`.
 - **No literal colors.** `fill: "tomato"` or `stroke: "#f00"` is an error, because colors come from the theme. A mark without `fill` or `stroke` is drawn in the text color.
-
-## Many rows
-
-Draw thousands of rows with a transform, such as `Plot.binX` or `Plot.windowY`, rather than one mark per row: each mark is an element on the page.
-
-A reader comments on a chart as a whole, like any figure.
-
-## Diagnostics
-
-Problems with the data and with what `plot` names are found when the page is compiled, and reported with their line in the page, or in the file. Problems with the drawing, `TOO_MANY_CATEGORIES`, `CHART_OVERLAP`, and Plot failing to draw, are found when a browser shows the page.
-
-| Code | Severity | Meaning |
-|---|---|---|
-| `CHART_PLOT` | error | The chart has no `plot` function, or `plot` ran longer than 1 second |
-| `CHART_DATA` | error | The data is missing, comes from two places, names no table on the page, is not in a known format, has a column problem, or could not load |
-| `CHART_FIELD` | error | A mark names a field that is not a column of its data |
-| `CHART_COLOR` | error | A mark has a literal color |
-| `CHART_OPTION` | error | `plot` returns options that Yapparatus sets, or calls `Plot.plot` |
-| `CHART_FAILED` | error | Plot could not draw the marks; the message is Plot's |
-| `TOO_MANY_CATEGORIES` | warning | More than four categories |
-| `CHART_OVERLAP` | warning | Tick labels on one axis overlap; show fewer ticks, rotate them, or swap the axes |
-
-A chart that fails keeps showing its last valid drawing, dimmed, above the errors.

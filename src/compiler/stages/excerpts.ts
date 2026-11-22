@@ -54,7 +54,10 @@ export function excerptRange(
   end: string | undefined,
 ): LineRange | { error: string } {
   const found = lines.flatMap((line, i) => (line.includes(start) ? [i + 1] : []));
-  if (found.length === 0) return { error: `start="${start}" is in no line of the file.` };
+  if (found.length === 0)
+    return {
+      error: `start="${start}" is in no line of the file. Quote the first line as the file has it now.`,
+    };
   if (found.length > 1)
     return {
       error: `start="${start}" is in ${found.length} lines, ${found.map((n) => `L${n}`).join(", ")}. Quote more of the line you mean.`,
@@ -62,7 +65,10 @@ export function excerptRange(
   const first = found[0] as number;
   if (end !== undefined) {
     const at = lines.findIndex((line, i) => i + 1 >= first && line.includes(end));
-    if (at < 0) return { error: `end="${end}" is in no line from L${first} on.` };
+    if (at < 0)
+      return {
+        error: `end="${end}" is in no line from L${first} on. Quote the last line as the file has it now.`,
+      };
     return { start: first, end: at + 1 };
   }
   const level = indent(lines[first - 1] ?? "");
@@ -156,7 +162,7 @@ export function excerpts(files: ExternalFiles) {
           issue(
             "EXCERPT_TEXT",
             text,
-            `<Excerpt mark="${text}"> is in no line of the excerpt, L${shown.start} to L${shown.end}.`,
+            `<Excerpt mark="${text}"> is in no line of the excerpt, L${shown.start} to L${shown.end}. Quote a line the excerpt shows.`,
           );
           return;
         }

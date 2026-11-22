@@ -178,7 +178,7 @@ export function createText(m: Metrics, measure: Measure, report: Report, icons: 
     if (fixed !== undefined && lines.length && textWidth > fixed + 0.5)
       report(
         "TEXT_OVERFLOW",
-        `${node.id}: a word is ${round(textWidth - fixed)} units wider than the fixed width allows.`,
+        `${node.id}: a word is ${round(textWidth - fixed)} units wider than the fixed width allows. Increase width.`,
         [node.id],
       );
     return c;

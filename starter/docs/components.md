@@ -1,6 +1,8 @@
 # Components
 
-`Figure`, `Chart`, `Diagram`, `Step`, `Table`, `Listing`, `Excerpt`, `Ref`, `Icon`, `FileTree`, `Tabs`, `Columns`, and `Panel` work in MDX pages and chat replies without imports, and so do alerts, code marks, and math. Diagrams and their steps have [their own reference](diagrams.md), and so do [charts](charts.md) and [icons](icons.md).
+Alerts, code marks, math, `Tabs`, `Columns`, `Panel`, `FileTree`, `Figure`, and `Icon` work in pages and chat replies without imports, as do custom components in pages. Tables, listings, excerpts, and `Ref` are in the guide.
+
+Contents: Figure · Code marks · Alerts · Math · Tabs and Columns · FileTree · Icons · Custom components
 
 ## Figure
 
@@ -11,57 +13,7 @@
 </Figure>
 ```
 
-A framed figure, at least as wide as the text column, growing to the right to fit its content. With `id` and `caption` it is numbered. `description` is the accessible description. The caption goes below the content. When the content is Markdown, such as a `FileTree`, leave a blank line after the opening tag and before the closing tag. Use `Diagram` for drawings and `Chart` for data; local images are not supported.
-
-## Table
-
-```mdx
-<Table id="routes" caption="The API routes.">
-
-| Route | Meaning |
-|---|---|
-| `GET /items` | List items |
-
-</Table>
-```
-
-Wrap a Markdown table. Leave a blank line after the opening tag and before the closing tag, or the table is read as text. The caption goes above the table. Left-align text, right-align numbers (`|---:|`), and keep cells short.
-
-## Listing
-
-````mdx
-<Listing id="config" caption="The Vite configuration.">
-
-```ts
-export default defineConfig({ plugins: [yapparatus()] })
-```
-
-</Listing>
-````
-
-Wrap one fenced code block or one `Excerpt`. The caption goes above the code. Every fenced block names its language. Keep code written for the document within 100 columns; code copied from a source keeps its formatting.
-
-## Excerpt
-
-```mdx
-<Listing id="retry-loop" caption="The retry loop.">
-<Excerpt from="/-/files/app/src/client.ts" start="export async function fetchWithRetry(" mark="await sleep(" />
-</Listing>
-```
-
-Lines of an external file, read when the page is compiled, from a directory that `"files"` in `document.json` names. The page compiler finds the excerpt's lines by their text, so the excerpt keeps showing the same code when lines are added or removed above it.
-
-| Attribute | Value |
-|---|---|
-| `from` | The file's address, `/-/files/<directory>/<path>`, without lines |
-| `start` | Text from the first line to show. Exactly one line of the file may contain it. Without `start`, the whole file |
-| `end` | Text from the last line to show: the first line from `start` on that contains it. Without `end`, the block that the `start` line opens: the lines indented deeper than it, and its closing `}`, `)`, or `]`. An opening `{` on the next line and `#` lines in column 0, such as `#ifdef`, stay in the block. A multi-line string that starts in column 0 ends the block; use `end` |
-| `mark` | Text of lines to highlight, or a list, `mark={["retry", "backoff"]}`: every line of the excerpt that contains one |
-| `wrap` | Written bare. Long lines wrap instead of scrolling, for prose such as Markdown |
-
-Quote enough of a line to name it once, such as `export function handle(` rather than `handle`. The block shows the file's line numbers, and its bar links to the lines. The language comes from the file name. Text that is in no line and `start` text in several lines are reported as `EXCERPT_TEXT`, and a `from` that is not a file address, has line numbers, or comes with invalid attributes as `EXCERPT_INVALID`, both with the page's line, so a change to the file that breaks an excerpt shows up in the diagnostics. A missing file is reported as `BROKEN_LINK`.
-
-Code marks written in the file are shown as text; use `mark` instead.
+A framed figure, at least as wide as the text column, growing to the right to fit its content. With `id` and `caption` it is numbered. `description` is the accessible description. The caption goes below the content. When the content is Markdown, such as a `FileTree`, leave a blank line after the opening tag and before the closing tag.
 
 ## Code marks
 
@@ -75,9 +27,7 @@ const config = {
 ```
 ````
 
-A comment at the end of a line marks it: `[!code ++]` added, `[!code --]` removed, `[!code highlight]` important. `[!code highlight:3]` marks three lines from there, and the same comment alone on its line marks the lines after it. Write the comment in the language's own syntax (`//`, `#`, `--`, `/* */`, or `<!-- -->`); the marks work in JSON too. The comments are removed from the page, and Copy leaves out removed lines.
-
-Mark only the lines the text talks about.
+A comment at the end of a line marks it: `[!code ++]` added, `[!code --]` removed, `[!code highlight]` important. `[!code highlight:3]` marks three lines from there, and the same comment alone on its line marks the lines after it. Write the comment in the language's own syntax (`//`, `#`, `--`, `/* */`, or `<!-- -->`); the marks work in JSON too. The comments are removed from the page, and Copy leaves out removed lines. Mark only the lines the text talks about.
 
 ## Alerts
 
@@ -86,7 +36,7 @@ Mark only the lines the text talks about.
 > Back up the database before you migrate.
 ```
 
-A blockquote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, or `[!CAUTION]` is an alert of that kind. Any other `[!…]` marker is an error. Keep an alert to one or two sentences, and use one only for what the reader must not miss. A blockquote without a marker is a quotation.
+A blockquote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, or `[!CAUTION]` is an alert of that kind. Any other `[!…]` marker is an error. A blockquote without a marker is a quotation. Use one only for what the reader must not miss.
 
 ## Math
 
@@ -98,7 +48,7 @@ $$
 $$
 ```
 
-TeX between `$$` marks is math. Inside a sentence it is inline; on lines of its own it is a block, centered on its own line. A single `$` is text, so prices such as $5 need no escaping. The page compiler turns the TeX into MathML, which the browser draws. TeX that does not parse is `MATH_INVALID`, and the page shows its source. Equations are not numbered and cannot be referenced.
+TeX between `$$` marks is math. Inside a sentence it is inline; on lines of its own it is a centered block. A single `$` is text, so prices such as $5 need no escaping. Equations are not numbered and cannot be referenced.
 
 ## Tabs and Columns
 
@@ -122,7 +72,7 @@ Install Node with your distribution's package manager.
 - A container holds only `Panel`s, at least two, each with its own `label` written as a string. Leave a blank line after each opening `<Panel>` tag and before its closing tag. Containers do not nest.
 - Choosing a tab selects the tab with the same label in every set, on every page. Write the same choice with the same label everywhere.
 - `Columns` holds two or three panels. Columns alone hold text and are not numbered. Wrap code side by side in a `Listing` and drawings side by side in a `Figure`, as below. A `Diagram` or `Chart` inside a `Figure` takes no `id` or `caption`; the figure has them.
-- A small change to code reads better as [code marks](#code-marks), and a comparison of several aspects as a `Table`.
+- A small change to code reads better as code marks, and a comparison of several aspects as a `Table`.
 
 ````mdx
 <Listing id="retry" caption="The retry delay, before and after backoff.">
@@ -160,6 +110,8 @@ await sleep(100 * 2 ** attempt);
 </FileTree>
 ```
 
+Use a `FileTree` for a directory listing. Draw a tree with `d.tree` only when it is part of a diagram, with edges to other shapes.
+
 Wrap one Markdown list, with a blank line after the opening tag and before the closing tag. The first word of each item is the name, and the rest is a comment. A name ending in `/`, or an item with a nested list, is a directory. Write the entry the text is about in bold. `…` stands for entries left out. Names are literal: a pattern such as `*.ts` reads as Markdown emphasis.
 
 To number a tree, wrap it in a `Figure`. The tree then draws no frame of its own:
@@ -177,16 +129,65 @@ To number a tree, wrap it in a `Figure`. The tree then draws no frame of its own
 </Figure>
 ```
 
-## Ref
+## Icons
 
 ```mdx
-<Ref to="routes" /> lists the routes.
-<Ref to="/setup" /> explains the setup.
-<Ref to="/setup#install" />
-<Ref to="system-map">the system map</Ref>
+<Icon name="lucide:database" label="Database" />
+<Icon name="selfhst:redis" size={28} label="Redis" />
+<Icon name="local:gateway" size={24} label="Gateway" />
 ```
 
-`to` is a figure, table, or listing id, a heading id on this page, or an address on any page: `/setup` or `/setup#install`. `figure--element` points at a diagram element or step. The default link text is the generated name, such as "Table 2.4", "Section 3.2", or "Chapter 3"; without numbering, the caption, heading, or page title. Refer to every numbered item before or where it appears. In a reply, use addresses for headings.
+- `name` is a literal `collection:icon`. An unknown name fails compilation.
+- `size` is pixels; default 20. `color` overrides the text color of a monochrome icon.
+- Give `label` when the icon carries meaning; leave it out when the text beside it says the same.
+- Diagrams draw Lucide icons only, named without the prefix: `d.box("Database", { icon: "database" })` and `d.icon("user", "Customer")`.
+
+### Collections
+
+| Prefix | Use for |
+|---|---|
+| `lucide` | General technical symbols and actions. The default family |
+| `selfhst` | Logos of real software and services, often with `-light` and `-dark` variants |
+| `energy-icons` | Energy and engineering symbols |
+| `local` | An SVG in `icons/`: `icons/gateway.svg` → `local:gateway` |
+
+Use one family for ordinary symbols, and logos only for the actual product. When a document with `selfhst` logos is shared, credit selfh.st (CC BY 4.0).
+
+### Find names
+
+Search every installed collection from the project directory; replace `redis` with a word:
+
+```sh
+node --input-type=module -e '
+import { readFileSync } from "node:fs";
+const { dependencies } = JSON.parse(readFileSync("package.json", "utf8"));
+for (const pkg of Object.keys(dependencies).filter((name) => name.startsWith("@iconify-json/"))) {
+  const { default: set } = await import(`${pkg}/icons.json`, { with: { type: "json" } });
+  const names = Object.keys({ ...set.icons, ...set.aliases }).filter((name) => name.includes(process.argv[1]));
+  if (names.length) console.log(`${set.prefix}: ${names.slice(0, 40).join(" ")}`);
+}' redis
+```
+
+```text
+selfhst: redis redis-dark redis-light
+```
+
+With web access, browse a collection at `https://icon-sets.iconify.design/<prefix>/`, such as [lucide](https://icon-sets.iconify.design/lucide/). Only installed collections compile; ask the user before adding one with `pnpm add @iconify-json/<prefix>`.
+
+### Local SVGs
+
+Put the file in `icons/` with a `viewBox`. Use `currentColor` for a monochrome icon so it follows the theme.
+
+### In custom components
+
+```tsx
+import Database from "~icons/lucide/database";
+import { Icon } from "yapparatus";
+
+export function DatabaseLabel() {
+  return <span><Icon icon={Database} size={20} /> Database</span>;
+}
+```
 
 ## Custom components
 
@@ -215,6 +216,4 @@ export function CacheLabel() {
 - To compute with a theme's colors, such as a contrast ratio, read the hex values from `palettes`: `palettes.dark.surface`. Styles use `theme`, which follows the reader's theme.
 - Use longhand properties (`borderWidth`, `backgroundColor`). StyleX silently drops shorthands that contain theme variables.
 - Do not import application internals; use `yapparatus` and `yapparatus/theme.stylex`.
-- Do not put a `<Diagram>` in a component. The page compiler compiles diagrams written in pages and replies only.
-
-Builds compile and embed these styles like the built-in ones.
+- Do not put a `<Diagram>` in a component: only diagrams written in pages and replies are compiled.

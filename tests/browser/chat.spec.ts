@@ -303,7 +303,7 @@ test("REST API: resources, status codes, waiting reads, agents, and origin check
     "- new error RUNTIME_FAILED content/first-page.mdx, /first-page: Another test error.",
   );
   expect(woken.prompt).toContain(
-    "await sendReply(); console.log((await waitForMessage()).prompt);",
+    'await sendReply(); console.log("Reply sent. Waiting for the next message."); console.log((await waitForMessage()).prompt);',
   );
   const past = (await (await agentRead(request, "a")).json()) as Chat;
   expect(past.diagnostics).toEqual([]);

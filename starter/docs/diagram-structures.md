@@ -1,8 +1,6 @@
 # Structures
 
-Records and marked text: tables, types, protocol headers, registers, arrays, linked data, and highlighted code. Read [diagrams.md](diagrams.md) first; this page adds `d.record`, `marks`, and members.
-
-Copy the example closest to your figure, then change the labels.
+Records and marked text: tables, types, protocol headers, registers, arrays, linked data, and highlighted code. This page adds `d.record`, `marks`, and members.
 
 ## A table with foreign keys
 
@@ -97,11 +95,9 @@ d.arrow(routing, req.member("host"))
 d.arrow(secret, req.member("auth"))
 ```
 
-- A mark is a substring that occurs once, or whole lines counted from 1: `{ lines: 3 }`, `{ lines: [2, 4] }`. Lines past the text's last line are `MARK_UNMATCHED`.
-- A string is the substring: `path: "/users/42"`.
+- A mark is a substring that occurs once, such as `path: "/users/42"`, or whole lines counted from 1: `{ lines: 3 }`, `{ lines: [2, 4] }`. When the text repeats, mark a longer substring or the lines.
 - `mono` text keeps its lines' start, like code. Other text is centered, and its marks follow.
-- Mark a longer substring, or the lines, when the text repeats.
-- Break a marked text's lines yourself with `\n`. Text that is not `mono` wraps at 320 units, and a mark whose words land on two lines is `MARK_UNMATCHED`.
+- Break a marked text's lines yourself with `\n`. Text that is not `mono` wraps at 320 units, and a mark cannot span two lines.
 
 ## Reference
 
@@ -141,11 +137,7 @@ A mark takes exactly one of `text` and `lines`. Its name in `marks` is its id.
 
 A record's cells and a text's marks are members. A member is an element like any other: edges attach to it, steps focus it, and it takes `role` and `category`.
 
-- `shape.member(id)` returns a member by its own id. A wrong id is reported with the valid ones, and the shape stands in.
+- `shape.member(id)` returns a member by its own id.
 - A member's id is its parent's, a dot, and its own: `users.team_id`, `req.path`. Its own id comes from its label (a cell's first tab column), from a mark's name, or from `id`.
 - An edge leaves a cell from the middle of a side on the record's outline: the side that a line from the cell's center toward the other end crosses first. A wide field takes its bottom for a note below it, even one off to the side.
 - `<Step focus="users">` focuses the record and its cells; `<Step focus="users.team_id">` focuses one cell and fades the rest.
-
-### Diagnostics
-
-`CELL_SPAN`, `MARK_UNMATCHED`, `RULER_CROWDED`, and `UNKNOWN_ELEMENT`; see [the table](diagrams.md#diagnostics).

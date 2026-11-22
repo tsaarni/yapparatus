@@ -43,7 +43,8 @@ export function checkIds(scene: Scene, report: Report) {
   const taken = new Set<string>();
   const settle = (all: ReadonlyArray<{ id: string; explicitId: boolean }>) => {
     for (const el of all.filter((e) => e.explicitId)) {
-      if (taken.has(el.id)) report("DUPLICATE_ID", `Two elements use id "${el.id}".`, [el.id]);
+      if (taken.has(el.id))
+        report("DUPLICATE_ID", `Two elements use id "${el.id}". Rename one.`, [el.id]);
       taken.add(el.id);
     }
     for (const el of all.filter((e) => !e.explicitId)) {
@@ -97,6 +98,9 @@ export function checkPlaced(scene: Scene, report: Report) {
     );
 }
 
+/** The fix for a label that overlaps something. */
+const moveLabel = "Change the label's side, segment, or along, or widen the gap.";
+
 /** Check the compiled drawing: accent overuse, overlaps, crossings, and enclosure intrusions. */
 export function validate(
   scene: Scene,
@@ -135,7 +139,7 @@ export function validate(
       if (o)
         report(
           "NODE_OVERLAP",
-          `${a.id} and ${b.id} overlap by ${round(o.width)} × ${round(o.height)}.`,
+          `${a.id} and ${b.id} overlap by ${round(o.width)} × ${round(o.height)}. Adjust the placement or the gaps.`,
           [a.id, b.id],
         );
     }
@@ -195,7 +199,7 @@ export function validate(
       if (o)
         report(
           "LABEL_OVERLAP",
-          `${edge.id} label "${textOf(label)}" intersects ${node.id} by ${round(o.width)} × ${round(o.height)}.`,
+          `${edge.id} label "${textOf(label)}" intersects ${node.id} by ${round(o.width)} × ${round(o.height)}. ${moveLabel}`,
           [edge.id, node.id],
         );
     }
@@ -205,7 +209,7 @@ export function validate(
         if (segmentHitsRect(other.points[i] as Vec, other.points[i + 1] as Vec, label.rect)) {
           report(
             "LABEL_OVERLAP",
-            `${edge.id} label "${textOf(label)}" is crossed by ${other.id}.`,
+            `${edge.id} label "${textOf(label)}" is crossed by ${other.id}. ${moveLabel}`,
             [edge.id, other.id],
           );
           break;
@@ -219,7 +223,7 @@ export function validate(
       if (a && b && !(a.edge.stepOnly && b.edge.stepOnly) && overlap(a.label.rect, b.label.rect))
         report(
           "LABEL_OVERLAP",
-          `Labels "${textOf(a.label)}" (${a.edge.id}) and "${textOf(b.label)}" (${b.edge.id}) overlap.`,
+          `Labels "${textOf(a.label)}" (${a.edge.id}) and "${textOf(b.label)}" (${b.edge.id}) overlap. ${moveLabel}`,
           [a.edge.id, b.edge.id],
         );
     }
@@ -272,7 +276,12 @@ export function intrusions(
     if (node.parent !== undefined && members.has(node.parent)) return [];
     const rects = node.labelRect ? [node.rect, node.labelRect] : [node.rect];
     if (!rects.some((r) => overlap(r, e.rect) && !contains(r, e.rect))) return [];
-    return [[`${node.id} is not a member of ${e.id} but overlaps its boundary.`, [node.id, e.id]]];
+    return [
+      [
+        `${node.id} is not a member of ${e.id} but overlaps its boundary. Move it out, or add it to the members.`,
+        [node.id, e.id],
+      ],
+    ];
   });
 }
 
@@ -299,7 +308,7 @@ export function checkOverlaps(edges: CompiledEdge[], routes: Vec[][], report: Re
       if (shared > sharedLimit)
         report(
           "EDGE_OVERLAP",
-          `${a.id} and ${b.id} run on top of each other for ${round(shared)} units, so they read as one line. Give one the route { bend: units }, attach one at a port(), or draw one edge with tail: "filled".`,
+          `${a.id} and ${b.id} run on top of each other for ${round(shared)} units, so they read as one line. Give one the route { bend: units }, attach one at a port(), or draw one edge with tail: "filled". Edges in one gutter can run apart, such as at g.gutterX(0).offset(8, 0).`,
           [a.id, b.id],
         );
     }

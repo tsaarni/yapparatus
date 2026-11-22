@@ -30,6 +30,8 @@ const log = createLogger("diagnostics");
 const settleTime = 2000;
 /** The longest a read waits for the checks of recent edits. */
 const settleLimit = 8000;
+/** The longest a compile waits for the watcher to report a page that Vite has not seen yet. */
+const watchLimit = 2000;
 /** Revisions of a page whose findings are kept: the current one, and those before it. */
 const keptRevisions = 3;
 
@@ -67,7 +69,10 @@ export class DiagnosticStore {
   private settleTimer: ReturnType<typeof setTimeout> | undefined;
   private readonly startedAt = Date.now();
   private timer: ReturnType<typeof setTimeout> | undefined;
-  private checking = false;
+  /** The check of the sources that is running; at most one runs at a time. */
+  private running: Promise<void> | undefined;
+  /** Whether a file changed while a check ran, so it runs again when it is done. */
+  private rerun = false;
   /** When the last check of the sources started. */
   private checkStarted = 0;
   private readonly options: DiagnosticOptions;
@@ -179,7 +184,7 @@ export class DiagnosticStore {
 
   /** Whether the server's checks of the latest file changes are done. Browsers report later. */
   settled(): boolean {
-    return !this.timer && !this.checking;
+    return !this.timer && !this.running;
   }
 
   /**
@@ -187,10 +192,12 @@ export class DiagnosticStore {
    * reports its edit, so this finds such an edit itself and waits for its checks.
    */
   async settle() {
-    if (this.savedSinceCheck()) this.fileChanged();
     const until = Date.now() + settleLimit;
-    while (Date.now() < until && !this.settled())
-      await new Promise((resolve) => setTimeout(resolve, 200));
+    while (Date.now() < until) {
+      if (this.settled() && this.savedSinceCheck()) this.fileChanged();
+      if (this.settled()) return;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
   }
 
   /**
@@ -251,8 +258,40 @@ export class DiagnosticStore {
     return pages;
   }
 
-  private compile(url: string) {
-    return compilePage(this.server, this.root, url);
+  /**
+   * Compile a page. Vite cannot load a new page until its watcher reports the file, which can
+   * come after a check that the agent runs right after writing it, so the compile waits for it.
+   */
+  private async compile(url: string) {
+    try {
+      return await compilePage(this.server, this.root, url);
+    } catch (error) {
+      const file = path.join(this.root, url);
+      if (!existsSync(file) || !(error as Error).message.startsWith("Failed to load url"))
+        throw error;
+      log.debug(`${url} is on disk but Vite has not seen it; waiting for the watcher`);
+      await this.watched(file);
+      return compilePage(this.server, this.root, url);
+    }
+  }
+
+  /** Resolve once the watcher reports `file`, after Vite's own handlers, or after the limit. */
+  private watched(file: string): Promise<void> {
+    const { watcher } = this.server;
+    return new Promise((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        watcher.off("add", seen);
+        watcher.off("change", seen);
+        setTimeout(resolve, 50);
+      };
+      const seen = (changed: string) => {
+        if (path.resolve(changed) === file) done();
+      };
+      const timer = setTimeout(done, watchLimit);
+      watcher.on("add", seen);
+      watcher.on("change", seen);
+    });
   }
 
   /**
@@ -287,14 +326,26 @@ export class DiagnosticStore {
     }
   }
 
-  /** Compile every page, and check links and `document.json`. Runs after each file change. */
-  async checkSources() {
-    this.checking = true;
-    try {
-      await this.runChecks();
-    } finally {
-      this.checking = false;
+  /**
+   * Compile every page, and check links and `document.json`. Runs after each file change, one
+   * check at a time: a change during a check runs it again, so no check reports stale files.
+   */
+  checkSources(): Promise<void> {
+    if (this.running) {
+      this.rerun = true;
+      return this.running;
     }
+    this.running = (async () => {
+      try {
+        do {
+          this.rerun = false;
+          await this.runChecks();
+        } while (this.rerun);
+      } finally {
+        this.running = undefined;
+      }
+    })();
+    return this.running;
   }
 
   private async runChecks() {

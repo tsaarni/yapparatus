@@ -123,7 +123,7 @@ function checkSteps(
       diagnostics.push(
         diagnostic(
           "DUPLICATE_ID",
-          `Step id "${step.id}" is already used in this figure.`,
+          `Step id "${step.id}" is already used in this figure. Rename the step.`,
           [],
           step.id,
         ),
@@ -142,9 +142,11 @@ function checkSteps(
   for (const element of unused)
     if (!steps.some((step) => step.elements.has(element.id)))
       diagnostics.push(
-        diagnostic("STEP_ONLY_UNUSED", `${element.id} is stepOnly, but no step focuses it.`, [
-          element.id,
-        ]),
+        diagnostic(
+          "STEP_ONLY_UNUSED",
+          `${element.id} is stepOnly, but no step focuses it. Focus it in a step, or remove stepOnly.`,
+          [element.id],
+        ),
       );
   steps.forEach((step, i) => {
     const together = stepOnly.filter((n) => step.elements.has(n.id));
@@ -155,7 +157,7 @@ function checkSteps(
           diagnostics.push(
             diagnostic(
               "NODE_OVERLAP",
-              `${x.id} and ${y.id} overlap, and step ${i + 1} shows both.`,
+              `${x.id} and ${y.id} overlap, and step ${i + 1} shows both. Adjust the placement or the gaps.`,
               [x.id, y.id],
             ),
           );
@@ -177,7 +179,7 @@ function checkSteps(
     diagnostics.push(
       diagnostic(
         "BUILD_WITHOUT_STEPS",
-        "build reveals elements step by step, but the diagram has no <Step> children.",
+        "build reveals elements step by step, but the diagram has no <Step> children. Add steps, or remove build.",
       ),
     );
   if (build && steps.length)

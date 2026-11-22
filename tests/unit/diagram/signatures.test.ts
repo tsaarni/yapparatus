@@ -657,7 +657,7 @@ function documented(): Map<string, Set<string>> {
   const diagrams = page("diagrams.md");
   const shapesSection = section(diagrams, "## Shapes");
   const shapeCalls = (tables(shapesSection)[0]?.rows ?? [])
-    .flatMap((row) => [...(row[0] ?? "").matchAll(/d\.(\w+)\(/g)].map(([, name = ""]) => name))
+    .flatMap((row) => codes(row[0] ?? ""))
     .filter((name) => name !== "record");
   const tablesFor = [
     { text: shapesSection, calls: shapeCalls },

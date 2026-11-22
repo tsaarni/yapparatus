@@ -172,7 +172,7 @@ export function createLayout(
     if (o.height !== undefined && needed > o.height + 0.5)
       report(
         "TEXT_OVERFLOW",
-        `${node.id}: content needs height ${round(needed)} but height is fixed at ${o.height}.`,
+        `${node.id}: content needs height ${round(needed)} but height is fixed at ${o.height}. Increase height.`,
         [node.id],
       );
     const stacked = stackRoom(o.replicas);

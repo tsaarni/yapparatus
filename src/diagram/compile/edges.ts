@@ -122,7 +122,11 @@ export function createEdges(
       points,
     };
     if (points.length < 2) {
-      report("DEGENERATE_EDGE", `${edge.id} starts and ends at the same point.`, [edge.id]);
+      report(
+        "DEGENERATE_EDGE",
+        `${edge.id} starts and ends at the same point. Connect different points, or draw a shape to itself to loop.`,
+        [edge.id],
+      );
       return { compiled: { ...base, labels: [], ariaLabel: edge.id }, route: points };
     }
     const labels = edge.labels.map((l) => placeLabel(edge, points, { ...shape.label, ...l }));

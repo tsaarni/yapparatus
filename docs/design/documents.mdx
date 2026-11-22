@@ -111,7 +111,7 @@ An address names something that the user can open, link to, or attach to a messa
 
 Everything that is not a page is under `/-/`, such as external files and the REST API. A page name starts with a letter or a digit, so the two never collide.
 
-Ids come from headings, such as `text-fragments` from "Text fragments", and from `id` attributes. A heading id is unique on its page, and a figure, table, or listing id in the whole document, so a reference to it works from any page. Text without an id, such as a table row, is named by its words inside the nearest id.
+Ids come from headings, such as `text-fragments` from "Text fragments", and from `id` attributes. An `id` attribute is chosen and a heading id follows the heading's text, so the attribute keeps its id: a heading whose id a figure, table, or listing on its page already has gets a suffix, as a repeated heading does. A heading id is unique on its page, and a figure, table, or listing id in the whole document, so a reference to it works from any page. Text without an id, such as a table row, is named by its words inside the nearest id.
 
 A diagram element cannot be selected as text, so it has an id, joined to the figure's id with `--`. An element id is unique only in its figure. A step with an `id` is named the same way.
 

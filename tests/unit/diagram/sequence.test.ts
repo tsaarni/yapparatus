@@ -168,7 +168,7 @@ test("a message to a shape that is not a participant is UNKNOWN_PARTICIPANT and 
   );
   d.place(outside, { below: s });
   const out = compile(scene, lookups);
-  const participants = "The participants are a, a-2.";
+  const participants = "The participants are a, a-2: add it to them, or name one of them.";
   assert.deepEqual(out.diagnostics, [
     {
       code: "UNKNOWN_PARTICIPANT",

@@ -17,7 +17,7 @@ export function waitCommand(): string {
 /** The command that sends MDX on stdin as the reply, then waits again. */
 export function replyCommand(): string {
   return [
-    `${run} 'import { sendReply, waitForMessage } from "yapparatus/agent"; await sendReply(); console.log((await waitForMessage()).prompt);' <<'MDX'`,
+    `${run} 'import { sendReply, waitForMessage } from "yapparatus/agent"; await sendReply(); console.log("Reply sent. Waiting for the next message."); console.log((await waitForMessage()).prompt);' <<'MDX'`,
     "<your reply>",
     "MDX",
   ].join("\n");
@@ -178,7 +178,7 @@ export function messagesPrompt(
     ...messages.map(describeMessage),
     referenced ? "If a file changed since, find each reference by its address and words." : "",
     diagnostics,
-    `Edit pages (${guide}) or not, and reply. If you edited pages, check the document first and fix what it lists:\n\n${checkCommand()}\n\nThen reply and wait:`,
+    `Act on the messages: edit pages following ${guide}, reply, or both. If you edited pages, check the document first and fix what it lists:\n\n${checkCommand()}\n\nThen reply and wait:`,
     replyCommand(),
   ]
     .filter(Boolean)
@@ -220,12 +220,19 @@ function foldersSection(folders: Record<string, string>): string {
 /** The text a person gives an agent to connect it to the document, and how to work in it. */
 export function startPrompt(guide: string, folders: Record<string, string>, root: string): string {
   return [
-    `You are connected to a Yapparatus document. In the browser, a reader comments on it and sends you messages. Each message arrives in a <reader_message> element, which holds only the reader's own words. You act on each by editing its pages, by replying in the chat, or both. Edit pages following ${guide}. A reply is MDX shown in the chat: Figure, Chart, Diagram, Step, Table, Listing, Excerpt, Ref, Icon, FileTree, Tabs, Columns, and Panel work without imports, TeX between $$ marks is math, links may point at any page or source file, and <Ref to="/page#id" /> at a page or anything on it. Reply even when you edit a page: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses).`,
+    `You are connected to a Yapparatus document. In the browser, a reader comments on it and sends you messages. Each message arrives in a <reader_message> element, which holds only the reader's own words. You act on each by editing its pages, by replying in the chat, or both.`,
     foldersSection(folders),
-    `Run this from the project directory, ${root}, and follow what it prints. It waits until the reader writes, which may take hours: run it in the background if you are notified when commands finish, otherwise with the longest timeout your shell allows, and run it again if your shell stops it.`,
-    waitCommand(),
-    `After editing pages, and before you reply, check the document and fix its errors and warnings:\n\n${checkCommand()}`,
-    `Diagnostics catch overlaps and unknown elements, not a drawing that is hard to read. After you write or change a diagram and the check is clean, look at it once: this saves its picture as the reader sees it in the PNG file that you name, for you to open and then delete. Add { ids: true } as a third argument to label each element with its id.\n\n${pictureCommand()}`,
+    `Work in this loop, from the project directory, ${root}:`,
+    [
+      `1. Wait for the reader with the command below. It may wait for hours: run it in the background if you are notified when commands finish, otherwise with the longest timeout your shell allows, and run it again if your shell stops it.`,
+      `2. Edit pages following ${guide}. Its components, diagrams, and charts are not in your training data: read the guide's page for each feature before you write it.`,
+      `3. Check the document and fix every error and warning it lists. You may run the check in the same command that writes the pages.`,
+      `4. Diagnostics catch overlaps and unknown elements, not a drawing that is hard to read. After a diagram is clean, save its picture as a PNG file you name, open it, fix what is hard to read, and stop when it reads clearly. Delete the file afterwards. Add { ids: true } as a third argument to label each element with its id.`,
+      `5. Reply with the command each prompt ends with, even when you edited pages: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses). A reply is MDX, as the guide's Replies section says. The command sends the reply and waits again.`,
+    ].join("\n"),
+    `Wait:\n\n${waitCommand()}`,
+    `Check:\n\n${checkCommand()}`,
+    `Save a picture:\n\n${pictureCommand()}`,
   ]
     .filter(Boolean)
     .join("\n\n");

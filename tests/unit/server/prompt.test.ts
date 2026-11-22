@@ -112,7 +112,7 @@ test("two folders with the same paths stay apart, in references and in the agent
     );
     const start = startPrompt("/project/docs/guide.md", { app: "app", lib: "lib" }, "/project");
     assert.match(start, /- app: app\n- lib: lib/);
-    assert.match(start, /Run this from the project directory, \/project,/);
+    assert.match(start, /Work in this loop, from the project directory, \/project:/);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

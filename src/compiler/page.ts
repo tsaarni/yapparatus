@@ -5,7 +5,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { Options } from "@mdx-js/rollup";
-import rehypeSlug from "rehype-slug";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import type { ViteDevServer } from "vite";
@@ -14,6 +13,7 @@ import { charts } from "./stages/charts.ts";
 import { markdownConventions } from "./stages/conventions.ts";
 import { diagrams, pageFigures } from "./stages/diagrams.ts";
 import { excerpts } from "./stages/excerpts.ts";
+import { headingIds } from "./stages/heading-ids.ts";
 import { codeHighlighting } from "./stages/highlight.ts";
 import { iconImports } from "./stages/icons.ts";
 import { math } from "./stages/math.ts";
@@ -32,7 +32,7 @@ export function pageStages(
     remarkPlugins: [remarkGfm, [remarkMath, { singleDollarTextMath: false }], iconImports],
     rehypePlugins: [
       math,
-      rehypeSlug,
+      headingIds,
       markdownConventions,
       excerpts(files),
       charts(files),

@@ -49,7 +49,12 @@ function render(tex: string, display: boolean, line: number, issues: ContentIssu
       .trim()
       .split("\n")[0]
       ?.replace(/:$/, "");
-    issues.push({ code: "MATH_INVALID", line, subject: tex, message: `Invalid math: ${reason}.` });
+    issues.push({
+      code: "MATH_INVALID",
+      line,
+      subject: tex,
+      message: `Invalid math: ${reason}. Fix the TeX between the $$ marks.`,
+    });
     const source: Element = {
       type: "element",
       tagName: "code",

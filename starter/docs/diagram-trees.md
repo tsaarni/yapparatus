@@ -1,8 +1,6 @@
 # Trees
 
-Org charts, class hierarchies, mind maps, and file trees. Read [diagrams.md](diagrams.md) first; this page adds `d.tree`.
-
-Copy the example closest to your figure, then change the labels.
+Org charts, class hierarchies, mind maps, and file trees. This page adds `d.tree`.
 
 ## Down: an org chart
 
@@ -49,6 +47,8 @@ d.tree(topic, [
 
 ## Indent: a file tree
 
+For a directory listing in the text, use `<FileTree>`. Draw it as a tree only when it is part of a diagram, with edges to other shapes.
+
 ```js
 const t = (name) => d.text(name, { mono: true })
 d.tree(t("src/"), [
@@ -71,9 +71,8 @@ d.tree(t("src/"), [
 | `levelGap` | Space between a parent and its children. Default: 48. `indent` uses `gap` |
 | `edge` | `{ head?, tail?, dashed?, role?, category?, stepOnly? }` for every line |
 
-- The `indent` layout uses `gap` between levels too, so a `levelGap` there is `INVALID_ARGUMENT`.
 - The lines have no arrowheads unless `edge` gives `head` or `tail`. A line goes from the parent to the child, so `tail` puts the arrowhead at the parent. The lines from one parent share one trunk, and the overlap check accepts a shared trunk.
 - Each subtree with children is a row or column whose id is its root's final id followed by `-tree`, such as `platform-tree`, or `platform-2-tree` when the root is `platform-2`. A step that focuses it focuses the branch: its shapes and its lines. `d.tree` returns the outermost one, so you can place it like any other element.
 - Inside a subtree, the row, column, or grid of the root's children is the root's id followed by `-children`. In the `both` layout, the two sides of the tree's root are `-left` and `-right` instead.
 - A line's id joins the ids of its ends, such as `platform->build`.
-- The tree owns the positions of its shapes. A shape that is already in a row, a column, or `place` is `CONFLICTING_PLACEMENT`.
+- The tree owns the positions of its shapes. Do not also put its shapes in a row, a column, or `place`.

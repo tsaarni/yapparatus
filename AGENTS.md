@@ -9,6 +9,7 @@ Rules for agents working on this project.
 | How do I write or edit a document page? | [starter/docs/guide.md](starter/docs/guide.md) and its references |
 | Why is it built this way? | [docs/design/](docs/design/overview.mdx), a Yapparatus document: `pnpm dev docs/design` |
 | How do I run it? | [README.md](README.md) |
+| How do I benchmark the guide or the agent prompts, when the user asks for it? | [tests/eval/README.md](tests/eval/README.md). Never run it unasked: it is slow and expensive |
 
 Follow the authoring guide when editing pages in `docs/design/` or `tests/fixtures/`. Follow the design documents when changing the web app, the diagram compiler, or the server. When a change settles a design question, update the design document in the same change; when it changes what authors write, update the guide too.
 

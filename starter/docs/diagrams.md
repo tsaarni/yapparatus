@@ -2,6 +2,8 @@
 
 `<Diagram>` draws an SVG figure from a short program. You decide the composition: what shares a row, what sits below what, where an edge goes. The compiler measures text, sizes shapes, places them, attaches edges, and reports problems. It never moves a node or reroutes an edge by itself.
 
+Contents: Example · Pick a form · Shapes · Ids · Layout · Grids · Points · Edges · Patterns · Frames · Categories · Steps · Size · Checklist
+
 ## Example
 
 ```mdx
@@ -20,29 +22,30 @@
 }} />
 ```
 
-`id` and `caption` make a numbered figure. `description` is the accessible description. `debug` shows bounds, ids, and route points.
+`id` and `caption` make a numbered figure, `description` is the accessible description, and `debug` shows bounds, ids, and route points.
 
-The page compiler runs `draw` when it compiles the page, and the browser only draws the result. Four rules follow:
+The page compiler runs `draw` when it compiles the page; the browser only draws the result. So:
 
-- `draw` uses only `d` and the values it defines itself. A page's imports and constants do not exist where it runs, and a name from outside is a `DRAW_FAILED` error that names it.
-- `draw` finishes within 1 second and creates at most 2000 elements. Past either limit, or when it throws, it stops with a `DRAW_FAILED` error. Any other mistake in a call is reported with the ids of its elements, and the rest of the figure is still checked, so one compile lists every mistake.
+- `draw` uses only `d` and the values it defines itself. A page's imports and constants do not exist where it runs.
+- `draw` finishes within 1 second and creates at most 2000 elements. A mistake in a call is reported with its elements, and the rest of the figure is still checked.
 - Write `<Diagram>` in a page or a reply. One inside a `.tsx` component is not compiled.
-- Write a `<Step>`'s `id` and `focus` as plain text, such as `focus="client api"`. A computed value, `focus={…}`, is a `STEP_NOT_TEXT` error.
+- Write a `<Step>`'s `id` and `focus` as plain text, such as `focus="client orders-api"`, never `focus={…}`.
 
 ## Pick a form
 
-Draw a figure when it shows structure, a path, or an order faster than text; a rule stays a sentence. Find what the reader needs to see, and copy its example.
+Find what the reader needs to see, and copy its example.
 
 | To show | Example |
 |---|---|
-| Components and who talks to whom | [Components](#components) |
-| A flow with a question | [A flow](#a-flow) |
-| Data through a pipeline: inputs, queues, reports | [A pipeline](#a-pipeline) |
-| States and transitions | [A state machine](#a-state-machine) |
-| Messages over time | [Sequences](diagram-sequences.md) |
-| Hierarchies: org charts, class trees, mind maps, file trees | [Trees](diagram-trees.md) |
-| Tables, types, protocol headers, registers, arrays | [Structures](diagram-structures.md) |
-| Which span of a text or code matters | [Marked text](diagram-structures.md#marked-text) |
+| Components and who talks to whom | Components |
+| A flow with a question | A flow |
+| Data through a pipeline: inputs, queues, reports | A pipeline |
+| States and transitions | A state machine |
+| Messages over time | `diagram-sequences.md` |
+| Hierarchies: org charts, class trees, mind maps | `diagram-trees.md` |
+| A directory listing | `<FileTree>`, not a diagram |
+| Tables, types, protocol headers, registers, arrays | `diagram-structures.md` |
+| Which span of a text or code matters | Marked text, `diagram-structures.md` |
 | A layout or a size | Boxes with a fixed `width` and `height`, placed with gaps that match the thing drawn |
 
 ### Components
@@ -61,8 +64,7 @@ d.arrow(api, db, "SQL")
 d.arrow(api, auth, "verify")
 ```
 
-- Peers in a row share a size with `equalSize`.
-- `enclose` names a process, a machine, or a network around shapes placed elsewhere.
+Peers share a size with `equalSize`. `enclose` names a process, a machine, or a network around shapes placed elsewhere.
 
 ### A flow
 
@@ -82,8 +84,7 @@ d.arrow(valid, reject, "no")
 d.arrow(serve, done)
 ```
 
-- The main path runs down a `column`; a side branch is placed `rightOf` its decision.
-- Ask in two or three words in a decision, and explain it in the prose.
+The main path runs down a `column`; a side branch is placed `rightOf` its decision.
 
 ### A pipeline
 
@@ -101,8 +102,7 @@ d.arrow(worker, db)
 d.arrow(worker, report)
 ```
 
-- A queue, a topic, or a stream is `d.queue`; a cylinder is storage that is read again.
-- `d.io` marks where data enters or leaves the flow, and `d.doc` what it produces.
+`d.io` marks where data enters or leaves, `d.queue` what flows between steps, `d.cylinder` storage that is read again, and `d.doc` what the flow produces.
 
 ### A state machine
 
@@ -118,112 +118,87 @@ d.arrow(busy, idle, { label: "done", route: { bend: 32 } })
 d.arrow(busy, busy, { label: "retry", route: { loop: "top" } })
 ```
 
-- Opposite transitions take the same `bend` route, and curve apart.
-- `d.arrow(a, a)` loops on the right; the route `{ loop: side }` picks the side.
+Opposite transitions take the same `bend` and curve apart. `d.arrow(a, a)` loops on the right; `{ loop: side }` picks the side.
 
 ## Shapes
 
-| Call | Draws |
+Every shape is `d.<shape>(label, options?)`, except `d.icon(name, label, options?)` and `d.record(cells, options?)`; `start` and `end` take an optional label.
+
+| Shape | Draws |
 |---|---|
-| `d.box(label, options?)` | A component, service, or step; with `replicas`, a stack of boxes; with `icon`, an icon left of the label |
-| `d.cylinder(label, options?)` | Storage: a database or a cache |
-| `d.queue(label, options?)` | A cylinder on its side: a queue, a topic, or a stream |
-| `d.doc(label, options?)` | A page with a wavy bottom: a document, a report, or a file; with `replicas`, a stack of pages |
-| `d.io(label, options?)` | A parallelogram: the input or output of a flow |
-| `d.actor(label, options?)` | A person or outside system |
-| `d.icon(name, label, options?)` | A thing drawn as a picture, such as a user, a cloud, or a server: an icon above its label |
-| `d.note(label, options?)` | A remark with a folded corner |
-| `d.decision(label, options?)` | A diamond around a short question |
-| `d.record(cells, options?)` | Cells on a grid: a table, type, header, register, or array. See [Structures](diagram-structures.md) |
-| `d.start(label?, options?)`, `d.end(label?, options?)` | The start and end of a flow or state machine |
-| `d.text(label, options?)` | Text without an outline; with `marks`, see [Marked text](diagram-structures.md#marked-text) |
+| `box` | A component, service, or step |
+| `cylinder` | Storage: a database or a cache |
+| `queue` | A cylinder on its side: a queue, a topic, or a stream |
+| `doc` | A page with a wavy bottom: a document, a report, or a file |
+| `io` | A parallelogram: the input or output of a flow |
+| `actor` | A person or outside system |
+| `icon` | A Lucide icon above its label, laid out as an actor, such as a user, a cloud, or a server |
+| `note` | A remark with a folded corner |
+| `decision` | A diamond around a short question. It grows about twice as fast as a box: ask in two or three words, such as `"One match?"`, and explain in the prose |
+| `record` | Cells on a grid: a table, type, header, register, or array, as `diagram-structures.md` describes |
+| `start`, `end` | The dots that start and end a flow or state machine |
+| `text` | Text without an outline, for a remark that belongs to no element, such as a heading over a group. An edge through it counts as through a shape |
 
-- **Decisions:** a diamond grows about twice as fast as a box around the same text. Ask in two or three words, such as `"One match?"`, explain the question in the prose, and leave diamonds out of `equalSize`.
-- **Start and end:** a label names what starts or ends the flow, such as `d.start("Request received")`. It sits beside the dot, on the `labelSide` given (`right` by default, or `left`, `top`, `bottom`), and does not move it: rows, columns, and gaps use the dot alone. The overlap checks include the label, so put it on a side no edge leaves from. Without a label, the id is the call and its count: `start-1`, `start-2`, and `end-1`.
-- **Text:** `d.text` is for a remark that belongs to no element, such as a heading over a group. A label for an element belongs to the element. Text has no fill, so an edge through it is reported like an edge through a shape.
-- **Replicas:** `replicas` on `d.box` or `d.doc` draws a stack of 2 to 4 boxes or pages, for pods, shards, workers, or several documents. The stack has exactly that many, so two pods are `replicas: 2`. For a larger or unknown number, put the number in the label of a stack of 4. Any other value is `INVALID_ARGUMENT`, and the shape is drawn alone. Each shape behind adds 5 units to the width and the height, and the text sits on the front shape. A fixed `width` or `height` is the front shape's.
+| Option | Shapes | Meaning |
+|---|---|---|
+| `id` | all | See Ids |
+| `sub` | all | A second, smaller line |
+| `role` | all | `accent`: the one element that matters most, drawn heavier, once per figure; `warning`: a failure or risk, with a badge; `muted`: steps back; `external`: outside the system, dashed; `default` |
+| `category` | all | What sets the element apart; see Categories |
+| `stepOnly` | all | Shown only in the steps that focus it; see Steps |
+| `width`, `height` | all but `start`, `end` | Fixed size. Text wraps at the width less the padding and a box's icon |
+| `minWidth`, `minHeight` | all but `start`, `end` | The least size |
+| `mono` | all but `start`, `end` | Monospace text |
+| `replicas` | `box`, `doc` | A stack of exactly 2 to 4, for pods, shards, workers, or documents; for more or an unknown number, put it in the label of a stack of 4. Each shape behind adds 5 units to width and height; text and a fixed size are the front shape's |
+| `icon` | `box` | A Lucide icon left of the label, in the label's color |
+| `labelSide` | `start`, `end` | Side of the dot for the label: `right` (default), `left`, `top`, `bottom`. The label names what starts or ends the flow, does not move the dot, and counts for overlaps: put it on a side no edge leaves |
+| `marks` | `text` | Marked spans and lines, as `diagram-structures.md` describes |
 
-```js
-const api = d.box("API")
-const workers = d.box("Billing workers", { replicas: 3 })
-const shards = d.box("16 shards", { replicas: 4 })
-const exports = d.doc("Exports", { replicas: 2 })
-d.row([api, workers, exports])
-d.place(shards, { below: workers })
-d.arrow(api, workers)
-d.arrow(workers, exports)
-d.arrow(workers, shards)
-```
+`record` takes the options in `diagram-structures.md`. `role` and `category` also work on edges, enclosures, frames, and a sequence's messages, notes, and fragments. Colors come only from the theme.
 
-- **Icons:** `icon: "database"` on `d.box` draws a Lucide icon left of the label. `d.icon(name, label)` draws a larger one above its label, laid out as an actor is. The name is the Lucide name without the `lucide:` prefix; other collections do not work in diagrams. Find names as [Icons](icons.md#find-names) shows. A box's icon is drawn in the color of its label; the box's outline shows its role and category. A `d.icon` has no outline, so its icon is drawn in the element's line color, as an actor's figure is, and shows the role and category; its label keeps the label color. An unknown name is `UNKNOWN_ICON`, with the nearest names.
+Icon names are Lucide names without `lucide:`; find them as Icons in `components.md` shows. A `d.icon` has no outline, so its icon shows the role and category.
 
 ```js
 const user = d.icon("user", "Customer")
 const api = d.box("Orders API", { icon: "server", role: "accent" })
-const db = d.box("Orders", { icon: "database", sub: "PostgreSQL" })
+const workers = d.box("Billing workers", { replicas: 3 })
+const exports = d.doc("Exports", { replicas: 2 })
 const cloud = d.icon("cloud", "Payment provider", { role: "external" })
-d.row([user, api, db])
+d.row([user, api, workers, exports])
 d.place(cloud, { below: api })
 d.arrow(user, api, "orders")
-d.arrow(api, db, "SQL")
+d.arrow(api, workers)
+d.arrow(workers, exports)
 d.arrow(api, cloud, "charge")
 ```
 
-The shapes take these options. "All" is every shape in the table above but `d.record`, which takes the options in [Structures](diagram-structures.md#record-options).
+Text:
 
-| Option | Shapes | Meaning |
-|---|---|---|
-| `id` | all | See [Ids](#ids) |
-| `sub` | all | A second, smaller line |
-| `role` | all | What the element is for, as the list below says |
-| `category` | all | What sets the element apart. See [Categories](#categories) |
-| `stepOnly` | all | Shown only in the steps that focus it. See [Steps](#steps) |
-| `width` | all but `start` and `end` | A fixed width. The text wraps at the width less the padding, and less a box's icon |
-| `height` | all but `start` and `end` | A fixed height. Overflow is reported |
-| `minWidth`, `minHeight` | all but `start` and `end` | The least width and height |
-| `mono` | all but `start` and `end` | Monospace text |
-| `replicas` | `box`, `doc` | A stack of 2 to 4. See Replicas above |
-| `icon` | `box` | An icon left of the label. See Icons above |
-| `labelSide` | `start`, `end` | The side of the dot where the label sits |
-| `marks` | `text` | Marked spans and lines. See [Marked text](diagram-structures.md#marked-text) |
-
-`role` is one of these:
-
-- `accent`: the one element that matters most, drawn heavier. Use it once per figure.
-- `warning`: a failure or a risk. It gets a badge.
-- `muted`: an element that steps back.
-- `external`: an element outside the system, drawn dashed.
-- `default`: the role without the option.
-
-`role` and `category` also work on arrows, enclosures, frames, and the messages, notes, and fragments of a sequence. There is no option for a color: colors come from the theme.
-
-A misspelled option is `UNKNOWN_OPTION`, and a value that the option does not take is `INVALID_ARGUMENT`. Both list what the call takes.
-
-`\n` starts a new line in a shape's label or `sub` and in an edge or message label. Sequence fragment titles and divider labels are one line.
-
-Long text wraps at spaces into lines of similar length: at 220 units in boxes, cylinders, queues, documents, inputs and outputs, decisions, actors, and icons, and at 320 in notes, text, and the labels of start and end. The shape grows to its widest line. Text in `mono`, record titles and cells, and edge labels do not wrap unless `width` is fixed; break their lines with `\n`.
+- `\n` breaks a line in a label, a `sub`, and an edge or message label. Fragment titles and divider labels are one line.
+- Long text wraps at spaces into even lines: at 220 units in boxes, cylinders, queues, docs, io, decisions, actors, and icons; at 320 in notes, text, and start and end labels. The shape grows to its widest line.
+- `mono` text, record titles and cells, and edge labels wrap only at a fixed `width`; break them with `\n`.
 
 ## Ids
 
-Every element has an id. Steps, links, and the reader's comments use it.
+Every element has an id: its `id` option, or else one made from its label. The variable that holds the element plays no part. In a figure `request-path` on the page `architecture.mdx`:
 
-- A shape's id comes from its label: `"Auth service"` → `auth-service`. A labelled start or end too: `d.start("Request received")` → `request-received`.
-- Lowercase letters, digits, and underscores stay, every other run of characters becomes one hyphen, and hyphens at the ends are dropped: `"user_id"` → `user_id`, `"GET /items"` → `get-items`.
-- An edge's id joins the ids of its ends: `client->api`. With a box labelled "Get an answer", the edge from `ask` is `ask->get-an-answer`.
-- A category's id comes from its name: `"To be removed"` → `to-be-removed`.
-- A record cell or text mark has its parent's id, a dot, and its own: `users.team_id`. See [Members](diagram-structures.md#members).
-- An enclosure's id comes from its title, and a frame's from its tab and title: `d.frame(a, b, { tab: "loop", title: "until empty" })` → `loop-until-empty`.
-- An element without text has the name of its call and its count among the calls of that kind: `row-1`, `column-1`, `grid-1`, `start-1`, `end-1`, `record-1`, `enclosure-1`, `frame-1`, `sequence-1`. Only your calls count, so the rows inside a tree or a sequence do not change these numbers.
-- An element that a sequence or a tree makes has its owner's id and a suffix, such as the lifeline `api-lifeline` or the branch `platform-tree`. See [Sequences](diagram-sequences.md#reference) and [Trees](diagram-trees.md#reference).
-- Repeated ids get a number: `box`, `box-2`. An element named after a repeated id follows it: `box-2-tree`.
+```js
+const db = d.cylinder("PostgreSQL", { id: "store" }) // store: /architecture#request-path--store
+const api = d.box("HTTP API") // http-api: /architecture#request-path--http-api
+d.row([api, db])
+d.arrow(api, db) // http-api->store: /architecture#request-path--http-api->store
+```
 
-Set `id` when:
+Steps, links, and the reader's comments use these ids: `<Step focus="http-api store">`.
 
-- prose, a link, or a `Ref` points at the element, so editing its label does not change its address;
-- the derived id is long or unclear;
-- two edges join the same shapes.
+- Text becomes an id in lowercase, with letters, digits, and underscores kept and every other run of characters one hyphen: `"Auth service"` → `auth-service`, `"GET /items"` → `get-items`, `"user_id"` → `user_id`. This holds for a shape's label, a labelled start or end, a category's name, an enclosure's title, and a frame's tab and title: `{ tab: "loop", title: "until empty" }` → `loop-until-empty`.
+- An edge joins the ids of its ends with `->`: `http-api->store` above.
+- A record cell or text mark is its parent's id, a dot, and its own: `users.team_id`.
+- An element without text is its call and its count among your calls of that kind: `row-1`, `start-1`, `record-1`, `enclosure-1`, `frame-1`, `sequence-1`.
+- What a sequence or a tree makes has its owner's id and a suffix, such as `api-lifeline` or `platform-tree`.
+- Repeated ids get a number: `box`, `box-2`.
 
-A link to an element is `/page#figure--element`, such as `/guide#request-flow--miss`. Steps may use derived ids, because they sit inside the figure and are checked with it.
+Set `id` when prose, a link, or a `Ref` points at the element, so a new label keeps its address; when the derived id is long or unclear; and when two edges join the same shapes.
 
 ## Layout
 
@@ -237,30 +212,23 @@ Each shape has exactly one position owner: a grid, a row, a column, or `place`. 
 | `d.place(b, { below: a, gap?, align? })` | Also `above`, `leftOf`, `rightOf` |
 | `d.place(b, { at: point, anchor? })` | Put the anchor of `b` (default `center`) on a point |
 | `d.enclose([a, b], { id?, title?, titleCorner?, padding?, role?, category?, stepOnly? })` | A boundary around shapes. It never moves them |
-| `d.equalSize([a, b])`, `equalWidth`, `equalHeight` | Share the largest measured size |
+| `d.equalSize([a, b])`, `equalWidth`, `equalHeight` | Share the largest measured size; a fixed size stays, and one smaller than the group's is reported |
 
 | Option | Calls | Meaning |
 |---|---|---|
-| `id` | `grid`, `row`, `column`, `enclose` | See [Ids](#ids) |
-| `gap` | `grid`, `row`, `column`, `place` | The space between the shapes |
-| `align` | `grid`, `row`, `column`, `place` | `start`, `center` (the default), or `end` |
-| `below`, `above`, `leftOf`, `rightOf` | `place` | The element to place the shape next to |
+| `id` | `grid`, `row`, `column`, `enclose` | See Ids |
+| `gap` | `grid`, `row`, `column`, `place` | The space between edges, not centers. Negative overlaps the shapes, which is reported |
+| `align` | `grid`, `row`, `column`, `place` | `start`, `center` (default), or `end`: across a row or column |
+| `below`, `above`, `leftOf`, `rightOf` | `place` | The element to place the shape next to; with `gap` and `align` |
 | `at`, `anchor` | `place` | A point, and the anchor of the shape that goes on it |
-| `title`, `titleCorner`, `padding` | `enclose` | The title, the corner that holds it, and the space around the members |
+| `title`, `titleCorner`, `padding` | `enclose` | The title, its corner (`topLeft` default, `topRight`, `bottomLeft`, `bottomRight`), and the space around the members |
 | `role`, `category`, `stepOnly` | `enclose` | As on shapes. Without a `role`, an enclosure is `muted` |
 
-- Gaps are measured between edges, not between centers.
-- A gap may be negative, to overlap shapes. The overlap is then reported as a warning.
-- A shape with a fixed `width` or `height` keeps it in a size group. A fixed size smaller than the group's is reported.
-- In a row, `align` places the shapes vertically, and in a column horizontally.
-- `place` takes exactly one of `below`, `above`, `leftOf`, `rightOf`, and `at`. The first four take `gap` and `align`, and `at` takes `anchor`.
-- Grids, rows, and columns are elements: they nest, and you can place them.
-- `titleCorner` is `topLeft` (the default), `topRight`, `bottomLeft`, or `bottomRight`.
-- The first shape without a position goes at the origin.
+`place` takes exactly one of `below`, `above`, `leftOf`, `rightOf`, and `at`. Grids, rows, and columns are elements: they nest, and you can place them.
 
 ### Grids
 
-Use a grid when two or more rows must line up. A row of columns lines up only when every shape has the same size; a grid lines up whatever the sizes.
+Use a grid when two or more rows must line up whatever the sizes of their shapes.
 
 ```js
 const web = d.box("Web app")
@@ -279,32 +247,18 @@ d.arrow(api, db, "SQL")
 d.arrow(api, auth, { route: { viaX: g.gutterX(1) }, label: "verify" })
 ```
 
-- Each column is as wide as its widest shape, and each row as tall as its tallest. A shape sits in the middle of its cell unless `align` says otherwise.
-- `null` leaves a cell empty. Rows may have different lengths. No cell spans two tracks: to hold several shapes in one cell, put a row or column in it.
-- `gap` is one number, or `[columnGap, rowGap]`. Default: `[88, 64]`.
-- `align` is one value, or `[horizontal, vertical]`.
-- `g.gutterX(i)` is the middle of the gap after column `i`, and `g.gutterY(i)` after row `i`, counted from 0. Route edges through them with `viaX` and `viaY`, so they run between the shapes. Rows and columns have gutters too.
-- A gutter is a channel that edges share. Edges that leave one shape and fork, or that merge into one shape, may share it. Unrelated edges in one gutter are `EDGE_OVERLAP`: run them at different offsets, such as `g.gutterX(0).offset(8, 0)`.
-- Focusing a grid in a step focuses its cells.
+- Each column is as wide as its widest shape, and each row as tall as its tallest.
+- `null` leaves a cell empty, and rows may differ in length. A cell holds one element: for several, put a row or column in it.
+- `gap` is one number or `[columnGap, rowGap]`, default `[88, 64]`; `align` is one value or `[horizontal, vertical]`.
+- `g.gutterX(i)` is the middle of the gap after column `i`, and `g.gutterY(i)` after row `i`, from 0. Rows and columns have them too. Edges routed through one with `viaX` or `viaY` turn at one line between the shapes. Edges that fork or merge may share a gutter; unrelated ones run apart at offsets, such as `g.gutterX(0).offset(8, 0)`.
 
 ## Points
 
-Every element has nine anchors:
-
-- `center`, `top`, `bottom`, `left`, `right`
-- `topLeft`, `topRight`, `bottomLeft`, `bottomRight`
-
-There are also these points:
-
-- `port(side, t)`: a point along a side, such as `api.port("right", 0.25)`. `t` defaults to 0.5.
-- `g.gutterX(i)`, `g.gutterY(i)`: the middle of the gap after a grid's column or row `i`. See [Grids](#grids).
-
-Derived points:
-
-- `p.offset(dx, dy)`: a shift; y grows downward.
-- `d.xy(a, b)`: the x of `a` with the y of `b`.
-- `d.lerp(a, b, t)`: between two points.
-- `[x, y]`: absolute coordinates.
+- Every element has nine anchors: `center`, `top`, `bottom`, `left`, `right`, `topLeft`, `topRight`, `bottomLeft`, `bottomRight`.
+- `port(side, t)` is a point along a side, such as `api.port("right", 0.25)`; `t` defaults to 0.5.
+- `p.offset(dx, dy)` shifts a point; y grows downward.
+- `d.xy(a, b)` is the x of `a` with the y of `b`, and `d.lerp(a, b, t)` a point between two.
+- `[x, y]` is absolute.
 
 ## Edges
 
@@ -314,12 +268,11 @@ d.arrow(from, to, { id, label, route, role, category, dashed, head, tail, stepOn
 d.line(from, to, ...)   // the same, with no arrowhead unless head or tail gives one
 ```
 
-- **Shape endpoint** (`api`): the edge meets the outline facing the other end.
-- **Point endpoint** (`api.bottom`): the edge starts or ends exactly at that point.
+An end at a shape, `api`, meets the outline facing the other end; an end at a point, `api.bottom`, is exactly there.
 
 | Option | Values |
 |---|---|
-| `id` | See [Ids](#ids) |
+| `id` | See Ids |
 | `label` | A string, a label's options, or a list of either, as below |
 | `route` | `"straight"` (default), `"hv"`, `"vh"`, `{ viaX: x }`, `{ viaY: y }`, `{ via: [p1, p2] }`, `{ bend: units }`, `{ loop: side }` |
 | `head` | The arrowhead at `to`: `"filled"` (default on `d.arrow`), `"open"`, or `"none"` (default on `d.line`) |
@@ -328,42 +281,34 @@ d.line(from, to, ...)   // the same, with no arrowhead unless head or tail gives
 | `role`, `category` | As on shapes |
 | `stepOnly` | Shown only in the steps that focus it |
 
-Arrowheads:
-
-- `head` is the arrowhead at the `to` end and `tail` the one at the `from` end. Either call takes both, and they override its defaults.
-- A filled head is for calls and flows, and an open head for replies and async messages.
-- An edge with a head at both ends is `d.arrow(a, b, { tail: "filled" })`.
+A filled head is for calls and flows, an open head for replies and async messages, and `{ tail: "filled" }` makes a two-way arrow.
 
 Routes:
 
-- `"hv"` goes across, then down; `"vh"` goes down, then across.
-- `viaX` and `viaY` go through a channel at a given x or y. The value is a number, or anything `via` takes: a point such as a grid's gutter, a shape for its center, or `[x, y]`.
-- `via` goes through the given points.
-- A route with corners leaves a shape at a right angle: in line with the first `via` point when the side reaches that far, and from the middle of the side otherwise. The last `via` point sets where it enters the other shape in the same way.
-- `bend` curves the edge this many units to the left of the direction of travel. Give an A→B edge and a B→A edge the same `bend`, and they curve apart.
-- `loop` is the route of an edge from a shape to itself, `d.arrow(a, a)`, and leaves and returns on the given side. Such an edge has `{ loop: "right" }` unless it gives a side, and takes no other route.
+- `"hv"` goes across, then down; `"vh"` down, then across.
+- `viaX` and `viaY` run through a channel at an x or y: a number, a point such as a gutter, a shape for its center, or `[x, y]`. `via` goes through the given points.
+- A route with corners leaves a shape at a right angle: in line with the first `via` point when the side reaches it, else from the middle of the side. The last `via` point sets the entry the same way.
+- `bend` curves the edge this many units left of its direction. An A→B and a B→A edge with the same `bend` curve apart.
+- `loop` is the only route of an edge from a shape to itself, and leaves and returns on its side, `right` by default.
 
 A label is a string or `{ text, segment, along, side, gap }`:
 
-- `segment` is the leg of the route, from 0.
-- `along` is the position along the leg, from 0 to 1.
-- `side` is `top`, `bottom`, `left`, or `right`: `top` puts the label above the leg.
-- Default position: the middle of the longest leg, above a horizontal leg and to the right of a vertical one. On curves and loops, the label goes outside.
-- An edge with several labels takes a list: `label: ["request", { text: "retry", segment: 2 }]`.
+- `segment` is the leg of the route, from 0, and `along` the position on it, from 0 to 1.
+- `side` is `top`, `bottom`, `left`, or `right` of the leg.
+- By default a label sits at the middle of the longest leg, above a horizontal leg and right of a vertical one, and outside curves and loops.
+- Several labels are a list: `label: ["request", { text: "retry", segment: 2 }]`.
 
 ## Patterns
 
-- **Peers share a size.** Give shapes in the same row or column `equalSize`, so the figure reads as a grid. Leave decisions and start or end dots out.
-- **Rows that line up are a grid.** Put shapes that share columns across rows in one `d.grid`, not in rows aligned with `place` or `at`.
-- **Elbows between columns use a gutter.** When several edges cross from one column to the next, route each through the grid's gutter: `route: { viaX: g.gutterX(0) }`. They then turn at one line instead of crossing each other.
-- **Edges that would cross a node go around it.** Route through a channel above or below, such as `route: { viaY: group.bottom.offset(0, 28) }`, and give the label the leg it belongs on with `segment`.
-- **Parallel edges between the same shapes** leave from offset points, such as `a.top.offset(40, 0)`, or curve apart with the same `bend` route.
-- **Enclosures name a boundary,** such as a process, a machine, or a network. Move the title with `titleCorner` when an edge would cross it.
-- **Gaps carry meaning.** Use the defaults, and widen a gap only to make room for an edge label or to separate groups.
+- **Peers share a size.** Give shapes in one row or column `equalSize`, but not decisions or start and end dots.
+- **Rows that line up are a grid,** not rows aligned with `place` or `at`.
+- **Edges that would cross a node go around it** through a channel, such as `route: { viaY: group.bottom.offset(0, 28) }`, with the label on its leg by `segment`.
+- **Parallel edges between the same shapes** leave from offset points, such as `a.top.offset(40, 0)`, or take the same `bend`.
+- **Gaps carry meaning.** Keep the defaults; widen a gap only to make room for an edge label or to separate groups.
 
 ## Frames
 
-`d.frame(topLeft, bottomRight, options?)` draws a titled region between two points, such as a network zone or a UML fragment. A frame is an element: it has the nine anchors and `port()`, an edge that ends at it meets its outline, and `place` and `enclose` take it. It does not own or move anything.
+`d.frame(topLeft, bottomRight, options?)` draws a titled region between two points, such as a network zone or a UML fragment. It has anchors and `port()`, an edge to it meets its outline, and `place` and `enclose` take it. It owns and moves nothing.
 
 ```js
 const client = d.actor("Client", { role: "external" })
@@ -381,20 +326,18 @@ d.arrow(api, db)
 
 | Option | Meaning |
 |---|---|
-| `id` | See [Ids](#ids) |
+| `id` | See Ids |
 | `tab` | The label in the top-left corner, such as `loop` |
 | `title` | The text after the tab |
 | `dividers` | A list of `{ at, label? }`: a dashed line at the y of the point `at`, with an optional label |
 | `role`, `category` | As on shapes. Without a `role`, a frame has a thin line and a tab on a raised fill |
 | `stepOnly` | Shown only in the steps that focus it |
 
-- The two points set the frame's bounds, so a grid, a row, a column, or `place` cannot position it: that is `NOT_PLACEABLE`. Move a frame by moving its points.
-- A shape can be placed next to a frame, as `client` is with `leftOf`.
-- A frame does not hold the shapes it covers: a step that focuses it focuses the frame alone. To group shapes for steps, use `enclose`.
+The points set a frame's bounds: move it by moving them, never with a grid, row, column, or `place`. Enclosures, cells, and marks are the same: position their members or parent. A step that focuses a frame focuses the frame alone; to group shapes for steps, use `enclose`.
 
 ## Categories
 
-A category shows which elements belong together, or how they differ. Give elements the same `category` and they share a color; a legend under the figure names each color.
+Elements with the same `category` share a color, and a legend under the figure names each one.
 
 ```js
 const orders = d.box("Orders API", { category: "New" })
@@ -408,123 +351,58 @@ d.arrow(payments, db)
 d.arrow(batch, db, { dashed: true })
 ```
 
-- **Colors follow the order of first use.** The first category gets the first color, and so on. Elements without a category stay neutral.
-- **At most four categories per figure.** More cannot be told apart reliably, especially with color blindness. A fifth is reported and drawn without a color.
-- **Name the difference, not the color.** The legend shows the words, so write what the reader should understand: "Runs in the browser", not "Blue".
-- **A category also has an id** for steps, derived like a label: `<Step focus="new">` focuses every element in "New". Pointing at a legend entry highlights its elements too.
-- A category changes an element's color only. An `accent` element in a category keeps its heavier outline, and a `warning` element keeps its badge.
+- Colors follow the order of first use; elements without a category stay neutral.
+- At most four categories per figure, so readers with color blindness can tell them apart. A fifth is drawn without a color.
+- Name the difference, not the color: "Runs in the browser", not "Blue".
+- A category has an id from its name: `<Step focus="new">` focuses every element in "New". Pointing at a legend entry highlights them too.
+- A category changes only the color: `accent` keeps its heavier outline, and `warning` its badge.
 
 ## Steps
 
-Steps tell the story of a figure in order. Each `<Step>` names the elements it is about and says one or two sentences. Step text is MDX, so it can link to the section that explains more. Steps never move anything; they only change what is highlighted, faded, or shown.
+Each `<Step>` names the elements it focuses and says one or two sentences of MDX, which may link onward. Focused elements are highlighted and the rest fade; steps never move anything. Give a figure steps when the text would otherwise say "first … then … finally": a request, a pipeline, a protocol, a state machine. A figure of four elements or fewer, or a structure without an order, needs none.
 
-A step that focuses both ends of an edge focuses the edge too: the first step below names `client` and `api`, and the arrow between them comes with them. Name an edge when the step focuses only one of its ends, as the second step names `api->cache`.
+A step's `focus` lists element ids, separated by spaces: an element's `id` option, or else one made from its label, as Ids describes. Variable names inside `draw` are not ids: below, the box in `api` is `orders-api`. To focus an element by a name you choose, give it that `id`, such as `{ id: "api" }`.
 
 ```mdx
 <Diagram id="cached-read" caption="A cached read." build draw={(d) => {
   const client = d.box("Client")
-  const api = d.box("API")
+  const api = d.box("Orders API") // id "orders-api", from the label
   const cache = d.cylinder("Cache")
-  const db = d.cylinder("Database")
-  d.row([client, api, cache])
+  const db = d.cylinder("Database") // id "database", from the label
+  d.row([client, api, cache]) // id "row-1", the first row
   d.place(db, { below: cache })
   d.arrow(client, api)
-  d.arrow(api, cache)
-  d.arrow(cache, db, { id: "miss", label: "miss" })
-  const why = d.note("Most reads stop here", { stepOnly: true })
+  d.arrow(api, cache) // id "orders-api->cache": the ids of its ends, joined by ->
+  d.arrow(cache, db, { id: "miss", label: "miss" }) // id "miss", from the id option
+  const why = d.note("Most reads stop here", { stepOnly: true }) // id "most-reads-stop-here", from the label
   d.place(why, { below: api })
 }}>
-  <Step focus="client api">The client sends a request to the API.</Step>
-  <Step id="lookup" focus="cache api->cache most-reads-stop-here">The API first looks in the cache.</Step>
+  <Step focus="client orders-api">The client sends a request to the API.</Step>
+  <Step id="lookup" focus="cache orders-api->cache most-reads-stop-here">The API looks in the cache.</Step>
   <Step focus="database miss">On a miss, the cache reads the database.</Step>
   <Step focus="row-1">Together, the three serve every read.</Step>
 </Diagram>
 ```
 
-| Feature | Meaning |
-|---|---|
-| `focus` | Element ids, separated by spaces. Focused elements are highlighted; the others fade |
-| Containers | Focusing an enclosure, grid, row, column, sequence, sequence fragment, or tree branch focuses everything in it |
-| Categories | Focusing a category's id focuses every element in it |
-| Edges | A step focuses an edge when it focuses both its ends. An end at an anchor, a port, or an offset of one, such as `api.bottom` or `api.top.offset(40, 0)`, counts as the shape; a cell or mark end counts as that member. A step names an edge with an end made by `xy`, `lerp`, a gutter, or `[x, y]`, a `stepOnly` edge, and a sequence message |
-| No `focus` | `<Step>` without `focus` shows the whole figure, as with no step open, without step-only elements. It changes no other step and counts as focusing nothing |
-| `build` | Each element stays hidden until the first step that focuses it, and an edge stays hidden while one of its ends is hidden. A step without `focus` does not reveal anything for the steps after it |
-| `stepOnly` | An option of shapes, record cells, text marks, edges, enclosures, frames, and the messages, notes, and fragments of a sequence: the element shows only in steps that focus it. Use it for callouts next to an element, or for versions of a label that change from step to step |
-| `id` | A step's address: `/page#cached-read--lookup`. Unique among the figure's elements and steps |
+- **Edges** come with both their ends. An end at an anchor, port, or offset of a shape counts as the shape, and a cell or mark end as that member. Name the edge when the step focuses one end only, as `orders-api->cache`; when an end is made by `xy`, `lerp`, a gutter, or `[x, y]`; and for a `stepOnly` edge or a sequence message.
+- **Containers and categories:** focusing an enclosure, grid, row, column, sequence, fragment, tree branch, or category's id focuses everything in it. Prefer that to listing members.
+- **No `focus`:** shows the whole figure without step-only elements, changes no other step, and counts as focusing nothing.
+- **`stepOnly`** on shapes, cells, marks, edges, enclosures, frames, and a sequence's messages, notes, and fragments shows the element only in steps that focus it: for callouts, or a label that changes from step to step (two `stepOnly` elements in one place). Step-only elements overlap others only when one step shows both.
+- **`build`** hides each element until the first step that focuses it, and an edge while an end is hidden. A step without `focus` reveals nothing. An element no step focuses shows faded from the first step; focus every shape with an edge, and leave only shapes without edges and enclosures as scenery.
+- **`id`** gives the step an address, `/page#cached-read--lookup`, unique among the figure's elements and steps. Link to it with `<Ref to="cached-read--lookup">the lookup</Ref>`. A reader's comment names the open step.
 
-To tell a story:
-
-Steps help when the reader must follow an order: a request through components, a pipeline, a protocol, or a state machine. Give a figure steps when the text would otherwise say "first … then … finally" about it. A figure with four elements or fewer, or one that shows a structure without an order, needs none.
-
-- Start with a step that focuses the main elements, so the reader sees the whole cast.
-- Revisit an element in a later step when the story comes back to it.
-- Put short remarks on the drawing with `stepOnly` notes. The eye then stays on the figure.
-- Show a change with two `stepOnly` elements in the same place, focused in different steps.
-- Say in each step what the drawing cannot: the reason or the consequence. Do not repeat the caption.
-- Link from a step to the section that explains more.
-- Steps and a numbered prose list that walk the same path repeat each other. Keep the walk in the steps, and keep rules and details in the prose after the figure.
-- With `build`, an element that no step focuses is shown, faded, from the first step. Focus every shape that should appear in order; a shape with an edge that no step focuses is reported. Shapes without edges and enclosures may stay as scenery.
-
-The reader steps with the buttons under the caption, the arrow keys, and Esc. Clicking an element opens the next step about it. A link to a step or element opens it. `<Ref to="cached-read--lookup">the lookup</Ref>` links to a step from the prose. When the reader comments on the figure, the message includes the open step. Print shows the whole figure, without step-only elements, and lists the steps.
-
-Use steps when the order matters. A simple figure needs none.
-
-## Diagnostics
-
-The page compiler finds diagnostics when it compiles the page, so they are listed without a browser. In development, they also appear under the figure, as dashed outlines on the elements, and in the header's list. New errors are sent to the agent at once. If a compile fails, the last valid drawing stays on screen, dimmed.
-
-| Code | Severity | Fix |
-|---|---|---|
-| `PLACEMENT_CYCLE` | error | Placements depend on each other. Place one of them independently |
-| `CONFLICTING_PLACEMENT` | error | A shape is in a grid, row, or column and also placed, or in two of them. Keep one |
-| `DUPLICATE_ID` | error | Two explicit ids are the same, a step id is taken, or an element has the same id as a category, so steps cannot focus the category. Rename one |
-| `NOT_PLACEABLE` | error | An enclosure, a frame, a cell, or a mark is in a grid, row, or column, or placed. Position its members, the elements its points name, or its parent instead |
-| `UNKNOWN_OPTION` | error | A call has an option it does not take, so the option is ignored. The message lists the options it takes, the nearest first |
-| `INVALID_ARGUMENT` | error | A call has a value it cannot use, an option of another form, such as `anchor` with `below`, an option that has no effect, or a route the edge cannot take, such as `{ loop: side }` between two shapes. The message names the call, the value, and the values it takes; the call uses the default or a stand-in |
-| `UNKNOWN_PARTICIPANT` | error | A sequence message or note names a shape that is not in the participants, so it is skipped. Add the shape to the participants |
-| `REPLY_WITHOUT_CALL` | warning | A sequence message with `reply: true` has no open call from the participant it returns to, so it closes no activation bar. Swap `from` and `to`, or remove `reply` |
-| `DRAW_FAILED` | error | The `draw` function threw, at the line given, uses a name it does not define, ran longer than 1 second, or created more than 2000 elements |
-| `DIAGRAM_FAILED` | error | The diagram compiler threw. The message says where |
-| `DEGENERATE_EDGE` | error | An edge starts and ends at the same point. Connect different shapes or points, or draw a shape to itself, which loops |
-| `LABEL_SEGMENT` | error | A label names a `segment` the route does not have. Count the legs from 0 |
-| `MARK_UNMATCHED` | error | A mark's text does not occur, occurs more than once, or is split across wrapped lines; or its lines are past the last line or start after they end. Mark a longer text or whole lines, break the text's lines with `\n`, or count the lines from 1 |
-| `CELL_SPAN` | error | A cell spans more columns than remain in its row. Split it into two cells |
-| `EDGE_NODE_INTERSECTION` | warning | Give the edge the route `{ viaX: x }`, `{ viaY: y }`, `{ via: [points] }`, or `{ bend: units }`, or move the shape. An edge that runs through its own end needs a straight route or another route form |
-| `EDGE_OVERLAP` | warning | Two edges run on top of each other and read as one line. Give one the route `{ bend: units }`, attach one at a `port()`, or draw one edge with `tail: "filled"`. Edges that fork from one point or merge into one point may share a stretch. Unrelated edges in one gutter run at different offsets, such as `g.gutterX(0).offset(8, 0)` |
-| `HEAD_CROWDED` | warning | An arrowhead has less than 17 units of line to sit on, so it is drawn smaller. Each end is reported by itself. Widen the gap |
-| `LABEL_OVERLAP`, `LABEL_CROWDED` | warning | Change `side`, `segment`, or `along`, or widen the gap |
-| `NODE_OVERLAP`, `ENCLOSURE_INTRUSION` | warning | Adjust the placement or gaps. Step-only elements, enclosures included, overlap only if one step shows both |
-| `ENCLOSURE_TITLE_CROSSED` | warning | Move the title with `titleCorner`, or move the edge |
-| `TEXT_OVERFLOW` | warning | A word is wider than a fixed `width`, a record cell is wider than its cell, or the text is taller than a fixed `height`. Increase `width` or `height` |
-| `FIXED_SIZE_IN_GROUP` | warning | A shape in `equalSize`, `equalWidth`, or `equalHeight` has a fixed size smaller than the group's. Remove the fixed size or take the shape out of the group |
-| `RULER_CROWDED` | warning | Return `""` for the column labels to skip, such as `(i) => (i % 4 ? "" : i)` |
-| `UNPLACED` | error | Add the shape to a grid, row, or column, or `place()` it |
-| `UNKNOWN_ICON` | error | The icon name is not a Lucide icon, so nothing is drawn. Use a name from the message, or find one as [Icons](icons.md#find-names) shows, without the `lucide:` prefix |
-| `UNKNOWN_GUTTER` | error | `gutterX(i)` or `gutterY(i)` names a gap that does not exist. A grid of n columns has gutters 0 to n - 2 |
-| `UNKNOWN_ELEMENT` | error | A step focuses an id that does not exist, or `member()` names a member that does not. The message lists the valid ids |
-| `STEP_NOT_TEXT` | error | A step's `id` or `focus` is computed, such as `focus={ids}`. Write it as plain text |
-| `BUILD_WITHOUT_STEPS` | warning | `build` needs `<Step>` children |
-| `BUILD_NEVER_FOCUSED` | warning | With `build`, a shape that has an edge is focused by no step, so it is shown faded from the first step. Focus it in the step where it should appear |
-| `STEP_ONLY_UNUSED` | warning | A `stepOnly` element that no step focuses is never shown |
-| `DIAGRAM_SCROLLS` | warning | Wider than 1280 units. Stack it more vertically |
-| `FONT_FALLBACK` | warning | The text has characters the web app's fonts lack, such as "→", so its width is estimated. Use characters the fonts have, such as `->` |
-| `ACCENT_OVERUSED` | warning | Keep `role: "accent"` on one element; give the others the default role |
-| `TOO_MANY_CATEGORIES` | warning | Merge categories, or split the figure. Four is the most |
+To tell the story: start with the whole cast; revisit an element when the story returns to it; put short remarks on the drawing as `stepOnly` notes; say what the drawing cannot, the reason or the consequence, not the caption. Keep the walk in the steps and the rules in the prose after the figure, not both.
 
 ## Size
 
-- Figures are at least as wide as the text column (560 px). They grow to the right to fit the drawing, up to about 960 units at natural size.
-- On small screens, drawings shrink to 75 % of their natural size, then scroll sideways.
-- Keep text-heavy diagrams under about 960 units.
-- Text is measured with the web app's font files, so the checks match what the browser draws.
+Figures are at least as wide as the text column, 560 units, and grow to the right. Keep a diagram under about 960 units, the most a page shows at natural size, by stacking rows into columns. Past 1280 units the reader must scroll.
 
 ## Checklist
 
 Before you finish a figure:
 
-- The document check lists no diagnostics for it.
+- The document check lists nothing for it.
 - The caption says what the figure shows in one or two sentences, and the text refers to it with `<Ref>` before or where it appears.
 - A figure that is hard to describe from its labels alone has a `description`.
 - At most one element has `role: "accent"`, and it is the element the text is about.
 - Labels are short: two or three words, with details in `sub` or in the text.
-- Each step's `focus` names elements that exist; `UNKNOWN_ELEMENT` lists the valid ids.

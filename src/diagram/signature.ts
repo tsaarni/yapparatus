@@ -569,7 +569,7 @@ export class CallCheck {
       at.path,
       given,
       () =>
-        `${at.path} is ${quote(given)}, which is not a ${among.noun}. ${at.otherwise} The ${among.noun}s are ${elements.map((el) => el.id).join(", ") || "none"}.`,
+        `${at.path} is ${quote(given)}, which is not a ${among.noun}. ${at.otherwise} The ${among.noun}s are ${elements.map((el) => el.id).join(", ") || "none"}: add it to them, or name one of them.`,
     );
     return rejected;
   }

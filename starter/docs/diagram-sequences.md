@@ -1,8 +1,6 @@
 # Sequences
 
-Messages between participants over time. Read [diagrams.md](diagrams.md) first; this page adds `d.sequence`.
-
-Copy the example closest to your figure, then change the labels.
+Messages between participants over time. This page adds `d.sequence`.
 
 ## A request with a branch
 
@@ -32,7 +30,7 @@ d.sequence([you, api, db], [
 
 ```js
 const app = d.box("App")
-const queue = d.cylinder("Queue")
+const queue = d.queue("Queue")
 const worker = d.box("Worker")
 d.sequence([app, queue, worker], [
   { from: app, to: queue, label: "enqueue", async: true },
@@ -58,7 +56,7 @@ d.sequence([app, queue, worker], [
 | `{ title?, messages }` | A branch in a fragment's `else` list |
 
 - A message takes at most one of `reply` and `async`. A reply has a dashed line and an open arrowhead, and an async message an open arrowhead. `dashed: true` or `dashed: false` sets the line of any message.
-- A reply returns to the participant that called. Its `from` is the callee and its `to` the caller, and the caller's call must still be open. Otherwise it is `REPLY_WITHOUT_CALL`: swap `from` and `to`, or remove `reply`.
+- A reply returns to the participant that called. Its `from` is the callee and its `to` the caller, and the caller's call must still be open.
 - `id`, `role`, `category`, and `stepOnly` work as on shapes. A `stepOnly` message shows only in the steps that focus it, together with the activation bar it opens. A `stepOnly` note shows only in its steps. A `stepOnly` fragment shows its frame only in its steps; its messages are step-only only when they have `stepOnly` too.
 
 | Option | Meaning |

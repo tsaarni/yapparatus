@@ -53,6 +53,8 @@ A code is an `error` when the page cannot be shown as written: a reference to no
 
 The web app sends codes without a severity, and the server adds it from that list.
 
+A message names what is wrong, with the values and ids involved, and says how to fix it.
+
 <Ref to="diagnostics-groups" /> lists the groups of the registry.
 
 <Table id="diagnostics-groups" caption="The groups of codes in the registry.">
@@ -91,22 +93,22 @@ A change to a component's code does not change a revision, so a finding the comp
 The agent reads diagnostics in the prompt of a wait, in the result of `checkDocument`, and in the refusal of a reply, one line per diagnostic. <Ref to="diagnostics-line" /> marks the parts of one line.
 
 <Diagram id="diagnostics-line" caption="One diagnostic as the agent reads it." draw={(d) => {
-  d.text("- new error DEGENERATE_EDGE docs/cache.mdx:40-62, /cache#flow, elements api->api: api->api starts and ends at the same point.", {
+  d.text("- new error UNKNOWN_GUTTER docs/cache.mdx:40-62, /cache#flow, elements row-1: row-1 has 3 columns, so gutterX takes 0 to 1; got 2.", {
     mono: true,
     id: "line",
     marks: {
       severity: { text: "new error", category: "Severity" },
-      code: { text: "DEGENERATE_EDGE", category: "Code" },
+      code: { text: "UNKNOWN_GUTTER", category: "Code" },
       file: { text: "docs/cache.mdx:40-62", category: "Place" },
       address: { text: "/cache#flow", category: "Place" },
-      elements: { text: "elements api->api", category: "Place" },
+      elements: { text: "elements row-1", category: "Place" },
     },
   })
 }} />
 
 `new` marks an error the agent has not been given. The agent links the address in its reply. New errors come first, and the unchecked pages follow.
 
-[`checkDocument`](/agent-library#checkdocument) first checks again any file saved after the last check started, because the file watcher reports an edit a moment late. It then waits until the server has checked the edits, and does not wait for a browser: a browser shows one page, often not the edited one. Pages no browser has rendered since they changed are listed as unchecked, and what a browser finds later ends the agent's next wait. The errors it returns count as given.
+[`checkDocument`](/agent-library#checkdocument) first checks again any file saved after the last check started, because the file watcher reports an edit a moment late. Checks run one at a time: an edit during a check runs it again, so a check never answers with files older than the request. Vite cannot load a new page until its file watcher reports the file, which can come after a check that runs right after the page was written. A page that Vite fails to load although it is on disk is compiled again once the watcher reports it, or after 2 s. `checkDocument` then waits until the server has checked the edits, and does not wait for a browser: a browser shows one page, often not the edited one. Pages no browser has rendered since they changed are listed as unchecked, and what a browser finds later ends the agent's next wait. The errors it returns count as given.
 
 [`waitForMessage`](/agent-library#waitformessage) returns reader messages and new errors. An error ends a wait when it has lasted 2 s and has not been given. Warnings never end a wait. An error that is fixed and comes back is new again.
 
@@ -117,6 +119,8 @@ In dev mode, the web app shows diagnostics under each diagram and chart, in plac
 ## Design decisions
 
 **Reports are tied to a revision and only add.** A report that replaced earlier findings would need the web app to know when a problem is fixed, and reports from several tabs would overwrite each other. With revisions, a report never has to be taken back.
+
+**The fix is in the message, not in the guide.** Agents read a fix when a diagnostic arrives and fix every diagnostic of a check in one round. A table of every code made the guide too long to read in one go, and a shorter guide is read whole.
 
 **`checkDocument` does not wait for browsers.** The server finds almost every problem itself. An open browser shows one page, often not the edited one, so a fixed wait would mostly wait for nothing, and the unchecked list already says what no browser has confirmed.
 

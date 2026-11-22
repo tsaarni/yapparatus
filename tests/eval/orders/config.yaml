@@ -1,0 +1,12 @@
+listen: ":8080"
+database: "postgres://orders@db:5432/orders"
+cache:
+  size: 10000
+  ttl: 30s
+queue:
+  url: "amqp://mq:5672"
+  name: "order-events"
+worker:
+  concurrency: 8
+  maxAttempts: 6
+  baseDelay: 200ms

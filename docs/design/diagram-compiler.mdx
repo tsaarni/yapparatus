@@ -185,7 +185,39 @@ A grid holds rows of cells, and each cell is an element or empty. A row is a gri
 
 ## Ids
 
-Every element has an id. The page uses it as the element's address, `/page#figure--element`, and steps, diagnostics, and references refer to elements by it. An element may have an explicit `id`. Without one, the compiler derives an id, as <Ref to="dc-ids" /> lists.
+Every element has an id. The page uses it as the element's address, `/page#figure--element`, and steps, diagnostics, and references refer to elements by it. An element may have an explicit `id`. Without one, the compiler derives an id, as <Ref to="dc-ids" /> lists. The variable that holds an element plays no part. <Ref to="dc-id-example" /> shows each case with its address, for a diagram `request-path` on the page `architecture.mdx`.
+
+<Listing id="dc-id-example" caption="Ids and addresses: the id option, else the label; never the variable.">
+
+```js
+draw={(d) => {
+  // id option: "store"
+  //   /architecture#request-path--store
+  const db = d.cylinder("PostgreSQL", { id: "store" })
+
+  // No id option, so the id comes from the label "HTTP API": "http-api"
+  // (the variable name "api" plays no part)
+  //   /architecture#request-path--http-api
+  const api = d.box("HTTP API")
+
+  // From the label "Client": "client"
+  //   /architecture#request-path--client
+  d.place(d.actor("Client"), { leftOf: api })
+
+  // From the labels: "worker-a", "worker-b"
+  //   /architecture#request-path--worker-a
+  //   /architecture#request-path--worker-b
+  for (const name of ["Worker A", "Worker B"]) d.box(name)
+
+  // An edge joins its ends' ids: "http-api->store"
+  //   /architecture#request-path--http-api->store
+  d.arrow(api, db)
+}}
+```
+
+</Listing>
+
+A step uses the same ids, and a step with an `id` has an address of its own. With `<Step id="lookup" focus="store">`, the step is `/architecture#request-path--lookup`, and the figure is `/architecture#request-path`. A `Ref` on the same page leaves out the page: `<Ref to="request-path--http-api" />`.
 
 <Table id="dc-ids" caption="Derived ids.">
 
@@ -435,7 +467,7 @@ Categories are numbered 1 to 4 in the order the draw program first uses them, an
 
 ## Checks
 
-Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. What each code means and how to fix it is in the [diagram reference](https://github.com/tsaarni/yapparatus/blob/main/starter/docs/diagrams.md).
+Each stage reports the problems it finds, as <Ref to="dc-check-origins" /> lists. Each message names the elements involved and says how to fix the problem, as [diagnostics](/diagnostics#codes-and-severity) describes.
 
 <Table id="dc-check-origins" caption="The stage that finds each diagram diagnostic.">
 
@@ -458,11 +490,11 @@ The collision checks run on the exact geometry, before rounding. Two rectangles 
 
 The checks report conflicts between elements that the user sees as separate. They skip a cell or mark and its parent, lifelines and activation bars, and pairs of step-only elements, which the step checks compare. A step-only enclosure is one of such a pair with a step-only shape inside its boundary or a step-only edge across its title. Free text is checked like any shape, because it has no fill and an edge through it shows through the words. An edge is checked against its own ends too, except on the leg that touches each end, so a route that runs through its own end is `EDGE_NODE_INTERSECTION`. The compiler reports it and does not repair it. A cell and its record count as one end, and an edge whose two ends are on one element, or that has a `bend` route, is not checked against its ends.
 
-Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel such as a grid's gutter, and an edge that lies wholly on another are reported. The fixes are the route `{ bend: units }`, a `port()`, or, for two edges in opposite directions, one edge with `tail: "filled"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
+Two edges that share a stretch of line longer than 4 units, within half a unit, read as one line, and the compiler reports `EDGE_OVERLAP`. It compares the routes before the arrowheads shorten them, so two identical curves are caught too, because their legs coincide. A fork or a merge reads correctly and is allowed: the edges run the shared stretch in the same direction, it starts at the first point of both routes or ends at the last point of both, and both routes go on past it. Edges in opposite directions, edges with different ends that share a channel such as a grid's gutter, and an edge that lies wholly on another are reported. The fixes are the route `{ bend: units }`, a `port()`, an offset from a shared gutter, or, for two edges in opposite directions, one edge with `tail: "filled"`. Passive edges, such as lifelines, and pairs of step-only edges are not compared.
 
 ### Steps and width
 
-The step checks run on the finished diagram, so they see the final ids. Each id in a step's `focus` must name an element, a container, or a category, or it is `UNKNOWN_ELEMENT`. The elements a step focuses are the ids it names, with each container and category replaced by itself and what `groups` lists for it, and then each edge whose two ends are among them. An edge follows its ends when each end is an element or a point taken from that one element alone: an anchor, a port, or an offset of either, offsets of offsets included. A cell or a mark is an end of its own, which focusing its record or text includes. A point made with `xy`, `lerp`, a gutter, or `[x, y]` combines elements or names none, so it is free. An edge with a free point at an end, a step-only edge, a sequence message, and a decoration such as a lifeline do not follow their ends, so a step names them. A step without `focus` shows the whole figure plain, as with no step open, and step-only elements are absent; for every other purpose it focuses nothing, so it is not the first step that focuses anything under `build`, it counts for neither `STEP_ONLY_UNUSED` nor `BUILD_NEVER_FOCUSED`, and a click or an address never opens it. The step checks, the web app's view, a click on an element, and an address all compute a step's elements in this one way. Shapes, cells, marks, edges, enclosures, and frames can be step-only, and so can the messages, notes, and fragments of a sequence, which are edges, shapes, and frames. Every step-only element must appear in some step, or it is `STEP_ONLY_UNUSED`. With `build`, a shape at an end of an edge that follows its ends must be focused by some step, or it is shown faded from the first step, which is `BUILD_NEVER_FOCUSED`. A member counts as its record or text. A shape with no such edge, an enclosure, a frame, and a grid may stay as scenery. Two step-only shapes that one step shows together must not overlap. A step-only shape that is not a member of a step-only enclosure that the same step shows must stay outside its boundary, and a step-only edge must not cross its title.
+The step checks run on the finished diagram, so they see the final ids. Each id in a step's `focus` must name an element, a container, or a category, or it is `UNKNOWN_ELEMENT`. The message lists the figure's ids. The elements a step focuses are the ids it names, with each container and category replaced by itself and what `groups` lists for it, and then each edge whose two ends are among them. An edge follows its ends when each end is an element or a point taken from that one element alone: an anchor, a port, or an offset of either, offsets of offsets included. A cell or a mark is an end of its own, which focusing its record or text includes. A point made with `xy`, `lerp`, a gutter, or `[x, y]` combines elements or names none, so it is free. An edge with a free point at an end, a step-only edge, a sequence message, and a decoration such as a lifeline do not follow their ends, so a step names them. A step without `focus` shows the whole figure plain, as with no step open, and step-only elements are absent; for every other purpose it focuses nothing, so it is not the first step that focuses anything under `build`, it counts for neither `STEP_ONLY_UNUSED` nor `BUILD_NEVER_FOCUSED`, and a click or an address never opens it. The step checks, the web app's view, a click on an element, and an address all compute a step's elements in this one way. Shapes, cells, marks, edges, enclosures, and frames can be step-only, and so can the messages, notes, and fragments of a sequence, which are edges, shapes, and frames. Every step-only element must appear in some step, or it is `STEP_ONLY_UNUSED`. With `build`, a shape at an end of an edge that follows its ends must be focused by some step, or it is shown faded from the first step, which is `BUILD_NEVER_FOCUSED`. A member counts as its record or text. A shape with no such edge, an enclosure, a frame, and a grid may stay as scenery. Two step-only shapes that one step shows together must not overlap. A step-only shape that is not a member of a step-only enclosure that the same step shows must stay outside its boundary, and a step-only edge must not cross its title.
 
 The width check reports `DIAGRAM_SCROLLS` for a diagram wider than a fixed limit: the width of the widest figure area divided by the smallest scale the web app shrinks a diagram to.
 
@@ -520,6 +552,8 @@ The draw program states the arrangement, and the compiler measures it. Automatic
 The compiler reports problems and does not repair them. A silent repair, such as moving a shape to remove an overlap, hides the problem, changes what the draw program says, and can be undone by the next edit. A stand-in for a value that a call cannot use is always reported as an error. It exists only so that the rest of the figure compiles and one compile reports every problem.
 
 A draw program is JavaScript, and the compiler checks every call when it runs. A text language such as Mermaid, D2, or PlantUML is shorter for simple graphs, but it has no loops, variables, or functions, and its errors are vague. Type-checking the program would add a second kind of error, without element ids, beside the diagnostics. The checks of the calls find the same mistakes while the program runs, so every problem is a diagnostic that names its elements. A program that throws names the page line of the statement.
+
+An element's id never comes from its variable. Graphviz, Mermaid, and D2 name a node by an identifier, and authors expect the same here, but a variable is a name in code: it changes in a refactoring, it may be camelCase, which ids do not allow, and the address a reader comments on would then depend on it. One rule, the `id` option or else the label, keeps every id visible in the call that makes the element. Authors still write a variable in a step when an example's variables and ids are the same word, so the examples in the diagram reference give their elements variables that differ from their ids.
 
 Diagrams compile on the server, so their diagnostics are known as soon as the page compiles, and a build carries data instead of programs. The cost is that the server measures text from the font files.
 
