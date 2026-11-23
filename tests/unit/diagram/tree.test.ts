@@ -351,3 +351,75 @@ test("a node in a row and then in a tree names the tree's container by its final
     ids: ["x"],
   });
 });
+
+test("a branch object gives the line into its node a label and a style over the tree's edge", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const n = (id: string) => sized(d, id);
+  d.tree(
+    n("r"),
+    [
+      { node: n("a"), edge: "yes", children: [n("a1"), { node: n("a2"), edge: "maybe" }] },
+      { node: n("b"), edge: { label: "no", role: "muted", head: "filled" } },
+      n("c"),
+    ],
+    { edge: { dashed: true } },
+  );
+  const out = compile(scene, lookups);
+  assert.deepEqual(out.diagnostics, []);
+  assert.deepEqual(
+    out.edges.map((e) => [e.id, e.labels.map((l) => l.lines[0]?.text), e.role, e.dashed, !!e.head]),
+    [
+      ["a->a1", [], "default", true, false],
+      ["a->a2", ["maybe"], "default", true, false],
+      ["r->a", ["yes"], "default", true, false],
+      ["r->b", ["no"], "muted", true, true],
+      ["r->c", [], "default", true, false],
+    ],
+  );
+  const r = rects(out);
+  const label = out.edges.find((e) => e.id === "r->a")?.labels[0]?.rect;
+  const a = r.a;
+  assert.ok(label && a, "the label and its child are drawn");
+  assert.equal(label.y + label.height / 2, a.y - 12, "centered on the last leg, next to the child");
+  assert.ok(label.x > a.x + 50, "beside the line, on its right");
+});
+
+test("labelled lines fit in every layout but indent once the level gap gives them room", () => {
+  for (const layout of ["down", "right", "both"] as const) {
+    const scene = new Scene();
+    const d = new DiagramBuilder(scene);
+    const n = (id: string) => sized(d, id);
+    d.tree(
+      n("r"),
+      [
+        { node: n("a"), edge: "yes", children: [{ node: n("a1"), edge: "no" }, n("a2")] },
+        { node: n("b"), edge: "no" },
+        n("c"),
+      ],
+      { layout, levelGap: 72 },
+    );
+    assert.deepEqual(compile(scene, lookups).diagnostics, [], layout);
+  }
+});
+
+test("a branch object without edge is INVALID_ARGUMENT once, and its subtree is still drawn", () => {
+  const scene = new Scene();
+  const d = new DiagramBuilder(scene);
+  const n = (id: string) => sized(d, id);
+  d.tree(n("r"), [n("a"), { node: n("b"), children: [n("x")] } as never]);
+  const out = compile(scene, lookups);
+  assert.deepEqual(out.diagnostics, [
+    {
+      code: "INVALID_ARGUMENT",
+      message:
+        "tree r-tree: children[1] has no edge. Write [node, children] for a child whose line has no options.",
+      ids: ["r-tree"],
+      subject: "children[1]",
+    },
+  ]);
+  assert.deepEqual(
+    out.edges.map((e) => e.id),
+    ["b->x", "r->a", "r->b"],
+  );
+});

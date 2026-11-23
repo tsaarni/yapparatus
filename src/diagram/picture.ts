@@ -358,13 +358,13 @@ export function pictureOf(
     out.push(group(shown(e.id), body, { "element-id": e.id, shape: "enclosure" }));
   }
   for (const edge of diagram.edges) if (edge.passive) out.push(edgeOf(edge));
+  for (const edge of diagram.edges) if (!edge.passive) out.push(edgeOf(edge));
   for (const node of diagram.nodes) out.push(nodeOf(node));
   for (const node of diagram.nodes) if (node.rules) out.push(recordOutline(node));
   for (const node of diagram.nodes)
     if (node.shape === "cell" && node.role === "warning")
       out.push(group(shown(node.id), warningBadge(node.rect)));
   for (const node of diagram.nodes) if (node.pin !== undefined) out.push(pin(node));
-  for (const edge of diagram.edges) if (!edge.passive) out.push(edgeOf(edge));
   for (const f of diagram.frames) {
     const k = inkOf(f, paint);
     const labels = (line: TextLine | undefined) =>

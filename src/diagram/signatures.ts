@@ -54,7 +54,7 @@ import {
   tuple,
   type Value as ValueOf,
 } from "./signature.ts";
-import type { TreeLayout, TreeOptions } from "./tree.ts";
+import type { TreeBranch, TreeEdge, TreeLayout, TreeOptions } from "./tree.ts";
 
 /** What an element is for. */
 const role = oneOf<Role>()("default", "accent", "muted", "warning", "external");
@@ -232,17 +232,23 @@ const sequenceEntry: ValueOf = either(
   ),
 );
 
-/** A child of a tree: a shape, or a shape with its own children. */
+/** A tree's children, which stand in empty when they are not a list. */
+const treeChildren: ValueOf = standIn(
+  list(() => treeChild, "a list of children"),
+  [],
+  "An empty list stands in.",
+);
+/** A child of a tree: a shape, a shape with its own children, or a branch with its own line. */
 const treeChild: ValueOf = either(
   element("shape"),
-  tuple(
-    "[shape, children]",
-    element("shape"),
-    standIn(
-      list(() => treeChild, "a list of children"),
-      [],
-      "An empty list stands in.",
-    ),
+  tuple("[shape, children]", element("shape"), treeChildren),
+  options<TreeBranch>()(
+    {
+      node: element("shape"),
+      edge: either(text, options<Exclude<TreeEdge, string>>()({ ...edgeStyle, label: edgeLabels })),
+      children: treeChildren,
+    },
+    { required: ["node"], tag: "node", noun: "a branch { node, edge, children }" },
   ),
 );
 

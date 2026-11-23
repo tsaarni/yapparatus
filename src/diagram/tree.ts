@@ -2,15 +2,15 @@
  * Trees from the diagram primitives: each subtree is a row or column of its root and its
  * children's subtrees, with lines from the root to each child that share one trunk.
  */
-import type {
-  Align,
-  EdgeOptions,
-  Element,
-  Grid,
-  GridOptions,
+import {
+  type Align,
+  type EdgeOptions,
+  type Element,
+  type Grid,
+  type GridOptions,
   Node,
-  PointLike,
-  Route,
+  type PointLike,
+  type Route,
 } from "./elements.ts";
 import { defaultGap, treeSpacing } from "./metrics.ts";
 import type { Scene } from "./scene.ts";
@@ -19,8 +19,19 @@ import { type CallCheck, quote } from "./signature.ts";
 /** How a tree grows: down, to the right, to both sides, or as an indented list. */
 export type TreeLayout = "down" | "right" | "both" | "indent";
 
-/** A child in a tree: a leaf, or a node with its own children. */
-export type TreeChild = Node | [node: Node, children: TreeChild[]];
+/** The options of one line of a tree: its label alone, or its label and style. */
+export type TreeEdge = string | Omit<EdgeOptions, "id" | "route">;
+
+/** A child whose line into it has its own label or style, with any children of its own. */
+export interface TreeBranch {
+  node: Node;
+  /** The line from the parent into this node. */
+  edge: TreeEdge;
+  children?: TreeChild[];
+}
+
+/** A child in a tree: a leaf, a node with its own children, or a branch with its own line. */
+export type TreeChild = Node | [node: Node, children: TreeChild[]] | TreeBranch;
 
 /** Options of a tree. */
 export interface TreeOptions {
@@ -54,7 +65,7 @@ export function tree(
   options: TreeOptions,
 ): Grid {
   const layout = options.layout ?? "down";
-  const outermost = grown(scene, root, children, options, layout);
+  const outermost = grown(scene, call, root, children, options, layout);
   if (layout === "indent" && options.levelGap !== undefined)
     call.ignore(
       "levelGap",
@@ -72,6 +83,7 @@ export function tree(
  */
 function grown(
   scene: Scene,
+  call: CallCheck,
   root: Node,
   children: TreeChild[],
   options: TreeOptions,
@@ -93,18 +105,38 @@ function grown(
       cells.map((cell) => [cell]),
       { ...o, gap: [defaultGap.x, cellGap], align },
     );
-  const split = (child: TreeChild): [Node, TreeChild[]] =>
-    Array.isArray(child) ? child : [child, []];
+  const reported = new WeakSet<TreeBranch>();
+  const split = (child: TreeChild): [Node, TreeChild[], TreeEdge?] => {
+    if (Array.isArray(child)) return child;
+    if (child instanceof Node) return [child, []];
+    if (child.edge === undefined && !reported.has(child)) {
+      reported.add(child);
+      noEdge(call, child);
+    }
+    return [child.node, child.children ?? [], child.edge];
+  };
+  const lineOptions = (own: TreeEdge | undefined): EdgeOptions => ({
+    head: "none",
+    ...options.edge,
+    ...(typeof own === "string" ? { label: own } : own),
+  });
   const named = (grid: Grid, owner: Node, suffix: string) => {
     scene.nameAfter(grid, owner, suffix);
     return grid;
   };
 
-  const join = (container: Grid, parent: Node, kids: TreeChild[], branch: Branch) => {
+  const join = (
+    container: Grid,
+    parent: Node,
+    kids: TreeChild[],
+    branch: Branch,
+    labelBeforeEnd = levelGap / 4,
+  ) => {
     scene.nameAfter(container, parent, "-tree");
     const lines = kids.map((kid, i) => {
       const [from, route] = branch(i);
-      return scene.addEdge(from, split(kid)[0], { head: "none", ...options.edge, route });
+      const [node, , own] = split(kid);
+      return scene.addEdge(from, node, { ...lineOptions(own), route }, { labelBeforeEnd });
     });
     scene.addGroup(container, lines);
     return container;
@@ -143,7 +175,8 @@ function grown(
         named(indented, node, "-children");
         const levels = column([node, indented], gap, "start", o);
         const trunk = node.bottomLeft.offset(treeSpacing.trunk, 0);
-        return join(levels, node, kids, () => [trunk, "vh"]);
+        const stub = (treeSpacing.indent - treeSpacing.trunk) / 2;
+        return join(levels, node, kids, () => [trunk, "vh"], stub);
       }
     }
   };
@@ -161,4 +194,14 @@ function grown(
   const halves = row(cells, levelGap, "center", outer);
   const at = cells.indexOf(root);
   return join(halves, root, children, (i) => [root, { viaX: halves.gutterX(i % 2 ? 0 : at) }]);
+}
+
+/** Report a branch object with no `edge`, which says nothing that `[node, children]` does not. */
+function noEdge(call: CallCheck, branch: TreeBranch) {
+  const path = call.pathOf(branch);
+  call.replace(
+    path,
+    branch,
+    () => `${path} has no edge. Write [node, children] for a child whose line has no options.`,
+  );
 }

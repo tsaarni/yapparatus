@@ -221,8 +221,8 @@ export class DiagramBuilder {
     return sequence(this.#scene, call, p, m, o, this.#name("sequence"));
   }
   /**
-   * A tree: the root over its subtrees, joined by lines. A child is a node or `[node, children]`.
-   * Returns the outermost row or column, which can be placed like any other element.
+   * A tree of lines from the root to its subtrees. A child is a node, `[node, children]`, or
+   * `{ node, edge, children }`; returns the outermost row or column.
    */
   tree(root: Node, children: TreeChild[], options: TreeOptions = {}): Grid {
     const call = this.#check(signatures.tree);

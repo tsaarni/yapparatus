@@ -688,6 +688,10 @@ test("the reference names exactly the options of labels, routes, cells, marks, a
   const structures = page("diagram-structures.md");
   const sequences = section(page("diagram-sequences.md"), "## Reference");
   const trees = section(page("diagram-trees.md"), "## Reference");
+  const treeChildren = signatures.tree.args[1]?.takes;
+  const treeChild = treeChildren?.kind === "list" ? treeChildren.of : undefined;
+  const branch = treeChild?.kind === "either" ? optionsIn(treeChild.of[2]) : undefined;
+  const childTable = tables(trees)[1]?.rows ?? [];
   const edgeOptions = callOptions("arrow")?.options ?? {};
   const sequenceArgs = signatures.sequence.args[1]?.takes;
   const entry = sequenceArgs?.kind === "list" ? sequenceArgs.of : undefined;
@@ -756,6 +760,12 @@ test("the reference names exactly the options of labels, routes, cells, marks, a
       "tree edge",
       names(codes(row(tables(trees)[0]?.rows ?? [], "edge")?.[1] ?? "")[0] ?? ""),
       keys(optionsIn(signatures.tree.args[2]?.takes)?.options.edge),
+    ],
+    ["tree branch", names(codes(childTable[2]?.[0] ?? "")[0] ?? ""), keys(branch)],
+    [
+      "tree branch edge",
+      names(codes(childTable[2]?.[1] ?? "").find((c) => c.startsWith("{")) ?? ""),
+      keys(branch?.options.edge),
     ],
     [
       "frame divider",

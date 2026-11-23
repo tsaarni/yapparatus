@@ -29,7 +29,13 @@ export type {
   SequenceNote,
   SequenceOptions,
 } from "../diagram/sequence.ts";
-export type { TreeChild, TreeLayout, TreeOptions } from "../diagram/tree.ts";
+export type {
+  TreeBranch,
+  TreeChild,
+  TreeEdge,
+  TreeLayout,
+  TreeOptions,
+} from "../diagram/tree.ts";
 export type { CodeMark, HighlightedCode, PageOutline } from "../document/page-module.ts";
 export type { Reference, TargetKind } from "../document/reference.ts";
 export type { DocumentSettings, NumberingSettings } from "../document/settings.ts";

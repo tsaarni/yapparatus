@@ -89,6 +89,14 @@ export function DiagramView({
       {passive.map((edge) => (
         <EdgeView key={edge.id} edge={edge} flagged={false} />
       ))}
+      {active.map((edge) => (
+        <EdgeView
+          key={edge.id}
+          edge={edge}
+          flagged={flagged.has(edge.id)}
+          {...element(edge.id, edge.ariaLabel)}
+        />
+      ))}
       {diagram.nodes.map((node) => (
         <NodeView
           key={node.id}
@@ -124,14 +132,6 @@ export function DiagramView({
             <Pin key={`${node.id}-pin`} node={node} state={stateOf(node.id)} />
           ),
       )}
-      {active.map((edge) => (
-        <EdgeView
-          key={edge.id}
-          edge={edge}
-          flagged={flagged.has(edge.id)}
-          {...element(edge.id, edge.ariaLabel)}
-        />
-      ))}
       {diagram.frames.map((frame) => (
         <FrameView
           key={`${frame.id}-labels`}

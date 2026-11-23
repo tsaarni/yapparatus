@@ -61,6 +61,14 @@ function dedupe(points: Vec[]): Vec[] {
   return points.filter((p, i) => i === 0 || distance(p, points[i - 1] as Vec) > 0.01);
 }
 
+/** The last leg, and the place on it `before` units from its end, when the edge asks for it. */
+function nearEnd(points: Vec[], before: number | undefined): Partial<LabelOptions> {
+  if (before === undefined) return {};
+  const segment = points.length - 2;
+  const leg = distance(points[segment] as Vec, points[segment + 1] as Vec);
+  return { segment, along: leg > before ? 1 - before / leg : 0.5 };
+}
+
 /**
  * Cut a line back by `cut` units from one end, along its last leg, so its stroke ends inside the
  * arrowhead. Points of a curve that the cut passes are dropped.
@@ -129,7 +137,10 @@ export function createEdges(
       );
       return { compiled: { ...base, labels: [], ariaLabel: edge.id }, route: points };
     }
-    const labels = edge.labels.map((l) => placeLabel(edge, points, { ...shape.label, ...l }));
+    const near = nearEnd(points, edge.labelBeforeEnd);
+    const labels = edge.labels.map((l) =>
+      placeLabel(edge, points, { ...shape.label, ...(l.segment === undefined ? near : {}), ...l }),
+    );
     const route = [...points];
     const curved = shape.radius === 0;
     const made = (["head", "tail"] as const).flatMap((end) => {

@@ -517,6 +517,8 @@ export interface EdgeInternals {
   derivedId?: string;
   /** Focused only by a step that names it, never by its ends, such as a sequence message. */
   byName?: boolean;
+  /** Put a label without a segment on the last leg, this many units before the `to` end. */
+  labelBeforeEnd?: number;
 }
 
 /** A line between two points or elements, with its route, style, and labels. */
@@ -537,6 +539,8 @@ export class Edge {
   /** Focused only by a step that names it, never by its ends. */
   readonly byName: boolean;
   readonly labels: readonly LabelOptions[];
+  /** Units before the `to` end where a label without a segment sits on the last leg. */
+  readonly labelBeforeEnd: number | undefined;
   /** Whether the id joins the ids of the ends, which are final only at compile time. */
   readonly fromEnds: boolean;
   constructor(from: PointLike, to: PointLike, options: EdgeOptions, internals: EdgeInternals = {}) {
@@ -554,6 +558,7 @@ export class Edge {
     this.passive = internals.passive ?? false;
     this.stepOnly = options.stepOnly ?? false;
     this.byName = internals.byName ?? false;
+    this.labelBeforeEnd = internals.labelBeforeEnd;
     this.labels = [options.label ?? []]
       .flat()
       .map((l) => (typeof l === "string" ? { text: l } : l))

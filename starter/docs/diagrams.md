@@ -42,7 +42,7 @@ Find what the reader needs to see, and copy its example.
 | Data through a pipeline: inputs, queues, reports | A pipeline |
 | States and transitions | A state machine |
 | Messages over time | `diagram-sequences.md` |
-| Hierarchies: org charts, class trees, mind maps | `diagram-trees.md` |
+| Hierarchies: org charts, class trees, mind maps, decision trees | `diagram-trees.md` |
 | A directory listing | `<FileTree>`, not a diagram |
 | Tables, types, protocol headers, registers, arrays | `diagram-structures.md` |
 | Which span of a text or code matters | Marked text, `diagram-structures.md` |

@@ -40,7 +40,7 @@ The components, diagrams, and charts are specific to Yapparatus and not in your 
 | A diagram of any kind, or its steps | `docs/diagrams.md` |
 | Database tables, types, protocol headers, registers, arrays, or marked text | `docs/diagrams.md`, then `docs/diagram-structures.md` |
 | Messages between participants over time | `docs/diagrams.md`, then `docs/diagram-sequences.md` |
-| A hierarchy: an org chart, a class tree, a mind map | `docs/diagrams.md`, then `docs/diagram-trees.md` |
+| A hierarchy: an org chart, a class tree, a mind map, a decision tree | `docs/diagrams.md`, then `docs/diagram-trees.md` |
 | Data files, or numbers to compare, trend, or spread | `docs/charts.md` |
 | Alerts, code marks, math, tabs, columns, a file tree, a framed figure, an icon, or a custom component | `docs/components.md` |
 
