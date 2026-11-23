@@ -71,6 +71,7 @@ The components, diagrams, and charts are specific to Yapparatus and not in your 
 - Write without personification: only people and programs act, as in "the color comes from the theme" rather than "the theme picks the color".
 - Avoid hype, metaphor, and filler words, such as "seamless", "under the hood", and "simply".
 - Avoid punchy patterns: slogans, kickers in headings or closing lines ("Small change, big impact"), questions answered at once ("The catch? …"), and announcements ("Let's dive in").
+- A heading names the topic of its section, so that a reader who sees only the contents knows what the section covers, such as "Connection timeouts" or "Certificate rotation". Use words the reader already knows: a term that the section itself introduces does not explain the heading. Prefer a clear heading of a few more words to a short one that needs the section to explain it. Avoid words that read as both a verb and a noun, such as "reads" or "checks". Do not phrase a heading as a question ("How timeouts work") or a claim ("Timeouts are per connection"), and do not use a vague word ("Details", "The approach").
 - Do not use em dashes. Use a period, a comma, or a colon instead.
 - Do not frame statements as contrasts, such as "it is not X, it is Y" or "X, not Y". State what is true. Mention the alternative only when the reader needs to know about it.
 - Use one term for one thing, everywhere. Do not vary words for style.
