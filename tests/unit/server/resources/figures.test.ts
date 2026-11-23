@@ -56,7 +56,7 @@ test("a chart's picture has no text, no CSS colors, and its legend", async () =>
   }
   const share = chartPictureSvg(drawn.get("share") as DrawnChart);
   assert.match(share, /paint-order="stroke"/);
-  assert.equal((share.match(/<rect[^>]* rx="4"/g) ?? []).length, 2);
+  assert.equal((share.match(/<rect[^>]* rx="3"/g) ?? []).length, 2);
   const errors = chartPictureSvg(drawn.get("errors") as DrawnChart);
   assert.match(errors, /<linearGradient id="legend-ramp">/);
 });

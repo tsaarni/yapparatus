@@ -3,6 +3,8 @@
  * has its own file; this file runs them in order, each with what the steps before it made.
  */
 import { type DiagnosticCode, diagnosticCodes } from "../../document/diagnostic.ts";
+import { categoryCount, tooManyCategories } from "../../figure/categories.ts";
+import type { Measure } from "../../figure/font.ts";
 import {
   type CompiledDiagram,
   type CompiledEdge,
@@ -11,11 +13,10 @@ import {
   type CompiledNode,
   headsOf,
   type LegendEntry,
-  maxCategories,
 } from "../drawing.ts";
 import { type Diagnostic, type Edge, slug } from "../elements.ts";
 import { inflate, type Rect, rounded, union, type Vec } from "../geometry.ts";
-import { defaultMetrics, type Lookups, type Measure, type Metrics } from "../metrics.ts";
+import { defaultMetrics, type Lookups, type Metrics } from "../metrics.ts";
 import type { Scene } from "../scene.ts";
 import { checkIds, checkOverlaps, checkPlaced, groupsOf, validate } from "./checks.ts";
 import { createEdges } from "./edges.ts";
@@ -37,7 +38,7 @@ export function compile(
     diagnostics.push({ code, message, ids, ...(subject !== undefined ? { subject } : {}) });
   const categoryOf = (name: string | undefined) => {
     const index = name === undefined ? -1 : scene.categories.indexOf(name);
-    return index >= 0 && index < maxCategories ? { category: index + 1 } : {};
+    return index >= 0 && index < categoryCount ? { category: index + 1 } : {};
   };
 
   checkIds(scene, report);
@@ -161,7 +162,7 @@ function legendOf(
   groups: Record<string, string[]>,
   report: Report,
 ): { legend: LegendEntry[]; categoryGroups: Record<string, string[]> } {
-  const legend = scene.categories.slice(0, maxCategories).map((name, i) => ({
+  const legend = scene.categories.slice(0, categoryCount).map((name, i) => ({
     name,
     id: slug(name),
     slot: i + 1,
@@ -182,13 +183,10 @@ function legendOf(
       );
     else categoryGroups[entry.id] = entry.elements;
   }
-  if (scene.categories.length > maxCategories)
+  if (scene.categories.length > categoryCount)
     report(
       "TOO_MANY_CATEGORIES",
-      `This figure has ${scene.categories.length} categories; ${maxCategories} can be told apart by color. Elements in ${scene.categories
-        .slice(maxCategories)
-        .map((c) => `"${c}"`)
-        .join(", ")} are drawn without a color. Merge categories, or split the figure.`,
+      tooManyCategories(scene.categories, "Merge categories, or split the figure."),
       [],
     );
   return { legend, categoryGroups };

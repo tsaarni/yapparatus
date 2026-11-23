@@ -2,7 +2,7 @@
  * The texts of a Plot drawing with the boxes they cover, by axis: what margins and overlap
  * checks read instead of a browser's layout.
  */
-import type { Measure } from "../diagram/metrics.ts";
+import type { Measure } from "../figure/font.ts";
 import { type Box, boundsOf, type ChartFont, type Quad, textQuads } from "./text-box.ts";
 
 /** The position scales Plot draws an axis for. */

@@ -3,7 +3,7 @@
  * families and sets tabular digits, as the drawing does. A canvas can do neither.
  */
 import type { ChartFont } from "../../chart/text-box.ts";
-import type { FontSpec, Measure } from "../../diagram/metrics.ts";
+import type { FontSpec, Measure } from "../../figure/font.ts";
 
 let probe: SVGTextElement | undefined;
 const widths = new Map<string, number>();

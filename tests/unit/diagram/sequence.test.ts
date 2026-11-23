@@ -16,10 +16,10 @@ import {
 } from "../../../src/diagram/drawing.ts";
 import type { Node } from "../../../src/diagram/elements.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
 import { pictureOf } from "../../../src/diagram/picture.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
 import type { SequenceEntry } from "../../../src/diagram/sequence.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */

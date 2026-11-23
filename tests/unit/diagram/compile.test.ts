@@ -7,10 +7,10 @@ import { compile } from "../../../src/diagram/compile/compile.ts";
 import type { CompiledEdge } from "../../../src/diagram/drawing.ts";
 import { type BoxOptions, type Node, type Route, slug } from "../../../src/diagram/elements.ts";
 import { type Rect, round } from "../../../src/diagram/geometry.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
 import { attachment, stack } from "../../../src/diagram/outlines.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
 import type { SequenceEntry } from "../../../src/diagram/sequence.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */

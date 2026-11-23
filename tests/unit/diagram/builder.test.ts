@@ -9,8 +9,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 const docs = path.join(import.meta.dirname, "../../../starter/docs");

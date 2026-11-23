@@ -8,6 +8,7 @@
   },
   "references": [
     { "path": "../document" },
+    { "path": "../figure" },
     { "path": "../protocol" },
     { "path": "../diagram" },
     { "path": "../chart" },

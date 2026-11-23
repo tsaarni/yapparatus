@@ -2,7 +2,7 @@
  * A chart's drawing as a standalone SVG picture for an agent: text as glyph outlines, literal
  * colors only, and the legend drawn under it, so a rasterizer needs no fonts or styles.
  */
-import type { Picture, PictureFonts } from "../diagram/picture.ts";
+import { legend, legendLayout, type Picture, type PictureFonts } from "../figure/picture.ts";
 import type { ChartDrawing } from "./drawing.ts";
 import { amountFormat, type ChartLegend } from "./legend.ts";
 import type { ChartPaint } from "./paint.ts";
@@ -10,16 +10,8 @@ import { type ChartFont, textRuns } from "./text-box.ts";
 
 const svgNamespace = "http://www.w3.org/2000/svg";
 
-/** The legend under the chart, as the web app lays out its buttons and its ramp. */
-const legend = {
-  marginTop: 12,
-  height: 28,
-  padX: 9,
-  gap: 4,
-  swatch: { width: 14, height: 10, radius: 4 },
-  font: { size: 12, weight: 500 },
-  ramp: { width: 64, gap: 8, weight: 400, stops: 8 },
-};
+/** The ramp in the legend: a bar of its colors between the lowest and the highest amount. */
+const ramp = { width: 64, gap: 8, weight: 400, stops: 8 };
 
 /** Attributes a `<text>` sets that only text has: its position, anchor, and font. */
 const textOnly = /^(x|y|dx|dy|text-anchor|font-.*|dominant-baseline)$/;
@@ -72,18 +64,16 @@ function categoriesOf(
   document: Document,
 ): { group: Element; height: number } {
   const { swatch } = legend;
-  const group = document.createElementNS(svgNamespace, "g");
   const spec = { family: font.family, ...legend.font };
-  let [x, y] = [0, legend.marginTop];
-  for (const entry of entries) {
-    const words = fonts.measure(entry.value, spec);
-    const button = legend.padX * 2 + swatch.width + legend.gap + words;
-    if (x > 0 && x + button > width) [x, y] = [0, y + legend.height + legend.gap];
-    const middle = y + legend.height / 2;
+  const names = entries.map((entry) => entry.value);
+  const { places, height } = legendLayout(names, width, font.family, fonts.measure);
+  const group = document.createElementNS(svgNamespace, "g");
+  entries.forEach((entry, i) => {
+    const place = places[i] as (typeof places)[number];
     const rect = document.createElementNS(svgNamespace, "rect");
     set(rect, {
-      x: x + legend.padX,
-      y: middle - swatch.height / 2,
+      x: place.swatchX,
+      y: place.middle - swatch.height / 2,
       width: swatch.width,
       height: swatch.height,
       rx: swatch.radius,
@@ -91,13 +81,12 @@ function categoriesOf(
     });
     const name = document.createElementNS(svgNamespace, "path");
     set(name, {
-      d: fonts.outline(entry.value, spec, x + legend.padX + swatch.width + legend.gap, middle),
+      d: fonts.outline(entry.value, spec, place.wordsX, place.middle),
       fill: paint.textMuted,
     });
     group.append(rect, name);
-    x += button + legend.gap;
-  }
-  return { group, height: y + legend.height };
+  });
+  return { group, height };
 }
 
 /** The legend's ramp: the lowest amount, a bar of the ramp's colors, and the highest amount. */
@@ -109,7 +98,7 @@ function rampOf(
   paint: ChartPaint,
   document: Document,
 ): { group: Element; height: number } {
-  const { ramp, swatch } = legend;
+  const { swatch } = legend;
   const group = document.createElementNS(svgNamespace, "g");
   const spec = { family: font.family, size: font.size, weight: ramp.weight, tabular: true };
   const middle = legend.marginTop + legend.height / 2;

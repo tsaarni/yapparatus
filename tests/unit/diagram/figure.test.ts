@@ -15,7 +15,7 @@ import {
   stepOnlyElements,
 } from "../../../src/diagram/drawing.ts";
 import { compileFigure } from "../../../src/diagram/figure.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */

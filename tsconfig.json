@@ -9,6 +9,7 @@
   "include": ["tests", "scripts", "*.ts"],
   "references": [
     { "path": "src/document" },
+    { "path": "src/figure" },
     { "path": "src/protocol" },
     { "path": "src/diagram" },
     { "path": "src/chart" },

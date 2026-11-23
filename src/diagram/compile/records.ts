@@ -2,10 +2,11 @@
  * Records and marked text: the grid of a record's cells, and where each member sits.
  */
 
+import type { FontSpec, Measure } from "../../figure/font.ts";
 import type { TextLine } from "../drawing.ts";
 import type { Element, Membership, Node } from "../elements.ts";
 import { anchorOf, type Rect, round, type Side, sideToward, type Vec } from "../geometry.ts";
-import { type FontSpec, fontsOf, type Measure, type Metrics, shapes } from "../metrics.ts";
+import { fontsOf, type Metrics, shapes } from "../metrics.ts";
 import { quote } from "../signature.ts";
 import type { Report, Text } from "./text.ts";
 

@@ -56,7 +56,7 @@ export function useChartReport(
   // biome-ignore lint/correctness/useExhaustiveDependencies: The signature captures the diagnostics.
   useEffect(() => {
     if (!live || !diagnostics?.length) return;
-    const element = document.querySelector(`[data-diagram="${CSS.escape(marker)}"]`);
+    const element = document.querySelector(`[data-figure="${CSS.escape(marker)}"]`);
     const block = element?.closest<HTMLElement>("[data-source]");
     const page = pages.find((p) => p.source === block?.dataset.source);
     if (!page?.outline) return;

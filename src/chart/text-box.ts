@@ -2,7 +2,7 @@
  * The box an SVG `<text>` covers, computed from its attributes and a text measure, so a chart's
  * labels are laid out the same in a browser and on the server, which has no layout engine.
  */
-import type { FontSpec, Measure } from "../diagram/metrics.ts";
+import type { FontSpec, Measure } from "../figure/font.ts";
 
 /** A rectangle in the drawing's coordinates. */
 export interface Box {

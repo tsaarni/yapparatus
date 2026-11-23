@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { parseHTML } from "linkedom";
 import { type ChartFont, quadsOverlap, textBox, textQuads } from "../../../src/chart/text-box.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 
 /** Half an em per character, and 0.6 em for tabular digits. */
 const measure: Measure = (text, font) => text.length * font.size * (font.tabular ? 0.6 : 0.5);

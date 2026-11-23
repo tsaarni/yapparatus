@@ -3,6 +3,8 @@
  * Paint values are written in and text is glyph outlines, so a rasterizer needs no fonts or styles.
  */
 
+import type { Measure } from "../figure/font.ts";
+import { legend, legendLayout, type Picture, type PictureFonts } from "../figure/picture.ts";
 import { type Align, textLine } from "./compile/text.ts";
 import {
   type CompiledDiagram,
@@ -13,18 +15,9 @@ import {
   type TextLine,
 } from "./drawing.ts";
 import { type Rect, union } from "./geometry.ts";
-import { badge, corner, defaultMetrics, type FontSpec, iconGrid, type Measure } from "./metrics.ts";
+import { badge, corner, defaultMetrics, iconGrid } from "./metrics.ts";
 import * as shape from "./outlines.ts";
 import { categories, frameLook, haloWidth, type Paint, type RolePaint, roles } from "./paint.ts";
-
-/** Text as glyph outlines: path data for text that starts at x with its central baseline at y. */
-export type TextOutline = (text: string, font: FontSpec, x: number, y: number) => string;
-
-/** How the picture draws text: the widths, and the outlines. */
-export interface PictureFonts {
-  measure: Measure;
-  outline: TextOutline;
-}
 
 /** Options of `pictureOf`. */
 export interface PictureOptions {
@@ -32,25 +25,10 @@ export interface PictureOptions {
   ids?: boolean;
 }
 
-/** A drawn picture: the SVG text and its size. */
-export interface Picture {
-  svg: string;
-  /** The picture's size in CSS pixels: the drawing, and the legend under it. */
-  width: number;
-  height: number;
-}
-
 const m = defaultMetrics;
 
-/** The legend under the drawing, as the web app's legend buttons are laid out. */
-const legend = {
-  marginTop: 12,
-  height: 28,
-  padX: 8,
-  gap: 4,
-  swatch: { width: 14, height: 10, border: 1.5, radius: 3 },
-  font: { family: m.sans, size: 12, weight: 500 },
-};
+/** The legend's swatch border: a diagram category has an ink edge around its fill. */
+const swatchBorder = 1.5;
 
 const n = (value: number) => Math.round(value * 100) / 100;
 const xml = (text: string) =>
@@ -444,47 +422,34 @@ function legendOf(
   color: Paint["colors"],
 ): { svg: string; height: number } {
   const { swatch } = legend;
-  let x = vb.x;
-  let y = vb.y + vb.height + legend.marginTop;
-  const out: string[] = [];
-  for (const entry of diagram.legend) {
-    const words = fonts.measure(entry.name, legend.font);
-    const width = legend.padX * 2 + swatch.width + legend.gap + words;
-    if (x > vb.x && x + width > vb.x + vb.width) {
-      x = vb.x;
-      y += legend.height + legend.gap;
-    }
-    const middle = y + legend.height / 2;
+  const names = diagram.legend.map((entry) => entry.name);
+  const { places, height } = legendLayout(names, vb.width, m.sans, fonts.measure);
+  const top = vb.y + vb.height;
+  const inset = swatchBorder / 2;
+  const out = diagram.legend.map((entry, i) => {
+    const place = places[i] as (typeof places)[number];
+    const middle = top + place.middle;
     const slot = categories[entry.slot - 1];
-    const inset = swatch.border / 2;
-    out.push(
+    return (
       rect(
         {
-          x: x + legend.padX + inset,
+          x: vb.x + place.swatchX + inset,
           y: middle - swatch.height / 2 + inset,
-          width: swatch.width - swatch.border,
-          height: swatch.height - swatch.border,
+          width: swatch.width - swatchBorder,
+          height: swatch.height - swatchBorder,
         },
         swatch.radius - inset,
         {
           fill: slot ? color[slot.fill] : "none",
           stroke: slot ? color[slot.ink] : color.borderControl,
-          "stroke-width": swatch.border,
+          "stroke-width": swatchBorder,
         },
       ) +
-        text(
-          {
-            text: entry.name,
-            x: x + legend.padX + swatch.width + legend.gap,
-            y: middle,
-            ...{ size: legend.font.size, weight: legend.font.weight },
-            align: "start",
-          },
-          color.textMuted,
-        ),
+      text(
+        { text: entry.name, x: vb.x + place.wordsX, y: middle, ...legend.font, align: "start" },
+        color.textMuted,
+      )
     );
-    x += width + legend.gap;
-  }
-  const height = y + legend.height - (vb.y + vb.height);
+  });
   return { svg: `<g data-layer="legend">${out.join("")}</g>`, height };
 }

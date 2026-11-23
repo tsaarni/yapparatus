@@ -11,7 +11,7 @@ import type { ChartPaint } from "../../../src/chart/paint.ts";
 import { oklabRamp } from "../../../src/chart/ramp.ts";
 import type { ChartSpec, Row } from "../../../src/chart/spec.ts";
 import { quadsOverlap } from "../../../src/chart/text-box.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 
 /** Wide enough for Inter: 0.55 em per character, 0.6 em for tabular digits. */
 const measure: Measure = (text, font) => text.length * font.size * (font.tabular ? 0.6 : 0.55);

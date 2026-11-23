@@ -8,5 +8,5 @@
     "outDir": "../../.cache/tsc/chart",
     "tsBuildInfoFile": "../../.cache/tsc/chart.tsbuildinfo"
   },
-  "references": [{ "path": "../document" }, { "path": "../diagram" }]
+  "references": [{ "path": "../document" }, { "path": "../figure" }]
 }

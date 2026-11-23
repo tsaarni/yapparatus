@@ -223,7 +223,7 @@ function collectSteps(children: ReactNode): StepItem[] {
 
 /** Scroll a sideways-scrolling figure so its focused elements are visible. */
 function revealFocused(marker: string) {
-  const svg = document.querySelector(`svg[data-diagram="${CSS.escape(marker)}"]`);
+  const svg = document.querySelector(`svg[data-figure="${CSS.escape(marker)}"]`);
   const scroller = svg?.closest<HTMLElement>(".figure-scroll");
   if (!svg || !scroller || scroller.scrollWidth <= scroller.clientWidth) return;
   const boxes = [...svg.querySelectorAll("[data-state=focus]")].map((e) =>

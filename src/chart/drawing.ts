@@ -2,7 +2,8 @@
  * Drawing a chart with Plot, the same in a browser and on the server: twice, with margins, height,
  * and colors from the first drawing, painted, and the problems the drawing shows.
  */
-import type { Measure } from "../diagram/metrics.ts";
+import { categoryCount, firstUseOrder, tooManyCategories } from "../figure/categories.ts";
+import type { Measure } from "../figure/font.ts";
 import { bandHeight, figureOptions, widthHeight } from "./figure.ts";
 import { isWarningSign, labelsOf } from "./labels.ts";
 import { type ChartLegend, repeatsAxis } from "./legend.ts";
@@ -12,7 +13,6 @@ import { type ChartPaint, paintDrawing } from "./paint.ts";
 import {
   type ChartProblem,
   type ChartSpec,
-  firstUseOrder,
   type PlotLibrary,
   type Row,
   thrownProblem,
@@ -70,15 +70,10 @@ function warningProblem(warning: string): ChartProblem {
 }
 
 /** More categories than colors, as a problem: the categories after the colors are muted. */
-function categoryProblem(domain: unknown[], paint: ChartPaint): ChartProblem[] {
-  const count = paint.categories.length;
-  if (domain.length <= count) return [];
-  return [
-    {
-      code: "TOO_MANY_CATEGORIES",
-      message: `The colors name ${domain.length} categories: ${domain.slice(0, 8).join(", ")}${domain.length > 8 ? ", …" : ""}. A chart has ${count} category colors, so the rest are drawn muted. Give fill or stroke a column with fewer categories, or split the chart with fx.`,
-    },
-  ];
+function categoryProblem(domain: unknown[]): ChartProblem[] {
+  if (domain.length <= categoryCount) return [];
+  const advice = "Give fill or stroke a column with fewer categories, or split the chart with fx.";
+  return [{ code: "TOO_MANY_CATEGORIES", message: tooManyCategories(domain, advice) }];
 }
 
 /** A category value as the legend names it. */
@@ -114,7 +109,12 @@ export function drawChart(input: ChartInput): ChartDrawing {
     ).value;
     const values = [...(first.scale("color")?.domain ?? [])];
     const amounts = values.length > 0 && values.every((v) => typeof v === "number");
-    const domain = amounts ? [] : firstUseOrder(values, rows);
+    const domain = amounts
+      ? []
+      : firstUseOrder(
+          values,
+          rows.flatMap((row) => Object.values(row)),
+        );
     const range = domain.map((_, i) => paint.categories[i] ?? paint.textMuted);
     const rampPositions = new Map<string, number>();
     const ramp = (t: number) => {
@@ -148,7 +148,7 @@ export function drawChart(input: ChartInput): ChartDrawing {
             }
           : undefined;
     const problems = [
-      ...categoryProblem(domain, paint),
+      ...categoryProblem(domain),
       ...overlaps(labelsOf(svg, font, measure)),
       ...[...new Set(warnings)].map(warningProblem),
     ];

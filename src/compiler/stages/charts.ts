@@ -27,9 +27,9 @@ import {
   rowObjects,
   typeTable,
 } from "../../chart/table.ts";
-import type { Measure } from "../../diagram/metrics.ts";
 import { diagnosticCodes } from "../../document/diagnostic.ts";
 import { type FileAddress, parseFileAddress } from "../../document/file-address.ts";
+import type { Measure } from "../../figure/font.ts";
 import { authorFunction, timedOut, withTimeLimit } from "../author-function.ts";
 import type { ExternalFiles, SourceFile } from "../external-files.ts";
 import { fontExtent, fontMeasure } from "../font-measure.ts";

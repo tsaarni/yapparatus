@@ -1,14 +1,9 @@
-/** Chart plot checks: marks name data columns, no literal colors, categories colored in order. */
+/** Chart plot checks: marks name data columns, and take no literal colors. */
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import * as Plot from "@observablehq/plot";
-import {
-  type ChartProblem,
-  chartLibrary,
-  checkSpec,
-  firstUseOrder,
-} from "../../../src/chart/spec.ts";
+import { type ChartProblem, chartLibrary, checkSpec } from "../../../src/chart/spec.ts";
 
 test("marks name columns of their data and take no literal colors", () => {
   const rows = [{ Month: 1, Service: "Search" }];
@@ -32,13 +27,4 @@ test("plot returns marks and position scales only", () => {
     /"width", "color"/,
   );
   assert.equal(checkSpec([])[0]?.code, "CHART_OPTION");
-});
-
-test("categories take colors in the order the rows first use them", () => {
-  const rows = [{ s: "Search" }, { s: "Checkout" }, { s: "Search" }];
-  assert.deepEqual(firstUseOrder(["Checkout", "Other", "Search"], rows), [
-    "Search",
-    "Checkout",
-    "Other",
-  ]);
 });

@@ -20,7 +20,7 @@ test("a diagram's picture is a PNG at twice the drawing's size", async ({ page, 
   expect(response.headers()["content-type"]).toBe("image/png");
   const size = pngSize(await response.body());
   await page.goto("/first-page");
-  const viewBox = await page.locator("#fixture-flow svg[data-diagram]").getAttribute("viewBox");
+  const viewBox = await page.locator("#fixture-flow svg[data-figure]").getAttribute("viewBox");
   const [, , width = 0, height = 0] = (viewBox ?? "").split(" ").map(Number);
   expect(size).toEqual({ width: Math.round(width * 2), height: Math.round(height * 2) });
 });

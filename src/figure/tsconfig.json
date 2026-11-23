@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ESNext"],
+    "types": [],
+    "outDir": "../../.cache/tsc/figure",
+    "tsBuildInfoFile": "../../.cache/tsc/figure.tsbuildinfo"
+  },
+  "references": []
+}

@@ -1,18 +1,7 @@
 /**
  * Measurements the compiler and the renderer share: fonts, metrics, and shape sizes.
  */
-
-/** A font as the measurer sees it: CSS family, size in units, and weight. */
-export interface FontSpec {
-  family: string;
-  size: number;
-  weight: number;
-  /** Digits all as wide, as CSS `font-variant-numeric: tabular-nums` sets them. */
-  tabular?: boolean;
-}
-
-/** Text width, injected: the server measures with the font files, tests use a fixed advance. */
-export type Measure = (text: string, font: FontSpec) => number;
+import type { Measure } from "../figure/font.ts";
 
 /** The icons a diagram may draw: each one's markup on the icon grid, and every name. */
 export interface IconSet {

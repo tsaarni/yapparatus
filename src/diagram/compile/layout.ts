@@ -3,6 +3,7 @@
  * lazy and memoized, so declaration order never matters; a real cycle is reported with its chain.
  */
 
+import type { Measure } from "../../figure/font.ts";
 import {
   type Align,
   Edge,
@@ -16,7 +17,7 @@ import {
   toExpr,
 } from "../elements.ts";
 import { anchorOf, inflate, portOf, type Rect, round, union, type Vec } from "../geometry.ts";
-import { enclosure, fragment, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { enclosure, fragment, type Metrics, shapes, tab } from "../metrics.ts";
 import { room, stackRoom } from "../outlines.ts";
 import type { Scene } from "../scene.ts";
 import { createRecords } from "./records.ts";

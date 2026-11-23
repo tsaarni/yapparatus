@@ -98,7 +98,7 @@ test("frames keep their look without a role; step-only frames and enclosures sho
     await expect(outline).toHaveCSS("stroke", await style(box, "stroke"));
     await expect(outline).toHaveCSS("fill", "none");
   }
-  const tab = flow.locator("svg[data-diagram] > g:last-child > path");
+  const tab = flow.locator("svg[data-figure] > g:last-child > path");
   await expect(tab).toHaveCSS("fill", await style(box, "fill"));
   await expect(tab).toHaveCSS("stroke", await style(box, "stroke"));
   await expect(tab).toHaveCSS("stroke-width", "1px");

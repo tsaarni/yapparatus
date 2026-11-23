@@ -246,22 +246,3 @@ export function runPlot(
   problems.push(...shape, ...(shape.length ? [] : stackProblems(spec)));
   return { spec, problems };
 }
-
-/**
- * Category values in the order the rows first use them, as diagrams give categories their
- * colors. Values no row holds, such as a transform's output, keep their place after them.
- */
-export function firstUseOrder(domain: unknown[], rows: Row[]): unknown[] {
-  const first = new Map<string, number>();
-  rows.forEach((row, i) => {
-    for (const value of Object.values(row)) {
-      const key = String(value);
-      if (!first.has(key)) first.set(key, i);
-    }
-  });
-  const at = (value: unknown) => first.get(String(value)) ?? Number.POSITIVE_INFINITY;
-  return domain
-    .map((value, i) => ({ value, i }))
-    .sort((a, b) => at(a.value) - at(b.value) || a.i - b.i)
-    .map(({ value }) => value);
-}

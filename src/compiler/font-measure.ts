@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import path from "node:path";
 import * as fontkit from "fontkit";
-import type { FontSpec, Measure } from "../diagram/metrics.ts";
+import type { FontSpec, Measure } from "../figure/font.ts";
 
 /** The stylesheets `src/web/main.tsx` imports. A test checks that the two lists agree. */
 export const fontStylesheets = [

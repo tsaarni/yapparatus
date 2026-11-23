@@ -2,6 +2,7 @@
  * Edges: routes, curves, loops, endpoints snapped to outlines, arrowheads, and labels.
  */
 
+import type { Measure } from "../../figure/font.ts";
 import type { CompiledEdge, CompiledHead, CompiledLabel } from "../drawing.ts";
 import {
   type Edge,
@@ -27,7 +28,7 @@ import {
   sideExit,
   type Vec,
 } from "../geometry.ts";
-import { corner, edgeLabel, type Measure, type Metrics, selfLoop } from "../metrics.ts";
+import { corner, edgeLabel, type Metrics, selfLoop } from "../metrics.ts";
 import { attachment } from "../outlines.ts";
 import type { Layout } from "./layout.ts";
 import { type Report, textLine } from "./text.ts";

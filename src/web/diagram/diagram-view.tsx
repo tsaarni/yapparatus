@@ -41,7 +41,7 @@ export function DiagramView({
 }) {
   if (!diagram.ok)
     return (
-      <div data-diagram={marker} role="img" aria-label={title} {...stylex.props(styles.failed)}>
+      <div data-figure={marker} role="img" aria-label={title} {...stylex.props(styles.failed)}>
         This diagram could not be drawn. See the errors below.
       </div>
     );
@@ -66,7 +66,7 @@ export function DiagramView({
     name !== undefined && Object.hasOwn(diagram.icons, name) ? diagram.icons[name] : undefined;
   return (
     <svg
-      data-diagram={marker}
+      data-figure={marker}
       viewBox={`${vb.x} ${vb.y} ${vb.width} ${vb.height}`}
       width={vb.width}
       height={vb.height}

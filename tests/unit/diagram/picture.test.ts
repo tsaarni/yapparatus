@@ -8,8 +8,8 @@ import { fontMeasure, textOutline } from "../../../src/compiler/font-measure.ts"
 import { lightPaint } from "../../../src/compiler/theme-values.ts";
 import type { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compileFigure, type Figure } from "../../../src/diagram/figure.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
 import { type PictureOptions, pictureOf } from "../../../src/diagram/picture.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 const lightColors = lightPaint.colors;

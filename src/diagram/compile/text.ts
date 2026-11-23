@@ -2,10 +2,11 @@
  * Text: measuring labels, wrapping them, and placing lines in the fonts the compiler chose.
  */
 import type { DiagnosticCode } from "../../document/diagnostic.ts";
+import type { FontSpec, Measure } from "../../figure/font.ts";
 import type { TextLine } from "../drawing.ts";
 import type { Node, Shape } from "../elements.ts";
 import { round } from "../geometry.ts";
-import { type FontSpec, fontsOf, type Measure, type Metrics, shapes, tab } from "../metrics.ts";
+import { fontsOf, type Metrics, shapes, tab } from "../metrics.ts";
 import { room } from "../outlines.ts";
 import type { Icons } from "./icons.ts";
 

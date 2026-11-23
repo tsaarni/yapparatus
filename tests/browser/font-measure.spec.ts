@@ -7,8 +7,9 @@ import { fontMeasure } from "../../src/compiler/font-measure.ts";
 import { lucideIcons } from "../../src/compiler/lucide-icons.ts";
 import { DiagramBuilder } from "../../src/diagram/builder.ts";
 import { compile } from "../../src/diagram/compile/compile.ts";
-import { type FontSpec, type Measure, defaultMetrics as m } from "../../src/diagram/metrics.ts";
+import { defaultMetrics as m } from "../../src/diagram/metrics.ts";
 import { Scene } from "../../src/diagram/scene.ts";
+import type { FontSpec, Measure } from "../../src/figure/font.ts";
 import { examplePages, examples } from "../unit/diagram/examples.ts";
 
 test.use({ launchOptions: { args: ["--font-render-hinting=none"] } });

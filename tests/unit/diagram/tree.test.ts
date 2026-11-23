@@ -6,9 +6,9 @@ import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
 import { expand, stepFocus } from "../../../src/diagram/drawing.ts";
 import type { Node } from "../../../src/diagram/elements.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
 import type { TreeLayout } from "../../../src/diagram/tree.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */

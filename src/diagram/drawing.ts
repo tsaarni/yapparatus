@@ -6,18 +6,12 @@
 import type { Diagnostic, HeadKind, Role, Shape } from "./elements.ts";
 import type { Rect, Vec } from "./geometry.ts";
 
-/**
- * Categories a figure can color. Beyond four, readers with red-green color blindness can no
- * longer tell every pair apart, and everyone else must keep matching colors to the legend.
- */
-export const maxCategories = 4;
-
 /** A category in a figure's legend: its words, its color slot, and the elements that have it. */
 export interface LegendEntry {
   name: string;
   /** For steps: `<Step focus="new">` focuses every element in the category "New". */
   id: string;
-  /** 1 to maxCategories: which category color it has. */
+  /** 1 to the category count: which category color it has. */
   slot: number;
   elements: string[];
 }

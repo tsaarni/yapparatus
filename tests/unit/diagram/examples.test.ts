@@ -7,9 +7,9 @@ import { test } from "node:test";
 import { lucideIcons } from "../../../src/compiler/lucide-icons.ts";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
-import type { Measure } from "../../../src/diagram/metrics.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
 import { diagnosticCodes } from "../../../src/document/diagnostic.ts";
+import type { Measure } from "../../../src/figure/font.ts";
 import { examples, examplePages as pages } from "./examples.ts";
 
 const measure: Measure = (text) => text.length * 7;

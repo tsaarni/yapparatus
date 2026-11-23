@@ -15,7 +15,7 @@ import { type ChartData, rowObjects } from "../../chart/table.ts";
 import { diagnosticCodes } from "../../document/diagnostic.ts";
 import { FigureFrame } from "../components/figure.tsx";
 import { Diagnostics } from "../components/figure-diagnostics.tsx";
-import { Button } from "../controls/button.tsx";
+import { FigureLegend } from "../components/figure-legend.tsx";
 import { useChartReport } from "../live/reporters.ts";
 import { styled } from "../style/styled.ts";
 import { fontSize, fontWeight, radius, sizes, space, theme } from "../style/theme.stylex.ts";
@@ -194,9 +194,10 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
     error ? unloaded.map((p) => ({ ...p, ...(id ? { target: id } : {}) })) : undefined,
   );
 
+  const categoryEntries = drawn?.legend?.kind === "categories" ? drawn.legend.entries : [];
   const label = caption ?? "Chart";
   const body = (
-    <div ref={host} data-diagram={marker} {...styled("chart", s.chart)}>
+    <div ref={host} data-figure={marker} {...styled("chart", s.chart)}>
       <div
         ref={canvas}
         role="img"
@@ -204,24 +205,14 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
         {...stylex.props(s.canvas, !!fallback && s.stale, !drawn && s.pending)}
       />
       {drawn?.legend?.kind === "categories" && (
-        <ul aria-label="Legend" {...stylex.props(s.legend)}>
-          {drawn.legend.entries.map((entry, i) => (
-            <li key={entry.value}>
-              <Button
-                variant="ghost"
-                size="small"
-                title="Highlight this category"
-                onMouseEnter={() => setPreview(entry.color)}
-                onMouseLeave={() => setPreview(undefined)}
-                onFocus={() => setPreview(entry.color)}
-                onBlur={() => setPreview(undefined)}
-              >
-                <span {...stylex.props(s.swatch, swatches()[i] ?? s.swatchMuted)} />
-                {entry.value}
-              </Button>
-            </li>
-          ))}
-        </ul>
+        <FigureLegend
+          entries={drawn.legend.entries.map((entry, i) => ({
+            key: entry.value,
+            name: entry.value,
+            swatch: [swatches()[i] ?? s.swatchMuted],
+          }))}
+          preview={(key) => setPreview(categoryEntries.find((e) => e.value === key)?.color)}
+        />
       )}
       {drawn?.legend?.kind === "ramp" && (
         <div
@@ -297,13 +288,6 @@ const s = stylex.create({
     marginTop: space.md,
     padding: 0,
     listStyle: "none",
-  },
-  swatch: {
-    display: "inline-block",
-    flexShrink: 0,
-    width: 14,
-    height: 10,
-    borderRadius: radius.sm,
   },
   swatch1: { backgroundColor: theme.category1 },
   swatch2: { backgroundColor: theme.category2 },
