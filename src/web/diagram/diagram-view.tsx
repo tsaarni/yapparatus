@@ -1,19 +1,147 @@
 /**
- * The SVG of a compiled diagram: its elements in drawing order, and the debug layer.
+ * The SVG of a compiled diagram: the drawing that pictures also use, with each element's state,
+ * colors, and address added, and the debug layer.
  */
 
 import * as stylex from "@stylexjs/stylex";
-import type { KeyboardEvent, MouseEvent } from "react";
+import { createElement, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import type { CompiledDiagram, ElementState } from "../../diagram/drawing.ts";
 import { minScale } from "../../diagram/metrics.ts";
 import { outline } from "../../diagram/outlines.ts";
+import { type ColorToken, colorTokens } from "../../diagram/paint.ts";
+import {
+  type DiagramPaint,
+  drawDiagram,
+  isText,
+  type Layer,
+  type SvgAttributes,
+  type SvgNode,
+  type SvgText,
+} from "../../diagram/render.ts";
 import { diagnosticCodes } from "../../document/diagnostic.ts";
-import { fontSize, space, theme } from "../style/theme.stylex.ts";
-import { EdgeView, EnclosureView, FrameView } from "./edge-view.tsx";
-import { interactive } from "./element.tsx";
-import { CellWarning, NodeView, Pin, RecordOutline } from "./node-view.tsx";
+import { styled } from "../style/styled.ts";
+import { dash, fontSize, space, stroke, theme } from "../style/theme.stylex.ts";
+import {
+  categoryStyle,
+  elementStyles,
+  interactive,
+  roleStyle,
+  stateStyle,
+  targetFor,
+} from "./element.tsx";
 
 const dev = import.meta.env.DEV;
+
+/**
+ * The web app's paint: theme variables, and each element's colors from the custom properties
+ * its role and category set, so a theme switch or a pointed-at element needs no new drawing.
+ */
+const paint: DiagramPaint = {
+  colors: Object.fromEntries(
+    colorTokens.map((token) => [token, theme[token]]),
+  ) as unknown as Record<ColorToken, string>,
+  stroke,
+  dash,
+  background: `var(--figure-bg, ${theme.surface})`,
+  ink: () => ({
+    ink: "var(--ink)",
+    fill: "var(--fill)",
+    label: `var(--label, ${theme.text})`,
+    weight: "var(--weight)",
+  }),
+  boost: (weight) => `calc(${weight} + var(--boost, 0px))`,
+  pointer: { hitWidth: 14, ringWidth: "calc(2 * var(--boost, 0px))" },
+};
+
+/** SVG attribute names as React writes them: `stroke-width` as `strokeWidth`. */
+function reactAttributes(attributes: SvgAttributes): Record<string, string | number> {
+  const out: Record<string, string | number> = {};
+  for (const [name, value] of Object.entries(attributes)) {
+    if (value === undefined) continue;
+    const key = /^(data|aria)-/.test(name)
+      ? name
+      : name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+    out[key] = value;
+  }
+  return out;
+}
+
+/** A line of text, set in the web app's fonts at the position the compiler measured. */
+function TextView({ text }: { text: SvgText }) {
+  const { line } = text;
+  return (
+    <text
+      x={line.x}
+      y={line.y}
+      fontSize={line.size}
+      fontWeight={line.weight}
+      fill={text.fill}
+      {...stylex.props(
+        elementStyles.text,
+        line.mono ? elementStyles.mono : elementStyles.sans,
+        line.align === "start" && elementStyles.start,
+        text.halo && elementStyles.halo,
+      )}
+    >
+      {line.text}
+    </text>
+  );
+}
+
+/** What the web app adds to an element's group in the drawing. */
+interface Context {
+  figure: string | undefined;
+  stateOf: (element: string) => ElementState;
+  button: (element: string) => boolean;
+}
+
+/** The look, the step state, and the address of a group, as attributes and classes. */
+function layerProps(layer: Layer, context: Context) {
+  const state = layer.state === undefined ? undefined : context.stateOf(layer.state);
+  const look = layer.look && [
+    layer.look.frame
+      ? (elementStyles.frameLook as stylex.StyleXStyles)
+      : roleStyle(layer.look.role ?? "default"),
+    categoryStyle(layer.look.category),
+  ];
+  const faded = layer.state !== undefined && [elementStyles.fade, stateStyle(state)];
+  if (layer.target && layer.id) {
+    const target = interactive(
+      layer.id,
+      layer.target.label,
+      context.figure,
+      context.button(layer.id),
+    );
+    return {
+      ...targetFor(target, state),
+      ...styled("diagram-target", elementStyles.target, look, faded),
+    };
+  }
+  const addressed = layer.shape === "enclosure" || layer.shape === "frame";
+  return {
+    ...(addressed && layer.id ? { "data-element-id": layer.id } : {}),
+    ...(layer.state !== undefined ? targetFor(undefined, state) : {}),
+    ...(layer.decor ? { "aria-hidden": true } : {}),
+    ...stylex.props(look, layer.decor && styles.passThrough, faded),
+  };
+}
+
+/** A node of the drawing as a React element. */
+function view(node: SvgNode, key: number, context: Context): ReactNode {
+  if (isText(node)) return <TextView key={key} text={node} />;
+  const props = {
+    key,
+    ...reactAttributes(node.attributes),
+    ...(node.layer ? layerProps(node.layer, context) : {}),
+  };
+  if (node.markup !== undefined)
+    return createElement(node.tag, { ...props, dangerouslySetInnerHTML: { __html: node.markup } });
+  return createElement(
+    node.tag,
+    props,
+    node.children?.map((child, i) => view(child, i, context)),
+  );
+}
 
 /** A compiled diagram as SVG, with each element's state and the handlers for stepping. */
 export function DiagramView({
@@ -53,17 +181,10 @@ export function DiagramView({
         )
       : [],
   );
-  const passive = diagram.edges.filter((e) => e.passive);
-  const active = diagram.edges.filter((e) => !e.passive);
-  const element = (id: string, label: string) => ({
-    state: stateOf(id),
-    target: interactive(id, label, figure, dev || stepped(id)),
-  });
-  const decoration = (state: ElementState) => (state && state !== "focus" ? { state } : {});
   const anyStepped = [...diagram.nodes, ...diagram.edges].some((p) => stepped(p.id));
-  const clip = `clip${marker.replace(/[^a-zA-Z0-9]/g, "")}`;
-  const iconOf = (name: string | undefined) =>
-    name !== undefined && Object.hasOwn(diagram.icons, name) ? diagram.icons[name] : undefined;
+  const idPrefix = `clip${marker.replace(/[^a-zA-Z0-9]/g, "")}`;
+  const context: Context = { figure, stateOf, button: (id) => dev || stepped(id) };
+  const drawn = drawDiagram(diagram, paint, { flagged, idPrefix });
   return (
     <svg
       data-figure={marker}
@@ -80,66 +201,7 @@ export function DiagramView({
         stale && styles.stale,
       )}
     >
-      {diagram.frames.map((frame) => (
-        <FrameView key={frame.id} frame={frame} layer="outline" state={stateOf(frame.id)} />
-      ))}
-      {diagram.enclosures.map((e) => (
-        <EnclosureView key={e.id} enclosure={e} state={stateOf(e.id)} />
-      ))}
-      {passive.map((edge) => (
-        <EdgeView key={edge.id} edge={edge} flagged={false} />
-      ))}
-      {active.map((edge) => (
-        <EdgeView
-          key={edge.id}
-          edge={edge}
-          flagged={flagged.has(edge.id)}
-          {...element(edge.id, edge.ariaLabel)}
-        />
-      ))}
-      {diagram.nodes.map((node) => (
-        <NodeView
-          key={node.id}
-          node={node}
-          icon={iconOf(node.icon?.name)}
-          flagged={flagged.has(node.id)}
-          clip={clip}
-          {...(node.passive
-            ? decoration(node.follows ? stateOf(node.follows) : undefined)
-            : element(node.id, node.label))}
-        />
-      ))}
-      {diagram.nodes
-        .filter((node) => node.rules)
-        .map((node) => (
-          <RecordOutline
-            key={`${node.id}-outline`}
-            node={node}
-            flagged={flagged.has(node.id)}
-            state={stateOf(node.id)}
-          />
-        ))}
-      {diagram.nodes.map(
-        (node) =>
-          node.shape === "cell" &&
-          node.role === "warning" && (
-            <CellWarning key={`${node.id}-warning`} node={node} state={stateOf(node.id)} />
-          ),
-      )}
-      {diagram.nodes.map(
-        (node) =>
-          node.pin !== undefined && (
-            <Pin key={`${node.id}-pin`} node={node} state={stateOf(node.id)} />
-          ),
-      )}
-      {diagram.frames.map((frame) => (
-        <FrameView
-          key={`${frame.id}-labels`}
-          frame={frame}
-          layer="labels"
-          state={stateOf(frame.id)}
-        />
-      ))}
+      {drawn.map((node, i) => view(node, i, context))}
       {debug && <DebugLayer diagram={diagram} />}
     </svg>
   );
@@ -184,6 +246,8 @@ const styles = stylex.create({
   },
   minWidth: (width: number) => ({ minWidth: `${width}px` }),
   stale: { opacity: 0.35, filter: "grayscale(1)" },
+  /** A layer that only paints: the pointer reaches the element under it. */
+  passThrough: { pointerEvents: "none" },
   failed: {
     padding: space.xl,
     color: theme.error,

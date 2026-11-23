@@ -143,8 +143,9 @@ test("the picture is well formed and draws every shape the figure has", () => {
   assert.match(svg, new RegExp(`fill="${lightColors.category1Surface}"`));
   assert.match(svg, new RegExp(`fill="${lightColors.warning}"`));
   assert.match(svg, /stroke-dasharray="5 4"/);
-  assert.match(svg, /<clipPath id="clip0">/);
-  assert.match(svg, /clip-path="url\(#clip0\)"/);
+  const clip = /<clipPath id="(clip-[^"]+)">/.exec(svg)?.[1];
+  assert.ok(clip, "a record with cells clips them");
+  assert.match(svg, new RegExp(`clip-path="url\\(#${clip}\\)"`));
   assert.match(svg, /stroke-dasharray="2 3"/);
   assert.match(svg, /stroke-width="5"[^>]*\/><path d="M[\d.]+ [\d.]+h3"/);
   assert.match(svg, /<g data-layer="legend">/);
@@ -190,7 +191,7 @@ test("a box's icon draws in its label's color, and an icon shape's in its ink, a
   assertWellFormed(svg);
   const icons = [
     ...svg.matchAll(
-      /<svg x="([\d.]+)" y="([\d.]+)" width="(\d+)" height="(\d+)" viewBox="0 0 24 24" color="([^"]+)">(.*?)<\/svg>/g,
+      /<svg x="([\d.]+)" y="([\d.]+)" width="(\d+)" height="(\d+)" viewBox="0 0 24 24" color="([^"]+)" overflow="visible" aria-hidden="true">(.*?)<\/svg>/g,
     ),
   ];
   assert.deepEqual(

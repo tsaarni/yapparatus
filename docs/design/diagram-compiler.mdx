@@ -542,9 +542,9 @@ Every browser downloads the compiled diagrams of a page with its JavaScript, so 
 
 A picture is a PNG of a diagram that the server draws for the agent. The agent asks for it with [`savePicture`](agent-library#savepicture), through [the figures resource](rest-api#read-a-picture), and [the server](server#pictures) draws it from the compiled diagram of the page as it is on disk. <Ref to="dc-picture" /> shows how.
 
-<Diagram id="dc-picture" caption="How the server draws a picture: an SVG from the compiled diagram, then a PNG by resvg." draw={(d) => {
+<Diagram id="dc-picture" caption="How the server draws a picture: the drawing of the compiled diagram written as SVG, then a PNG by resvg." draw={(d) => {
   const compiled = d.box("Compiled diagram", { id: "compiled" })
-  const svg = d.box("SVG writer", { sub: "no fonts, no stylesheets", id: "svg" })
+  const svg = d.box("Drawing", { sub: "written as SVG", id: "svg" })
   const resvg = d.box("resvg", { sub: "2 pixels per unit", id: "resvg" })
   const png = d.box("PNG", { role: "accent", id: "png" })
   d.equalSize([compiled, svg, resvg, png])
@@ -559,7 +559,7 @@ A picture is a PNG of a diagram that the server draws for the agent. The agent a
   d.arrow(glyphs, svg)
 }} />
 
-The SVG writer writes one SVG document that needs no fonts and no stylesheets. It draws the same layers in the same order as the web app, with the same shape outlines, and adds a legend below. An icon is a nested `svg` element at the icon's rectangle, with the icon grid as its view box and a color as its `color`: the label's on a box, and the element's ink on an icon shape, as an actor's figure. The markup's `currentColor` takes that color, and its stroke widths scale with the icon. resvg draws it as a browser does. The picture shows the diagram with no step open. It paints each role and category with the same theme tokens as the web app, resolved to the light theme's values, so every agent gets the same picture. Text is drawn as glyph outlines from the web app's font files, so it is exactly as wide as the compiler measured it.
+The web app and the picture draw a compiled diagram with one drawing: a tree of SVG elements in the layers of the web app, with each element's group marked with its id, the element whose step state it takes, and whether the reader can point at it. A paint gives the drawing its values. The web app's paint is the theme's variables, so each element takes its colors from the custom properties of its role and category, and its lines grow when the reader points at it. The web app also draws the wide hit areas of lines, adds each element's address and step state to its group, and sets text in its fonts. The picture's paint is the light theme's values, and the picture writes the drawing as one SVG document that needs no fonts and no stylesheets, and adds a legend below. An icon is a nested `svg` element at the icon's rectangle, with the icon grid as its view box and a color as its `color`: the label's on a box, and the element's ink on an icon shape, as an actor's figure. The markup's `currentColor` takes that color, and its stroke widths scale with the icon. resvg draws it as a browser does. The picture shows the diagram with no step open. It paints each role and category with the same theme tokens as the web app, resolved to the light theme's values, so every agent gets the same picture. Text is drawn as glyph outlines from the web app's font files, so it is exactly as wide as the compiler measured it.
 
 With the `ids` option, the picture also writes each element's id beside it and outlines the elements that diagnostics name. The server passes the SVG to resvg at two pixels per unit, so that small text stays legible to a model.
 
@@ -574,6 +574,8 @@ A draw program is JavaScript, and the compiler checks every call when it runs. A
 An element's id never comes from its variable. Graphviz, Mermaid, and D2 name a node by an identifier, and authors expect the same here, but a variable is a name in code: it changes in a refactoring, it may be camelCase, which ids do not allow, and the address a reader comments on would then depend on it. One rule, the `id` option or else the label, keeps every id visible in the call that makes the element. Authors still write a variable in a step when an example's variables and ids are the same word, so the examples in the diagram reference give their elements variables that differ from their ids.
 
 Diagrams compile on the server, so their diagnostics are known as soon as the page compiles, and a build carries data instead of programs. The cost is that the server measures text from the font files.
+
+The web app and the picture share one drawing, so a change to a shape changes both, and the picture cannot drift from what readers see.
 
 Pictures are drawn by resvg inside the server process. A headless browser would draw the web app's own SVG exactly, but it is a large dependency and takes seconds to start for one image.
 

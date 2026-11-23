@@ -4,10 +4,10 @@
  */
 
 import * as stylex from "@stylexjs/stylex";
-import type { ElementState, TextLine } from "../../diagram/drawing.ts";
+import type { ElementState } from "../../diagram/drawing.ts";
 import type { Role } from "../../diagram/elements.ts";
 import { elementSeparator } from "../../document/address.ts";
-import { dash, duration, stroke, theme, when } from "../style/theme.stylex.ts";
+import { duration, stroke, theme, when } from "../style/theme.stylex.ts";
 
 /**
  * Diagram elements are targets: a namespaced DOM id (`figure--element`) makes them linkable.
@@ -59,33 +59,6 @@ export function targetFor(target: Target | undefined, state: ElementState) {
   return state === "hidden" || state === "absent"
     ? { ...target, ...marked, tabIndex: -1, "aria-hidden": true }
     : { ...target, ...marked };
-}
-
-/** Text exactly as the compiler measured it: its size, weight, and position. */
-export function Line({ line, halo = false }: { line: TextLine; halo?: boolean }) {
-  return (
-    <text
-      x={line.x}
-      y={line.y}
-      fontSize={line.size}
-      fontWeight={line.weight}
-      {...stylex.props(
-        elementStyles.text,
-        line.mono ? elementStyles.mono : elementStyles.sans,
-        line.align === "start" && elementStyles.start,
-        line.muted && elementStyles.muted,
-        halo && elementStyles.halo,
-      )}
-    >
-      {line.text}
-    </text>
-  );
-}
-
-/** An element's text lines, as the compiler measured them. */
-export function Lines({ lines }: { lines: TextLine[] }) {
-  // biome-ignore lint/suspicious/noArrayIndexKey: Lines are positional.
-  return lines.map((line, i) => <Line key={i} line={line} />);
 }
 
 /**
@@ -199,27 +172,19 @@ export const elementStyles = stylex.create({
     "--label": theme.textMuted,
     "--weight": stroke.hairline,
   },
-  dashed: { strokeDasharray: dash.dashed },
+  /** Text sets its color as an attribute, from the drawing. */
   text: {
-    fill: `var(--label, ${theme.text})`,
     textAnchor: "middle",
     dominantBaseline: "central",
   },
   sans: { fontFamily: theme.sans },
   mono: { fontFamily: theme.mono },
   start: { textAnchor: "start" },
-  muted: { fill: theme.textMuted },
   /** A halo in the figure's own color keeps text readable over lines. */
   halo: {
     paintOrder: "stroke",
     stroke: `var(--figure-bg, ${theme.surface})`,
     strokeWidth: 5,
     strokeLinejoin: "round",
-  },
-  flag: {
-    fill: "none",
-    stroke: theme.warning,
-    strokeWidth: stroke.hairline,
-    strokeDasharray: dash.dotted,
   },
 });
