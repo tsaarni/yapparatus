@@ -34,7 +34,7 @@ import { authorFunction, timedOut, withTimeLimit } from "../author-function.ts";
 import type { ExternalFiles, SourceFile } from "../external-files.ts";
 import { fontExtent, fontMeasure } from "../font-measure.ts";
 import { revision } from "../revision.ts";
-import { chartColors, chartType, chartWidth } from "../theme-values.ts";
+import { chartPaint, chartType, chartWidth } from "../theme-values.ts";
 import { codeLanguageOf, contentIssues } from "./conventions.ts";
 import { excerptFiles } from "./excerpts.ts";
 
@@ -109,7 +109,8 @@ function drawingProblems(spec: ChartSpec, rows: Row[], measure: Measure): ChartP
       document: blankDocument(),
       font,
       measure,
-      colors: chartColors,
+      paint: chartPaint,
+      id: "chart",
     }).problems;
   const wide = draw(chartWidth);
   const narrow = draw(phoneWidth).filter(

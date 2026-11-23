@@ -1,6 +1,6 @@
 # Charts
 
-`<Chart>` draws a chart from data with [Observable Plot](https://observablehq.com/plot/). You write the marks. Yapparatus sets the size, fonts, margins, and colors, gives each category a theme color, and reports problems. The data is a table on the page, a block of CSV inside the chart, or a CSV or TSV file in an external directory.
+`<Chart>` draws a chart from data with [Observable Plot](https://observablehq.com/plot/). You write the marks. Yapparatus sets the size, fonts, margins, colors, and look of the marks, and reports problems. The data is a table on the page, a block of CSV inside the chart, or a CSV or TSV file in an external directory.
 
 ## Example
 
@@ -22,7 +22,7 @@
       }),
     ],
     x: { type: "utc" },
-    y: { type: "log", grid: true },
+    y: { type: "log" },
   })}
 />
 ````
@@ -40,6 +40,7 @@ Draw a chart when the reader needs to compare numbers, see a trend, or see how v
 | A change over time | `Plot.lineY`, with `Plot.dot` on measured points |
 | A noisy series as its trend | `Plot.lineY(rows, Plot.windowY({ k: 7 }, { x: "…", y: "…" }))` |
 | Parts of a total over time | `Plot.areaY(rows, { x: "…", y: "…", fill: "…" })`, which stacks |
+| An amount by two categories, such as weekday and hour | `Plot.cell(rows, { x: "…", y: "…", fill: "…" })` with a number `fill`, and `Plot.text` with the same `x`, `y` for the values |
 | Amounts by category | `Plot.barY`, or `Plot.barX` when the labels are long |
 | Amounts per day, week, or month | `Plot.rectY(rows, { x: "…", y: "…", interval: "day" })`, not `Plot.barY` |
 | Single events, such as requests | `Plot.dot` with a time `x`, and `y: { type: "log" }` for latencies |
@@ -79,13 +80,14 @@ An empty cell is `null`. A column that mixes numbers or dates with other text is
 ```js
 plot={(Plot, rows) => ({
   marks: [Plot.barY(rows, { x: "Service", y: "Requests" }), Plot.ruleY([0])],
-  y: { grid: true },
 })}
 ```
 
 - Every mark and transform of Plot works: `Plot.dot(rows, …)`, `Plot.boxY(rows, …)`, `Plot.areaY(rows, …)`, and transforms such as `Plot.groupX`, `Plot.binX`, and `Plot.windowY`. A mark can also take its own array, as `Plot.ruleY([300])` does.
 - A field option names a column exactly as its header is written: `y: "p99 (ms)"`.
-- `plot` may also return `x`, `y`, `fx`, `fy`, and `r`: the options of those scales, such as `{ type: "log" }`, `{ type: "utc" }` for times written with `Z`, `{ grid: true }`, `{ label: "…" }`, `{ ticks: 5 }`, or `{ tickRotate: -30 }`. Use `fx` or `fy` to split a chart into small multiples.
+- `plot` may also return `x`, `y`, `fx`, `fy`, and `r`: the options of those scales, such as `{ type: "log" }`, `{ type: "utc" }` for times written with `Z`, `{ label: "…" }`, `{ ticks: 5 }`, or `{ tickRotate: -30 }`. Use `fx` or `fy` to split a chart into small multiples.
+- Yapparatus sets the look: the height from the data, a grid on the value axis, line widths, dot sizes, rounded bars, and halos on text. Leave out `strokeWidth`, `r`, and `opacity` unless they show data, such as `r` for a column or `fillOpacity` on areas that overlap.
+- `Plot.areaY` with a `fill` column stacks its series, and `Plot.lineY` over the same columns does not, so the lines sit below the areas: a `CHART_STACK` warning. Add `y1: 0` and `fillOpacity: 0.3` to the area to draw each series from zero, or stack the lines with `Plot.lineY(rows, Plot.stackY2({ x: "…", y: "…", stroke: "…" }))`.
 - Tick labels must not overlap, at the page's full width or on a phone: give many or long ones fewer `ticks` or a `tickRotate`, or put long category names on `y`. Overlap is a `CHART_OVERLAP` warning; one that only a phone has names its width.
 - Plot's own warnings, such as dates on a band scale, are `CHART_WARNING`: do what the message says. Bars on dates are `Plot.rectY` with `interval: "day"`, because `Plot.barY` makes each date a category.
 - Draw thousands of rows with a transform, such as `Plot.binX` or `Plot.windowY`: each mark is an element on the page.
@@ -93,7 +95,7 @@ plot={(Plot, rows) => ({
 
 ## Color
 
-- **Set `fill` or `stroke` to a column of categories** to color by it: `stroke: "Service"`. Categories take the theme's four category colors in the order the rows first use them, and a legend under the chart names them.
+- **A column of categories** in `fill` or `stroke`, text or dates, gives each category one of the theme's four category colors, in the order the rows first use them: `stroke: "Service"`. A legend under the chart names them, unless the same column is on a shown axis, as in `Plot.barY(rows, { x: "Language", y: "…", fill: "Language" })`.
 - **Four categories at most.** More are drawn in a muted color and reported. Give `fill` or `stroke` a column with fewer values, or split the chart with `fx`.
-- **Color shows categories, not amounts.** A column of numbers in `fill` or `stroke` becomes one category for each value. Show amounts by position or size, with `y` or `r`.
-- **No literal colors.** `fill: "tomato"` or `stroke: "#f00"` is an error, because colors come from the theme. A mark without `fill` or `stroke` is drawn in the text color.
+- **A column of numbers** in `fill` is an amount: shades of the accent from light to strong, with a legend of the lowest and highest value. Use it for heatmaps with `Plot.cell`.
+- **No literal colors.** `fill: "tomato"` or `stroke: "#f00"` is an error, because colors come from the theme. A mark without `fill` or `stroke` is drawn in the accent color.

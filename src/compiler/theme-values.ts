@@ -6,6 +6,8 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import type { ChartPaint } from "../chart/paint.ts";
+import { oklabRamp } from "../chart/ramp.ts";
 import { colorTokens, type DashToken, type Paint, type StrokeToken } from "../diagram/paint.ts";
 
 /** The same path from src/compiler/ and from the compiled lib/compiler/. */
@@ -81,11 +83,18 @@ export const chartType = {
   weight: Number(themes.fontWeight.regular),
 };
 
-/** A chart's colors in the light theme: its categories, muted, and its text. */
-export const chartColors = {
+/** A chart's paint in the light theme, as literal colors, with a ramp mixed in OKLab. */
+export const chartPaint: ChartPaint = {
   categories: (["category1", "category2", "category3", "category4"] as const).map(
     (token) => lightPaint.colors[token],
   ),
-  muted: lightPaint.colors.textMuted,
-  text: lightPaint.colors.textBody,
+  accent: lightPaint.colors.accent,
+  accentSurface: lightPaint.colors.accentSurface,
+  text: lightPaint.colors.text,
+  textBody: lightPaint.colors.textBody,
+  textMuted: lightPaint.colors.textMuted,
+  rule: lightPaint.colors.borderStrong,
+  grid: lightColor("border"),
+  surface: lightPaint.colors.surface,
+  ramp: oklabRamp(lightPaint.colors.accentSurface, lightPaint.colors.accent),
 };

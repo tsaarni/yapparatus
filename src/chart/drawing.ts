@@ -1,11 +1,14 @@
 /**
- * Drawing a chart with Plot, the same in a browser and on the server: twice, with margins and
- * category colors from the first drawing, and the problems the drawing shows.
+ * Drawing a chart with Plot, the same in a browser and on the server: twice, with margins, height,
+ * and colors from the first drawing, painted, and the problems the drawing shows.
  */
 import type { Measure } from "../diagram/metrics.ts";
+import { bandHeight, figureOptions, widthHeight } from "./figure.ts";
 import { isWarningSign, labelsOf } from "./labels.ts";
-import { fitMargins, type Margins, type PlotDrawing } from "./margins.ts";
+import { type ChartLegend, repeatsAxis } from "./legend.ts";
+import { fitMargins, type Margins, marginsOf, type PlotDrawing } from "./margins.ts";
 import { overlaps } from "./overlaps.ts";
+import { type ChartPaint, paintDrawing } from "./paint.ts";
 import {
   type ChartProblem,
   type ChartSpec,
@@ -15,19 +18,6 @@ import {
   thrownProblem,
 } from "./spec.ts";
 import type { ChartFont } from "./text-box.ts";
-
-/** The colors a chart draws with: one per category in order, then muted, and the text color. */
-export interface ChartColors {
-  categories: readonly string[];
-  muted: string;
-  text: string;
-}
-
-/** A category of the legend and its color. */
-export interface LegendEntry {
-  value: string;
-  color: string;
-}
 
 /** What to draw and how: the marks of `plot`, the rows, the width, and the look. */
 export interface ChartInput {
@@ -39,13 +29,15 @@ export interface ChartInput {
   document: Document;
   font: ChartFont;
   measure: Measure;
-  colors: ChartColors;
+  paint: ChartPaint;
+  /** Prefix of the ids the drawing defines, unique on the page. */
+  id: string;
 }
 
 /** A drawing and its legend, or none when Plot threw, with the problems found while drawing. */
 export interface ChartDrawing {
   svg?: SVGSVGElement;
-  legend: LegendEntry[];
+  legend?: ChartLegend;
   problems: ChartProblem[];
 }
 
@@ -78,8 +70,8 @@ function warningProblem(warning: string): ChartProblem {
 }
 
 /** More categories than colors, as a problem: the categories after the colors are muted. */
-function categoryProblem(domain: unknown[], colors: ChartColors): ChartProblem[] {
-  const count = colors.categories.length;
+function categoryProblem(domain: unknown[], paint: ChartPaint): ChartProblem[] {
+  const count = paint.categories.length;
   if (domain.length <= count) return [];
   return [
     {
@@ -89,19 +81,25 @@ function categoryProblem(domain: unknown[], colors: ChartColors): ChartProblem[]
   ];
 }
 
+/** A category value as the legend names it. */
+const valueText = (value: unknown) =>
+  value instanceof Date ? value.toISOString().slice(0, 10) : String(value);
+
 /**
- * Draw twice: the first drawing's categories and label boxes set the colors and margins of the
- * second. Overlaps, extra categories, and Plot's warnings are problems; Plot's sign goes.
+ * Draw twice: the first drawing's values, scales, and labels set the second's colors, height, and
+ * margins, and it is painted. Overlaps, extra categories, and Plot's warnings are problems.
  */
 export function drawChart(input: ChartInput): ChartDrawing {
-  const { Plot, spec, rows, width, document, font, measure, colors } = input;
-  const options = (color: object, margins?: Margins) =>
+  const { Plot, spec, rows, width, document, font, measure, paint } = input;
+  const options = (color: object, height: number, first?: PlotDrawing, margins?: Margins) =>
     ({
       ...spec,
+      ...figureOptions(spec, { width, height }, first),
       width,
+      height,
       document,
-      style: { fontFamily: font.family, fontSize: `${font.size}px`, color: colors.text },
-      color: { type: "categorical", ...color },
+      style: { fontFamily: font.family, fontSize: `${font.size}px` },
+      color,
       ...(margins && {
         marginTop: margins.top,
         marginRight: margins.right,
@@ -110,30 +108,52 @@ export function drawChart(input: ChartInput): ChartDrawing {
       }),
     }) as Parameters<PlotLibrary["plot"]>[0];
   try {
+    const categorical = { type: "categorical", range: paint.categories };
     const first = withWarnings(
-      () => Plot.plot(options({ range: colors.categories })) as PlotDrawing,
+      () => Plot.plot(options(categorical, widthHeight(width))) as PlotDrawing,
     ).value;
-    const domain = firstUseOrder([...(first.scale("color")?.domain ?? [])], rows);
-    const range = domain.map((_, i) => colors.categories[i] ?? colors.muted);
+    const values = [...(first.scale("color")?.domain ?? [])];
+    const amounts = values.length > 0 && values.every((v) => typeof v === "number");
+    const domain = amounts ? [] : firstUseOrder(values, rows);
+    const range = domain.map((_, i) => paint.categories[i] ?? paint.textMuted);
+    const rampPositions = new Map<string, number>();
+    const ramp = (t: number) => {
+      const color = paint.ramp(t);
+      rampPositions.set(color, t);
+      return color;
+    };
+    const color = amounts
+      ? { type: "linear", interpolate: ramp }
+      : domain.length
+        ? { type: "categorical", domain, range }
+        : categorical;
     const margins = fitMargins(first, labelsOf(first, font, measure));
+    const height = bandHeight(first, margins ?? marginsOf(first)) ?? widthHeight(width);
     const { value: svg, warnings } = withWarnings(
-      () =>
-        Plot.plot(
-          options(domain.length ? { domain, range } : { range: colors.categories }, margins),
-        ) as SVGSVGElement,
+      () => Plot.plot(options(color, height, first, margins)) as PlotDrawing,
     );
     for (const text of svg.querySelectorAll("text")) if (isWarningSign(text)) text.remove();
-    const legend = domain.map((value, i) => ({
-      value: value instanceof Date ? value.toISOString().slice(0, 10) : String(value),
-      color: range[i] as string,
-    }));
+    paintDrawing(svg, { paint, id: input.id, rampPositions });
+    const legend: ChartLegend | undefined = repeatsAxis(spec, svg)
+      ? undefined
+      : amounts
+        ? { kind: "ramp", low: Math.min(...values), high: Math.max(...values) }
+        : domain.length
+          ? {
+              kind: "categories",
+              entries: domain.map((value, i) => ({
+                value: valueText(value),
+                color: range[i] as string,
+              })),
+            }
+          : undefined;
     const problems = [
-      ...categoryProblem(domain, colors),
+      ...categoryProblem(domain, paint),
       ...overlaps(labelsOf(svg, font, measure)),
       ...[...new Set(warnings)].map(warningProblem),
     ];
-    return { svg, legend, problems };
+    return { svg, ...(legend && { legend }), problems };
   } catch (error) {
-    return { legend: [], problems: [thrownProblem(error)] };
+    return { problems: [thrownProblem(error)] };
   }
 }

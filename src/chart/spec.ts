@@ -4,6 +4,7 @@
  */
 import type * as PlotModule from "@observablehq/plot";
 import type { DiagnosticCode } from "../document/diagnostic.ts";
+import { stackProblems } from "./stacking.ts";
 
 /** The Observable Plot module that `plot` receives. */
 export type PlotLibrary = typeof PlotModule;
@@ -29,6 +30,34 @@ export interface ChartProblem {
   /** What the problem is about, so two problems in one chart stay apart. */
   subject?: string;
   message: string;
+}
+
+/** A mark as Plot builds it: its ARIA label, its channels, and its facet fields. */
+export interface PlotMark {
+  ariaLabel?: string;
+  channels: Record<string, { value: unknown } | undefined>;
+  fx?: unknown;
+  fy?: unknown;
+}
+
+/** The marks of a spec, with Plot's composite marks, such as a box, taken apart. */
+export function marksOf(spec: ChartSpec): PlotMark[] {
+  const flat = (mark: unknown): PlotMark[] =>
+    Array.isArray(mark)
+      ? mark.flatMap(flat)
+      : mark && typeof mark === "object" && "channels" in mark
+        ? [mark as PlotMark]
+        : [];
+  return flat(spec.marks);
+}
+
+/** The column a channel reads: its field, or the field a transform of it names. */
+export function columnOf(channel: { value: unknown } | undefined): string | undefined {
+  const value = channel?.value;
+  if (typeof value === "string") return value;
+  if (value && typeof value === "object" && "label" in value && typeof value.label === "string")
+    return value.label;
+  return undefined;
 }
 
 /** The options `plot` may return. Everything else about the figure is Yapparatus's. */
@@ -154,7 +183,7 @@ function checkOptions(
         problems.push({
           code: "CHART_COLOR",
           subject: `Plot.${name} ${key}: ${value}`,
-          message: `Plot.${name} sets ${key}: "${value}". The theme picks colors: set ${key} to a column of categories${fields ? `, one of ${list(fields)},` : ""} and each category gets its own color, or leave it out for the text color.`,
+          message: `Plot.${name} sets ${key}: "${value}". The theme picks colors: set ${key} to a column${fields ? `, one of ${list(fields)},` : ""} and each category gets its own color and each amount a shade, or leave it out for the accent color.`,
         });
       continue;
     }
@@ -213,7 +242,8 @@ export function runPlot(
   } catch (error) {
     return { problems: [...problems, thrownProblem(error)] };
   }
-  problems.push(...checkSpec(spec));
+  const shape = checkSpec(spec);
+  problems.push(...shape, ...(shape.length ? [] : stackProblems(spec)));
   return { spec, problems };
 }
 

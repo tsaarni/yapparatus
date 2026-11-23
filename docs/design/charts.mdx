@@ -42,7 +42,7 @@ The page compiler reads the CSV and TSV formats, gives the columns their types, 
 
 ## Examples
 
-The charts in this section show the forms that a chart supports. The browser shares are yearly worldwide figures from [StatCounter](https://gs.statcounter.com/browser-market-share). The request latencies are made-up example data, read from a CSV file in the repository. <Ref to="charts-example-share" /> draws lines and dots, colored by a column of categories, with a legend. <Ref to="charts-example-latency" /> and <Ref to="charts-example-latency-box" /> read the same file, as a performance investigation would. The scatter plot on a log scale shows that the requests over the target began with a deploy that emptied a cache, and the box plots show that almost every cache miss is slower than the target. <Ref to="charts-example-devices" /> draws the rows of <Ref to="charts-example-device-table" /> as bars, split into small multiples with `fx`. Its legend names the bars in place of an x axis, whose labels would overlap on a phone.
+The charts in this section show the forms that a chart supports. The browser shares are yearly worldwide figures from [StatCounter](https://gs.statcounter.com/browser-market-share). The request latencies are made-up example data, read from a CSV file in the repository. <Ref to="charts-example-share" /> draws lines and dots, colored by a column of categories, with a legend. <Ref to="charts-example-latency" /> and <Ref to="charts-example-latency-box" /> read the same file, as a performance investigation would. The scatter plot on a log scale shows that the requests over the target began with a deploy that emptied a cache, and the box plots show that almost every cache miss is slower than the target. <Ref to="charts-example-devices" /> draws the rows of <Ref to="charts-example-device-table" /> as bars, split into small multiples with `fx`. Its legend names the bars in place of an x axis, whose labels would overlap on a phone. <Ref to="charts-example-errors" /> is a heatmap: a column of numbers in `fill` shades the cells.
 
 <Chart id="charts-example-share" caption="Worldwide browser share by year, on all devices, as lines with dots. Data from StatCounter." plot={(Plot, rows) => ({
   marks: [
@@ -50,7 +50,6 @@ The charts in this section show the forms that a chart supports. The browser sha
     Plot.dot(rows, { x: "Year", y: "Share (%)", fill: "Browser" }),
     Plot.ruleY([0]),
   ],
-  y: { grid: true },
 })}>
 
 ```csv
@@ -101,14 +100,14 @@ Year,Browser,Share (%)
 
 <Chart id="charts-example-latency" caption="Latency of each request to an orders API over ten minutes, by cache result, on a log scale. Example data." from="/-/files/yapparatus/docs/design/data/orders-latency.csv" plot={(Plot, rows) => ({
   marks: [
-    Plot.dot(rows, { x: "Time", y: "Latency (ms)", fill: "Cache", r: 2.5 }),
+    Plot.dot(rows, { x: "Time", y: "Latency (ms)", fill: "Cache" }),
     Plot.ruleY([300]),
     Plot.text([300], { y: (d) => d, frameAnchor: "right", textAnchor: "end", dy: -8, text: () => "300 ms target" }),
     Plot.ruleX([new Date("2026-03-14T10:04:00Z")]),
     Plot.text([new Date("2026-03-14T10:04:00Z")], { x: (d) => d, frameAnchor: "top", dx: -6, textAnchor: "end", text: () => "Deploy" }),
   ],
   x: { type: "utc", label: "Time (UTC)" },
-  y: { type: "log", grid: true },
+  y: { type: "log" },
 })} />
 
 <Chart id="charts-example-latency-box" caption="The same requests as box plots of latency by cache result, on a log scale. Example data." from="/-/files/yapparatus/docs/design/data/orders-latency.csv" plot={(Plot, rows) => ({
@@ -117,7 +116,7 @@ Year,Browser,Share (%)
     Plot.ruleY([300]),
   ],
   x: { label: null },
-  y: { type: "log", grid: true },
+  y: { type: "log" },
 })} />
 
 <Table id="charts-example-device-table" caption="Worldwide browser share on desktop and on mobile in 2025. Data from StatCounter.">
@@ -142,8 +141,42 @@ Year,Browser,Share (%)
   ],
   x: { axis: null, domain: ["Chrome", "Safari", "Edge", "Firefox"] },
   fx: { label: null },
-  y: { grid: true },
 })} />
+
+<Chart id="charts-example-errors" caption="Server errors by weekday and hour of day, as a heatmap. Example data." plot={(Plot, rows) => ({
+  marks: [
+    Plot.cell(rows, { x: "Hour", y: "Day", fill: "Errors" }),
+    Plot.text(rows, { x: "Hour", y: "Day", text: "Errors" }),
+  ],
+  x: { type: "band" },
+  y: { domain: ["Mon", "Tue", "Wed", "Thu", "Fri"] },
+})}>
+
+```csv
+Day,Hour,Errors
+Mon,0,2
+Mon,6,5
+Mon,12,14
+Mon,18,9
+Tue,0,1
+Tue,6,4
+Tue,12,31
+Tue,18,8
+Wed,0,3
+Wed,6,6
+Wed,12,12
+Wed,18,7
+Thu,0,2
+Thu,6,3
+Thu,12,11
+Thu,18,6
+Fri,0,4
+Fri,6,9
+Fri,12,22
+Fri,18,15
+```
+
+</Chart>
 
 ## Data sources
 
@@ -166,10 +199,32 @@ A file's data is its own module, named with a hash of the file's text, so a brow
 
 ## Drawing
 
-The browser and the page compiler draw a chart with one function. It takes Plot, what `plot` returned, the rows, the width, a document to make the elements in, the font with a text measure, and the colors. The browser passes its own document, its fonts measured by the browser, and the theme's colors as CSS variables. The page compiler passes a document without a browser, from [linkedom](https://github.com/WebReflection/linkedom), the font measure of the [diagram compiler](diagram-compiler), and the light theme's colors. The chart draws twice:
+The browser and the page compiler draw a chart with one function. It takes Plot, what `plot` returned, the rows, the width, a document to make the elements in, the font with a text measure, the paint, and a prefix for the ids the drawing defines. The browser passes its own document, its fonts measured by the browser, and the theme's colors as CSS variables. The page compiler passes a document without a browser, from [linkedom](https://github.com/WebReflection/linkedom), the font measure of the [diagram compiler](diagram-compiler), and the light theme's colors as literal values. The chart draws twice:
 
-1. The first drawing gives the categories and the box of every label. Each margin grows by how far a label reaches past the edge, and by how far an axis label crowds the tick labels on its side of the plot. Plot keeps an axis label at the edge of the figure, so a wider margin moves the tick labels away from it.
-2. The second drawing uses the categories in their order and the new margins. Labels that still run into each other are `CHART_OVERLAP`.
+1. The first drawing, at a height from the width, gives the color values, the scales, and the box of every label. Each margin grows by how far a label reaches past the edge, and by how far an axis label crowds the tick labels on its side of the plot. Plot keeps an axis label at the edge of the figure, so a wider margin moves the tick labels away from it.
+2. The second drawing uses the colors, the new margins, and the height, and is painted. Labels that still run into each other are `CHART_OVERLAP`.
+
+The height follows the data. A y scale of bands, as in horizontal bars, box plots, or a heatmap, gets 30 pixels for each band in each `fy` facet, plus the margins, and at least 120 pixels, so two bars are not two slabs and ten are not squeezed. Any other chart is half as high as it is wide, between 220 and 380 pixels.
+
+Yapparatus sets the axes and leaves the marks to the author. Axes have no tick marks and no arrows in their labels, and the label of a y axis stands above it, also on a band scale. The value axis has a grid: y when it is continuous, and x when y has bands and x is continuous. A continuous y axis has a tick for about every 64 pixels of height, and a continuous x axis one for about every 110 pixels of width, so a tall chart does not list every round number. Bars on a band x scale are at most 96 pixels wide, so two bars do not fill the width. A chart of only dots, lines, texts, and rules is inset by 6 pixels, so a dot at the end of the domain is not cut by the frame, while bars keep their baseline on it. The author's scale options win over all of these.
+
+<Table id="charts-look" caption="How the paint draws each kind of mark. A mark without a color of its own takes the accent.">
+
+| Mark | Look |
+|---|---|
+| Bar, rect | Accent, or the tint with an accent edge under a line or dot without a color; rounded corners; histogram rects apart by a 1-pixel gap |
+| Box plot | A tinted box with an accent edge and median, or the category's box with a median in the surface color; muted whiskers |
+| Area | Accent, or the tint under a line or dot without a color. Areas colored by category are slightly transparent, with a line in the figure color between stacked areas |
+| Line | 2 pixels, with round joins |
+| Dot | Filled with its color, at least 4 pixels in radius, ringed in the surface color |
+| Cell | Rounded, apart by 2-pixel gaps; a text on a cell takes the text color on a light shade and the surface color on a dark one |
+| Text | Body text color with a halo in the surface color |
+| Regression | A 2-pixel accent line over a faint accent band, both clipped to the frame |
+| Rule, grid, axis | Rules in the strong border color, the grid in a faint border color, tick and axis labels in the muted text color |
+
+</Table>
+
+The paint is one pass over Plot's drawing. It finds each mark by the label Plot gives its group, sets colors, widths, and corners as attributes, and removes Plot's style sheet. Every color comes from the paint: the category colors, the accent and its tint, three text colors, the rule and grid colors, the figure's surface, and the ramp. The page compiler's drawing has only literal colors and no CSS.
 
 Neither side reads the layout of a drawing. The box of a label comes from its attributes: its position and the transforms around it, its anchor, its lines, its font size, and the width of its text from the measure, with the font's ascent and descent for its height. A rotated label keeps its rotated box, so rotated tick labels overlap only when their text does. The boxes agree with Chrome's within about a pixel.
 
@@ -181,7 +236,12 @@ The page compiler draws each chart at the widest width a chart has in the readin
 
 ## Color
 
-A chart's `fill` or `stroke` names the column of categories. The colors are the four category colors of [the theme](styling#color), as CSS variables, so a theme switch needs no new drawing. Categories take the colors in the order the rows first use them, as diagram categories do. A fifth category and later ones are muted and reported as `TOO_MANY_CATEGORIES`, a warning.
+A chart's `fill` or `stroke` names a column, and its values set the colors. The first drawing's color values decide how:
+
+- **Categories.** Text and dates take the four category colors of [the theme](styling#color) in the order the rows first use them, as diagram categories do. A fifth category and later ones are muted and reported as `TOO_MANY_CATEGORIES`, a warning. The legend lists the categories and highlights one's marks on hover.
+- **Amounts.** Numbers take a ramp of one hue, from the accent's tint at the lowest value to the accent at the highest, as in <Ref to="charts-example-errors" />. The legend is a bar of the ramp between the lowest and highest value.
+
+The legend is left out when it repeats an axis: when every mark colored by a column also puts that column on an axis that the drawing shows. The browser's colors are CSS variables, so a theme switch needs no new drawing, and its ramp mixes them with `color-mix` in OKLab. The page compiler's ramp mixes the light theme's colors in OKLab itself and gives literal colors.
 
 **[Direction](directions):** a user can point at a dot, a line, or a range of a chart. The address names it by its data values, such as `/sales#sales-chart--Month=2026-03` or `Revenue=100..300`, so it still finds the marks after rows are added or sorted.
 
@@ -189,7 +249,7 @@ A chart's `fill` or `stroke` names the column of categories. The colors are the 
 
 The library that `plot` receives checks each call before it calls Plot. The page compiler runs `plot` with this library in a fresh JavaScript context with a time limit of 1 second, as it runs a diagram's draw program, so `plot` uses only `Plot`, `rows`, and the values it defines itself. The two drawings run within the same time limit, because Plot calls the accessors that `plot` wrote while it draws. A `plot` whose run and drawings pass the time limit is `CHART_PLOT`. <Ref to="charts-mark-checks" /> lists the checks and where each is found.
 
-<Table id="charts-mark-checks" caption="The checks on what plot asks of Plot and on the drawing. All are errors except the last three, which are warnings.">
+<Table id="charts-mark-checks" caption="The checks on what plot asks of Plot and on the drawing. All are errors except the last four, which are warnings.">
 
 | Code | Found when | Found by |
 |---|---|---|
@@ -199,6 +259,7 @@ The library that `plot` receives checks each call before it calls Plot. The page
 | `CHART_FAILED` | `plot` throws, or Plot throws while it draws | Page compiler |
 | `CHART_OVERLAP` | Tick labels on one axis overlap, or an axis label overlaps tick labels | Page compiler |
 | `CHART_WARNING` | Plot warns while it draws | Page compiler |
+| `CHART_STACK` | An area stacks its series, and a line over the same columns does not | Page compiler |
 | `TOO_MANY_CATEGORIES` | The colors name more categories than the theme has colors | Page compiler |
 
 </Table>
@@ -214,6 +275,10 @@ Plot alone draws nothing for an unknown field without an error, and reads a colo
 **Categories take colors in the order of first use.** Plot's default sorts the values, so one added row could change every color.
 
 **A file's data is a separate module.** Rows in the page would make it slow to open and to compile.
+
+**Numbers in `fill` are amounts.** Plot gives them a continuous scale, and one category per value would run out of colors at the fifth.
+
+**The look is set as attributes from a paint.** One pass gives the browser and the page compiler the same drawing, with CSS variables in one and literal colors in the other, and without a style sheet.
 
 **Label boxes come from attributes.** A server has no layout engine, and one computation for both sides finds each problem once, in the page compiler, with the same margins the reader sees.
 

@@ -3,6 +3,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { type ChartDrawing, drawChart } from "../../chart/drawing.ts";
+import type { ChartPaint } from "../../chart/paint.ts";
 import {
   type ChartProblem,
   type PlotFunction,
@@ -120,6 +121,24 @@ function useData(
 /** A drawing, or only the problems that kept it from being drawn. */
 type Drawn = Partial<ChartDrawing> & { problems: ChartProblem[] };
 
+/** The theme's paint as CSS variables, so a theme switch needs no new drawing. */
+const paint: ChartPaint = {
+  categories: categoryColors,
+  accent: theme.accent,
+  accentSurface: theme.accentSurface,
+  text: theme.text,
+  textBody: theme.textBody,
+  textMuted: theme.textMuted,
+  rule: theme.borderStrong,
+  grid: theme.border,
+  surface: `var(--figure-bg, ${theme.surface})`,
+  ramp: (t) =>
+    `color-mix(in oklab, ${theme.accent} ${Math.round(t * 1000) / 10}%, ${theme.accentSurface})`,
+};
+
+/** The legend's numbers at the ends of a ramp. */
+const amount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
 const lastValid = new Map<string, Drawn>();
 const swatches = () => [s.swatch1, s.swatch2, s.swatch3, s.swatch4];
 
@@ -138,7 +157,7 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
   const rows = useMemo(() => (data ? rowObjects(data) : []), [data]);
   // biome-ignore lint/correctness/useExhaustiveDependencies: The source text stands for `plot`.
   const result = useMemo(
-    () => (Plot && fonts && width && data ? draw(Plot, plot, rows, width) : undefined),
+    () => (Plot && fonts && width && data ? draw(Plot, plot, rows, width, marker) : undefined),
     [Plot, fonts, width, source, data, rows],
   );
   const key = id ?? caption;
@@ -186,9 +205,9 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
         aria-label={description ?? label}
         {...stylex.props(s.canvas, !!fallback && s.stale, !drawn && s.pending)}
       />
-      {drawn?.legend && drawn.legend.length > 0 && (
+      {drawn?.legend?.kind === "categories" && (
         <ul aria-label="Legend" {...stylex.props(s.legend)}>
-          {drawn.legend.map((entry, i) => (
+          {drawn.legend.entries.map((entry, i) => (
             <li key={entry.value}>
               <Button
                 variant="ghost"
@@ -205,6 +224,17 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
             </li>
           ))}
         </ul>
+      )}
+      {drawn?.legend?.kind === "ramp" && (
+        <div
+          role="img"
+          aria-label={`Legend: shades from ${amount.format(drawn.legend.low)} to ${amount.format(drawn.legend.high)}`}
+          {...stylex.props(s.legend, s.ramp)}
+        >
+          <span>{amount.format(drawn.legend.low)}</span>
+          <span {...stylex.props(s.rampBar)} />
+          <span>{amount.format(drawn.legend.high)}</span>
+        </div>
       )}
       {dev && problems.length > 0 && <Diagnostics items={problems} of="chart" />}
     </div>
@@ -231,6 +261,7 @@ function draw(
   plot: PlotFunction,
   rows: ReturnType<typeof rowObjects>,
   width: number,
+  marker: string,
 ): Drawn {
   const { spec, problems: called } = runPlot(Plot, plot, rows);
   if (!spec || called.some((p) => diagnosticCodes[p.code].severity === "error"))
@@ -243,9 +274,11 @@ function draw(
     document,
     font: chartFont(theme.sans, Number.parseFloat(fontSize.xs), Number(fontWeight.regular)),
     measure: measureText,
-    colors: { categories: categoryColors, muted: theme.textMuted, text: theme.textBody },
+    paint,
+    id: `chart-${marker.replace(/[^\w-]/g, "")}`,
   });
-  drawn.svg?.style.setProperty("--plot-background", theme.surfaceRaised);
+  drawn.svg?.style.setProperty("display", "block");
+  drawn.svg?.style.setProperty("max-width", "100%");
   return { ...drawn, problems: [...called, ...drawn.problems] };
 }
 
@@ -279,4 +312,19 @@ const s = stylex.create({
   swatch3: { backgroundColor: theme.category3 },
   swatch4: { backgroundColor: theme.category4 },
   swatchMuted: { backgroundColor: theme.textMuted },
+  ramp: {
+    alignItems: "center",
+    gap: space.sm,
+    color: theme.textMuted,
+    fontSize: fontSize.xs,
+    fontVariantNumeric: "tabular-nums",
+  },
+  /** The ramp's colors from low to high, mixed in OKLab as the chart mixes them. */
+  rampBar: {
+    display: "inline-block",
+    width: space.xl4,
+    height: 10,
+    borderRadius: radius.sm,
+    backgroundImage: `linear-gradient(in oklab to right, ${theme.accentSurface}, ${theme.accent})`,
+  },
 });

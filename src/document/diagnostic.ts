@@ -92,6 +92,10 @@ export const diagnosticCodes = {
   CHART_FAILED: { severity: "error", meaning: "Drawing the chart threw." },
   CHART_OVERLAP: { severity: "warning", meaning: "Tick labels or an axis label overlap." },
   CHART_WARNING: { severity: "warning", meaning: "Plot warned while drawing the chart." },
+  CHART_STACK: {
+    severity: "warning",
+    meaning: "Areas stack their series and lines over the same columns do not.",
+  },
   /** Diagrams. */
   DRAW_FAILED: { severity: "error", meaning: "The diagram's draw function threw or ran too long." },
   DIAGRAM_FAILED: { severity: "error", meaning: "The diagram compiler threw." },

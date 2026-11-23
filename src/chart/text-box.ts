@@ -25,7 +25,7 @@ export interface ChartFont {
 }
 
 /** An affine transform as SVG writes it: `[a, b, c, d, e, f]`. */
-type Matrix = [number, number, number, number, number, number];
+export type Matrix = [number, number, number, number, number, number];
 
 const identity: Matrix = [1, 0, 0, 1, 0, 0];
 
@@ -124,7 +124,7 @@ function chunksOf(text: Element, fontSize: number): Chunk[] {
 }
 
 /** The transform from an element's coordinates to its root `<svg>`'s, with its own transform. */
-function transformOf(element: Element): Matrix {
+export function transformOf(element: Element): Matrix {
   let matrix = identity;
   for (let at: Element | null = element; at; at = at.parentElement) {
     if (at.tagName.toLowerCase() === "svg") break;
