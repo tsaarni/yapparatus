@@ -9,12 +9,12 @@ import type { ViteDevServer } from "vite";
 import { fontMeasure, textOutline } from "../../compiler/font-measure.ts";
 import { compilePage } from "../../compiler/page.ts";
 import { pageFigures } from "../../compiler/stages/diagrams.ts";
+import { lightPaint } from "../../compiler/theme-values.ts";
 import type { CompiledDiagram } from "../../diagram/drawing.ts";
 import { pictureOf } from "../../diagram/picture.ts";
 import { createLogger } from "../../protocol/log.ts";
 import { pictureErrors } from "../prompt.ts";
 import { HttpError, type Router } from "../router.ts";
-import { lightPaint } from "../theme-values.ts";
 
 const log = createLogger("figures");
 

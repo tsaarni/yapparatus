@@ -151,6 +151,58 @@ test("a plot that does not end is stopped after 1 second", async () => {
   assert.ok(Date.now() - started < 3000);
   assert.deepEqual(
     issues.map((i) => [i.code, i.subject, i.message]),
-    [["CHART_PLOT", "plot", "plot did not finish in 1 second. Check its loops."]],
+    [["CHART_PLOT", "plot", late]],
+  );
+});
+
+const late =
+  "plot and drawing the chart did not finish in 1 second. Check plot's loops and accessors.";
+
+test("an accessor that does not end stops the drawing after 1 second, and Plot's warnings end", async () => {
+  const warn = console.warn;
+  const started = Date.now();
+  const { issues } = await build(
+    `<Chart id="slow" plot={(Plot, rows) => ({ marks: [Plot.dot(rows, { x: (d) => { for (;;); }, y: "a" })] })}>\n\n\`\`\`csv\na\n1\n\`\`\`\n\n</Chart>\n`,
+  );
+  assert.ok(Date.now() - started < 3000);
+  assert.deepEqual(
+    issues.map((i) => [i.code, i.message]),
+    [["CHART_PLOT", late]],
+  );
+  assert.equal(console.warn, warn);
+});
+
+test("the stage draws each chart and reports what the drawing shows, at the page's line", async () => {
+  const days = Array.from(
+    { length: 31 },
+    (_, i) => `2026-10-${String(i + 1).padStart(2, "0")},${i % 7}`,
+  );
+  const deploys = await build(
+    `# Deploys\n\n<Chart id="deploys" plot={(Plot, rows) => ({ marks: [Plot.barY(rows, { x: "Day", y: "Deploys" })] })}>\n\n\`\`\`csv\nDay,Deploys\n${days.join("\n")}\n\`\`\`\n\n</Chart>\n`,
+  );
+  assert.deepEqual(
+    deploys.issues.map((i) => [i.code, i.target, i.line, i.subject]),
+    [
+      ["CHART_WARNING", "deploys", 3, "some data associated with the x scale are dates"],
+      ["CHART_OVERLAP", "deploys", 3, "x at 320 px"],
+    ],
+  );
+  assert.match(deploys.issues[1]?.message ?? "", /^On a phone, 320 px wide: The x tick labels/);
+  const colors = await build(
+    `<Chart id="kinds" plot={(Plot, rows) => ({ marks: [Plot.dot(rows, { x: "a", y: "a", fill: "kind" })] })}>\n\n\`\`\`csv\na,kind\n${[1, 2, 3, 4, 5].map((n) => `${n},k${n}`).join("\n")}\n\`\`\`\n\n</Chart>\n`,
+  );
+  assert.deepEqual(
+    colors.issues.map((i) => i.code),
+    ["TOO_MANY_CATEGORIES"],
+  );
+});
+
+test("a chart's file is drawn too", async () => {
+  const { issues } = await build(
+    `<Chart from="/-/files/sample/throughput.csv" plot={(Plot, rows) => ({ marks: [Plot.barY(rows, { x: "connections", y: "rps" })] })} />\n`,
+  );
+  assert.deepEqual(
+    issues.map((i) => [i.code, i.subject]),
+    [["CHART_OVERLAP", "x at 320 px"]],
   );
 });

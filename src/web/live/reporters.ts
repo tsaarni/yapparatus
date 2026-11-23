@@ -44,8 +44,8 @@ export function installGlobalReporters() {
 }
 
 /**
- * Report what a chart found against the revision of the page it sits in. A chart with nothing
- * to report sends nothing: the page's own report says it was rendered.
+ * Report a chart whose data file could not load against the revision of the page it sits in.
+ * The page compiler finds every other chart problem; a chart that loaded sends nothing.
  */
 export function useChartReport(
   marker: string,

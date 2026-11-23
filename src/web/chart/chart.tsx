@@ -2,13 +2,12 @@
 
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { type ChartDrawing, drawChart } from "../../chart/drawing.ts";
 import {
   type ChartProblem,
-  firstUseOrder,
   type PlotFunction,
   type PlotLibrary,
   runPlot,
-  thrownProblem,
 } from "../../chart/spec.ts";
 import { type ChartData, rowObjects } from "../../chart/table.ts";
 import { diagnosticCodes } from "../../document/diagnostic.ts";
@@ -17,9 +16,9 @@ import { Diagnostics } from "../components/figure-diagnostics.tsx";
 import { Button } from "../controls/button.tsx";
 import { useChartReport } from "../live/reporters.ts";
 import { styled } from "../style/styled.ts";
-import { fontSize, radius, sizes, space, theme } from "../style/theme.stylex.ts";
+import { fontSize, fontWeight, radius, sizes, space, theme } from "../style/theme.stylex.ts";
 import { useFontsReady } from "./fonts-ready.ts";
-import { fitMargins, type Margins, type PlotDrawing } from "./margins.ts";
+import { chartFont, measureText } from "./text-measure.ts";
 
 /** The props an author writes on a chart, and those the compiler adds. */
 export interface ChartProps {
@@ -118,16 +117,8 @@ function useData(
   return data ? { data } : loaded;
 }
 
-/**
- * A drawing, or only the problems that kept it from being drawn. `drawing` holds the problems
- * found while drawing, which only a browser finds; the page compiler reports the others.
- */
-interface Drawn {
-  svg?: SVGSVGElement;
-  legend?: { value: string; color: string }[];
-  problems: ChartProblem[];
-  drawing: ChartProblem[];
-}
+/** A drawing, or only the problems that kept it from being drawn. */
+type Drawn = Partial<ChartDrawing> & { problems: ChartProblem[] };
 
 const lastValid = new Map<string, Drawn>();
 const swatches = () => [s.swatch1, s.swatch2, s.swatch3, s.swatch4];
@@ -161,7 +152,6 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
       ? [{ code: "CHART_DATA", message: `The data could not load: ${error}` }]
       : [];
   const problems = unloaded.length ? unloaded : (result?.problems ?? []);
-  const reported = unloaded.length ? unloaded : (result?.drawing ?? []);
 
   const canvas = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -184,9 +174,7 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
   useChartReport(
     marker,
     key ?? marker,
-    result || missing || error
-      ? reported.map((p) => ({ ...p, ...(id ? { target: id } : {}) }))
-      : undefined,
+    error ? unloaded.map((p) => ({ ...p, ...(id ? { target: id } : {}) })) : undefined,
   );
 
   const label = caption ?? "Chart";
@@ -235,8 +223,8 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
 Chart.breakout = true;
 
 /**
- * Draw the chart twice: the first drawing gives the categories' color order and the labels'
- * extent, which sets the margins of the second. Overlapping labels are reported.
+ * Run `plot` and draw its marks at the chart's width, in the theme's type and colors. The page
+ * compiler reports the problems; the chart shows them while editing.
  */
 function draw(
   Plot: PlotLibrary,
@@ -246,83 +234,19 @@ function draw(
 ): Drawn {
   const { spec, problems: called } = runPlot(Plot, plot, rows);
   if (!spec || called.some((p) => diagnosticCodes[p.code].severity === "error"))
-    return { problems: called, drawing: [] };
-  const drawing: ChartProblem[] = [];
-  const base = {
-    ...spec,
+    return { problems: called };
+  const drawn = drawChart({
+    Plot,
+    spec,
+    rows,
     width,
-    style: { fontFamily: theme.sans, fontSize: fontSize.xs, color: theme.textBody },
-  };
-  const options = (color: object, margins?: Margins) => ({
-    ...base,
-    color: { type: "categorical", ...color },
-    ...(margins && {
-      marginTop: margins.top,
-      marginRight: margins.right,
-      marginBottom: margins.bottom,
-      marginLeft: margins.left,
-    }),
+    document,
+    font: chartFont(theme.sans, Number.parseFloat(fontSize.xs), Number(fontWeight.regular)),
+    measure: measureText,
+    colors: { categories: categoryColors, muted: theme.textMuted, text: theme.textBody },
   });
-  const measure = document.createElement("div");
-  measure.style.cssText = `position:absolute;visibility:hidden;left:-10000px;top:0;width:${width}px`;
-  document.body.append(measure);
-  try {
-    const first = Plot.plot(options({ range: categoryColors }) as Parameters<typeof Plot.plot>[0]);
-    measure.append(first);
-    const domain = firstUseOrder([...((first as PlotDrawing).scale("color")?.domain ?? [])], rows);
-    if (domain.length > categoryColors.length)
-      drawing.push({
-        code: "TOO_MANY_CATEGORIES",
-        message: `The colors name ${domain.length} categories: ${domain.slice(0, 8).join(", ")}${domain.length > 8 ? ", …" : ""}. A chart has ${categoryColors.length} category colors, so the rest are drawn muted. Give fill or stroke a column with fewer categories, or split the chart with fx.`,
-      });
-    const range = domain.map((_, i) => categoryColors[i] ?? theme.textMuted);
-    const margins = fitMargins(first as PlotDrawing);
-    first.remove();
-    const svg = Plot.plot(
-      options(domain.length ? { domain, range } : { range: categoryColors }, margins) as Parameters<
-        typeof Plot.plot
-      >[0],
-    ) as SVGSVGElement;
-    svg.style.setProperty("--plot-background", theme.surfaceRaised);
-    measure.append(svg);
-    drawing.push(...overlaps(svg));
-    svg.remove();
-    const legend = domain.map((value, i) => ({
-      value: value instanceof Date ? value.toISOString().slice(0, 10) : String(value),
-      color: range[i] as string,
-    }));
-    return { svg, legend, problems: [...called, ...drawing], drawing };
-  } catch (error) {
-    drawing.push(thrownProblem(error));
-    return { problems: [...called, ...drawing], drawing };
-  } finally {
-    measure.remove();
-  }
-}
-
-/** Tick labels on one axis that run into each other, which no margin can fix. */
-function overlaps(svg: Element): ChartProblem[] {
-  const problems: ChartProblem[] = [];
-  for (const axis of ["x", "y", "fx", "fy"]) {
-    const labels = [...svg.querySelectorAll(`[aria-label="${axis}-axis tick label"] text`)].map(
-      (t) => ({ text: t.textContent ?? "", r: t.getBoundingClientRect() }),
-    );
-    const horizontal = axis.endsWith("x");
-    const sorted = labels.sort((a, b) => (horizontal ? a.r.left - b.r.left : a.r.top - b.r.top));
-    const clash = sorted.find((a, i) => {
-      const b = sorted[i + 1];
-      if (!b) return false;
-      return horizontal ? a.r.right > b.r.left + 1 : a.r.bottom > b.r.top + 1;
-    });
-    if (!clash) continue;
-    const next = sorted[sorted.indexOf(clash) + 1];
-    problems.push({
-      code: "CHART_OVERLAP",
-      subject: axis,
-      message: `The ${axis} tick labels "${clash.text}" and "${next?.text}" overlap. Show fewer ticks with ${axis}: { ticks: 5 }, rotate them with ${axis}: { tickRotate: -30 }, shorten the values, or swap the axes.`,
-    });
-  }
-  return problems;
+  drawn.svg?.style.setProperty("--plot-background", theme.surfaceRaised);
+  return { ...drawn, problems: [...called, ...drawn.problems] };
 }
 
 const s = stylex.create({

@@ -7,6 +7,8 @@ export interface FontSpec {
   family: string;
   size: number;
   weight: number;
+  /** Digits all as wide, as CSS `font-variant-numeric: tabular-nums` sets them. */
+  tabular?: boolean;
 }
 
 /** Text width, injected: the server measures with the font files, tests use a fixed advance. */

@@ -90,7 +90,8 @@ export const diagnosticCodes = {
   },
   CHART_FIELD: { severity: "error", meaning: "A mark names a column its data does not have." },
   CHART_FAILED: { severity: "error", meaning: "Drawing the chart threw." },
-  CHART_OVERLAP: { severity: "warning", meaning: "Tick labels on an axis overlap." },
+  CHART_OVERLAP: { severity: "warning", meaning: "Tick labels or an axis label overlap." },
+  CHART_WARNING: { severity: "warning", meaning: "Plot warned while drawing the chart." },
   /** Diagrams. */
   DRAW_FAILED: { severity: "error", meaning: "The diagram's draw function threw or ran too long." },
   DIAGRAM_FAILED: { severity: "error", meaning: "The diagram compiler threw." },

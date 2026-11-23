@@ -6,10 +6,19 @@ import * as Plot from "@observablehq/plot";
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
+import { parseHTML } from "linkedom";
 import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
+import { type ChartInput, drawChart } from "../../chart/drawing.ts";
 import { type DataFormat, formatNamed, formatNames, formatOfFile } from "../../chart/formats.ts";
-import { type ChartProblem, type PlotFunction, runPlot } from "../../chart/spec.ts";
+import {
+  type ChartProblem,
+  type ChartSpec,
+  type PlotFunction,
+  type Row,
+  runPlot,
+  thrownProblem,
+} from "../../chart/spec.ts";
 import {
   type ChartData,
   type DataIssue,
@@ -18,10 +27,14 @@ import {
   rowObjects,
   typeTable,
 } from "../../chart/table.ts";
+import type { Measure } from "../../diagram/metrics.ts";
+import { diagnosticCodes } from "../../document/diagnostic.ts";
 import { type FileAddress, parseFileAddress } from "../../document/file-address.ts";
-import { authorFunction, timedOut } from "../author-function.ts";
+import { authorFunction, timedOut, withTimeLimit } from "../author-function.ts";
 import type { ExternalFiles, SourceFile } from "../external-files.ts";
+import { fontExtent, fontMeasure } from "../font-measure.ts";
 import { revision } from "../revision.ts";
+import { chartColors, chartType, chartWidth } from "../theme-values.ts";
 import { codeLanguageOf, contentIssues } from "./conventions.ts";
 import { excerptFiles } from "./excerpts.ts";
 
@@ -73,15 +86,56 @@ export function dataModuleCode(data: ChartData) {
   return `export default JSON.parse(${JSON.stringify(JSON.stringify(data))});`;
 }
 
+/** The width of a chart on a phone, where tick labels run into each other first. */
+const phoneWidth = 320;
+
+/** The document a chart is drawn in on the server, which has no browser. */
+const blankDocument = () =>
+  parseHTML("<!doctype html><html><body></body></html>")
+    .document as unknown as ChartInput["document"];
+
 /**
- * Run a chart's `plot` on its rows in its own context, with JavaScript's globals and none of
- * Node's, and return what the checked Plot library and the returned spec show is wrong.
+ * Draw a chart at the widest reading width and at a phone's width, and return the problems of the
+ * first and the overlaps that only the second has, named by its width.
  */
-export function plotProblems(source: string, data: ChartData): ChartProblem[] {
+function drawingProblems(spec: ChartSpec, rows: Row[], measure: Measure): ChartProblem[] {
+  const font = { ...chartType, ...fontExtent(chartType.family) };
+  const draw = (width: number) =>
+    drawChart({
+      Plot,
+      spec,
+      rows,
+      width,
+      document: blankDocument(),
+      font,
+      measure,
+      colors: chartColors,
+    }).problems;
+  const wide = draw(chartWidth);
+  const narrow = draw(phoneWidth).filter(
+    (p) =>
+      p.code === "CHART_OVERLAP" && !wide.some((w) => w.code === p.code && w.subject === p.subject),
+  );
+  return [
+    ...wide,
+    ...narrow.map((p) => ({
+      ...p,
+      subject: `${p.subject} at ${phoneWidth} px`,
+      message: `On a phone, ${phoneWidth} px wide: ${p.message}`,
+    })),
+  ];
+}
+
+/**
+ * Run `plot` in its own context, with JavaScript's globals only, and draw the chart if `draw` is
+ * set, in the time limit. Returns what the checked library, the spec, and the drawings show.
+ */
+export function plotProblems(source: string, data: ChartData, draw: boolean): ChartProblem[] {
   const late: ChartProblem = {
     code: "CHART_PLOT",
     subject: "plot",
-    message: "plot did not finish in 1 second. Check its loops.",
+    message:
+      "plot and drawing the chart did not finish in 1 second. Check plot's loops and accessors.",
   };
   let plot: ReturnType<typeof authorFunction>;
   try {
@@ -98,20 +152,36 @@ export function plotProblems(source: string, data: ChartData): ChartProblem[] {
         message: "plot is a function that returns the marks: (Plot, rows) => ({ marks: [...] }).",
       },
     ];
-  let stopped = false;
-  const { problems } = runPlot(
-    Plot,
-    (library, rows) => {
-      try {
-        return plot(library, rows) as ReturnType<PlotFunction>;
-      } catch (error) {
-        stopped = timedOut(error);
-        throw error;
-      }
-    },
-    rowObjects(data),
-  );
-  return stopped ? [late] : problems;
+  const call = plot;
+  const rows = rowObjects(data);
+  const { measure } = fontMeasure();
+  measure("0", { ...chartType, tabular: true });
+  const warn = console.warn;
+  try {
+    return withTimeLimit(() => {
+      let stopped = false;
+      const { spec, problems } = runPlot(
+        Plot,
+        (library, rows) => {
+          try {
+            return call(library, rows) as ReturnType<PlotFunction>;
+          } catch (error) {
+            stopped = timedOut(error);
+            throw error;
+          }
+        },
+        rows,
+      );
+      if (stopped) return [late];
+      if (!draw || !spec || problems.some((p) => diagnosticCodes[p.code].severity === "error"))
+        return problems;
+      return [...problems, ...drawingProblems(spec, rows, measure)];
+    });
+  } catch (error) {
+    return [timedOut(error) ? late : thrownProblem(error)];
+  } finally {
+    console.warn = warn;
+  }
 }
 
 /** The JSX attribute of an element with a name, if the author wrote one. */
@@ -182,9 +252,9 @@ export function charts(files: ExternalFiles) {
           ? plot.value.value
           : undefined;
       const chartId = attribute(node, "id")?.value;
-      const check = (data: ChartData) => {
+      const check = (data: ChartData, cells: DataIssue[]) => {
         if (plotSource === undefined || !rowCount(data)) return;
-        for (const problem of plotProblems(plotSource, data))
+        for (const problem of plotProblems(plotSource, data, !cells.length))
           issues.push({
             code: problem.code,
             line,
@@ -229,7 +299,7 @@ export function charts(files: ExternalFiles) {
         for (const problem of read.issues)
           issue(problem.subject, problem.message, block.line + problem.line - 1);
         if (!rowCount(read.data)) issue("data", "<Chart> has no rows of data.");
-        check(read.data);
+        check(read.data, read.issues);
         setAttribute(node, "data", valueToEstree(read.data));
         return;
       }
@@ -258,7 +328,7 @@ export function charts(files: ExternalFiles) {
         for (const problem of found)
           issue(problem.subject, `<Chart> in table "${id}": ${problem.message}`, problem.line);
         if (!rowCount(data)) issue("data", "<Chart> has no rows of data.");
-        check(data);
+        check(data, found);
         setAttribute(node, "data", valueToEstree(data));
         return;
       }
@@ -283,7 +353,7 @@ export function charts(files: ExternalFiles) {
       for (const problem of read.issues)
         issue(problem.subject, `<Chart> in ${from}, line ${problem.line}: ${problem.message}`);
       if (!rowCount(read.data)) issue("data", "<Chart> has no rows of data.");
-      check(read.data);
+      check(read.data, read.issues);
       const watched = excerptFiles.get(file.path) ?? new Set<string>();
       watched.add(read.source.file);
       excerptFiles.set(file.path, watched);

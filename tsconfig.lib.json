@@ -1,6 +1,9 @@
 {
   "extends": "./tsconfig.base.json",
   "compilerOptions": {
+    // The chart code draws into a document, from the browser or from linkedom, so it names DOM
+    // types. Each directory's own project still keeps the DOM out of the others.
+    "lib": ["ESNext", "DOM"],
     "types": ["node"],
     "composite": false,
     "emitDeclarationOnly": false,

@@ -117,7 +117,7 @@ The source code is split into directories. Code in each directory runs in Node, 
 | Document | Both | Nothing | [Pages, addresses](documents), references, and diagnostics |
 | Protocol | Both | Document | The types of the [REST API](rest-api), and the logger |
 | Diagram | Both | Document | The [diagram compiler](diagram-compiler) |
-| Chart | Both | Document | The [chart](charts) data and specification checks |
+| Chart | Both | Document and diagram | The [chart](charts) data and specification checks, and drawing a chart |
 | Compiler | Node | The shared directories | The [page compiler](page-compiler) and its [stages](page-compiler#pipeline), reading [external files](documents#external-files), and the checks of `document.json` and of links |
 | Server | Node | Compiler and the shared directories | The [server](server) |
 | Agent | Node | Protocol and document | The [agent library](agent-library) |
@@ -152,12 +152,13 @@ The source code is split into directories. Code in each directory runs in Node, 
   for (const from of [vite, server, compiler]) d.arrow(from.bottom, d.xy(from.bottom, shared.top))
   d.arrow(agent, protocol)
   d.arrow(agent.right, doc.right, { route: { viaX: agent.right.offset(32, 0) } })
+  d.arrow(chart, diagram)
   for (const from of [diagram, chart, protocol]) d.arrow(from, doc)
 }} />
 
 The type checker enforces the rule. Each directory is a TypeScript project with the library and types of where its code runs, and a reference to each directory it may import. The shared directories have neither the DOM library nor Node's types, the Node directories have Node's types, and the web app has the DOM library and Vite's client types. An import from a directory that a project does not reference is an error, and so is a name from the wrong environment, such as `document` in the diagram compiler.
 
-Two shared directories need more than the standard library. The chart directory has the DOM library, because the types of Observable Plot, which the chart specification uses, name DOM types. The logger runs in Node and in the browser, so its declarations give it the console methods that both have and the level that Vite's `define` gives the browser. The web app declares the [document module](page-compiler#the-document-module), the other virtual modules, and the single-file build's constant.
+Two shared directories need more than the standard library. The chart directory has the DOM library, because the types of Observable Plot, which the chart specification uses, name DOM types, and a chart is drawn into a document that the browser or the server gives it. The chart directory measures text as the diagram compiler does, with its font and measure types. The logger runs in Node and in the browser, so its declarations give it the console methods that both have and the level that Vite's `define` gives the browser. The web app declares the [document module](page-compiler#the-document-module), the other virtual modules, and the single-file build's constant.
 
 The `yap` command and the `yapparatus/vite` and `yapparatus/agent` entries are compiled to JavaScript before they are published, so the compiled package holds only Node and shared code. The web app is published as source, and the Vite of the project that uses it compiles it.
 

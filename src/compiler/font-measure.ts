@@ -52,7 +52,7 @@ const widths = new Map<string, Width>();
 export function fontMeasure(): FontMeasure {
   const uncovered = new Set<string>();
   const measure: Measure = (text, font) => {
-    const key = `${font.family}|${font.weight}|${font.size}|${text}`;
+    const key = `${font.family}|${font.weight}|${font.size}|${font.tabular ?? false}|${text}`;
     let width = widths.get(key);
     if (!width) {
       width = measureText(text, font);
@@ -134,6 +134,17 @@ export function textOutline(text: string, spec: FontSpec, x: number, y: number):
   return d;
 }
 
+/**
+ * The ascent and descent of a family's text, in em: how far a line reaches above and below its
+ * baseline, from the first face's line metrics, as a browser sets SVG text.
+ */
+export function fontExtent(family: string): { ascent: number; descent: number } {
+  const face = faceFor(familyFaces(family), " ");
+  if (!face) throw new Error(`No font file of ${family} has a space.`);
+  const font = fontFile(face.file);
+  return { ascent: font.ascent / font.unitsPerEm, descent: -font.descent / font.unitsPerEm };
+}
+
 const round = (value: number) => Math.round(value * 100) / 100;
 
 /**
@@ -159,7 +170,8 @@ const scriptCharacter = /[^\p{Script=Common}\p{Script=Inherited}]/u;
  */
 function advance(face: Face, text: string, spec: FontSpec): number {
   const font = instance(face, spec.weight, spec.size);
-  return (font.layout(text, undefined, script(text)).advanceWidth / font.unitsPerEm) * spec.size;
+  const features = spec.tabular ? ["tnum"] : undefined;
+  return (font.layout(text, features, script(text)).advanceWidth / font.unitsPerEm) * spec.size;
 }
 
 /** The script to shape a run with: its own, or Latin for a run without letters. See `advance`. */

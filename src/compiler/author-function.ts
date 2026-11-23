@@ -34,6 +34,23 @@ export function authorFunction(source: string, filename: string): AuthorFunction
   };
 }
 
+/** The context that `withTimeLimit` runs the compiler's own functions in. */
+let timer: vm.Context | undefined;
+
+/**
+ * Run the compiler's work that calls an author's code, such as Plot's accessors, in the time limit.
+ * No `finally` runs when the time is up, so the caller restores any state the work changes.
+ */
+export function withTimeLimit<T>(run: () => T): T {
+  timer ??= vm.createContext();
+  timer[callName] = run;
+  try {
+    return vm.runInContext(`${callName}()`, timer, { timeout: timeLimit }) as T;
+  } finally {
+    delete timer[callName];
+  }
+}
+
 /** Whether an error is the end of a call that passed the time limit. */
 export function timedOut(error: unknown): boolean {
   return (

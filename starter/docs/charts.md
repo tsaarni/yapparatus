@@ -41,6 +41,7 @@ Draw a chart when the reader needs to compare numbers, see a trend, or see how v
 | A noisy series as its trend | `Plot.lineY(rows, Plot.windowY({ k: 7 }, { x: "…", y: "…" }))` |
 | Parts of a total over time | `Plot.areaY(rows, { x: "…", y: "…", fill: "…" })`, which stacks |
 | Amounts by category | `Plot.barY`, or `Plot.barX` when the labels are long |
+| Amounts per day, week, or month | `Plot.rectY(rows, { x: "…", y: "…", interval: "day" })`, not `Plot.barY` |
 | Single events, such as requests | `Plot.dot` with a time `x`, and `y: { type: "log" }` for latencies |
 | How two values relate | `Plot.dot` |
 | How values spread | `Plot.rectY(rows, Plot.binX({ y: "count" }, { x: "…" }))` |
@@ -85,9 +86,10 @@ plot={(Plot, rows) => ({
 - Every mark and transform of Plot works: `Plot.dot(rows, …)`, `Plot.boxY(rows, …)`, `Plot.areaY(rows, …)`, and transforms such as `Plot.groupX`, `Plot.binX`, and `Plot.windowY`. A mark can also take its own array, as `Plot.ruleY([300])` does.
 - A field option names a column exactly as its header is written: `y: "p99 (ms)"`.
 - `plot` may also return `x`, `y`, `fx`, `fy`, and `r`: the options of those scales, such as `{ type: "log" }`, `{ type: "utc" }` for times written with `Z`, `{ grid: true }`, `{ label: "…" }`, `{ ticks: 5 }`, or `{ tickRotate: -30 }`. Use `fx` or `fy` to split a chart into small multiples.
-- Tick labels must not overlap: give many or long ones fewer `ticks` or a `tickRotate`, or put long category names on `y`.
+- Tick labels must not overlap, at the page's full width or on a phone: give many or long ones fewer `ticks` or a `tickRotate`, or put long category names on `y`. Overlap is a `CHART_OVERLAP` warning; one that only a phone has names its width.
+- Plot's own warnings, such as dates on a band scale, are `CHART_WARNING`: do what the message says. Bars on dates are `Plot.rectY` with `interval: "day"`, because `Plot.barY` makes each date a category.
 - Draw thousands of rows with a transform, such as `Plot.binX` or `Plot.windowY`: each mark is an element on the page.
-- `plot` returns only marks and scale options, and does not call `Plot.plot` or `Plot.legend`: Yapparatus sets the size, margins, fonts, and colors. It uses only `Plot`, `rows`, and values written inside it, and finishes within 1 second.
+- `plot` returns only marks and scale options, and does not call `Plot.plot` or `Plot.legend`: Yapparatus sets the size, margins, fonts, and colors. It uses only `Plot`, `rows`, and values written inside it, and it and the drawing of its marks finish within 1 second.
 
 ## Color
 

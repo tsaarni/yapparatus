@@ -47,7 +47,7 @@ export const pictureErrors = {
         : "Its page has no diagram with an id."
     } Only a <Diagram> with an id has a picture.`,
   chart: (address: string) =>
-    `${address} is a chart, and only diagrams have pictures. A browser checks a chart when it shows the page.`,
+    `${address} is a chart, and only diagrams have pictures. The page compiler draws each chart and reports its problems with the page's diagnostics.`,
   notDrawn: (address: string) =>
     `${address} could not be drawn. Check the document, fix the diagram's errors, and ask again:\n\n${checkCommand()}`,
   notCompiled: (page: string, message: string) =>
@@ -91,7 +91,7 @@ export function diagnosticsSection(
           .join("\n")}`
       : "Diagnostics: none",
     unchecked.length
-      ? `Not checked since they changed: chart drawings, render errors, and runtime errors on these pages. A browser checks them when the reader opens a page, so link each change in your reply:\n${unchecked
+      ? `Not checked since they changed: render errors and runtime errors on these pages. A browser checks them when the reader opens a page, so link each change in your reply:\n${unchecked
           .map((page) =>
             [
               `- ${page.address}`,

@@ -4,13 +4,13 @@ A chart is a figure that [Observable Plot](https://observablehq.com/plot/), a Ja
 
 ## Overview
 
-The [page compiler](page-compiler#charts) reads the data, gives each column a type, and runs the chart's `plot` function on it, so problems with the data and the marks are reported without a browser. The browser runs `plot` again and draws the chart at the width of the page. <Ref to="charts-path" /> shows the path.
+The [page compiler](page-compiler#charts) reads the data, gives each column a type, runs the chart's `plot` function on it, and draws the chart, so problems with the data, the marks, and the drawing are reported without a browser. The browser runs `plot` again and draws the chart the same way at the width of the page. <Ref to="charts-path" /> shows the path.
 
 <Diagram id="charts-path" caption="The path of a chart's data, from the page or a file to the drawing." draw={(d) => {
   const table = d.box("Table on the page", { id: "table-source", sub: "from=\"#id\"" })
   const block = d.box("CSV block", { id: "csv-block", sub: "inside the chart" })
   const file = d.cylinder("CSV or TSV file", { id: "data-file", sub: "in an external directory" })
-  const types = d.box("Read and check", { id: "column-types", sub: "one type per column", category: "Page compiler" })
+  const types = d.box("Read, check, draw", { id: "column-types", sub: "one type per column", category: "Page compiler" })
   const prop = d.box("In the page", { id: "data-prop", sub: "from a table or block", category: "Page compiler" })
   const module = d.cylinder("Data module", { id: "data-module", sub: "from a file", category: "Page compiler" })
   const chart = d.box("Chart", { id: "chart", sub: "rows and plot", category: "Browser" })
@@ -32,17 +32,17 @@ The [page compiler](page-compiler#charts) reads the data, gives each column a ty
   d.arrow(chart, figure)
 }}>
   <Step focus="table-source csv-block data-file">The data is a table, a block, or a file.</Step>
-  <Step focus="column-types">Each column gets one type, and every problem is reported at its line.</Step>
+  <Step focus="column-types">Each column gets one type, and every problem is reported at its line. The page compiler draws the chart to check it.</Step>
   <Step focus="data-prop data-module">Data from the page goes into the page. A file's data becomes its own module.</Step>
   <Step focus="chart load">The chart loads a file's data when it comes near the screen.</Step>
   <Step focus="figure">The chart runs `plot` and draws twice: once to measure, once to show.</Step>
 </Diagram>
 
-The page compiler reads the CSV and TSV formats, gives the columns their types, and checks them and the calls to Plot. The browser draws the chart, measures its margins, waits for the fonts, and checks the drawing. The typed data is the one form that both sides use.
+The page compiler reads the CSV and TSV formats, gives the columns their types, and checks them, the calls to Plot, and the drawing. The browser waits for the fonts and draws the chart. Both sides draw with one function, so the typed data and the drawing are the same on both.
 
 ## Examples
 
-The charts in this section show the forms that a chart supports. The browser shares are yearly worldwide figures from [StatCounter](https://gs.statcounter.com/browser-market-share). The request latencies are made-up example data, read from a CSV file in the repository. <Ref to="charts-example-share" /> draws lines and dots, colored by a column of categories, with a legend. <Ref to="charts-example-latency" /> and <Ref to="charts-example-latency-box" /> read the same file, as a performance investigation would. The scatter plot on a log scale shows that the requests over the target began with a deploy that emptied a cache, and the box plots show that almost every cache miss is slower than the target. <Ref to="charts-example-devices" /> draws the rows of <Ref to="charts-example-device-table" /> as bars, split into small multiples with `fx`.
+The charts in this section show the forms that a chart supports. The browser shares are yearly worldwide figures from [StatCounter](https://gs.statcounter.com/browser-market-share). The request latencies are made-up example data, read from a CSV file in the repository. <Ref to="charts-example-share" /> draws lines and dots, colored by a column of categories, with a legend. <Ref to="charts-example-latency" /> and <Ref to="charts-example-latency-box" /> read the same file, as a performance investigation would. The scatter plot on a log scale shows that the requests over the target began with a deploy that emptied a cache, and the box plots show that almost every cache miss is slower than the target. <Ref to="charts-example-devices" /> draws the rows of <Ref to="charts-example-device-table" /> as bars, split into small multiples with `fx`. Its legend names the bars in place of an x axis, whose labels would overlap on a phone.
 
 <Chart id="charts-example-share" caption="Worldwide browser share by year, on all devices, as lines with dots. Data from StatCounter." plot={(Plot, rows) => ({
   marks: [
@@ -140,7 +140,7 @@ Year,Browser,Share (%)
     Plot.barY(rows, { fx: "Device", x: "Browser", y: "Share (%)", fill: "Browser" }),
     Plot.ruleY([0]),
   ],
-  x: { label: null, domain: ["Chrome", "Safari", "Edge", "Firefox"] },
+  x: { axis: null, domain: ["Chrome", "Safari", "Edge", "Firefox"] },
   fx: { label: null },
   y: { grid: true },
 })} />
@@ -166,12 +166,18 @@ A file's data is its own module, named with a hash of the file's text, so a brow
 
 ## Drawing
 
-The chart waits for the web app's fonts, because margins measured with a fallback font would be wrong, and draws again when its width changes. It calls `plot` with the rows and a [checked Plot library](#checks-on-the-marks), adds the width, the font, and the colors, and draws twice, off screen:
+The browser and the page compiler draw a chart with one function. It takes Plot, what `plot` returned, the rows, the width, a document to make the elements in, the font with a text measure, and the colors. The browser passes its own document, its fonts measured by the browser, and the theme's colors as CSS variables. The page compiler passes a document without a browser, from [linkedom](https://github.com/WebReflection/linkedom), the font measure of the [diagram compiler](diagram-compiler), and the light theme's colors. The chart draws twice:
 
-1. The first drawing gives the categories and the extent of every label. Each margin grows by how far a label reaches past the edge.
-2. The second drawing uses the categories in their order and the new margins. Tick labels that still run into each other are `CHART_OVERLAP`.
+1. The first drawing gives the categories and the box of every label. Each margin grows by how far a label reaches past the edge, and by how far an axis label crowds the tick labels on its side of the plot. Plot keeps an axis label at the edge of the figure, so a wider margin moves the tick labels away from it.
+2. The second drawing uses the categories in their order and the new margins. Labels that still run into each other are `CHART_OVERLAP`.
 
-The chart shows the second drawing with a legend.
+Neither side reads the layout of a drawing. The box of a label comes from its attributes: its position and the transforms around it, its anchor, its lines, its font size, and the width of its text from the measure, with the font's ascent and descent for its height. A rotated label keeps its rotated box, so rotated tick labels overlap only when their text does. The boxes agree with Chrome's within about a pixel.
+
+Plot writes its warnings, such as dates on a band scale, to the console and puts a warning sign in the figure. The chart takes the sign out and reports each warning as `CHART_WARNING`, with what the author can do.
+
+The browser waits for the web app's fonts, because labels measured with a fallback font would be wrong, and draws again when its width changes. It shows the second drawing with a legend.
+
+The page compiler draws each chart at the widest width a chart has in the reading layout, and again at the width it has on a phone. Overlap depends on the width, so a reader at another width can still see labels overlap. An overlap that only the phone width has names that width. It does not draw a chart whose data or marks have errors, since those are reported already.
 
 ## Color
 
@@ -181,23 +187,23 @@ A chart's `fill` or `stroke` names the column of categories. The colors are the 
 
 ## Checks on the marks
 
-The library that `plot` receives checks each call before it calls Plot. The page compiler runs `plot` with this library in a fresh JavaScript context with a time limit of 1 second, as it runs a diagram's draw program, so `plot` uses only `Plot`, `rows`, and the values it defines itself. A `plot` that runs past the time limit is `CHART_PLOT`. <Ref to="charts-mark-checks" /> lists the checks and where each is found.
+The library that `plot` receives checks each call before it calls Plot. The page compiler runs `plot` with this library in a fresh JavaScript context with a time limit of 1 second, as it runs a diagram's draw program, so `plot` uses only `Plot`, `rows`, and the values it defines itself. The two drawings run within the same time limit, because Plot calls the accessors that `plot` wrote while it draws. A `plot` whose run and drawings pass the time limit is `CHART_PLOT`. <Ref to="charts-mark-checks" /> lists the checks and where each is found.
 
-<Table id="charts-mark-checks" caption="The checks on what plot asks of Plot. All are errors except CHART_OVERLAP.">
+<Table id="charts-mark-checks" caption="The checks on what plot asks of Plot and on the drawing. All are errors except the last three, which are warnings.">
 
 | Code | Found when | Found by |
 |---|---|---|
 | `CHART_FIELD` | A field, such as `x` or `fill`, names no column | Page compiler |
 | `CHART_COLOR` | `fill` or `stroke` is a CSS color, such as `"tomato"` | Page compiler |
 | `CHART_OPTION` | `plot` calls `Plot.plot` or `Plot.legend`, or returns more than `marks`, `x`, `y`, `fx`, `fy`, and `r` | Page compiler |
-| `CHART_FAILED` | `plot` throws, or Plot throws while it draws | Page compiler, browser |
-| `CHART_OVERLAP` | Tick labels on one axis overlap | Browser |
+| `CHART_FAILED` | `plot` throws, or Plot throws while it draws | Page compiler |
+| `CHART_OVERLAP` | Tick labels on one axis overlap, or an axis label overlaps tick labels | Page compiler |
+| `CHART_WARNING` | Plot warns while it draws | Page compiler |
+| `TOO_MANY_CATEGORIES` | The colors name more categories than the theme has colors | Page compiler |
 
 </Table>
 
-Plot alone draws nothing for an unknown field without an error, and reads a color name as a constant color. The browser shows every problem under the chart, and reports to the server only those that drawing finds, as [revisions and reports](diagnostics#revisions-and-reports) describes. Those are known only after a browser has shown the page.
-
-**[Direction](directions):** the server draws charts too, so `TOO_MANY_CATEGORIES`, `CHART_OVERLAP`, and Plot's drawing errors are found when the page compiles. Overlap depends on the width, so the server checks at fixed widths.
+Plot alone draws nothing for an unknown field without an error, and reads a color name as a constant color. The page compiler finds every problem in the table when the page compiles, so the agent sees it before anyone opens the page. In dev mode, the browser shows the problems of its own drawing under the chart, and reports to the server only a data file that does not load, as [revisions and reports](diagnostics#revisions-and-reports) describes.
 
 ## Design decisions
 
@@ -208,6 +214,8 @@ Plot alone draws nothing for an unknown field without an error, and reads a colo
 **Categories take colors in the order of first use.** Plot's default sorts the values, so one added row could change every color.
 
 **A file's data is a separate module.** Rows in the page would make it slow to open and to compile.
+
+**Label boxes come from attributes.** A server has no layout engine, and one computation for both sides finds each problem once, in the page compiler, with the same margins the reader sees.
 
 ## Sources
 

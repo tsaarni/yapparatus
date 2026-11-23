@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { loadThemes } from "../../../../src/server/theme-values.ts";
+import { loadThemes } from "../../../../src/compiler/theme-values.ts";
 
 /** The dark and light themes' roles, from the real theme file. */
 const { theme, lightTheme } = await loadThemes();

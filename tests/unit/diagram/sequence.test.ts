@@ -5,6 +5,7 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { lightPaint } from "../../../src/compiler/theme-values.ts";
 import { DiagramBuilder } from "../../../src/diagram/builder.ts";
 import { compile } from "../../../src/diagram/compile/compile.ts";
 import {
@@ -19,7 +20,6 @@ import type { Measure } from "../../../src/diagram/metrics.ts";
 import { pictureOf } from "../../../src/diagram/picture.ts";
 import { Scene } from "../../../src/diagram/scene.ts";
 import type { SequenceEntry } from "../../../src/diagram/sequence.ts";
-import { lightPaint } from "../../../src/server/theme-values.ts";
 import { fixedIcons } from "./fixed-icons.ts";
 
 /** 7 units per character: deterministic stand-in for font measurement. */

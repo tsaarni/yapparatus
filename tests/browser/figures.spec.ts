@@ -75,6 +75,6 @@ test("the agent saves a picture in the file it names", async () => {
   );
   expect(failed.code).toBe(1);
   expect(failed.stderr.trim()).toBe(
-    "/charts#latency is a chart, and only diagrams have pictures. A browser checks a chart when it shows the page.",
+    "/charts#latency is a chart, and only diagrams have pictures. The page compiler draws each chart and reports its problems with the page's diagnostics.",
   );
 });

@@ -203,7 +203,7 @@ The panel header shows the [agent state](server#agent-state). While the newest m
 
 In dev mode, the header shows the number of errors and warnings, and opens a list of them grouped by page. An item's code and line open the page at the diagnostic's place. Its message is text that the user can select, and its Copy button copies the diagnostic with its file and line. Its Comment button writes a request to fix the diagnostic into the message box. Diagnostics also appear in place: a page that fails to render shows its error instead of its content, and a [diagram](components#diagram) or chart lists them under the figure.
 
-Some problems appear only when a page runs in the browser: render errors, runtime errors, chart problems, and replies that fail to show. The web app reports them to the server with the page's revision, and reports a clean revision too, so the server knows the page was checked. See [revisions and reports](diagnostics#revisions-and-reports).
+Some problems appear only when a page runs in the browser: render errors, runtime errors, chart data that fails to load, and replies that fail to show. The web app reports them to the server with the page's revision, and reports a clean revision too, so the server knows the page was checked. See [revisions and reports](diagnostics#revisions-and-reports).
 
 ## Layers
 
@@ -212,7 +212,7 @@ The web app is divided into layers. Each layer uses only the layers before it in
 1. Style: the tokens, a reset, semantic class names, and the focus ring; see [styling](styling).
 2. Controls: the button, copying with feedback on the button, `Icon`, and the web app's own icons.
 3. Addressing: addresses, navigation, and prefetching; numbers and `Ref` targets; the Link and Comment buttons; references and the selection menu's state.
-4. Live updates: requests to the server, its updates, and the reports of runtime errors and chart problems.
+4. Live updates: requests to the server, its updates, and the reports of runtime errors and chart data that fails to load.
 5. Prose: the elements that Markdown compiles to, the page or reply and figure contexts, the breakout rule, headings, code blocks and their line numbers, blockquotes and alerts, links, and tables.
 6. Components: `Figure`, `Table`, `Listing`, `Ref`, `FileTree`, `Excerpt`, `Tabs`, `Columns`, `Panel`, and the diagnostics under a diagram or a chart; then `Diagram`, `Step`, and `Chart`. See [components](components) and [charts](charts).
 7. The registry: the components that pages and replies use without imports.

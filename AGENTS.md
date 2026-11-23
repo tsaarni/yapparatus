@@ -36,7 +36,8 @@ Each directory under `src/` has one runtime: pure (no DOM, no Node), node, or br
 | Directory | Runtime | May import |
 |---|---|---|
 | `document/` | pure | nothing |
-| `protocol/`, `diagram/`, `chart/` | pure | `document` |
+| `protocol/`, `diagram/` | pure | `document` |
+| `chart/` | pure | `document`, `diagram` |
 | `compiler/` | node | all pure |
 | `server/` | node | `compiler`, all pure |
 | `agent/` | node | `protocol`, `document` |

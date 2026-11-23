@@ -15,7 +15,7 @@ The agent must not see how it is judged. It gets a copy of `starter/` and of `or
    - **element**: clicks the first diagram element whose id contains `cache`, and asks which settings in `config.yaml` control it, as a table under the figure. Passes if that page gains a `Table`.
    - **lines**: selects the `retry` function in `worker.go` in the file view, and asks whether its jitter is explained, adding it if not. Passes if a page mentions jitter.
 5. After the last reply, the harness reads the chat as another agent. That ends the agent's wait with "Another agent took over the chat", and the agent stops by itself, so its counts are complete.
-6. Opens every page in the browser, so chart drawings are checked, reads the final diagnostics, and saves a picture of every diagram.
+6. Opens every page in the browser, so render errors are checked, reads the final diagnostics, and saves a picture of every diagram.
 
 The browser stays open during the run, so errors that only a browser finds reach the agent as they would with a reader.
 
