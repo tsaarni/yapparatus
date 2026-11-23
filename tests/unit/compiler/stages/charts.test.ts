@@ -7,7 +7,12 @@ import { test } from "node:test";
 import { compile } from "@mdx-js/mdx";
 import remarkGfm from "remark-gfm";
 import type { ExternalFiles } from "../../../../src/compiler/external-files.ts";
-import { charts, dataModuleCode, readChartFile } from "../../../../src/compiler/stages/charts.ts";
+import {
+  charts,
+  dataModuleCode,
+  pageCharts,
+  readChartFile,
+} from "../../../../src/compiler/stages/charts.ts";
 import { contentIssues } from "../../../../src/compiler/stages/conventions.ts";
 import { excerpts } from "../../../../src/compiler/stages/excerpts.ts";
 
@@ -204,5 +209,19 @@ test("a chart's file is drawn too", async () => {
   assert.deepEqual(
     issues.map((i) => [i.code, i.subject]),
     [["CHART_OVERLAP", "x at 320 px"]],
+  );
+});
+
+test("the drawing reads the options that plot writes in its own context, such as sort", async () => {
+  const marks =
+    'plot={(Plot, rows) => ({ marks: [Plot.barY(rows, { x: "a", y: "b", sort: { x: "-y" } })] })}';
+  const source = `<Chart id="sorted" ${marks}>\n\n\`\`\`csv\na,b\nlow,1\nhigh,9\nmiddle,5\n\`\`\`\n\n</Chart>\n`;
+  const file = `/virtual/${Math.random()}.mdx`;
+  await compile({ value: source, path: file }, { rehypePlugins: [charts(files)] });
+  const svg = pageCharts.get(file)?.get("sorted")?.svg;
+  const ticks = svg?.querySelectorAll('g[aria-label="x-axis tick label"] text') ?? [];
+  assert.deepEqual(
+    [...ticks].map((t) => t.textContent),
+    ["high", "middle", "low"],
   );
 });

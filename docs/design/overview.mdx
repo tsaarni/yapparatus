@@ -10,7 +10,7 @@ Three properties of the design support this. First, the agent can write pages wi
 
 - The agent describes a diagram as rows, columns, and placements in a short JavaScript program, and the [diagram compiler](diagram-compiler) computes every size and position. A language model states an arrangement well and computes coordinates poorly.
 - The diagram compiler reports overlapping shapes, edges that cross shapes, and text that does not fit. The agent can also save a [picture](diagram-compiler#pictures) of a diagram and look at it.
-- The agent writes chart data as a table or a CSV file, and draws it with Observable Plot, which agents already know. The page compiler checks the data.
+- The agent writes chart data as a table or a CSV file, and draws it with Observable Plot, which agents already know. The page compiler checks the data and the drawing, and the agent can save a [picture](charts#pictures) of a chart too.
 - The agent shows code from the source files without copying it into the page, so the page stays up to date when the code changes.
 - Figures, tables, and listings are numbered automatically, and every color comes from the theme. The agent writes no numbers and no colors.
 - Every problem, such as a broken link, is reported with its file and line, so the agent fixes its own pages.

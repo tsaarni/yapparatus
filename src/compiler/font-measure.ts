@@ -120,7 +120,7 @@ export function textOutline(text: string, spec: FontSpec, x: number, y: number):
     }
     const font = instance(run.face, spec.weight, spec.size);
     const scale = spec.size / font.unitsPerEm;
-    const laid = font.layout(run.text, undefined, script(run.text));
+    const laid = font.layout(run.text, features(spec), script(run.text));
     laid.glyphs.forEach((glyph, i) => {
       const at = laid.positions[i];
       if (!at) return;
@@ -170,8 +170,14 @@ const scriptCharacter = /[^\p{Script=Common}\p{Script=Inherited}]/u;
  */
 function advance(face: Face, text: string, spec: FontSpec): number {
   const font = instance(face, spec.weight, spec.size);
-  const features = spec.tabular ? ["tnum"] : undefined;
-  return (font.layout(text, features, script(text)).advanceWidth / font.unitsPerEm) * spec.size;
+  return (
+    (font.layout(text, features(spec), script(text)).advanceWidth / font.unitsPerEm) * spec.size
+  );
+}
+
+/** The OpenType features a font spec turns on: tabular digits. */
+function features(spec: FontSpec): string[] | undefined {
+  return spec.tabular ? ["tnum"] : undefined;
 }
 
 /** The script to shape a run with: its own, or Latin for a run without letters. See `advance`. */

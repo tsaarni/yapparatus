@@ -85,7 +85,7 @@ The server [checks the reply](server#reply-checks) before it stores it. A refuse
 
 ## savePicture
 
-`savePicture(address, file, options?)` saves a diagram's picture as a PNG in the file that the agent names. The address is the figure's `/page#figure`. With `{ ids: true }`, the picture labels each element with its id and outlines the elements that diagnostics name. The agent opens the file as an image and deletes it afterwards. The picture shows what no diagnostic covers, such as a layout that is valid but hard to read, so the start prompt asks the agent to look after it changes a diagram and the check is clean, and to stop once the drawing reads clearly.
+`savePicture(address, file, options?)` saves a diagram's or a chart's picture as a PNG in the file that the agent names. The address is the figure's `/page#figure`. With `{ ids: true }`, a diagram's picture labels each element with its id and outlines the elements that diagnostics name; a chart has no elements to label, so it takes no options. The agent opens the file as an image and deletes it afterwards. The picture shows what no diagnostic covers, such as a layout that is valid but hard to read, so the start prompt asks the agent to look after it changes a diagram or a chart and the check is clean, and to stop once the drawing reads clearly.
 
 ## Prompts
 

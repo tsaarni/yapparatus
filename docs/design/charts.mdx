@@ -234,6 +234,12 @@ The browser waits for the web app's fonts, because labels measured with a fallba
 
 The page compiler draws each chart at the widest width a chart has in the reading layout, and again at the width it has on a phone. Overlap depends on the width, so a reader at another width can still see labels overlap. An overlap that only the phone width has names that width. It does not draw a chart whose data or marks have errors, since those are reported already.
 
+## Pictures
+
+A picture is a PNG of a chart that the server draws for the agent, as it draws [a diagram's](diagram-compiler#pictures), through [the figures resource](rest-api#read-a-picture). It is the drawing the page compiler made at the widest width, so the agent sees what the checks saw. The picture writer copies the drawing and turns each text into glyph outlines, from the same runs of text that give the label boxes, so the text keeps its place, anchor, rotation, size, weight, and tabular digits. The text keeps its paint and its halo, a stroke in the surface color drawn under the fill. The page compiler's paint leaves only literal colors, and the writer reads the light color of any `light-dark()` pair and the text color for `currentColor` that Plot leaves. Under the drawing it draws the legend as the browser shows it: a swatch and the name of each category, or the ramp between its lowest and highest amount. The caption is not part of the picture.
+
+A chart whose data or marks have errors has no drawing, so its picture returns `422`, as for a diagram that could not be drawn. A chart has no element ids, so it takes no `ids` option.
+
 ## Color
 
 A chart's `fill` or `stroke` names a column, and its values set the colors. The first drawing's color values decide how:
@@ -279,6 +285,8 @@ Plot alone draws nothing for an unknown field without an error, and reads a colo
 **Numbers in `fill` are amounts.** Plot gives them a continuous scale, and one category per value would run out of colors at the fifth.
 
 **The look is set as attributes from a paint.** One pass gives the browser and the page compiler the same drawing, with CSS variables in one and literal colors in the other, and without a style sheet.
+
+**`plot`'s options are copied into the page compiler's context.** `plot` runs in its own JavaScript context, and Plot reads an object as options, such as `sort`, only if it was made in Plot's context. The page compiler copies the plain objects of each call to Plot, so it draws what the browser draws.
 
 **Label boxes come from attributes.** A server has no layout engine, and one computation for both sides finds each problem once, in the page compiler, with the same margins the reader sees.
 

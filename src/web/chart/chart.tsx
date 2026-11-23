@@ -3,6 +3,7 @@
 import * as stylex from "@stylexjs/stylex";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { type ChartDrawing, drawChart } from "../../chart/drawing.ts";
+import { amountFormat } from "../../chart/legend.ts";
 import type { ChartPaint } from "../../chart/paint.ts";
 import {
   type ChartProblem,
@@ -136,9 +137,6 @@ const paint: ChartPaint = {
     `color-mix(in oklab, ${theme.accent} ${Math.round(t * 1000) / 10}%, ${theme.accentSurface})`,
 };
 
-/** The legend's numbers at the ends of a ramp. */
-const amount = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
-
 const lastValid = new Map<string, Drawn>();
 const swatches = () => [s.swatch1, s.swatch2, s.swatch3, s.swatch4];
 
@@ -228,12 +226,12 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
       {drawn?.legend?.kind === "ramp" && (
         <div
           role="img"
-          aria-label={`Legend: shades from ${amount.format(drawn.legend.low)} to ${amount.format(drawn.legend.high)}`}
+          aria-label={`Legend: shades from ${amountFormat.format(drawn.legend.low)} to ${amountFormat.format(drawn.legend.high)}`}
           {...stylex.props(s.legend, s.ramp)}
         >
-          <span>{amount.format(drawn.legend.low)}</span>
+          <span>{amountFormat.format(drawn.legend.low)}</span>
           <span {...stylex.props(s.rampBar)} />
-          <span>{amount.format(drawn.legend.high)}</span>
+          <span>{amountFormat.format(drawn.legend.high)}</span>
         </div>
       )}
       {dev && problems.length > 0 && <Diagnostics items={problems} of="chart" />}

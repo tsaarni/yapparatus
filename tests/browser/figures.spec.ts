@@ -1,5 +1,6 @@
 /**
- * Diagram pictures from /-/api/figures: PNG size, element ids, errors, and pictures after edits.
+ * Pictures from /-/api/figures: diagrams and charts, PNG size, element ids, errors, and pictures
+ * after edits.
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -24,6 +25,15 @@ test("a diagram's picture is a PNG at twice the drawing's size", async ({ page, 
   expect(size).toEqual({ width: Math.round(width * 2), height: Math.round(height * 2) });
 });
 
+test("a chart's picture is a PNG of its drawing, from a block or a file", async ({ request }) => {
+  for (const id of ["latency", "throughput"]) {
+    const response = await request.get(`/-/api/figures/charts/${id}`);
+    expect(response.status()).toBe(200);
+    expect(response.headers()["content-type"]).toBe("image/png");
+    expect(pngSize(await response.body()).width).toBeGreaterThan(0);
+  }
+});
+
 test("ids label the elements", async ({ request }) => {
   const get = async (query: string) =>
     (await request.get(`/-/api/figures/second-page/step-flow${query}`)).body();
@@ -40,9 +50,11 @@ test("a picture that cannot be drawn answers with what to do", async ({ request 
     expect(response.headers()["content-type"]).toBe("application/json");
     return ((await response.json()) as { error: string }).error;
   };
-  expect(await error("charts/latency", 404)).toContain("/charts#latency is a chart");
+  expect(await error("charts/latency?ids=true", 400)).toContain(
+    "/charts#latency is a chart, and ids label the elements of a diagram.",
+  );
   expect(await error("second-page/nothing", 404)).toContain(
-    "The diagrams with an id on its page: step-flow.",
+    "The diagrams and charts with an id on its page: step-flow.",
   );
   expect(await error("no-such-page/flow", 404)).toContain("There is no page /no-such-page");
   expect(await error("second-page/step-flow?ids=yes", 400)).toContain("true or false");
@@ -70,11 +82,17 @@ test("the agent saves a picture in the file it names", async () => {
   );
   expect(saved.stderr).toBe("");
   expect(pngSize(readFileSync(file)).width).toBeGreaterThan(0);
+  const chart = path.join(root, "latency.png");
+  const drawn = await runCommand(
+    `import { savePicture } from "yapparatus/agent"; await savePicture("/charts#latency", ${JSON.stringify(chart)});`,
+  );
+  expect(drawn.stderr).toBe("");
+  expect(pngSize(readFileSync(chart)).width).toBeGreaterThan(0);
   const failed = await runCommand(
-    'import { savePicture } from "yapparatus/agent"; await savePicture("/charts#latency", "chart.png");',
+    'import { savePicture } from "yapparatus/agent"; await savePicture("/charts#latency", "chart.png", { ids: true });',
   );
   expect(failed.code).toBe(1);
   expect(failed.stderr.trim()).toBe(
-    "/charts#latency is a chart, and only diagrams have pictures. The page compiler draws each chart and reports its problems with the page's diagnostics.",
+    "/charts#latency is a chart, and ids label the elements of a diagram. Ask again without ids.",
   );
 });

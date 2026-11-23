@@ -40,16 +40,16 @@ export const pictureErrors = {
   badIds: () => "ids is true or false.",
   noPage: (page: string) =>
     `There is no page /${page} in the document. A figure's address is /<page>#<figure>, as in links.`,
-  noDiagram: (address: string, diagrams: string[]) =>
-    `${address} is not a diagram with an id. ${
-      diagrams.length
-        ? `The diagrams with an id on its page: ${diagrams.join(", ")}.`
-        : "Its page has no diagram with an id."
-    } Only a <Diagram> with an id has a picture.`,
-  chart: (address: string) =>
-    `${address} is a chart, and only diagrams have pictures. The page compiler draws each chart and reports its problems with the page's diagnostics.`,
+  noFigure: (address: string, figures: string[]) =>
+    `${address} is not a diagram or chart with an id. ${
+      figures.length
+        ? `The diagrams and charts with an id on its page: ${figures.join(", ")}.`
+        : "Its page has no diagram or chart with an id."
+    } Only a <Diagram> or <Chart> with an id has a picture.`,
+  chartIds: (address: string) =>
+    `${address} is a chart, and ids label the elements of a diagram. Ask again without ids.`,
   notDrawn: (address: string) =>
-    `${address} could not be drawn. Check the document, fix the diagram's errors, and ask again:\n\n${checkCommand()}`,
+    `${address} could not be drawn. Check the document, fix the figure's errors, and ask again:\n\n${checkCommand()}`,
   notCompiled: (page: string, message: string) =>
     `The page ${page} does not compile: ${message}\nCheck the document, fix it, and ask again:\n\n${checkCommand()}`,
 };
@@ -227,7 +227,7 @@ export function startPrompt(guide: string, folders: Record<string, string>, root
       `1. Wait for the reader with the command below. It may wait for hours: run it in the background if you are notified when commands finish, otherwise with the longest timeout your shell allows, and run it again if your shell stops it.`,
       `2. Edit pages following ${guide}. Its components, diagrams, and charts are not in your training data: read the guide's page for each feature before you write it.`,
       `3. Check the document and fix every error and warning it lists. You may run the check in the same command that writes the pages.`,
-      `4. Diagnostics catch overlaps and unknown elements, not a drawing that is hard to read. After a diagram is clean, save its picture as a PNG file you name, open it, fix what is hard to read, and stop when it reads clearly. Delete the file afterwards. Add { ids: true } as a third argument to label each element with its id.`,
+      `4. Diagnostics catch overlaps and unknown elements, not a drawing that is hard to read. After a diagram or chart is clean, save its picture as a PNG file you name, open it, fix what is hard to read, and stop when it reads clearly. Delete the file afterwards. For a diagram, add { ids: true } as a third argument to label each element with its id.`,
       `5. Reply with the command each prompt ends with, even when you edited pages: say in a sentence what changed on each page, with a link to the change, such as [the new section on misses](/cache#misses). A reply is MDX, as the guide's Replies section says. The command sends the reply and waits again.`,
     ].join("\n"),
     `Wait:\n\n${waitCommand()}`,

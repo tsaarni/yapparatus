@@ -189,8 +189,8 @@ node --input-type=module-typescript -e 'import { checkDocument } from "yapparatu
 ```
 
 - In the chat, read them after editing and fix them before you reply. Errors found later, when a browser opens a changed page, end your wait for messages.
-- Pages, diagrams, and chart data are checked when a page compiles. Chart drawings, render errors, and runtime errors are checked only when a browser shows the page; the diagnostics list the pages no browser has shown since they changed. In your reply, link each change, such as `[the new section on misses](/cache#misses)`, so the reader's browser checks it.
-- Diagnostics do not tell you that a diagram is hard to read. After a diagram's diagnostics are clean, save its picture, open the PNG as an image, and delete it afterwards. `savePicture("/cache#flow", "/tmp/flow.png", { ids: true })` labels each element with its id.
+- Pages, diagrams, chart data, and chart drawings are checked when a page compiles. Render errors and runtime errors are checked only when a browser shows the page; the diagnostics list the pages no browser has shown since they changed. In your reply, link each change, such as `[the new section on misses](/cache#misses)`, so the reader's browser checks it.
+- Diagnostics do not tell you that a diagram or chart is hard to read. After its diagnostics are clean, save its picture, open the PNG as an image, and delete it afterwards. A chart's picture shows its legend. For a diagram, `savePicture("/cache#flow", "/tmp/flow.png", { ids: true })` labels each element with its id.
 
 ```sh
 node --input-type=module-typescript -e 'import { savePicture } from "yapparatus/agent"; await savePicture("/page#figure", "/tmp/figure.png");'

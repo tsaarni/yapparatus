@@ -9,12 +9,14 @@ import type {
   MdxJsxTextElementHast,
 } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
+import type { ChartDrawing } from "../../chart/drawing.ts";
 import type { DiagramBuilder } from "../../diagram/builder.ts";
 import type { CompiledDiagram } from "../../diagram/drawing.ts";
 import { compileFigure, drawFailed, type FigureStep } from "../../diagram/figure.ts";
 import { authorFunction, timedOut } from "../author-function.ts";
 import { fontMeasure } from "../font-measure.ts";
 import { lucideIcons } from "../lucide-icons.ts";
+import { pageCharts } from "./charts.ts";
 import { type ContentIssue, compiledAttribute, contentIssues } from "./conventions.ts";
 
 type Jsx = MdxJsxFlowElementHast | MdxJsxTextElementHast;
@@ -36,12 +38,16 @@ const cache = new Map<string, Compiled>();
 const cacheSize = 500;
 
 /**
- * The figures of each compiled file by path: its source text, diagrams by id, and chart ids.
+ * The figures of each compiled file by path: its source text, and its diagrams and charts by id.
  * The server draws pictures from here and recompiles the file when its text on disk differs.
  */
 export const pageFigures = new Map<
   string,
-  { source: string; diagrams: Map<string, CompiledDiagram>; charts: Set<string> }
+  {
+    source: string;
+    diagrams: Map<string, CompiledDiagram>;
+    charts: Map<string, ChartDrawing | undefined>;
+  }
 >();
 
 /** The stage that compiles each `<Diagram>` and records the page's figures. */
@@ -52,7 +58,7 @@ export function diagrams() {
     const figures = {
       source: String(file.value),
       diagrams: new Map<string, CompiledDiagram>(),
-      charts: new Set<string>(),
+      charts: pageCharts.get(file.path) ?? new Map<string, ChartDrawing | undefined>(),
     };
     visit(tree, (node) => {
       if (node.type !== "mdxJsxFlowElement" && node.type !== "mdxJsxTextElement") return;
@@ -62,7 +68,6 @@ export function diagrams() {
         const figure = diagram(jsx, issues);
         if (typeof id === "string") figures.diagrams.set(id, figure);
       }
-      if (jsx.name === "Chart" && typeof id === "string") figures.charts.add(id);
     });
     pageFigures.set(file.path, figures);
   };

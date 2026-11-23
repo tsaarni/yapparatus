@@ -12,6 +12,9 @@ export type ChartLegend =
   | { kind: "categories"; entries: LegendEntry[] }
   | { kind: "ramp"; low: number; high: number };
 
+/** The legend's numbers at the ends of a ramp. */
+export const amountFormat = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
+
 /** Position channels by the scale whose axis shows them. */
 const positions = { x: ["x", "x1", "x2"], y: ["y", "y1", "y2"] } as const;
 

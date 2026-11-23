@@ -2,7 +2,7 @@
  * The box an SVG `<text>` covers, computed from its attributes and a text measure, so a chart's
  * labels are laid out the same in a browser and on the server, which has no layout engine.
  */
-import type { Measure } from "../diagram/metrics.ts";
+import type { FontSpec, Measure } from "../diagram/metrics.ts";
 
 /** A rectangle in the drawing's coordinates. */
 export interface Box {
@@ -143,24 +143,48 @@ export type Quad = [Point, Point, Point, Point];
 /** A point in the drawing's coordinates. */
 export type Point = [number, number];
 
+/** A run of a `<text>` as it is set: its characters, font, left edge, baseline, and width. */
+export interface TextRun {
+  text: string;
+  font: FontSpec;
+  left: number;
+  baseline: number;
+  width: number;
+}
+
 /**
- * The rectangles a `<text>` covers, one per chunk: each is as wide as the measure says and as
- * tall as the font's ascent and descent, turned and moved as the text's transforms say.
+ * The runs of a `<text>` in its own coordinates, one per chunk, each placed by its anchor and as
+ * wide as the measure says, in the font size, weight, and digits the drawing's attributes set.
  */
-export function textQuads(text: Element, font: ChartFont, measure: Measure): Quad[] {
+export function textRuns(text: Element, font: ChartFont, measure: Measure): TextRun[] {
   const size = fontSizeOf(text, font.size);
   const weight = Number(inherited(text, "font-weight")) || font.weight;
   const anchor = inherited(text, "text-anchor") ?? "start";
   const shift = anchor === "middle" ? 0.5 : anchor === "end" ? 1 : 0;
   const variant = `${inherited(text, "font-variant") ?? ""} ${inherited(text, "font-variant-numeric") ?? ""}`;
   const spec = { family: font.family, size, weight, tabular: variant.includes("tabular-nums") };
-  const [a, b, c, d, e, f] = transformOf(text);
-  const place = (x: number, y: number): Point => [a * x + c * y + e, b * x + d * y + f];
   return chunksOf(text, size).map((chunk) => {
     const width = measure(chunk.text, spec);
-    const left = chunk.x - width * shift;
-    const top = chunk.y - font.ascent * size;
-    const bottom = chunk.y + font.descent * size;
+    return {
+      text: chunk.text,
+      font: spec,
+      left: chunk.x - width * shift,
+      baseline: chunk.y,
+      width,
+    };
+  });
+}
+
+/**
+ * The rectangles a `<text>` covers, one per chunk: each is as wide as the measure says and as
+ * tall as the font's ascent and descent, turned and moved as the text's transforms say.
+ */
+export function textQuads(text: Element, font: ChartFont, measure: Measure): Quad[] {
+  const [a, b, c, d, e, f] = transformOf(text);
+  const place = (x: number, y: number): Point => [a * x + c * y + e, b * x + d * y + f];
+  return textRuns(text, font, measure).map(({ left, baseline, width, font: spec }) => {
+    const top = baseline - font.ascent * spec.size;
+    const bottom = baseline + font.descent * spec.size;
     return [
       place(left, top),
       place(left + width, top),

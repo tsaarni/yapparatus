@@ -2,14 +2,14 @@
  * `<Chart>` data, read and checked at compile time. A data block or page table becomes the `data`
  * prop; a file, which can be large, is loaded from its own module through the `load` prop.
  */
-import * as Plot from "@observablehq/plot";
+import * as PlotModule from "@observablehq/plot";
 import { valueToEstree } from "estree-util-value-to-estree";
 import type { Element, ElementContent, Root } from "hast";
 import { toString as textOf } from "hast-util-to-string";
 import { parseHTML } from "linkedom";
 import type { MdxJsxFlowElementHast } from "mdast-util-mdx-jsx";
 import { visit } from "unist-util-visit";
-import { type ChartInput, drawChart } from "../../chart/drawing.ts";
+import { type ChartDrawing, type ChartInput, drawChart } from "../../chart/drawing.ts";
 import { type DataFormat, formatNamed, formatNames, formatOfFile } from "../../chart/formats.ts";
 import {
   type ChartProblem,
@@ -86,6 +86,36 @@ export function dataModuleCode(data: ChartData) {
   return `export default JSON.parse(${JSON.stringify(JSON.stringify(data))});`;
 }
 
+/** Is a value a plain object, made in this context or in another, such as `plot`'s? */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null) return false;
+  const prototype = Object.getPrototypeOf(value);
+  return (
+    prototype !== null &&
+    Object.getPrototypeOf(prototype) === null &&
+    Object.prototype.toString.call(value) === "[object Object]"
+  );
+}
+
+/** A value with its plain objects, and theirs, copied into this context. */
+function ownContext(value: unknown): unknown {
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, ownContext(item)]));
+}
+
+/**
+ * Plot, called with options copied into this context. Plot reads an object as options only if
+ * it is made in its own context, so it would ignore what `plot` writes, such as `sort`.
+ */
+const Plot = Object.fromEntries(
+  Object.entries(PlotModule).map(([name, value]) => [
+    name,
+    typeof value === "function" && !/^[A-Z]/.test(name)
+      ? (...args: unknown[]) => (value as (...a: unknown[]) => unknown)(...args.map(ownContext))
+      : value,
+  ]),
+) as unknown as typeof PlotModule;
+
 /** The width of a chart on a phone, where tick labels run into each other first. */
 const phoneWidth = 320;
 
@@ -94,12 +124,22 @@ const blankDocument = () =>
   parseHTML("<!doctype html><html><body></body></html>")
     .document as unknown as ChartInput["document"];
 
+/** The type of a chart's text with its font's ascent and descent, as the server draws it. */
+export const drawingFont = () => ({ ...chartType, ...fontExtent(chartType.family) });
+
+/** What the page compiler found for a chart: its problems, and its drawing at the widest width. */
+export interface CheckedChart {
+  problems: ChartProblem[];
+  /** The drawing a picture shows; none when the chart has errors that keep it from being drawn. */
+  drawing?: ChartDrawing;
+}
+
 /**
- * Draw a chart at the widest reading width and at a phone's width, and return the problems of the
- * first and the overlaps that only the second has, named by its width.
+ * Draw a chart at the widest reading width and at a phone's width. The problems are the first's
+ * and the overlaps that only the second has, named by its width; the drawing is the first.
  */
-function drawingProblems(spec: ChartSpec, rows: Row[], measure: Measure): ChartProblem[] {
-  const font = { ...chartType, ...fontExtent(chartType.family) };
+function drawingProblems(spec: ChartSpec, rows: Row[], measure: Measure): CheckedChart {
+  const font = drawingFont();
   const draw = (width: number) =>
     drawChart({
       Plot,
@@ -111,13 +151,14 @@ function drawingProblems(spec: ChartSpec, rows: Row[], measure: Measure): ChartP
       measure,
       paint: chartPaint,
       id: "chart",
-    }).problems;
-  const wide = draw(chartWidth);
-  const narrow = draw(phoneWidth).filter(
+    });
+  const drawing = draw(chartWidth);
+  const wide = drawing.problems;
+  const narrow = draw(phoneWidth).problems.filter(
     (p) =>
       p.code === "CHART_OVERLAP" && !wide.some((w) => w.code === p.code && w.subject === p.subject),
   );
-  return [
+  const problems = [
     ...wide,
     ...narrow.map((p) => ({
       ...p,
@@ -125,13 +166,14 @@ function drawingProblems(spec: ChartSpec, rows: Row[], measure: Measure): ChartP
       message: `On a phone, ${phoneWidth} px wide: ${p.message}`,
     })),
   ];
+  return { problems, ...(drawing.svg && { drawing }) };
 }
 
 /**
  * Run `plot` in its own context, with JavaScript's globals only, and draw the chart if `draw` is
  * set, in the time limit. Returns what the checked library, the spec, and the drawings show.
  */
-export function plotProblems(source: string, data: ChartData, draw: boolean): ChartProblem[] {
+export function checkChart(source: string, data: ChartData, draw: boolean): CheckedChart {
   const late: ChartProblem = {
     code: "CHART_PLOT",
     subject: "plot",
@@ -142,17 +184,23 @@ export function plotProblems(source: string, data: ChartData, draw: boolean): Ch
   try {
     plot = authorFunction(source, "yapparatus:plot");
   } catch (error) {
-    if (timedOut(error)) return [late];
-    return [{ code: "CHART_PLOT", subject: "plot", message: `plot does not compile: ${error}` }];
+    if (timedOut(error)) return { problems: [late] };
+    return {
+      problems: [
+        { code: "CHART_PLOT", subject: "plot", message: `plot does not compile: ${error}` },
+      ],
+    };
   }
   if (!plot)
-    return [
-      {
-        code: "CHART_PLOT",
-        subject: "plot",
-        message: "plot is a function that returns the marks: (Plot, rows) => ({ marks: [...] }).",
-      },
-    ];
+    return {
+      problems: [
+        {
+          code: "CHART_PLOT",
+          subject: "plot",
+          message: "plot is a function that returns the marks: (Plot, rows) => ({ marks: [...] }).",
+        },
+      ],
+    };
   const call = plot;
   const rows = rowObjects(data);
   const { measure } = fontMeasure();
@@ -165,7 +213,7 @@ export function plotProblems(source: string, data: ChartData, draw: boolean): Ch
         Plot,
         (library, rows) => {
           try {
-            return call(library, rows) as ReturnType<PlotFunction>;
+            return ownContext(call(library, rows)) as ReturnType<PlotFunction>;
           } catch (error) {
             stopped = timedOut(error);
             throw error;
@@ -173,13 +221,14 @@ export function plotProblems(source: string, data: ChartData, draw: boolean): Ch
         },
         rows,
       );
-      if (stopped) return [late];
+      if (stopped) return { problems: [late] };
       if (!draw || !spec || problems.some((p) => diagnosticCodes[p.code].severity === "error"))
-        return problems;
-      return [...problems, ...drawingProblems(spec, rows, measure)];
+        return { problems };
+      const drawn = drawingProblems(spec, rows, measure);
+      return { ...drawn, problems: [...problems, ...drawn.problems] };
     });
   } catch (error) {
-    return [timedOut(error) ? late : thrownProblem(error)];
+    return { problems: [timedOut(error) ? late : thrownProblem(error)] };
   } finally {
     console.warn = warn;
   }
@@ -236,11 +285,19 @@ function pageTables(tree: Root) {
   return tables;
 }
 
-/** The stage that reads each `<Chart>`'s data into its `data` or `load` prop. */
+/**
+ * The drawings of each compiled file's charts by path, then by chart id. A chart that could not be
+ * drawn has none. The server draws pictures from here.
+ */
+export const pageCharts = new Map<string, Map<string, ChartDrawing | undefined>>();
+
+/** The stage that reads each `<Chart>`'s data into its `data` or `load` prop and draws it. */
 export function charts(files: ExternalFiles) {
   return () => (tree: Root, file: { path: string }) => {
     const issues = contentIssues.get(file.path) ?? [];
     contentIssues.set(file.path, issues);
+    const drawings = new Map<string, ChartDrawing | undefined>();
+    pageCharts.set(file.path, drawings);
     const tables = pageTables(tree);
     visit(tree, "mdxJsxFlowElement", (node: MdxJsxFlowElementHast) => {
       if (node.name !== "Chart") return;
@@ -253,9 +310,12 @@ export function charts(files: ExternalFiles) {
           ? plot.value.value
           : undefined;
       const chartId = attribute(node, "id")?.value;
+      if (typeof chartId === "string") drawings.set(chartId, undefined);
       const check = (data: ChartData, cells: DataIssue[]) => {
         if (plotSource === undefined || !rowCount(data)) return;
-        for (const problem of plotProblems(plotSource, data, !cells.length))
+        const { problems, drawing } = checkChart(plotSource, data, !cells.length);
+        if (typeof chartId === "string") drawings.set(chartId, drawing);
+        for (const problem of problems)
           issues.push({
             code: problem.code,
             line,

@@ -16,7 +16,7 @@ The server has an HTTP API under `/-/api`, which the web app and the agent libra
 | [`GET /diagnostics`](#read-the-diagnostics) | Reads every diagnostic, once the checks of recent edits are done | `200` with the diagnostics |
 | [`POST /diagnostics`](#report-diagnostics) | Adds what a browser found in one revision of a page, or in a reply | `204` |
 | [`GET /files/{directory}/{path}`](#read-an-external-file) | Reads an external file, highlighted | `200` with the file |
-| [`GET /figures/{page}/{figure}`](#read-a-picture) | Draws a diagram as a picture | `200` with a PNG image |
+| [`GET /figures/{page}/{figure}`](#read-a-picture) | Draws a diagram or a chart as a picture | `200` with a PNG image |
 
 </Table>
 
@@ -416,13 +416,13 @@ GET /-/api/files/app/src/server.ts HTTP/1.1
 
 ### Read a picture
 
-`GET /-/api/figures/{page}/{figure}` draws a diagram as a PNG image in the light theme. The path is the figure's address, `/{page}#{figure}`, with the figure id as the last segment. [The server](server#pictures) describes how. <Ref to="api-figure-parameters" /> lists the parameters.
+`GET /-/api/figures/{page}/{figure}` draws a diagram or a chart as a PNG image in the light theme. The path is the figure's address, `/{page}#{figure}`, with the figure id as the last segment. [The server](server#pictures) describes how. <Ref to="api-figure-parameters" /> lists the parameters.
 
 <Table id="api-figure-parameters" caption="The parameters of GET /-/api/figures/{page}/{figure}.">
 
 | Parameter | Values | Effect |
 |---|---|---|
-| `ids` | `true` or `false` | With `true`, labels each element with its id and outlines the elements that diagnostics name |
+| `ids` | `true` or `false` | With `true`, labels each element of a diagram with its id and outlines the elements that diagnostics name. A chart has no elements, so `ids` on a chart returns `400` |
 
 </Table>
 
@@ -436,7 +436,7 @@ Content-Type: image/png
 Cache-Control: no-store
 ```
 
-Only a diagram with an id has a picture. A chart, an unknown id, or an unknown page returns `404`. For an unknown id, the `error` lists the ids of the diagrams on the page. A diagram that could not be drawn, or a page that does not compile, returns `422`, and the `error` says to check the document first.
+Only a diagram or a chart with an id has a picture. An unknown id or an unknown page returns `404`. For an unknown id, the `error` lists the ids of the diagrams and charts on the page. A figure that could not be drawn, such as a chart whose data or marks have errors, or a page that does not compile, returns `422`, and the `error` says to check the document first.
 
 ## Updates
 

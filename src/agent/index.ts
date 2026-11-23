@@ -167,8 +167,8 @@ export async function checkDocument(): Promise<DocumentDiagnostics> {
 }
 
 /**
- * Save the diagram at `/page#figure` as a light-theme PNG at `file`, which the caller removes.
- * `ids` labels each element with its id and outlines the elements that diagnostics name.
+ * Save the diagram or chart at `/page#figure` as a light-theme PNG at `file`, which the caller
+ * removes. `ids` labels a diagram's elements with their ids and outlines those diagnostics name.
  */
 export async function savePicture(
   address: string,
