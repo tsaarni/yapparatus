@@ -1,4 +1,7 @@
-/** Static and single-file builds: reading without the chat, steps, source files, and chart data. */
+/**
+ * Static and single-file builds: reading without the chat, steps, source files, chart data, and
+ * what keeps them small.
+ */
 
 import {
   cpSync,
@@ -13,9 +16,12 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { gunzipSync } from "node:zlib";
 import { expect, type Page, test } from "@playwright/test";
+import * as fontkit from "fontkit";
 import { build, type PreviewServer, preview } from "vite";
 import { apiPrefix } from "../../src/protocol/rest-api.ts";
+import { fontFaces } from "../../src/vite/font-subsets.ts";
 import { yapparatus } from "../../src/vite/plugin.ts";
 
 let root: string;
@@ -54,6 +60,15 @@ test.beforeAll(async () => {
     configFile: false,
     logLevel: "error",
     plugins: yapparatus({ document: "content", singleFile: true }),
+  });
+  mkdirSync(path.join(root, "plain"));
+  writeFileSync(path.join(root, "plain/document.json"), '{ "pages": ["intro.mdx"] }');
+  writeFileSync(path.join(root, "plain/intro.mdx"), "# Intro\n\nOne paragraph.\n");
+  await build({
+    root,
+    configFile: false,
+    logLevel: "error",
+    plugins: yapparatus({ document: "plain", singleFile: true }),
   });
   server = await preview({
     root,
@@ -227,4 +242,62 @@ test("single HTML works from disk without external assets", async ({ page }) => 
   expect(readFileSync(path.join(root, "dist-single/content/index.html"), "utf8")).not.toContain(
     privateSentinel,
   );
+});
+
+test("a build's fonts hold every character its pages show, and pages preload the body font", async ({
+  page,
+}) => {
+  const assets = path.join(root, "dist/content/-/assets");
+  const css = readdirSync(assets)
+    .filter((entry) => entry.endsWith(".css"))
+    .map((entry) => readFileSync(path.join(assets, entry), "utf8"))
+    .join("");
+  const inter = fontFaces(css).filter((face) => face.family === "Inter Variable");
+  const built = inter.map((face) =>
+    fontkit.create(readFileSync(path.join(assets, path.basename(face.url)))),
+  );
+  const fontsource = path.join(root, "node_modules/@fontsource-variable/inter/files");
+  const full = readdirSync(fontsource)
+    .filter((entry) => entry.endsWith("-standard-normal.woff2"))
+    .map((entry) => fontkit.create(readFileSync(path.join(fontsource, entry))));
+  const shown = new Set<string>();
+  for (const address of ["first-page", "charts", "source-code"]) {
+    await page.goto(`http://127.0.0.1:4174/${address}`);
+    await expect(page.locator("main article h1")).toBeVisible();
+    await page.locator("figure svg").last().scrollIntoViewIfNeeded();
+    const text = await page.evaluate(() => document.body.textContent ?? "");
+    for (const char of text) shown.add(char);
+  }
+  const has = (fonts: typeof built, char: string) =>
+    fonts.some(
+      (font) =>
+        "hasGlyphForCodePoint" in font && font.hasGlyphForCodePoint(char.codePointAt(0) ?? 0),
+    );
+  const missing = [...shown].filter((char) => has(full, char) && !has(built, char));
+  expect(missing).toEqual([]);
+  expect([...shown].filter((char) => char > "\u007f" && has(full, char)).length).toBeGreaterThan(0);
+  for (const font of built)
+    expect("variationAxes" in font && font.variationAxes).toHaveProperty("wght");
+  const latin = inter.find((face) => face.url.includes("inter-latin-standard"));
+  expect(readFileSync(path.join(root, "dist/content/second-page/index.html"), "utf8")).toContain(
+    `<link rel="preload" as="font" type="font/woff2" crossorigin href="${latin?.url}">`,
+  );
+});
+
+test("a single file stores its script compressed, and holds Plot only when a page has a chart", async ({
+  page,
+}) => {
+  const script = (file: string) => {
+    const html = readFileSync(path.join(root, file), "utf8");
+    const packed = /data:application\/gzip;base64,([^"]+)"/.exec(html)?.[1] ?? "";
+    return { html, code: gunzipSync(Buffer.from(packed, "base64")).toString() };
+  };
+  const charted = script("dist-single/content/index.html");
+  const plain = script("dist-single/plain/index.html");
+  expect(charted.html).not.toContain("First page");
+  expect(charted.code).toContain("First page");
+  expect(charted.code).toContain("plot-d6a7b5");
+  expect(plain.code).not.toContain("plot-d6a7b5");
+  await page.goto(pathToFileURL(path.join(root, "dist-single/plain/index.html")).href);
+  await expect(page.getByRole("heading", { name: "Intro" })).toBeVisible();
 });

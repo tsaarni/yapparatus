@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { documentError } from "../../../src/compiler/document-directory.ts";
+import { documentError, drawsCharts } from "../../../src/compiler/document-directory.ts";
 
 /** A project with a document.json in each of `documents`. */
 function project(documents: string[]): string {
@@ -52,4 +52,16 @@ test("a document directory cannot contain another one", () => {
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
+});
+
+test("a document draws charts when a page or a custom component has a <Chart>", () => {
+  const root = project(["docs"]);
+  writeFileSync(path.join(root, "docs/intro.mdx"), "# Intro\n\nA chart shows sales.\n");
+  assert.equal(drawsCharts(root, "docs"), false);
+  writeFileSync(
+    path.join(root, "docs/sales.tsx"),
+    "export const Sales = () => <Chart plot={p} />;",
+  );
+  assert.equal(drawsCharts(root, "docs"), true);
+  rmSync(root, { recursive: true, force: true });
 });

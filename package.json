@@ -62,6 +62,7 @@
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
     "shiki": "^4.6.0",
+    "subset-font": "2.9.0",
     "temml": "^0.14.0",
     "unist-util-remove-position": "^5.0.0",
     "unist-util-visit": "^5.2.0",
@@ -81,6 +82,7 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/subset-font": "^2.3.0",
     "mdast-util-mdx-jsx": "^3.2.1",
     "typescript": "^7.0.2"
   },

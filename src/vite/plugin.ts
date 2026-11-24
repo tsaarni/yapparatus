@@ -5,13 +5,15 @@
 import path from "node:path";
 import type { PluginOption } from "vite";
 import { viteSingleFile } from "vite-plugin-singlefile";
-import { documentError } from "../compiler/document-directory.ts";
+import { documentError, drawsCharts } from "../compiler/document-directory.ts";
 import { ExternalFiles } from "../compiler/external-files.ts";
 import { pipeline } from "../compiler/pipeline.ts";
 import { virtualModules } from "../compiler/virtual-modules.ts";
 import { appPrefix } from "../document/file-address.ts";
 import { logLevel } from "../protocol/log.ts";
 import { installRestApi } from "../server/rest-api.ts";
+import { fontSubsets } from "./font-subsets.ts";
+import { packedScript } from "./packed-script.ts";
 import { pageFiles } from "./page-files.ts";
 
 /** The options of the Vite plugin. */
@@ -64,8 +66,11 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
     },
     virtualModules(document),
     ...pipeline(document),
+    withoutPlot(document),
+    fontSubsets(),
     ...(options.singleFile
       ? [
+          packedScript(),
           viteSingleFile(),
           {
             name: "yapparatus:single-file-css",
@@ -75,4 +80,21 @@ export function yapparatus(options: YapparatusOptions): PluginOption[] {
         ]
       : [pageFiles(document)]),
   ];
+}
+
+const noPlot = "\0yapparatus:no-plot";
+/** A build of a document that draws no chart holds no Observable Plot. */
+function withoutPlot(document: { root: () => string; content: string }): PluginOption {
+  return {
+    name: "yapparatus:without-plot",
+    apply: "build",
+    enforce: "pre",
+    resolveId(id) {
+      if (id === "@observablehq/plot" && !drawsCharts(document.root(), document.content))
+        return noPlot;
+    },
+    load(id) {
+      if (id === noPlot) return "export {};";
+    },
+  };
 }

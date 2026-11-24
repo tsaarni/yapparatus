@@ -1,5 +1,5 @@
 /** Where a document lives in the project: its directory, page ids, and directory checks. */
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import type { ExternalFiles } from "./external-files.ts";
 
@@ -46,4 +46,12 @@ export function documentError(root: string, document: string): string | undefine
     .find((file) => file.endsWith("/document.json"));
   if (inner)
     return `${document} contains the document directory ${document}/${path.posix.dirname(inner)}.`;
+}
+
+/** Whether a page or a custom component of the document draws a `<Chart>`. */
+export function drawsCharts(root: string, content: string): boolean {
+  const dir = path.join(root, content);
+  return (readdirSync(dir, { recursive: true }) as string[])
+    .filter((file) => /\.(mdx|[jt]sx)$/.test(file))
+    .some((file) => /<Chart[\s/>]/.test(readFileSync(path.join(dir, file), "utf8")));
 }
