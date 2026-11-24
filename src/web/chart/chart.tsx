@@ -60,7 +60,10 @@ function usePlotLibrary() {
   return plot;
 }
 
-/** The width the chart has, which follows the reading layout. */
+/**
+ * The width the chart has, which follows the reading layout. It is read from a ruler with no
+ * height, so drawing the chart never resizes what is watched.
+ */
 function useWidth() {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
@@ -148,7 +151,8 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
   const Plot = usePlotLibrary();
   const fonts = useFontsReady();
   const marker = useId();
-  const [host, width] = useWidth();
+  const host = useRef<HTMLDivElement>(null);
+  const [ruler, width] = useWidth();
   const { data, error } = useData(written, load, host);
   const [preview, setPreview] = useState<string>();
   const source = plot.toString();
@@ -198,6 +202,7 @@ export function Chart({ plot, data: written, load, id, caption, description }: C
   const label = caption ?? "Chart";
   const body = (
     <div ref={host} data-figure={marker} {...styled("chart", s.chart)}>
+      <div ref={ruler} {...stylex.props(s.ruler)} />
       <div
         ref={canvas}
         role="img"
@@ -277,6 +282,7 @@ const s = stylex.create({
     width: `calc(${sizes.textWidth} + ${sizes.breakout} - 2 * ${space.xl} - 2px)`,
     maxWidth: "100%",
   },
+  ruler: { height: 0 },
   canvas: { minHeight: 120 },
   pending: { minHeight: 400 },
   stale: { opacity: 0.35, filter: "grayscale(1)" },

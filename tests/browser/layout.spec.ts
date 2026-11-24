@@ -98,7 +98,7 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
   await page.keyboard.press("Escape");
 
   await page.locator(".masthead").getByRole("button", { name: "Chat", exact: true }).click();
-  await page.locator(".chat").evaluate((element) => {
+  await page.locator(".chat-slot").evaluate((element) => {
     (element as HTMLElement).style.width = "600px";
   });
   await expect(page.locator(".app")).toHaveAttribute("data-layout", "compact");
@@ -111,9 +111,21 @@ test("reading layout: contents, text column, wide figures, and resized chat", as
       }),
     )
     .toBe(true);
+  const reading = () =>
+    page.locator(".app").evaluate((app) => ({ width: app.clientWidth, top: app.scrollTop }));
+  await page.locator(".app").evaluate((app) => app.scrollTo({ top: 400 }));
+  const before = await reading();
+  expect(before.top).toBeGreaterThan(0);
   await page.getByRole("button", { name: "Full width", exact: true }).click();
   await expect(page.locator(".chat")).toHaveCSS("width", "1440px");
+  expect(await reading()).toEqual(before);
   await page.getByRole("button", { name: "Return to page" }).click();
+  await expect(page.locator(".chat")).toHaveCSS("width", "600px");
+  expect(await reading()).toEqual(before);
+
+  await masthead.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(page.locator(".chat")).toHaveCount(0);
+  await masthead.getByRole("button", { name: "Chat", exact: true }).click();
   await expect(page.locator(".chat")).toHaveCSS("width", "600px");
 });
 
@@ -200,7 +212,7 @@ test("the reading column, not the window, sets the reading type", async ({ page 
   const title = page.locator("article h1");
   await expect(title).toHaveCSS("font-size", "32px");
   await page.locator(".masthead").getByRole("button", { name: "Chat", exact: true }).click();
-  await page.locator(".chat").evaluate((element) => {
+  await page.locator(".chat-slot").evaluate((element) => {
     (element as HTMLElement).style.width = "700px";
   });
   await expect(title).toHaveCSS("font-size", "28px");

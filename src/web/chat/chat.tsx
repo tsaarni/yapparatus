@@ -1,7 +1,7 @@
 /** The chat panel: the messages with the agent, a typing indicator, and the message box. */
 
 import * as stylex from "@stylexjs/stylex";
-import { type Ref, useCallback, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import type { Reference } from "../../document/reference.ts";
 import type { Chat as ChatRead } from "../../protocol/rest-api.ts";
 import { commands } from "../live/client.ts";
@@ -14,7 +14,6 @@ import {
   sizes,
   space,
   theme,
-  when,
 } from "../style/theme.stylex.ts";
 import { ChatHeader } from "./chat-header.tsx";
 import { Composer } from "./composer.tsx";
@@ -37,7 +36,6 @@ export interface ChatProps {
   onError: (message: string) => void;
   draft: string;
   setDraft: (draft: string) => void;
-  panelRef: Ref<HTMLElement>;
 }
 
 /** The chat panel beside the page. */
@@ -74,12 +72,7 @@ export function Chat(props: ChatProps) {
   }
 
   return (
-    <aside
-      ref={props.panelRef}
-      aria-label="Chat"
-      {...styled("chat", s.panel, props.full && s.panelFull)}
-      style={props.full ? { width: "100vw" } : undefined}
-    >
+    <aside aria-label="Chat" {...styled("chat", s.panel, props.full && s.panelFull)}>
       <ChatHeader
         agent={chat.agent}
         count={count}
@@ -136,32 +129,25 @@ export function Chat(props: ChatProps) {
 }
 
 const s = stylex.create({
+  /** Fills the slot beside the page, which holds the width the reader drags it to. */
   panel: {
-    position: "fixed",
-    zIndex: layer.chat,
-    top: 0,
-    right: 0,
-    bottom: 0,
-    display: { default: "flex", [when.print]: "none" },
+    display: "flex",
     flexDirection: "column",
-    width: {
-      default: `var(--chat-width, ${sizes.chatWidth})`,
-      [when.smallScreen]: "100vw",
-    },
-    minWidth: { default: 340, [when.smallScreen]: 0 },
-    maxWidth: "100vw",
-    resize: { default: "horizontal", [when.smallScreen]: "none" },
-    direction: "rtl",
-    overflow: "hidden",
+    height: "100%",
     backgroundColor: theme.surface,
     borderLeftWidth: 1,
     borderLeftStyle: "solid",
     borderLeftColor: theme.border,
     fontFamily: theme.sans,
   },
+  /** Covers the window, while the slot keeps its width so the page beneath does not reflow. */
   panelFull: {
-    width: "100vw",
-    resize: "none",
+    position: "fixed",
+    zIndex: layer.chat,
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
   },
   thread: {
     direction: "ltr",

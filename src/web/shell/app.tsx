@@ -2,15 +2,7 @@
 
 import { onPagesChanged, pages, settings } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
-import {
-  type CSSProperties,
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { elementSeparator, splitAddress } from "../../document/address.ts";
 import { parseFileAddress } from "../../document/file-address.ts";
 import type { Reference } from "../../document/reference.ts";
@@ -51,7 +43,6 @@ const live = import.meta.env.DEV;
 type Layout = "wide" | "compact";
 /** The width, beside the chat, from which the contents fit beside the page. */
 const wideLayout = 1100;
-const smallScreen = window.matchMedia(when.smallScreen.replace("@media ", ""));
 
 /** State kept in session storage, so it survives reloads in this tab. */
 function useStored<T>(key: string, initial: T) {
@@ -63,7 +54,7 @@ function useStored<T>(key: string, initial: T) {
       return initial;
     }
   });
-  useEffect(() => {
+  useLayoutEffect(() => {
     sessionStorage.setItem(key, JSON.stringify(value));
   }, [key, value]);
   return [value, setValue] as const;
@@ -87,11 +78,9 @@ export function App() {
   const [full, setFull] = useState(false);
   const [drawer, setDrawer] = useState(false);
   const [layout, setLayout] = useState<Layout>("wide");
-  const [panelWidth, setPanelWidth] = useState<number>();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<{ text: string; id: number }>();
   const appRef = useRef<HTMLDivElement>(null);
-  const panelRef = useRef<HTMLElement>(null);
   const selection = useSelectionMenu(true);
   const [pendingShow, setPendingShow] = useState<Reference>();
   const chatOpen = live && open;
@@ -142,17 +131,6 @@ export function App() {
   useEffect(() => {
     if (layout === "wide") setDrawer(false);
   }, [layout]);
-
-  useEffect(() => {
-    const panel = panelRef.current;
-    if (!chatOpen || full || !panel) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry && !smallScreen.matches)
-        setPanelWidth(Math.round(entry.borderBoxSize[0]?.inlineSize ?? panel.offsetWidth));
-    });
-    observer.observe(panel);
-    return () => observer.disconnect();
-  }, [chatOpen, full]);
 
   const addReferences = useCallback(
     (items: Reference[]) => {
@@ -260,130 +238,155 @@ export function App() {
 
   const wide = layout === "wide";
   return (
-    <div
-      ref={appRef}
-      data-layout={layout}
-      data-scroll-root
-      tabIndex={-1}
-      {...styled(
-        `app ${chatOpen ? "with-chat" : ""} ${full ? "chat-full" : ""}`,
-        s.app,
-        chatOpen && s.withChat,
-      )}
-      style={panelWidth ? ({ "--chat-width": `${panelWidth}px` } as CSSProperties) : undefined}
-    >
-      <Header
-        wide={wide}
-        drawer={drawer}
-        setDrawer={setDrawer}
-        page={page}
-        file={file}
-        diagnostics={diagnostics}
-        commentOn={commentOn}
-        open={open}
-        setOpen={setOpen}
-      />
+    <div {...stylex.props(s.shell)}>
+      <div
+        ref={appRef}
+        data-layout={layout}
+        data-scroll-root
+        tabIndex={-1}
+        {...styled(`app ${chatOpen ? "with-chat" : ""} ${full ? "chat-full" : ""}`, s.app)}
+      >
+        <Header
+          wide={wide}
+          drawer={drawer}
+          setDrawer={setDrawer}
+          page={page}
+          file={file}
+          diagnostics={diagnostics}
+          commentOn={commentOn}
+          open={open}
+          setOpen={setOpen}
+        />
 
-      <div {...stylex.props(s.body, wide && s.bodyWide)}>
-        {(wide || drawer) && (
-          <Sidebar page={page} drawer={!wide} onNavigate={() => setDrawer(false)} />
-        )}
-        {drawer && !wide && (
-          <button
-            type="button"
-            aria-label="Close contents"
-            tabIndex={-1}
-            onClick={() => setDrawer(false)}
-            {...stylex.props(s.scrim)}
+        <div {...stylex.props(s.body, wide && s.bodyWide)}>
+          {(wide || drawer) && (
+            <Sidebar page={page} drawer={!wide} onNavigate={() => setDrawer(false)} />
+          )}
+          {drawer && !wide && (
+            <button
+              type="button"
+              aria-label="Close contents"
+              tabIndex={-1}
+              onClick={() => setDrawer(false)}
+              {...stylex.props(s.scrim)}
+            />
+          )}
+          <main {...styled("reading-main", s.main, !wide && s.mainCentered)}>
+            <article
+              {...styled("article", s.article)}
+              onClick={
+                live
+                  ? (event) => {
+                      const item = page && referenceFromDiagram(event.target, page);
+                      if (item) addReferences([item]);
+                    }
+                  : undefined
+              }
+              onKeyDown={
+                live
+                  ? (event) => {
+                      if (event.key !== "Enter" && event.key !== " ") return;
+                      const item = page && referenceFromDiagram(event.target, page);
+                      if (!item) return;
+                      event.preventDefault();
+                      addReferences([item]);
+                    }
+                  : undefined
+              }
+            >
+              {file ? (
+                <FileView
+                  file={file}
+                  fragment={route.fragment}
+                  {...(live ? { onComment: addReferences } : {})}
+                />
+              ) : (
+                <PageView page={page} handlers={handlers} revision={pagesRevision} />
+              )}
+            </article>
+          </main>
+        </div>
+
+        {selection.menu && (page || file) && (
+          <SelectionMenu
+            menu={selection.menu}
+            dismiss={selection.dismiss}
+            page={page}
+            onComment={addReferences}
           />
         )}
-        <main {...styled("reading-main", s.main, !wide && s.mainCentered)}>
-          <article
-            {...styled("article", s.article)}
-            onClick={
-              live
-                ? (event) => {
-                    const item = page && referenceFromDiagram(event.target, page);
-                    if (item) addReferences([item]);
-                  }
-                : undefined
-            }
-            onKeyDown={
-              live
-                ? (event) => {
-                    if (event.key !== "Enter" && event.key !== " ") return;
-                    const item = page && referenceFromDiagram(event.target, page);
-                    if (!item) return;
-                    event.preventDefault();
-                    addReferences([item]);
-                  }
-                : undefined
-            }
-          >
-            {file ? (
-              <FileView
-                file={file}
-                fragment={route.fragment}
-                {...(live ? { onComment: addReferences } : {})}
-              />
-            ) : (
-              <PageView page={page} handlers={handlers} revision={pagesRevision} />
-            )}
-          </article>
-        </main>
+
+        <Notifications
+          notice={notice}
+          onDismissNotice={() => setNotice(undefined)}
+          error={error}
+          onDismissError={() => setError("")}
+        />
       </div>
-
-      {selection.menu && (page || file) && (
-        <SelectionMenu
-          menu={selection.menu}
-          dismiss={selection.dismiss}
-          page={page}
-          onComment={addReferences}
-        />
+      {live && (
+        <div
+          {...styled(
+            "chat-slot",
+            s.chatSlot,
+            full && s.chatSlotFull,
+            !chatOpen && s.chatSlotClosed,
+          )}
+        >
+          {chatOpen && (
+            <Chat
+              chat={chat}
+              references={references}
+              setReferences={setReferences}
+              draft={draft}
+              setDraft={setDraft}
+              full={full}
+              setFull={setFull}
+              onClose={() => setOpen(false)}
+              onShowOnPage={(item) => {
+                setFull(false);
+                showOnPage(item);
+              }}
+              onError={setError}
+            />
+          )}
+        </div>
       )}
-
-      {chatOpen && (
-        <Chat
-          chat={chat}
-          references={references}
-          setReferences={setReferences}
-          draft={draft}
-          setDraft={setDraft}
-          full={full}
-          setFull={setFull}
-          onClose={() => setOpen(false)}
-          onShowOnPage={(item) => {
-            setFull(false);
-            showOnPage(item);
-          }}
-          onError={setError}
-          panelRef={panelRef}
-        />
-      )}
-
-      <Notifications
-        notice={notice}
-        onDismissNotice={() => setNotice(undefined)}
-        error={error}
-        onDismissError={() => setError("")}
-      />
     </div>
   );
 }
 
 const s = stylex.create({
+  /** The page beside the chat slot, which takes the width the reader drags it to. */
+  shell: {
+    display: { default: "grid", [when.print]: "block" },
+    gridTemplateColumns: "minmax(0, 1fr) auto",
+  },
+  /** Holds the chat beside the page; the reader drags its left edge. Covers a small screen. */
+  chatSlot: {
+    position: { default: "relative", [when.smallScreen]: "fixed" },
+    zIndex: layer.chat,
+    top: 0,
+    right: 0,
+    display: { default: null, [when.print]: "none" },
+    width: { default: sizes.chatWidth, [when.smallScreen]: "100vw" },
+    minWidth: { default: 340, [when.smallScreen]: "100vw" },
+    maxWidth: "100vw",
+    height: "100dvh",
+    resize: { default: "horizontal", [when.smallScreen]: "none" },
+    direction: "rtl",
+    overflow: "hidden",
+  },
+  chatSlotFull: {
+    resize: "none",
+  },
+  chatSlotClosed: {
+    display: "none",
+  },
   /** The page scrolls here, beside the chat, and not in the window. Print shows it whole. */
   app: {
     height: { default: "100dvh", [when.print]: "auto" },
     overflowY: { default: "auto", [when.print]: "visible" },
     outlineStyle: "none",
-  },
-  withChat: {
-    marginRight: {
-      default: `var(--chat-width, ${sizes.chatWidth})`,
-      [when.smallScreen]: 0,
-      [when.print]: 0,
-    },
   },
   body: {
     display: "grid",

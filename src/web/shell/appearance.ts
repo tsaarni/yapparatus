@@ -5,7 +5,7 @@
 
 import { settings } from "virtual:yapparatus/document";
 import * as stylex from "@stylexjs/stylex";
-import { useEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { lightTheme } from "../style/theme.stylex.ts";
 
 /** The reader's theme choice; "system" follows the system's setting. */
@@ -54,7 +54,7 @@ export function installTheme() {
 /** The reader's choice, applied and remembered. Follows the system while it is "system". */
 export function useThemeChoice() {
   const [choice, setChoice] = useState(storedChoice);
-  useEffect(() => {
+  useLayoutEffect(() => {
     apply(choice);
     try {
       if (choice === "system") localStorage.removeItem(storageKey);
