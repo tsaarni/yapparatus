@@ -73,6 +73,12 @@ The router leaves reloads, downloads, and other sites to the browser. It does th
 
 While the user reads, the web app also loads the next page in the contents. In a browser without the Navigation API, every link loads a page from the server, and links between pages of a [single-file build](page-compiler#builds) do not work.
 
+**[Direction](directions):** the document has its own search over every page. A header button or Ctrl+K (⌘K) opens a dialog that lists matching sections as the user types, with the page title, heading, and matched words. Enter opens the section with the words marked, as [Show on page](#show-on-page) does.
+
+- **Text.** Prose, lists, tables, and figure captions; no code blocks or excerpts. Headings rank above body text. [MiniSearch](https://lucaong.github.io/minisearch/) matches word starts and small typos.
+- **Loading.** The page compiler writes each page's section text into its own module, outside the [document module](page-compiler#the-document-module). The web app loads the text and MiniSearch when search first opens. In dev mode, an edit then replaces only that page's sections, in about 1 ms.
+- **Weight.** On this document, the text is 54 KB and MiniSearch 7 KB compressed. The website loads them only on the first search. The single file grows by about 80 KB, to 0.77 MB, because it holds the text twice.
+
 ## Hot updates
 
 In dev mode, the web app shows an edited page without a reload. When a page or an external file that it excerpts changes, the page compiler compiles the page again, and the [document module](page-compiler#the-document-module) swaps in the new page and its outline. The web app then numbers the document again and renders the page with its new code. An edit to `document.json` reloads the web app.
