@@ -37,6 +37,7 @@ The components, diagrams, and charts are specific to Yapparatus and not in your 
 
 | When the document has | Read |
 |---|---|
+| Explanations of a repository: its parts, its paths, and its code | `docs/codebase.md`, before you read the code |
 | A diagram of any kind, or its steps | `docs/diagrams.md` |
 | Database tables, types, protocol headers, registers, arrays, or marked text | `docs/diagrams.md`, then `docs/diagram-structures.md` |
 | Messages between participants over time | `docs/diagrams.md`, then `docs/diagram-sequences.md` |
